@@ -55,4 +55,9 @@ export default defineConfig({
     host: "0.0.0.0",
     allowedHosts: true,
   },
+  // react-grid-layout (CJS) references process.env.NODE_ENV at runtime in the browser.
+  // Shim it so the bundle doesn't crash with "process is not defined".
+  define: {
+    "process.env.NODE_ENV": JSON.stringify(process.env.NODE_ENV ?? "development"),
+  },
 });

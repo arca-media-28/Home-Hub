@@ -1,3 +1,3 @@
-- [react-grid-layout CJS interop](react-grid-layout-cjs.md) — WidthProvider/Responsive aren't accessible as named ESM imports via Vite; use default import + ResizeObserver instead
+- [react-grid-layout CJS browser quirk](react-grid-layout-cjs.md) — shim process.env.NODE_ENV in Vite define; no named {Responsive,WidthProvider} imports; cast default as ComponentType<any>
 - [SQLite data dir](sqlite-datadir.md) — DATA_DIR defaults to ./data (not /data) in dev; /data only exists in Docker
 - [TanStack Query v5 onError](tanstack-query-v5.md) — onError removed from useQuery options in v5; use useEffect + isError instead

@@ -1,49 +1,19 @@
 ---
-name: react-grid-layout CJS interop with Vite
-description: How to use react-grid-layout's Responsive and WidthProvider in a Vite project
+name: react-grid-layout CJS browser quirk
+description: react-grid-layout references process.env.NODE_ENV at runtime in the browser, requiring a Vite define shim to avoid crashes.
 ---
 
-# react-grid-layout CJS interop
+## Rule
+When using `react-grid-layout` with Vite, add a `define` block to `vite.config.ts` to shim `process.env.NODE_ENV` in the browser bundle.
 
-## The Rule
-Do NOT use `import { Responsive, WidthProvider } from "react-grid-layout"`.
-Vite's esbuild pre-bundler does NOT lift extra properties set on `module.exports` as named ESM exports.
-
-## Why
-react-grid-layout's index.js does:
-```js
-module.exports = require("./build/ReactGridLayout").default; // the GridLayout component
-module.exports.Responsive = ...;
-module.exports.WidthProvider = ...;
-```
-Vite treats `module.exports` as the default export only. Named export destructuring fails at runtime ("does not provide an export named 'WidthProvider'").
-
-## How to Apply
-Use the default GridLayout export directly and measure container width with a ResizeObserver:
-
-```tsx
-import GridLayout from "react-grid-layout";
-
-const [gridWidth, setGridWidth] = useState(1200);
-const containerRef = useRef<HTMLDivElement>(null);
-
-useEffect(() => {
-  const el = containerRef.current;
-  if (!el) return;
-  const ro = new ResizeObserver(entries => {
-    setGridWidth(entries[0].contentRect.width);
-  });
-  ro.observe(el);
-  return () => ro.disconnect();
-}, []);
-
-// In JSX:
-<div ref={containerRef}>
-  <GridLayout layout={layout} cols={12} rowHeight={80} width={gridWidth} ...>
-    {children}
-  </GridLayout>
-</div>
+```ts
+define: {
+  "process.env.NODE_ENV": JSON.stringify(process.env.NODE_ENV ?? "development"),
+},
 ```
 
-Also: import `react-resizable/css/styles.css` fails (transitive dep not hoisted by pnpm).
-Inline the CSS into `index.css` instead.
+**Why:** `react-grid-layout` is a CJS package that calls `process.env.NODE_ENV` inside browser-executed code (e.g. in `DraggableCore.handleDragStart`). Without the shim, dragging any tile crashes the app with `ReferenceError: process is not defined`.
+
+**How to apply:** Add to the `defineConfig({})` call in `vite.config.ts` alongside the other config blocks. This is required even though Vite normally handles `import.meta.env` — CJS packages that use Node's `process` object directly bypass that mechanism.
+
+Also: Do NOT use named imports `{Responsive, WidthProvider}` from react-grid-layout with Vite — esbuild CJS interop doesn't lift them. Use the default `GridLayout` export and cast it as `ComponentType<any>` to work around missing TS prop types (cols, margin, containerPadding).
