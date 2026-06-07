@@ -1,7 +1,10 @@
 import jwt from "jsonwebtoken";
+import crypto from "crypto";
+import fs from "fs";
+import path from "path";
 import type { Request, Response, NextFunction } from "express";
 
-// Known weak defaults shipped in compose files or docs — reject all of them in production
+// Known weak defaults shipped in compose files or docs — never use these as-is
 const KNOWN_WEAK_SECRETS = new Set([
   "homelab-dashboard-secret-change-in-prod",
   "change-this-secret-in-production",
@@ -9,20 +12,52 @@ const KNOWN_WEAK_SECRETS = new Set([
   "changeme",
 ]);
 
-const rawSecret = process.env["JWT_SECRET"];
+const dataDir = process.env["DATA_DIR"] || "./data";
+const isProduction = process.env["NODE_ENV"] === "production";
 
-// In production, JWT_SECRET must be explicitly provided and must not be a known weak value
-if (process.env["NODE_ENV"] === "production") {
-  if (!rawSecret || rawSecret.trim() === "" || KNOWN_WEAK_SECRETS.has(rawSecret)) {
+// Resolve the JWT signing secret:
+//  1. Use an explicitly-provided strong JWT_SECRET if present.
+//  2. In dev, fall back to a stable dev-only secret.
+//  3. In production with no (or a weak) secret, auto-generate a strong random
+//     secret and persist it in the data volume so it survives restarts.
+//     This keeps self-hosting "just works" while avoiding predictable secrets.
+function resolveJwtSecret(): string {
+  const provided = process.env["JWT_SECRET"];
+
+  if (provided && provided.trim() !== "" && !KNOWN_WEAK_SECRETS.has(provided)) {
+    return provided;
+  }
+
+  if (!isProduction) {
+    return "homelab-dashboard-dev-only";
+  }
+
+  // Production: read or generate a persistent secret in the data volume
+  const secretFile = path.join(dataDir, "jwt-secret");
+  try {
+    if (fs.existsSync(secretFile)) {
+      const existing = fs.readFileSync(secretFile, "utf8").trim();
+      if (existing) return existing;
+    }
+    const generated = crypto.randomBytes(48).toString("hex");
+    fs.mkdirSync(dataDir, { recursive: true });
+    fs.writeFileSync(secretFile, generated, { mode: 0o600 });
+    console.warn(
+      `[auth] No strong JWT_SECRET provided. Generated a persistent random secret at ${secretFile}. ` +
+      "Set the JWT_SECRET environment variable to override it.",
+    );
+    return generated;
+  } catch (err) {
     console.error(
-      "[FATAL] JWT_SECRET is missing or set to a known-insecure default. " +
-      "Provide a strong, randomly-generated JWT_SECRET environment variable before running in production.",
+      "[FATAL] Could not read or create a JWT secret in the data directory. " +
+      "Provide a strong JWT_SECRET environment variable instead.",
+      err,
     );
     process.exit(1);
   }
 }
 
-const JWT_SECRET = rawSecret ?? "homelab-dashboard-dev-only";
+const JWT_SECRET = resolveJwtSecret();
 
 export interface JwtPayload {
   userId: number;

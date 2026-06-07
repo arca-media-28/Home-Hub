@@ -1,3 +1,4 @@
 - [react-grid-layout CJS browser quirk](react-grid-layout-cjs.md) — shim process.env.NODE_ENV in Vite define; no named {Responsive,WidthProvider} imports; cast default as ComponentType<any>
 - [SQLite data dir](sqlite-datadir.md) — DATA_DIR defaults to ./data (not /data) in dev; /data only exists in Docker
 - [TanStack Query v5 onError](tanstack-query-v5.md) — onError removed from useQuery options in v5; use useEffect + isError instead
+- [JWT secret self-host](jwt-secret-self-host.md) — prod auto-generates + persists a random JWT secret in DATA_DIR (no fail-closed); keep compose JWT_SECRET default empty

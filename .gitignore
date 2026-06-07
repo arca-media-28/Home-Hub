@@ -48,8 +48,9 @@ Thumbs.db
 .cache/
 .local/
 
-# Runtime data — SQLite DB, WAL/SHM files, and user uploads must never be committed
+# Runtime data — SQLite DB, WAL/SHM files, generated secret, and user uploads must never be committed
 artifacts/api-server/data/*.sqlite
 artifacts/api-server/data/*.sqlite-wal
 artifacts/api-server/data/*.sqlite-shm
+artifacts/api-server/data/jwt-secret
 artifacts/api-server/data/uploads/

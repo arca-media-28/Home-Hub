@@ -12,11 +12,11 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3000
+      # SQLite database file and uploaded images live in the mounted /data volume
       - DATA_DIR=/data
-      # SQLite database lives in the mounted /data volume
-      - DATABASE_URL=file:/data/db.sqlite
-      # CHANGE THIS in production — use a long random string
-      - JWT_SECRET=${JWT_SECRET:-change-this-secret-in-production}
+      # Optional: provide your own strong secret. If left unset, the server
+      # auto-generates one and persists it in the /data volume on first run.
+      - JWT_SECRET=${JWT_SECRET:-}
       # ── Optional: TrueNAS SCALE ───────────────────────────────
       # - TRUENAS_URL=http://your-truenas-ip
       # - TRUENAS_API_KEY=your-truenas-api-key
