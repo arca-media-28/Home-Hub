@@ -165,6 +165,19 @@ export default function Dashboard() {
     };
   }, []);
 
+  // Warn before leaving the tab if a layout save is still in flight or has
+  // failed and not yet been retried, so a slow-network change is never lost.
+  const hasUnsavedLayout = saveLayout.isPending || saveLayout.isError;
+  useEffect(() => {
+    if (!hasUnsavedLayout) return;
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [hasUnsavedLayout]);
+
   function handleLogout() {
     localStorage.removeItem("token");
     // Only drop auth-related state. Keep the tile list cache so a slow
