@@ -1,4 +1,4 @@
-import { useGetTruenasMetrics } from "@workspace/api-client-react";
+import { useGetTruenasMetrics, getGetTruenasMetricsQueryKey } from "@workspace/api-client-react";
 import { HardDrive, Cpu, MemoryStick } from "lucide-react";
 
 function Bar({ value, label }: { value: number; label: string }) {
@@ -22,7 +22,7 @@ function Bar({ value, label }: { value: number; label: string }) {
 
 export default function TruenasTile() {
   const { data, isLoading, isError } = useGetTruenasMetrics({
-    query: { refetchInterval: 30_000 },
+    query: { queryKey: getGetTruenasMetricsQueryKey(), refetchInterval: 30_000 },
   });
 
   if (isLoading) {

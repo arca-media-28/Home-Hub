@@ -266,7 +266,7 @@ export default function TileEditModal({ open, onOpenChange, tile, mode }: TileEd
 
               <div className="space-y-1.5">
                 <Label>Image Fit</Label>
-                <Select value={imageFit} onValueChange={setImageFit}>
+                <Select value={imageFit} onValueChange={(v) => setImageFit(v as typeof imageFit)}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>

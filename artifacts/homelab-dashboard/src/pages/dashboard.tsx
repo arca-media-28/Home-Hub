@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from "react";
+import React, { useState, useCallback, useRef, useEffect } from "react";
 import { useLocation } from "wouter";
 import GridLayout from "react-grid-layout";
 import "react-grid-layout/css/styles.css";
@@ -7,6 +7,8 @@ import {
   useGetTiles,
   useSaveLayout,
   TileType,
+  getGetMeQueryKey,
+  getGetTilesQueryKey,
   type Tile,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -32,6 +34,10 @@ import {
   ChevronDown,
   Pencil,
 } from "lucide-react";
+
+// react-grid-layout's TS types omit some valid props (cols, margin, containerPadding)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const Grid = GridLayout as React.ComponentType<any>;
 
 const COLS = 12;
 const ROW_HEIGHT = 80;
@@ -75,31 +81,29 @@ export default function Dashboard() {
   const containerRef = useRef<HTMLDivElement>(null);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Measure container width for the grid
+  // Measure container width for the non-responsive GridLayout
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
     const ro = new ResizeObserver((entries) => {
-      const width = entries[0]?.contentRect.width;
-      if (width) setGridWidth(width);
+      const w = entries[0]?.contentRect.width;
+      if (w) setGridWidth(w);
     });
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
 
   const { data: me, isError: meError } = useGetMe({
-    query: { retry: false },
+    query: { queryKey: getGetMeQueryKey(), retry: false },
   });
 
-  // Redirect to login when auth check fails (TanStack Query v5: no onError in query options)
+  // Redirect to login on auth failure (TanStack Query v5 removed onError from query options)
   useEffect(() => {
     if (meError) setLocation("/login");
   }, [meError, setLocation]);
 
   const { data: tiles = [], isLoading } = useGetTiles({
-    query: {
-      enabled: Boolean(me),
-    },
+    query: { queryKey: getGetTilesQueryKey(), enabled: Boolean(me) },
   });
 
   const saveLayout = useSaveLayout({
@@ -240,7 +244,7 @@ export default function Dashboard() {
           </div>
         ) : (
           <div ref={containerRef}>
-            <GridLayout
+            <Grid
               className="layout"
               layout={layout}
               cols={COLS}
@@ -279,7 +283,7 @@ export default function Dashboard() {
                   {renderTileContent(tile)}
                 </div>
               ))}
-            </GridLayout>
+            </Grid>
           </div>
         )}
       </main>

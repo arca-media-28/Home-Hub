@@ -1,7 +1,17 @@
 import jwt from "jsonwebtoken";
 import type { Request, Response, NextFunction } from "express";
 
-const JWT_SECRET = process.env["JWT_SECRET"] || "homelab-dashboard-secret-change-in-prod";
+const DEFAULT_SECRET = "homelab-dashboard-secret-change-in-prod";
+const JWT_SECRET = process.env["JWT_SECRET"] || DEFAULT_SECRET;
+
+// Warn loudly (or exit) when running in production with the insecure default secret
+if (process.env["NODE_ENV"] === "production" && JWT_SECRET === DEFAULT_SECRET) {
+  console.error(
+    "[FATAL] JWT_SECRET is set to the insecure default value. " +
+    "Set a strong, random JWT_SECRET environment variable before running in production.",
+  );
+  process.exit(1);
+}
 
 export interface JwtPayload {
   userId: number;

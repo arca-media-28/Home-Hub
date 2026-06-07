@@ -51,12 +51,17 @@ router.get("/truenas", requireAuth, async (_req, res) => {
     const memUsedGb = memData ? (memData[1] ?? 0) / 1e9 : 0;
     const memTotalGb = memData ? ((memData[1] ?? 0) + (memData[2] ?? 0)) / 1e9 : 0;
 
-    const pools = (poolRes?.data ?? []).map((p: { name: string; status: string; topology?: { data?: Array<{ stats?: { bytes: number[] } }> } }) => ({
-      name: p.name,
-      status: p.status,
-      usedBytes: p.topology?.data?.[0]?.stats?.bytes?.[0] ?? 0,
-      totalBytes: p.topology?.data?.[0]?.stats?.bytes?.[0] ?? 0,
-    }));
+    // TrueNAS pool stats: bytes[0] = used, bytes[1] = available (free)
+    const pools = (poolRes?.data ?? []).map((p: { name: string; status: string; topology?: { data?: Array<{ stats?: { bytes: number[] } }> } }) => {
+      const usedBytes = p.topology?.data?.[0]?.stats?.bytes?.[0] ?? 0;
+      const freeBytes = p.topology?.data?.[0]?.stats?.bytes?.[1] ?? 0;
+      return {
+        name: p.name,
+        status: p.status,
+        usedBytes,
+        totalBytes: usedBytes + freeBytes,
+      };
+    });
 
     res.json({ cpuPercent: Number(cpuPercent.toFixed(1)), memUsedGb, memTotalGb, pools });
   } catch (err) {

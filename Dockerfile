@@ -6,21 +6,14 @@ WORKDIR /build
 
 RUN apk add --no-cache python3 make g++
 
-# Install pnpm
 RUN npm install -g pnpm@10
 
-# Copy workspace config files first (for caching)
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY tsconfig.base.json tsconfig.json ./
-
-# Copy all lib packages (needed for builds)
 COPY lib/ lib/
 COPY artifacts/api-server/ artifacts/api-server/
 
-# Install all dependencies
 RUN pnpm install --frozen-lockfile
-
-# Build the API server
 RUN pnpm --filter @workspace/api-server run build
 
 ##############################################
@@ -37,6 +30,11 @@ COPY lib/ lib/
 COPY artifacts/homelab-dashboard/ artifacts/homelab-dashboard/
 
 RUN pnpm install --frozen-lockfile
+
+# BASE_PATH defaults to "/" (root); PORT is unused during build but must be valid
+ENV BASE_PATH=/
+ENV NODE_ENV=production
+
 RUN pnpm --filter @workspace/homelab-dashboard run build
 
 ##############################################
@@ -46,7 +44,6 @@ FROM node:20-alpine AS production
 WORKDIR /app
 
 RUN apk add --no-cache python3 make g++
-
 RUN npm install -g pnpm@10
 
 # Copy package files for production deps
@@ -59,8 +56,9 @@ RUN pnpm install --filter @workspace/api-server --prod
 
 # Copy built API server
 COPY --from=api-builder /build/artifacts/api-server/dist ./artifacts/api-server/dist
-# Copy built frontend
-COPY --from=frontend-builder /build/artifacts/homelab-dashboard/dist ./frontend-dist
+
+# Copy built frontend to /frontend-dist (served by Express in production)
+COPY --from=frontend-builder /build/artifacts/homelab-dashboard/dist/public ./frontend-dist
 
 # Create data directory
 RUN mkdir -p /data/uploads
@@ -69,11 +67,10 @@ RUN mkdir -p /data/uploads
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV DATA_DIR=/data
-ENV DATABASE_URL=file:/data/db.sqlite
-ENV JWT_SECRET=change-this-secret-in-production
+ENV JWT_SECRET=""
+ENV FRONTEND_DIST=/app/frontend-dist
 
-# Expose the port
 EXPOSE 3000
 
-# Start the API server (it also serves the frontend via static files)
+# Entrypoint: validate JWT_SECRET and start the server
 CMD ["node", "--enable-source-maps", "./artifacts/api-server/dist/index.mjs"]

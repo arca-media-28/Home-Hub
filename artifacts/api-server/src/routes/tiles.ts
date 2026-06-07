@@ -71,7 +71,7 @@ router.post("/", requireAuth, (req: AuthRequest, res) => {
 
 // GET /api/tiles/:id
 router.get("/:id", requireAuth, (req: AuthRequest, res) => {
-  const id = parseInt(req.params.id!);
+  const id = parseInt(String(req.params["id"]));
   const tile = tileStmts.findById.get(id, req.user!.userId);
   if (!tile) {
     res.status(404).json({ error: "Tile not found" });
@@ -82,7 +82,7 @@ router.get("/:id", requireAuth, (req: AuthRequest, res) => {
 
 // PUT /api/tiles/:id
 router.put("/:id", requireAuth, (req: AuthRequest, res) => {
-  const id = parseInt(req.params.id!);
+  const id = parseInt(String(req.params["id"]));
   const existing = tileStmts.findById.get(id, req.user!.userId);
   if (!existing) {
     res.status(404).json({ error: "Tile not found" });
@@ -125,7 +125,7 @@ router.put("/:id", requireAuth, (req: AuthRequest, res) => {
 
 // DELETE /api/tiles/:id
 router.delete("/:id", requireAuth, (req: AuthRequest, res) => {
-  const id = parseInt(req.params.id!);
+  const id = parseInt(String(req.params["id"]));
   const existing = tileStmts.findById.get(id, req.user!.userId);
   if (!existing) {
     res.status(404).json({ error: "Tile not found" });

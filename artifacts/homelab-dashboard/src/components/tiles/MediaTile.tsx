@@ -1,9 +1,9 @@
-import { useGetMediaRecent } from "@workspace/api-client-react";
+import { useGetMediaRecent, getGetMediaRecentQueryKey } from "@workspace/api-client-react";
 import { Tv } from "lucide-react";
 
 export default function MediaTile() {
   const { data, isLoading, isError } = useGetMediaRecent({
-    query: { refetchInterval: 30_000 },
+    query: { queryKey: getGetMediaRecentQueryKey(), refetchInterval: 30_000 },
   });
 
   if (isLoading) {

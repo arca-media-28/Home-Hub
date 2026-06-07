@@ -1,4 +1,4 @@
-import { useGetSonarrQueue } from "@workspace/api-client-react";
+import { useGetSonarrQueue, getGetSonarrQueueQueryKey } from "@workspace/api-client-react";
 import { Radio } from "lucide-react";
 
 function formatBytes(bytes: number | null | undefined): string {
@@ -10,7 +10,7 @@ function formatBytes(bytes: number | null | undefined): string {
 
 export default function SonarrTile() {
   const { data, isLoading, isError } = useGetSonarrQueue({
-    query: { refetchInterval: 30_000 },
+    query: { queryKey: getGetSonarrQueueQueryKey(), refetchInterval: 30_000 },
   });
 
   if (isLoading) {
