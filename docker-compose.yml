@@ -1,0 +1,42 @@
+version: "3.9"
+
+services:
+  homelab-dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: homelab-dashboard
+    restart: unless-stopped
+    ports:
+      - "${PORT:-3000}:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DATA_DIR=/data
+      # SQLite database lives in the mounted /data volume
+      - DATABASE_URL=file:/data/db.sqlite
+      # CHANGE THIS in production — use a long random string
+      - JWT_SECRET=${JWT_SECRET:-change-this-secret-in-production}
+      # ── Optional: TrueNAS SCALE ───────────────────────────────
+      # - TRUENAS_URL=http://your-truenas-ip
+      # - TRUENAS_API_KEY=your-truenas-api-key
+      # ── Optional: Media Server (Plex or Jellyfin) ─────────────
+      # - MEDIA_SERVER_TYPE=jellyfin   # or "plex"
+      # - MEDIA_SERVER_URL=http://your-media-server:8096
+      # - MEDIA_SERVER_API_KEY=your-api-key
+      # ── Optional: Sonarr ──────────────────────────────────────
+      # - SONARR_URL=http://your-sonarr:8989
+      # - SONARR_API_KEY=your-sonarr-api-key
+    volumes:
+      # SQLite database file and uploaded images persist here
+      - homelab-data:/data
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  homelab-data:
+    driver: local

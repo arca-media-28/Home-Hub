@@ -3,20 +3,27 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Homelab Dashboard API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Authentication
+  - name: tiles
+    description: Dashboard tiles
+  - name: uploads
+    description: Image uploads
+  - name: widgets
+    description: Live data widgets
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,13 +31,500 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /auth/register:
+    post:
+      operationId: register
+      tags: [auth]
+      summary: Register a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuthCredentials"
+      responses:
+        "201":
+          description: Registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Log in and receive a JWT
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuthCredentials"
+      responses:
+        "200":
+          description: Logged in
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Get current user info
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /tiles:
+    get:
+      operationId: getTiles
+      tags: [tiles]
+      summary: List all tiles for the authenticated user
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Tile list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Tile"
+    post:
+      operationId: createTile
+      tags: [tiles]
+      summary: Create a new tile
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TileInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Tile"
+
+  /tiles/{id}:
+    get:
+      operationId: getTile
+      tags: [tiles]
+      summary: Get a single tile
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Tile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Tile"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    put:
+      operationId: updateTile
+      tags: [tiles]
+      summary: Update a tile's config or position
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TileUpdate"
+      responses:
+        "200":
+          description: Updated tile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Tile"
+    delete:
+      operationId: deleteTile
+      tags: [tiles]
+      summary: Delete a tile
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /tiles/layout:
+    put:
+      operationId: saveLayout
+      tags: [tiles]
+      summary: Bulk-save tile layout (positions and sizes)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LayoutUpdate"
+      responses:
+        "200":
+          description: Updated tiles
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Tile"
+
+  /widgets/truenas:
+    get:
+      operationId: getTruenasMetrics
+      tags: [widgets]
+      summary: Get TrueNAS system metrics (CPU, RAM, ZFS pools)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: TrueNAS metrics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TruenasMetrics"
+
+  /widgets/media:
+    get:
+      operationId: getMediaRecent
+      tags: [widgets]
+      summary: Get recently added media from Plex or Jellyfin
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Recent media items
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MediaItem"
+
+  /widgets/sonarr:
+    get:
+      operationId: getSonarrQueue
+      tags: [widgets]
+      summary: Get upcoming shows or active download queue from Sonarr
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Sonarr queue/calendar
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SonarrData"
+
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
   schemas:
     HealthStatus:
       type: object
+      required: [status]
       properties:
         status:
           type: string
-      required:
-        - status
 
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+
+    AuthCredentials:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+          minLength: 3
+        password:
+          type: string
+          minLength: 6
+
+    AuthResponse:
+      type: object
+      required: [token, user]
+      properties:
+        token:
+          type: string
+        user:
+          $ref: "#/components/schemas/UserProfile"
+
+    UserProfile:
+      type: object
+      required: [id, username]
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+
+    Tile:
+      type: object
+      required: [id, userId, type, gridX, gridY, gridW, gridH]
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        type:
+          type: string
+          enum: [app, truenas, media, sonarr]
+        gridX:
+          type: integer
+        gridY:
+          type: integer
+        gridW:
+          type: integer
+        gridH:
+          type: integer
+        name:
+          type: ["string", "null"]
+        url:
+          type: ["string", "null"]
+        bgColor:
+          type: ["string", "null"]
+        imageUrl:
+          type: ["string", "null"]
+        imageFit:
+          type: ["string", "null"]
+          enum: ["cover", "contain", "center", "top-left", null]
+        createdAt:
+          type: string
+
+    TileInput:
+      type: object
+      required: [type, gridX, gridY, gridW, gridH]
+      properties:
+        type:
+          type: string
+          enum: [app, truenas, media, sonarr]
+        gridX:
+          type: integer
+        gridY:
+          type: integer
+        gridW:
+          type: integer
+        gridH:
+          type: integer
+        name:
+          type: string
+        url:
+          type: string
+        bgColor:
+          type: string
+        imageUrl:
+          type: string
+        imageFit:
+          type: string
+
+    TileUpdate:
+      type: object
+      properties:
+        gridX:
+          type: integer
+        gridY:
+          type: integer
+        gridW:
+          type: integer
+        gridH:
+          type: integer
+        name:
+          type: string
+        url:
+          type: string
+        bgColor:
+          type: string
+        imageUrl:
+          type: string
+        imageFit:
+          type: string
+
+    LayoutItem:
+      type: object
+      required: [id, gridX, gridY, gridW, gridH]
+      properties:
+        id:
+          type: integer
+        gridX:
+          type: integer
+        gridY:
+          type: integer
+        gridW:
+          type: integer
+        gridH:
+          type: integer
+
+    LayoutUpdate:
+      type: object
+      required: [tiles]
+      properties:
+        tiles:
+          type: array
+          items:
+            $ref: "#/components/schemas/LayoutItem"
+
+    UploadResult:
+      type: object
+      required: [url]
+      properties:
+        url:
+          type: string
+
+    TruenasMetrics:
+      type: object
+      required: [cpuPercent, memUsedGb, memTotalGb, pools]
+      properties:
+        cpuPercent:
+          type: number
+        memUsedGb:
+          type: number
+        memTotalGb:
+          type: number
+        pools:
+          type: array
+          items:
+            $ref: "#/components/schemas/ZfsPool"
+
+    ZfsPool:
+      type: object
+      required: [name, status, usedBytes, totalBytes]
+      properties:
+        name:
+          type: string
+        status:
+          type: string
+        usedBytes:
+          type: number
+        totalBytes:
+          type: number
+
+    MediaItem:
+      type: object
+      required: [id, title, type]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        type:
+          type: string
+        year:
+          type: ["integer", "null"]
+        thumb:
+          type: ["string", "null"]
+        addedAt:
+          type: ["string", "null"]
+
+    SonarrData:
+      type: object
+      required: [queue, upcoming]
+      properties:
+        queue:
+          type: array
+          items:
+            $ref: "#/components/schemas/SonarrQueueItem"
+        upcoming:
+          type: array
+          items:
+            $ref: "#/components/schemas/SonarrUpcomingItem"
+
+    SonarrQueueItem:
+      type: object
+      required: [id, title, status]
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        status:
+          type: string
+        progress:
+          type: ["number", "null"]
+        size:
+          type: ["number", "null"]
+
+    SonarrUpcomingItem:
+      type: object
+      required: [id, title, airDate]
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        seriesTitle:
+          type: string
+        airDate:
+          type: string
+        seasonNumber:
+          type: ["integer", "null"]
+        episodeNumber:
+          type: ["integer", "null"]

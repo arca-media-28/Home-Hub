@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Homelab Dashboard"
+version = "1.0.0"
+id = "artifacts/homelab-dashboard"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 19881
+
+[services.development]
+run = "pnpm --filter @workspace/homelab-dashboard run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/homelab-dashboard", "run", "build" ]
+publicDir = "artifacts/homelab-dashboard/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "19881"
+BASE_PATH = "/"
