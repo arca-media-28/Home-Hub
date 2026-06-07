@@ -33,6 +33,8 @@ import {
   Unlock,
   ChevronDown,
   Pencil,
+  Check,
+  Loader2,
 } from "lucide-react";
 
 // react-grid-layout's TS types omit some valid props (cols, margin, containerPadding)
@@ -79,7 +81,8 @@ export default function Dashboard() {
   const [gridWidth, setGridWidth] = useState(1200);
 
   const containerRef = useRef<HTMLDivElement>(null);
-  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const savedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [showSaved, setShowSaved] = useState(false);
 
   // Measure container width for the non-responsive GridLayout
   useEffect(() => {
@@ -108,8 +111,17 @@ export default function Dashboard() {
 
   const saveLayout = useSaveLayout({
     mutation: {
+      onSuccess: (data) => {
+        // Reconcile with the server's authoritative response
+        queryClient.setQueryData(getGetTilesQueryKey(), data);
+        if (savedTimeoutRef.current) clearTimeout(savedTimeoutRef.current);
+        setShowSaved(true);
+        savedTimeoutRef.current = setTimeout(() => setShowSaved(false), 2000);
+      },
       onError: () => {
         toast({ title: "Failed to save layout", variant: "destructive" });
+        // Roll back the optimistic update to the server's true state
+        queryClient.invalidateQueries({ queryKey: getGetTilesQueryKey() });
       },
     },
   });
@@ -119,24 +131,45 @@ export default function Dashboard() {
   const handleLayoutChange = useCallback(
     (currentLayout: { i: string; x: number; y: number; w: number; h: number }[]) => {
       if (!editMode) return;
-      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-      saveTimeoutRef.current = setTimeout(() => {
-        const mapped = currentLayout.map((l) => ({
-          id: parseInt(l.i, 10),
-          gridX: l.x,
-          gridY: l.y,
-          gridW: l.w,
-          gridH: l.h,
-        }));
-        saveLayout.mutate({ data: { tiles: mapped } });
-      }, 600);
+
+      const mapped = currentLayout.map((l) => ({
+        id: parseInt(l.i, 10),
+        gridX: l.x,
+        gridY: l.y,
+        gridW: l.w,
+        gridH: l.h,
+      }));
+
+      // Optimistically apply the new positions to the cache so a tab close
+      // during the in-flight request never loses the change.
+      const byId = new Map(mapped.map((m) => [m.id, m]));
+      queryClient.setQueryData<Tile[]>(getGetTilesQueryKey(), (old) =>
+        old?.map((t) => {
+          const m = byId.get(t.id);
+          return m
+            ? { ...t, gridX: m.gridX, gridY: m.gridY, gridW: m.gridW, gridH: m.gridH }
+            : t;
+        }),
+      );
+
+      // Persist immediately on drag/resize end — no debounce.
+      saveLayout.mutate({ data: { tiles: mapped } });
     },
-    [editMode, saveLayout],
+    [editMode, saveLayout, queryClient],
   );
+
+  // Clean up the "saved" indicator timer on unmount
+  useEffect(() => {
+    return () => {
+      if (savedTimeoutRef.current) clearTimeout(savedTimeoutRef.current);
+    };
+  }, []);
 
   function handleLogout() {
     localStorage.removeItem("token");
-    queryClient.clear();
+    // Only drop auth-related state. Keep the tile list cache so a slow
+    // re-login doesn't briefly flash a stale empty grid.
+    queryClient.removeQueries({ queryKey: getGetMeQueryKey() });
     setLocation("/login");
   }
 
@@ -172,6 +205,18 @@ export default function Dashboard() {
           </div>
 
           <div className="flex items-center gap-2">
+            {saveLayout.isPending ? (
+              <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                Saving…
+              </span>
+            ) : showSaved ? (
+              <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Check className="w-3.5 h-3.5 text-primary" />
+                Saved
+              </span>
+            ) : null}
+
             {editMode && (
               <Button size="sm" variant="default" className="gap-1.5" onClick={openCreateModal}>
                 <Plus className="w-3.5 h-3.5" />
