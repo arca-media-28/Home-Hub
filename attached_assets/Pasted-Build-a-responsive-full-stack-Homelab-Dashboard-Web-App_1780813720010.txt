@@ -1,0 +1,51 @@
+Build a responsive, full-stack Homelab Dashboard Web Application designed to be containerized and hosted.
+
+Tech Stack:
+
+Frontend: React (Vite), Tailwind CSS, Lucide Icons, and react-grid-layout for a draggable, resizable grid system.
+
+Backend: Node.js with Express.
+
+Database: SQLite using Prisma ORM. This is crucial for easy portability and volume mapping in Docker.
+
+Authentication: JWT-based login system with hashed passwords.
+
+Core Features & Requirements:
+
+1. Authentication & Persistence:
+
+Create a secure login and registration flow.
+
+All dashboard configurations, tile layouts, and uploaded images must be tied to the authenticated user and saved in the SQLite database so the custom layout persists across different devices.
+
+2. The Dynamic Tile Grid:
+
+The main dashboard should be a grid where users can add, remove, resize, and drag-and-drop tiles.
+
+Tile Settings Modal: Clicking "Edit" on a tile should open a modal allowing the user to customize:
+
+App Name and Target URL (opens in a new tab).
+
+Background Color (using a color picker).
+
+Image Upload (allow users to upload an image for the tile background or icon. Save these files locally in an /uploads directory).
+
+Image Placement/Fit (dropdown options like: Cover, Contain, Center, or Top-Left).
+
+3. Live Data Widgets (Backend Proxies):
+
+Create specific "Smart Tiles" that display live data. The Node.js backend must proxy these requests to the external services to avoid CORS issues and to securely store API keys in an .env file.
+
+TrueNAS SCALE Widget: Connect to the TrueNAS API (prepare for the modern JSON-RPC 2.0 WebSocket API) to display live system metrics: CPU usage percentage, Memory consumption, and ZFS Storage Pool capacity/health.
+
+Media Server Widget (Plex/Jellyfin): Fetch and display the cover art and titles for "Recently Added" media.
+
+Automation Widget (Sonarr): Connect to the Sonarr API to display a list of "Upcoming" shows or the currently active download queue.
+
+4. Export & Deployment Readiness:
+
+Write a complete Dockerfile and docker-compose.yml for the application.
+
+Ensure the SQLite database file and the /uploads image directory are located in a centralized /data folder within the container. This ensures I can map a persistent volume to them when deploying.
+
+Ensure the application listens on a configurable port (default 3000), making it ready to be placed behind a reverse proxy.
