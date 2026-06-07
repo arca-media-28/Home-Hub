@@ -1,17 +1,28 @@
 import jwt from "jsonwebtoken";
 import type { Request, Response, NextFunction } from "express";
 
-const DEFAULT_SECRET = "homelab-dashboard-secret-change-in-prod";
-const JWT_SECRET = process.env["JWT_SECRET"] || DEFAULT_SECRET;
+// Known weak defaults shipped in compose files or docs — reject all of them in production
+const KNOWN_WEAK_SECRETS = new Set([
+  "homelab-dashboard-secret-change-in-prod",
+  "change-this-secret-in-production",
+  "secret",
+  "changeme",
+]);
 
-// Warn loudly (or exit) when running in production with the insecure default secret
-if (process.env["NODE_ENV"] === "production" && JWT_SECRET === DEFAULT_SECRET) {
-  console.error(
-    "[FATAL] JWT_SECRET is set to the insecure default value. " +
-    "Set a strong, random JWT_SECRET environment variable before running in production.",
-  );
-  process.exit(1);
+const rawSecret = process.env["JWT_SECRET"];
+
+// In production, JWT_SECRET must be explicitly provided and must not be a known weak value
+if (process.env["NODE_ENV"] === "production") {
+  if (!rawSecret || rawSecret.trim() === "" || KNOWN_WEAK_SECRETS.has(rawSecret)) {
+    console.error(
+      "[FATAL] JWT_SECRET is missing or set to a known-insecure default. " +
+      "Provide a strong, randomly-generated JWT_SECRET environment variable before running in production.",
+    );
+    process.exit(1);
+  }
 }
+
+const JWT_SECRET = rawSecret ?? "homelab-dashboard-dev-only";
 
 export interface JwtPayload {
   userId: number;

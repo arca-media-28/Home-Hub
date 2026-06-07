@@ -40,6 +40,17 @@ db.exec(`
     image_fit TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
+
+  CREATE TABLE IF NOT EXISTS uploaded_files (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    filename TEXT NOT NULL,
+    original_name TEXT NOT NULL,
+    mimetype TEXT NOT NULL,
+    size INTEGER NOT NULL,
+    url TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
 `);
 
 // ── Helper types ──────────────────────────────────────────────────────────────
@@ -74,6 +85,27 @@ export const userStmts = {
   findById: db.prepare<[number], DbUser>("SELECT * FROM users WHERE id = ?"),
   create: db.prepare<[string, string], { id: number }>(
     "INSERT INTO users (username, password) VALUES (?, ?) RETURNING id"
+  ),
+};
+
+export interface DbUploadedFile {
+  id: number;
+  user_id: number;
+  filename: string;
+  original_name: string;
+  mimetype: string;
+  size: number;
+  url: string;
+  created_at: string;
+}
+
+export const uploadStmts = {
+  create: db.prepare<[number, string, string, string, number, string], { id: number }>(
+    `INSERT INTO uploaded_files (user_id, filename, original_name, mimetype, size, url)
+     VALUES (?, ?, ?, ?, ?, ?) RETURNING id`
+  ),
+  findAllByUser: db.prepare<[number], DbUploadedFile>(
+    "SELECT * FROM uploaded_files WHERE user_id = ? ORDER BY created_at DESC"
   ),
 };
 

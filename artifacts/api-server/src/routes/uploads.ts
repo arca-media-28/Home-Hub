@@ -2,6 +2,7 @@ import { Router } from "express";
 import multer from "multer";
 import path from "path";
 import { requireAuth, type AuthRequest } from "../lib/auth.js";
+import { uploadStmts } from "../lib/db.js";
 
 const router = Router();
 
@@ -40,7 +41,18 @@ router.post("/", requireAuth, upload.single("file"), async (req: AuthRequest, re
       return;
     }
     const url = `/api/uploads/files/${req.file.filename}`;
-    res.status(201).json({ url });
+
+    // Persist file reference in DB
+    const row = uploadStmts.create.get(
+      req.user!.userId,
+      req.file.filename,
+      req.file.originalname,
+      req.file.mimetype,
+      req.file.size,
+      url,
+    );
+
+    res.status(201).json({ id: row!.id, url });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Internal server error" });
