@@ -10,9 +10,9 @@ function Bar({ value, label }: { value: number; label: string }) {
         <span>{label}</span>
         <span className="font-medium text-foreground">{pct.toFixed(0)}%</span>
       </div>
-      <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+      <div className="h-1.5 bg-muted overflow-hidden">
         <div
-          className="h-full rounded-full transition-all duration-700"
+          className="h-full transition-all duration-700"
           style={{ width: `${pct}%`, background: color }}
         />
       </div>

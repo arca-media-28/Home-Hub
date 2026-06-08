@@ -49,9 +49,9 @@ export default function SonarrTile() {
                 <span className="text-xs text-muted-foreground">{formatBytes(item.size)}</span>
               </div>
               {item.progress != null && (
-                <div className="h-1 bg-muted rounded-full overflow-hidden mt-0.5">
+                <div className="h-1 bg-muted overflow-hidden mt-0.5">
                   <div
-                    className="h-full bg-primary rounded-full transition-all duration-700"
+                    className="h-full bg-primary transition-all duration-700"
                     style={{ width: `${item.progress}%` }}
                   />
                 </div>

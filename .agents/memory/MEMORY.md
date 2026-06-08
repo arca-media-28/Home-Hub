@@ -2,3 +2,4 @@
 - [SQLite data dir](sqlite-datadir.md) — DATA_DIR defaults to ./data (not /data) in dev; /data only exists in Docker
 - [TanStack Query v5 onError](tanstack-query-v5.md) — onError removed from useQuery options in v5; use useEffect + isError instead
 - [JWT secret self-host](jwt-secret-self-host.md) — prod auto-generates + persists a random JWT secret in DATA_DIR (no fail-closed); keep compose JWT_SECRET default empty
+- [Homelab theming](homelab-theming.md) — reskin whole app via index.css tokens; mirror :root/.dark, set all --radius-* (not just --radius) for sharp corners, watch hardcoded color leaks, verify authed views with runTest.

@@ -57,7 +57,7 @@ export default function TileEditModal({ open, onOpenChange, tile, mode }: TileEd
   const [type, setType] = useState<string>(tile?.type ?? TileType.app);
   const [name, setName] = useState(tile?.name ?? "");
   const [url, setUrl] = useState(tile?.url ?? "");
-  const [bgColor, setBgColor] = useState(tile?.bgColor ?? "#1e293b");
+  const [bgColor, setBgColor] = useState(tile?.bgColor ?? "#1c1c20");
   const [imageUrl, setImageUrl] = useState(tile?.imageUrl ?? "");
   const [imageFit, setImageFit] = useState(tile?.imageFit ?? "cover");
   const [showColorPicker, setShowColorPicker] = useState(false);
@@ -68,7 +68,7 @@ export default function TileEditModal({ open, onOpenChange, tile, mode }: TileEd
       setType(tile?.type ?? TileType.app);
       setName(tile?.name ?? "");
       setUrl(tile?.url ?? "");
-      setBgColor(tile?.bgColor ?? "#1e293b");
+      setBgColor(tile?.bgColor ?? "#1c1c20");
       setImageUrl(tile?.imageUrl ?? "");
       setImageFit(tile?.imageFit ?? "cover");
       setShowColorPicker(false);
@@ -221,7 +221,7 @@ export default function TileEditModal({ open, onOpenChange, tile, mode }: TileEd
                   <Input
                     value={bgColor}
                     onChange={(e) => setBgColor(e.target.value)}
-                    placeholder="#1e293b"
+                    placeholder="#1c1c20"
                     className="font-mono text-sm"
                   />
                 </div>

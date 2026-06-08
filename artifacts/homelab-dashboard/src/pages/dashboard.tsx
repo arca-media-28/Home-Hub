@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import {
   LayoutGrid,
+  Terminal,
   Plus,
   LogOut,
   Lock,
@@ -201,20 +202,25 @@ export default function Dashboard() {
 
   if (!me && isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-muted-foreground text-sm">Loading…</div>
+      <div className="min-h-screen flex items-center justify-center bg-background bg-dot-pattern">
+        <div className="text-muted-foreground text-sm">
+          <span className="text-primary">{"> "}</span>
+          <span className="animate-pulse">Initializing…</span>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background bg-dot-pattern">
       {/* Header */}
       <header className="sticky top-0 z-30 border-b border-border bg-background/80 backdrop-blur-sm">
         <div className="max-w-screen-2xl mx-auto px-4 h-14 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
-            <LayoutGrid className="w-5 h-5 text-primary" />
-            <span className="font-semibold text-sm tracking-tight">Homelab</span>
+            <Terminal className="w-5 h-5 text-primary" />
+            <span className="font-bold text-sm uppercase tracking-widest text-foreground">
+              Homelab
+            </span>
           </div>
 
           <div className="flex items-center gap-2">
@@ -278,13 +284,14 @@ export default function Dashboard() {
       <main className="max-w-screen-2xl mx-auto px-4 py-6">
         {isLoading ? (
           <div className="flex items-center justify-center h-48 text-muted-foreground text-sm">
-            Loading tiles…
+            <span className="text-primary">{"> "}</span>
+            <span className="animate-pulse">Loading tiles…</span>
           </div>
         ) : tiles.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-72 gap-4 text-center">
+          <div className="flex flex-col items-center justify-center h-72 gap-4 text-center border border-dashed border-border bg-card/40">
             <LayoutGrid className="w-12 h-12 text-primary opacity-40" />
             <div>
-              <p className="font-semibold text-foreground">No tiles yet</p>
+              <p className="font-bold uppercase tracking-widest text-foreground">No tiles yet</p>
               <p className="text-sm text-muted-foreground mt-1">
                 Enable edit mode and add your first tile.
               </p>
@@ -318,15 +325,15 @@ export default function Dashboard() {
               {tiles.map((tile) => (
                 <div
                   key={String(tile.id)}
-                  className={`relative rounded-xl overflow-hidden border border-border shadow-sm bg-card transition-all ${
-                    editMode ? "ring-2 ring-primary/30 hover:ring-primary/60 cursor-default" : ""
+                  className={`relative overflow-hidden border border-border shadow-sm bg-card transition-all ${
+                    editMode ? "ring-1 ring-primary/40 hover:ring-primary cursor-default" : "hover:border-primary/40"
                   }`}
                 >
                   {editMode && (
                     <div className="drag-handle absolute inset-0 z-20 flex items-start justify-end p-1.5 cursor-grab active:cursor-grabbing">
                       <button
                         type="button"
-                        className="p-1 rounded bg-background/80 hover:bg-background border border-border shadow-sm text-muted-foreground hover:text-foreground transition-colors"
+                        className="p-1 bg-background/80 hover:bg-background border border-border shadow-sm text-muted-foreground hover:text-primary transition-colors"
                         onMouseDown={(e) => e.stopPropagation()}
                         onClick={(e) => {
                           e.stopPropagation();

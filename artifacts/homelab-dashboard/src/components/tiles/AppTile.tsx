@@ -7,7 +7,7 @@ interface AppTileProps {
 
 export default function AppTile({ tile }: AppTileProps) {
   const hasImage = Boolean(tile.imageUrl);
-  const bg = tile.bgColor || "hsl(220 15% 13%)";
+  const bg = tile.bgColor || "hsl(240 6% 12%)";
 
   const imageFitClass = (() => {
     switch (tile.imageFit) {
@@ -21,7 +21,7 @@ export default function AppTile({ tile }: AppTileProps) {
 
   return (
     <div
-      className="w-full h-full rounded-xl overflow-hidden flex flex-col items-center justify-center relative group cursor-pointer select-none"
+      className="w-full h-full overflow-hidden flex flex-col items-center justify-center relative group cursor-pointer select-none"
       style={{ background: hasImage ? undefined : bg }}
       onClick={() => tile.url && window.open(tile.url, "_blank", "noopener,noreferrer")}
     >
@@ -33,12 +33,12 @@ export default function AppTile({ tile }: AppTileProps) {
           draggable={false}
         />
       )}
-      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors rounded-xl" />
+      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
 
       <div className="relative z-10 flex flex-col items-center gap-1 px-2 text-center">
         {tile.name && (
           <span
-            className="font-semibold text-sm leading-tight drop-shadow-sm max-w-full truncate"
+            className="font-bold text-sm leading-tight tracking-wide drop-shadow-sm max-w-full truncate"
             style={{ color: hasImage ? "#fff" : "inherit" }}
           >
             {tile.name}

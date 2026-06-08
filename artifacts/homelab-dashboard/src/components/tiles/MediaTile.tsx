@@ -35,10 +35,10 @@ export default function MediaTile() {
               <img
                 src={item.thumb}
                 alt={item.title}
-                className="w-8 h-8 rounded object-cover flex-shrink-0 bg-muted"
+                className="w-8 h-8 object-cover flex-shrink-0 bg-muted border border-border"
               />
             ) : (
-              <div className="w-8 h-8 rounded bg-muted flex-shrink-0 flex items-center justify-center">
+              <div className="w-8 h-8 bg-muted border border-border flex-shrink-0 flex items-center justify-center">
                 <Tv className="w-4 h-4 text-muted-foreground" />
               </div>
             )}
