@@ -125,6 +125,30 @@ export interface UploadResult {
   url: string;
 }
 
+export interface ServiceConnection {
+  service: string;
+  /** @nullable */
+  url?: string | null;
+  /** @nullable */
+  apiKey?: string | null;
+  /** @nullable */
+  username?: string | null;
+  /** @nullable */
+  password?: string | null;
+  /** @nullable */
+  token?: string | null;
+  /** @nullable */
+  updatedAt?: string | null;
+}
+
+export interface ServiceConnectionUpdate {
+  url?: string;
+  apiKey?: string;
+  username?: string;
+  password?: string;
+  token?: string;
+}
+
 export interface ZfsPool {
   name: string;
   status: string;

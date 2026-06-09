@@ -252,3 +252,44 @@ export const GetSonarrQueueResponse = zod.object({
 })
 
 
+/**
+ * @summary List saved service connection settings
+ */
+export const GetConnectionsResponseItem = zod.object({
+  "service": zod.string(),
+  "url": zod.string().nullish(),
+  "apiKey": zod.string().nullish(),
+  "username": zod.string().nullish(),
+  "password": zod.string().nullish(),
+  "token": zod.string().nullish(),
+  "updatedAt": zod.string().nullish()
+})
+export const GetConnectionsResponse = zod.array(GetConnectionsResponseItem)
+
+
+/**
+ * @summary Save connection settings for a single service
+ */
+export const UpdateConnectionParams = zod.object({
+  "service": zod.enum(['truenas', 'plex', 'sonarr', 'radarr', 'qbittorrent'])
+})
+
+export const UpdateConnectionBody = zod.object({
+  "url": zod.string().optional(),
+  "apiKey": zod.string().optional(),
+  "username": zod.string().optional(),
+  "password": zod.string().optional(),
+  "token": zod.string().optional()
+})
+
+export const UpdateConnectionResponse = zod.object({
+  "service": zod.string(),
+  "url": zod.string().nullish(),
+  "apiKey": zod.string().nullish(),
+  "username": zod.string().nullish(),
+  "password": zod.string().nullish(),
+  "token": zod.string().nullish(),
+  "updatedAt": zod.string().nullish()
+})
+
+

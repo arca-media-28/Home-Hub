@@ -18,6 +18,8 @@ tags:
     description: Image uploads
   - name: widgets
     description: Live data widgets
+  - name: connections
+    description: Service connection settings
 paths:
   /healthz:
     get:
@@ -276,6 +278,57 @@ paths:
               schema:
                 $ref: "#/components/schemas/SonarrData"
 
+  /connections:
+    get:
+      operationId: getConnections
+      tags: [connections]
+      summary: List saved service connection settings
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Service connections
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ServiceConnection"
+
+  /connections/{service}:
+    put:
+      operationId: updateConnection
+      tags: [connections]
+      summary: Save connection settings for a single service
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: service
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [truenas, plex, sonarr, radarr, qbittorrent]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ServiceConnectionUpdate"
+      responses:
+        "200":
+          description: Updated connection
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServiceConnection"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
 components:
   securitySchemes:
     bearerAuth:
@@ -437,6 +490,39 @@ components:
       required: [url]
       properties:
         url:
+          type: string
+
+    ServiceConnection:
+      type: object
+      required: [service]
+      properties:
+        service:
+          type: string
+        url:
+          type: ["string", "null"]
+        apiKey:
+          type: ["string", "null"]
+        username:
+          type: ["string", "null"]
+        password:
+          type: ["string", "null"]
+        token:
+          type: ["string", "null"]
+        updatedAt:
+          type: ["string", "null"]
+
+    ServiceConnectionUpdate:
+      type: object
+      properties:
+        url:
+          type: string
+        apiKey:
+          type: string
+        username:
+          type: string
+        password:
+          type: string
+        token:
           type: string
 
     TruenasMetrics:

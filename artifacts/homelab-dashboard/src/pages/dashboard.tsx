@@ -36,6 +36,7 @@ import {
   Pencil,
   Check,
   Loader2,
+  Settings as SettingsIcon,
 } from "lucide-react";
 
 // react-grid-layout's TS types omit some valid props (cols, margin, containerPadding)
@@ -260,6 +261,16 @@ export default function Dashboard() {
                   Edit
                 </>
               )}
+            </Button>
+
+            <Button
+              size="sm"
+              variant="ghost"
+              className="gap-1.5"
+              onClick={() => setLocation("/settings")}
+              aria-label="Settings"
+            >
+              <SettingsIcon className="w-4 h-4" />
             </Button>
 
             <DropdownMenu>

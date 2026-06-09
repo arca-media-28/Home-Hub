@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { setAuthTokenGetter } from "@workspace/api-client-react";
 import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/dashboard";
+import Settings from "@/pages/Settings";
 import Login from "@/pages/login";
 import Register from "@/pages/register";
 
@@ -17,6 +18,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Dashboard} />
+      <Route path="/settings" component={Settings} />
       <Route path="/login" component={Login} />
       <Route path="/register" component={Register} />
       <Route component={NotFound} />

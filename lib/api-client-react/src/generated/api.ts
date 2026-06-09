@@ -26,6 +26,8 @@ import type {
   HealthStatus,
   LayoutUpdate,
   MediaItem,
+  ServiceConnection,
+  ServiceConnectionUpdate,
   SonarrData,
   Tile,
   TileInput,
@@ -1010,4 +1012,153 @@ export function useGetSonarrQueue<TData = Awaited<ReturnType<typeof getSonarrQue
 
 
 
+
+export const getGetConnectionsUrl = () => {
+
+
+
+
+  return `/api/connections`
+}
+
+/**
+ * @summary List saved service connection settings
+ */
+export const getConnections = async ( options?: RequestInit): Promise<ServiceConnection[]> => {
+
+  return customFetch<ServiceConnection[]>(getGetConnectionsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetConnectionsQueryKey = () => {
+    return [
+    `/api/connections`
+    ] as const;
+    }
+
+
+export const getGetConnectionsQueryOptions = <TData = Awaited<ReturnType<typeof getConnections>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getConnections>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetConnectionsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getConnections>>> = ({ signal }) => getConnections({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getConnections>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetConnectionsQueryResult = NonNullable<Awaited<ReturnType<typeof getConnections>>>
+export type GetConnectionsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List saved service connection settings
+ */
+
+export function useGetConnections<TData = Awaited<ReturnType<typeof getConnections>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getConnections>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetConnectionsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getUpdateConnectionUrl = (service: 'truenas' | 'plex' | 'sonarr' | 'radarr' | 'qbittorrent',) => {
+
+
+
+
+  return `/api/connections/${service}`
+}
+
+/**
+ * @summary Save connection settings for a single service
+ */
+export const updateConnection = async (service: 'truenas' | 'plex' | 'sonarr' | 'radarr' | 'qbittorrent',
+    serviceConnectionUpdate: ServiceConnectionUpdate, options?: RequestInit): Promise<ServiceConnection> => {
+
+  return customFetch<ServiceConnection>(getUpdateConnectionUrl(service),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      serviceConnectionUpdate,)
+  }
+);}
+
+
+
+
+export const getUpdateConnectionMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateConnection>>, TError,{service: 'truenas' | 'plex' | 'sonarr' | 'radarr' | 'qbittorrent';data: BodyType<ServiceConnectionUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateConnection>>, TError,{service: 'truenas' | 'plex' | 'sonarr' | 'radarr' | 'qbittorrent';data: BodyType<ServiceConnectionUpdate>}, TContext> => {
+
+const mutationKey = ['updateConnection'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateConnection>>, {service: 'truenas' | 'plex' | 'sonarr' | 'radarr' | 'qbittorrent';data: BodyType<ServiceConnectionUpdate>}> = (props) => {
+          const {service,data} = props ?? {};
+
+          return  updateConnection(service,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateConnectionMutationResult = NonNullable<Awaited<ReturnType<typeof updateConnection>>>
+    export type UpdateConnectionMutationBody = BodyType<ServiceConnectionUpdate>
+    export type UpdateConnectionMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Save connection settings for a single service
+ */
+export const useUpdateConnection = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateConnection>>, TError,{service: 'truenas' | 'plex' | 'sonarr' | 'radarr' | 'qbittorrent';data: BodyType<ServiceConnectionUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateConnection>>,
+        TError,
+        {service: 'truenas' | 'plex' | 'sonarr' | 'radarr' | 'qbittorrent';data: BodyType<ServiceConnectionUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateConnectionMutationOptions(options));
+    }
 

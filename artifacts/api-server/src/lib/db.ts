@@ -51,7 +51,28 @@ db.exec(`
     url TEXT NOT NULL,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
+
+  CREATE TABLE IF NOT EXISTS service_connections (
+    service TEXT PRIMARY KEY,
+    url TEXT,
+    api_key TEXT,
+    username TEXT,
+    password TEXT,
+    extra TEXT,
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
 `);
+
+// Instance-wide connection settings for the supported services. Seed an empty
+// row for each on first run so the settings page always has something to render.
+const SERVICE_CONNECTION_KEYS = ["truenas", "plex", "sonarr", "radarr", "qbittorrent"] as const;
+
+const seedConnection = db.prepare(
+  "INSERT OR IGNORE INTO service_connections (service) VALUES (?)"
+);
+for (const service of SERVICE_CONNECTION_KEYS) {
+  seedConnection.run(service);
+}
 
 // ── Helper types ──────────────────────────────────────────────────────────────
 
@@ -125,5 +146,38 @@ export const tileStmts = {
   ),
   delete: db.prepare<[number, number], void>(
     "DELETE FROM tiles WHERE id = ? AND user_id = ?"
+  ),
+};
+
+export interface DbServiceConnection {
+  service: string;
+  url: string | null;
+  api_key: string | null;
+  username: string | null;
+  password: string | null;
+  extra: string | null;
+  updated_at: string;
+}
+
+export const connectionStmts = {
+  findAll: db.prepare<[], DbServiceConnection>(
+    "SELECT * FROM service_connections ORDER BY service ASC"
+  ),
+  findByService: db.prepare<[string], DbServiceConnection>(
+    "SELECT * FROM service_connections WHERE service = ?"
+  ),
+  upsert: db.prepare<
+    [string, string | null, string | null, string | null, string | null, string | null],
+    void
+  >(
+    `INSERT INTO service_connections (service, url, api_key, username, password, extra, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+     ON CONFLICT(service) DO UPDATE SET
+       url = excluded.url,
+       api_key = excluded.api_key,
+       username = excluded.username,
+       password = excluded.password,
+       extra = excluded.extra,
+       updated_at = datetime('now')`
   ),
 };

@@ -5,6 +5,7 @@ import tilesRouter from "./tiles.js";
 import layoutRouter from "./layout.js";
 import uploadsRouter from "./uploads.js";
 import widgetsRouter from "./widgets.js";
+import connectionsRouter from "./connections.js";
 
 const router: IRouter = Router();
 
@@ -14,5 +15,6 @@ router.use("/tiles/layout", layoutRouter);
 router.use("/tiles", tilesRouter);
 router.use("/uploads", uploadsRouter);
 router.use("/widgets", widgetsRouter);
+router.use("/connections", connectionsRouter);
 
 export default router;
