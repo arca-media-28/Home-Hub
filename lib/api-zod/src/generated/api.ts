@@ -268,6 +268,27 @@ export const GetConnectionsResponse = zod.array(GetConnectionsResponseItem)
 
 
 /**
+ * @summary Test a service connection using the supplied values without saving
+ */
+export const TestConnectionParams = zod.object({
+  "service": zod.enum(['truenas', 'plex', 'sonarr', 'radarr', 'qbittorrent'])
+})
+
+export const TestConnectionBody = zod.object({
+  "url": zod.string().optional(),
+  "apiKey": zod.string().optional(),
+  "username": zod.string().optional(),
+  "password": zod.string().optional(),
+  "token": zod.string().optional()
+})
+
+export const TestConnectionResponse = zod.object({
+  "ok": zod.boolean(),
+  "message": zod.string()
+})
+
+
+/**
  * @summary Save connection settings for a single service
  */
 export const UpdateConnectionParams = zod.object({

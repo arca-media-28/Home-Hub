@@ -295,6 +295,40 @@ paths:
                 items:
                   $ref: "#/components/schemas/ServiceConnection"
 
+  /connections/{service}/test:
+    post:
+      operationId: testConnection
+      tags: [connections]
+      summary: Test a service connection using the supplied values without saving
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: service
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [truenas, plex, sonarr, radarr, qbittorrent]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ServiceConnectionUpdate"
+      responses:
+        "200":
+          description: Test result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConnectionTestResult"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /connections/{service}:
     put:
       operationId: updateConnection
@@ -523,6 +557,15 @@ components:
         password:
           type: string
         token:
+          type: string
+
+    ConnectionTestResult:
+      type: object
+      required: [ok, message]
+      properties:
+        ok:
+          type: boolean
+        message:
           type: string
 
     TruenasMetrics:

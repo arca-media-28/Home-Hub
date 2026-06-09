@@ -22,6 +22,7 @@ import type {
 import type {
   AuthCredentials,
   AuthResponse,
+  ConnectionTestResult,
   ErrorResponse,
   HealthStatus,
   LayoutUpdate,
@@ -1089,6 +1090,78 @@ export function useGetConnections<TData = Awaited<ReturnType<typeof getConnectio
 
 
 
+
+export const getTestConnectionUrl = (service: 'truenas' | 'plex' | 'sonarr' | 'radarr' | 'qbittorrent',) => {
+
+
+
+
+  return `/api/connections/${service}/test`
+}
+
+/**
+ * @summary Test a service connection using the supplied values without saving
+ */
+export const testConnection = async (service: 'truenas' | 'plex' | 'sonarr' | 'radarr' | 'qbittorrent',
+    serviceConnectionUpdate: ServiceConnectionUpdate, options?: RequestInit): Promise<ConnectionTestResult> => {
+
+  return customFetch<ConnectionTestResult>(getTestConnectionUrl(service),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      serviceConnectionUpdate,)
+  }
+);}
+
+
+
+
+export const getTestConnectionMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof testConnection>>, TError,{service: 'truenas' | 'plex' | 'sonarr' | 'radarr' | 'qbittorrent';data: BodyType<ServiceConnectionUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof testConnection>>, TError,{service: 'truenas' | 'plex' | 'sonarr' | 'radarr' | 'qbittorrent';data: BodyType<ServiceConnectionUpdate>}, TContext> => {
+
+const mutationKey = ['testConnection'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof testConnection>>, {service: 'truenas' | 'plex' | 'sonarr' | 'radarr' | 'qbittorrent';data: BodyType<ServiceConnectionUpdate>}> = (props) => {
+          const {service,data} = props ?? {};
+
+          return  testConnection(service,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type TestConnectionMutationResult = NonNullable<Awaited<ReturnType<typeof testConnection>>>
+    export type TestConnectionMutationBody = BodyType<ServiceConnectionUpdate>
+    export type TestConnectionMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Test a service connection using the supplied values without saving
+ */
+export const useTestConnection = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof testConnection>>, TError,{service: 'truenas' | 'plex' | 'sonarr' | 'radarr' | 'qbittorrent';data: BodyType<ServiceConnectionUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof testConnection>>,
+        TError,
+        {service: 'truenas' | 'plex' | 'sonarr' | 'radarr' | 'qbittorrent';data: BodyType<ServiceConnectionUpdate>},
+        TContext
+      > => {
+      return useMutation(getTestConnectionMutationOptions(options));
+    }
 
 export const getUpdateConnectionUrl = (service: 'truenas' | 'plex' | 'sonarr' | 'radarr' | 'qbittorrent',) => {
 

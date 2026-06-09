@@ -4,6 +4,7 @@ import {
   useGetMe,
   useGetConnections,
   useUpdateConnection,
+  useTestConnection,
   getGetConnectionsQueryKey,
   getGetMeQueryKey,
   type ServiceConnection,
@@ -25,6 +26,8 @@ import {
   Tv,
   Film,
   Download,
+  Plug,
+  X,
 } from "lucide-react";
 
 type ServiceKey = "truenas" | "plex" | "sonarr" | "radarr" | "qbittorrent";
@@ -121,11 +124,14 @@ function ServiceCard({
   const queryClient = useQueryClient();
   const [form, setForm] = useState<FormState>(() => connectionToForm(connection));
   const [savedAt, setSavedAt] = useState(false);
+  const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
 
   // Re-sync the form when server values load/refresh, so saved values pre-fill.
   useEffect(() => {
     setForm(connectionToForm(connection));
   }, [connection]);
+
+  const testMutation = useTestConnection();
 
   const mutation = useUpdateConnection({
     mutation: {
@@ -143,14 +149,18 @@ function ServiceCard({
 
   const Icon = def.icon;
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  function buildPayload(): ServiceConnectionUpdate {
     const payload: ServiceConnectionUpdate = {};
     for (const field of def.fields) {
       payload[field.key] = form[field.key];
     }
+    return payload;
+  }
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
     mutation.mutate(
-      { service: def.key, data: payload },
+      { service: def.key, data: buildPayload() },
       {
         onError: () => {
           toast({
@@ -159,6 +169,18 @@ function ServiceCard({
             variant: "destructive",
           });
         },
+      },
+    );
+  }
+
+  function handleTest() {
+    setTestResult(null);
+    testMutation.mutate(
+      { service: def.key, data: buildPayload() },
+      {
+        onSuccess: (result) => setTestResult(result),
+        onError: () =>
+          setTestResult({ ok: false, message: "Could not reach service" }),
       },
     );
   }
@@ -204,7 +226,24 @@ function ServiceCard({
 
       <div className="flex items-center justify-between gap-3 px-5 py-4 border-t border-border">
         <div className="min-h-5 text-xs">
-          {mutation.isError ? (
+          {testMutation.isPending ? (
+            <span className="flex items-center gap-1.5 text-muted-foreground">
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              Testing…
+            </span>
+          ) : testResult ? (
+            testResult.ok ? (
+              <span className="flex items-center gap-1.5 text-primary">
+                <Check className="w-3.5 h-3.5" />
+                {testResult.message}
+              </span>
+            ) : (
+              <span className="flex items-center gap-1.5 text-destructive">
+                <X className="w-3.5 h-3.5" />
+                {testResult.message}
+              </span>
+            )
+          ) : mutation.isError ? (
             <span className="flex items-center gap-1.5 text-destructive">
               <AlertTriangle className="w-3.5 h-3.5" />
               Could not save — try again.
@@ -220,16 +259,33 @@ function ServiceCard({
             </span>
           ) : null}
         </div>
-        <Button type="submit" size="sm" disabled={mutation.isPending} className="gap-1.5">
-          {mutation.isPending ? (
-            <>
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={handleTest}
+            disabled={testMutation.isPending || mutation.isPending}
+            className="gap-1.5"
+          >
+            {testMutation.isPending ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              Saving…
-            </>
-          ) : (
-            "Save"
-          )}
-        </Button>
+            ) : (
+              <Plug className="w-3.5 h-3.5" />
+            )}
+            Test
+          </Button>
+          <Button type="submit" size="sm" disabled={mutation.isPending} className="gap-1.5">
+            {mutation.isPending ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                Saving…
+              </>
+            ) : (
+              "Save"
+            )}
+          </Button>
+        </div>
       </div>
     </form>
   );

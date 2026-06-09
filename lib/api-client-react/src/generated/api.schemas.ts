@@ -149,6 +149,11 @@ export interface ServiceConnectionUpdate {
   token?: string;
 }
 
+export interface ConnectionTestResult {
+  ok: boolean;
+  message: string;
+}
+
 export interface ZfsPool {
   name: string;
   status: string;
