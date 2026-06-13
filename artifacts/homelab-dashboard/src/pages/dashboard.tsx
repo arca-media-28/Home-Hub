@@ -21,6 +21,8 @@ import AppTile from "@/components/tiles/AppTile";
 import TruenasTile from "@/components/tiles/TruenasTile";
 import MediaTile from "@/components/tiles/MediaTile";
 import SonarrTile from "@/components/tiles/SonarrTile";
+import RadarrTile from "@/components/tiles/RadarrTile";
+import QbittorrentTile from "@/components/tiles/QbittorrentTile";
 import TileEditModal, { type EditMode } from "@/components/TileEditModal";
 import { Button } from "@/components/ui/button";
 import {
@@ -70,6 +72,10 @@ function renderTileContent(tile: Tile) {
       return <MediaTile />;
     case TileType.sonarr:
       return <SonarrTile />;
+    case TileType.radarr:
+      return <RadarrTile />;
+    case TileType.qbittorrent:
+      return <QbittorrentTile />;
     default:
       return <AppTile tile={tile} />;
   }
@@ -81,6 +87,8 @@ const TILE_SERVICE: Partial<Record<Tile["type"], string>> = {
   [TileType.truenas]: "truenas",
   [TileType.media]: "plex",
   [TileType.sonarr]: "sonarr",
+  [TileType.radarr]: "radarr",
+  [TileType.qbittorrent]: "qbittorrent",
 };
 
 function StatusBadge({ status }: { status: ServiceStatus | undefined }) {

@@ -278,6 +278,36 @@ paths:
               schema:
                 $ref: "#/components/schemas/SonarrData"
 
+  /widgets/radarr:
+    get:
+      operationId: getRadarrQueue
+      tags: [widgets]
+      summary: Get upcoming movie releases or active download queue from Radarr
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Radarr queue/calendar
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RadarrData"
+
+  /widgets/qbittorrent:
+    get:
+      operationId: getQbittorrentStatus
+      tags: [widgets]
+      summary: Get active torrents and global transfer stats from qBittorrent
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: qBittorrent torrents/transfer stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QbittorrentData"
+
   /connections:
     get:
       operationId: getConnections
@@ -458,7 +488,7 @@ components:
           type: integer
         type:
           type: string
-          enum: [app, truenas, media, sonarr]
+          enum: [app, truenas, media, sonarr, radarr, qbittorrent]
         gridX:
           type: integer
         gridY:
@@ -487,7 +517,7 @@ components:
       properties:
         type:
           type: string
-          enum: [app, truenas, media, sonarr]
+          enum: [app, truenas, media, sonarr, radarr, qbittorrent]
         gridX:
           type: integer
         gridY:
@@ -717,3 +747,72 @@ components:
           type: ["integer", "null"]
         episodeNumber:
           type: ["integer", "null"]
+
+    RadarrData:
+      type: object
+      required: [queue, upcoming]
+      properties:
+        queue:
+          type: array
+          items:
+            $ref: "#/components/schemas/RadarrQueueItem"
+        upcoming:
+          type: array
+          items:
+            $ref: "#/components/schemas/RadarrUpcomingItem"
+
+    RadarrQueueItem:
+      type: object
+      required: [id, title, status]
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        status:
+          type: string
+        progress:
+          type: ["number", "null"]
+        size:
+          type: ["number", "null"]
+
+    RadarrUpcomingItem:
+      type: object
+      required: [id, title, releaseDate]
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        releaseDate:
+          type: string
+        year:
+          type: ["integer", "null"]
+
+    QbittorrentData:
+      type: object
+      required: [torrents, downloadSpeed, uploadSpeed]
+      properties:
+        torrents:
+          type: array
+          items:
+            $ref: "#/components/schemas/QbittorrentTorrent"
+        downloadSpeed:
+          type: number
+        uploadSpeed:
+          type: number
+
+    QbittorrentTorrent:
+      type: object
+      required: [name, progress, state, dlSpeed, upSpeed]
+      properties:
+        name:
+          type: string
+        progress:
+          type: number
+        state:
+          type: string
+        dlSpeed:
+          type: number
+        upSpeed:
+          type: number

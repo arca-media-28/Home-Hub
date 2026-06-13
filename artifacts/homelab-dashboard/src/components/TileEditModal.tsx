@@ -41,6 +41,8 @@ const TILE_TYPES = [
   { value: TileType.truenas, label: "TrueNAS Metrics" },
   { value: TileType.media, label: "Media Server" },
   { value: TileType.sonarr, label: "Sonarr" },
+  { value: TileType.radarr, label: "Radarr" },
+  { value: TileType.qbittorrent, label: "qBittorrent" },
 ] as const;
 
 const IMAGE_FITS = [

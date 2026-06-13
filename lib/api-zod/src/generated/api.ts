@@ -69,7 +69,7 @@ export const GetMeResponse = zod.object({
 export const GetTilesResponseItem = zod.object({
   "id": zod.number(),
   "userId": zod.number(),
-  "type": zod.enum(['app', 'truenas', 'media', 'sonarr']),
+  "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'qbittorrent']),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -88,7 +88,7 @@ export const GetTilesResponse = zod.array(GetTilesResponseItem)
  * @summary Create a new tile
  */
 export const CreateTileBody = zod.object({
-  "type": zod.enum(['app', 'truenas', 'media', 'sonarr']),
+  "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'qbittorrent']),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -111,7 +111,7 @@ export const GetTileParams = zod.object({
 export const GetTileResponse = zod.object({
   "id": zod.number(),
   "userId": zod.number(),
-  "type": zod.enum(['app', 'truenas', 'media', 'sonarr']),
+  "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'qbittorrent']),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -147,7 +147,7 @@ export const UpdateTileBody = zod.object({
 export const UpdateTileResponse = zod.object({
   "id": zod.number(),
   "userId": zod.number(),
-  "type": zod.enum(['app', 'truenas', 'media', 'sonarr']),
+  "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'qbittorrent']),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -185,7 +185,7 @@ export const SaveLayoutBody = zod.object({
 export const SaveLayoutResponseItem = zod.object({
   "id": zod.number(),
   "userId": zod.number(),
-  "type": zod.enum(['app', 'truenas', 'media', 'sonarr']),
+  "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'qbittorrent']),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -249,6 +249,42 @@ export const GetSonarrQueueResponse = zod.object({
   "seasonNumber": zod.number().nullish(),
   "episodeNumber": zod.number().nullish()
 }))
+})
+
+
+/**
+ * @summary Get upcoming movie releases or active download queue from Radarr
+ */
+export const GetRadarrQueueResponse = zod.object({
+  "queue": zod.array(zod.object({
+  "id": zod.number(),
+  "title": zod.string(),
+  "status": zod.string(),
+  "progress": zod.number().nullish(),
+  "size": zod.number().nullish()
+})),
+  "upcoming": zod.array(zod.object({
+  "id": zod.number(),
+  "title": zod.string(),
+  "releaseDate": zod.string(),
+  "year": zod.number().nullish()
+}))
+})
+
+
+/**
+ * @summary Get active torrents and global transfer stats from qBittorrent
+ */
+export const GetQbittorrentStatusResponse = zod.object({
+  "torrents": zod.array(zod.object({
+  "name": zod.string(),
+  "progress": zod.number(),
+  "state": zod.string(),
+  "dlSpeed": zod.number(),
+  "upSpeed": zod.number()
+})),
+  "downloadSpeed": zod.number(),
+  "uploadSpeed": zod.number()
 })
 
 

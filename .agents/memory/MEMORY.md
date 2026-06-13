@@ -4,3 +4,4 @@
 - [JWT secret self-host](jwt-secret-self-host.md) — prod auto-generates + persists a random JWT secret in DATA_DIR (no fail-closed); keep compose JWT_SECRET default empty
 - [Homelab theming](homelab-theming.md) — reskin whole app via index.css tokens; mirror :root/.dark, set all --radius-* (not just --radius) for sharp corners, watch hardcoded color leaks, verify authed views with runTest.
 - [service_connections is global](service-connections-global.md) — table keyed by service only (no userId); rows shared across all users; PUT clobbers real settings, beware testing on live.
+- [Widget data + HTTP convention](widget-data-convention.md) — mock only when unconfigured, configured-failure→502; shared httpClient (self-signed TLS) in lib/http.ts; TrueNAS/Sonarr/Radarr/qBittorrent API gotchas.

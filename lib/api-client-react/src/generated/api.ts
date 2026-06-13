@@ -28,6 +28,8 @@ import type {
   HealthStatus,
   LayoutUpdate,
   MediaItem,
+  QbittorrentData,
+  RadarrData,
   ServiceConnection,
   ServiceConnectionUpdate,
   ServiceStatus,
@@ -1004,6 +1006,160 @@ export function useGetSonarrQueue<TData = Awaited<ReturnType<typeof getSonarrQue
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetSonarrQueueQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetRadarrQueueUrl = () => {
+
+
+
+
+  return `/api/widgets/radarr`
+}
+
+/**
+ * @summary Get upcoming movie releases or active download queue from Radarr
+ */
+export const getRadarrQueue = async ( options?: RequestInit): Promise<RadarrData> => {
+
+  return customFetch<RadarrData>(getGetRadarrQueueUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetRadarrQueueQueryKey = () => {
+    return [
+    `/api/widgets/radarr`
+    ] as const;
+    }
+
+
+export const getGetRadarrQueueQueryOptions = <TData = Awaited<ReturnType<typeof getRadarrQueue>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRadarrQueue>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetRadarrQueueQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getRadarrQueue>>> = ({ signal }) => getRadarrQueue({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getRadarrQueue>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetRadarrQueueQueryResult = NonNullable<Awaited<ReturnType<typeof getRadarrQueue>>>
+export type GetRadarrQueueQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get upcoming movie releases or active download queue from Radarr
+ */
+
+export function useGetRadarrQueue<TData = Awaited<ReturnType<typeof getRadarrQueue>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRadarrQueue>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetRadarrQueueQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetQbittorrentStatusUrl = () => {
+
+
+
+
+  return `/api/widgets/qbittorrent`
+}
+
+/**
+ * @summary Get active torrents and global transfer stats from qBittorrent
+ */
+export const getQbittorrentStatus = async ( options?: RequestInit): Promise<QbittorrentData> => {
+
+  return customFetch<QbittorrentData>(getGetQbittorrentStatusUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetQbittorrentStatusQueryKey = () => {
+    return [
+    `/api/widgets/qbittorrent`
+    ] as const;
+    }
+
+
+export const getGetQbittorrentStatusQueryOptions = <TData = Awaited<ReturnType<typeof getQbittorrentStatus>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getQbittorrentStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetQbittorrentStatusQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getQbittorrentStatus>>> = ({ signal }) => getQbittorrentStatus({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getQbittorrentStatus>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetQbittorrentStatusQueryResult = NonNullable<Awaited<ReturnType<typeof getQbittorrentStatus>>>
+export type GetQbittorrentStatusQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get active torrents and global transfer stats from qBittorrent
+ */
+
+export function useGetQbittorrentStatus<TData = Awaited<ReturnType<typeof getQbittorrentStatus>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getQbittorrentStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetQbittorrentStatusQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

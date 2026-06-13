@@ -1,7 +1,8 @@
 import { Router } from "express";
-import axios from "axios";
 import { requireAuth } from "../lib/auth.js";
 import { connectionStmts } from "../lib/db.js";
+import { httpClient } from "../lib/http.js";
+import { logger } from "../lib/logger.js";
 
 const router = Router();
 
@@ -45,15 +46,41 @@ function getSavedConnection(service: string): SavedConnection {
 
 // ────────────────────────────────────────────────
 // TrueNAS SCALE Widget
-// Uses JSON-RPC 2.0 over HTTP API
 // ────────────────────────────────────────────────
+// Build a legend→latest-value map for a single reporting graph. TrueNAS returns
+// each graph as { legend: string[], data: number[][], aggregations? }. Each data
+// row begins with a unix timestamp, so the values align with the legend after
+// dropping that first column. Prefer the aggregated mean when present.
+function latestByLegend(graph: unknown): Record<string, number> {
+  const g = graph as
+    | { legend?: string[]; data?: number[][]; aggregations?: { mean?: number[] } }
+    | undefined;
+  const legend = g?.legend ?? [];
+
+  let values: number[];
+  const mean = g?.aggregations?.mean;
+  if (Array.isArray(mean)) {
+    values = mean.map((n) => Number(n) || 0);
+  } else {
+    const rows = g?.data ?? [];
+    const last = rows[rows.length - 1] ?? [];
+    values = last.slice(1).map((n) => Number(n) || 0);
+  }
+
+  const map: Record<string, number> = {};
+  legend.forEach((name, i) => {
+    map[name] = values[i] ?? 0;
+  });
+  return map;
+}
+
 router.get("/truenas", requireAuth, async (_req, res) => {
   const saved = getSavedConnection("truenas");
   const baseUrl = saved.url || process.env["TRUENAS_URL"];
   const apiKey = saved.apiKey || process.env["TRUENAS_API_KEY"];
 
   if (!baseUrl || !apiKey) {
-    // Return mock data when not configured
+    // Sample data only when the service is genuinely unconfigured.
     res.json({
       cpuPercent: 12.4,
       memUsedGb: 14.2,
@@ -67,45 +94,69 @@ router.get("/truenas", requireAuth, async (_req, res) => {
   }
 
   try {
-    const headers = { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" };
+    const headers = { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" };
 
-    // CPU usage
-    const cpuRes = await axios.get(`${baseUrl}/api/v2.0/reporting/get_data`, {
-      headers,
-      data: JSON.stringify({ graphs: [{ name: "cpu" }], reporting_query: { start: "now-30s", end: "now" } }),
-      timeout: 5000,
-    }).catch(() => null);
+    // The reporting endpoint must be a POST with the query as the JSON body.
+    // (Issuing a GET with a body does not reliably send the payload.) Both
+    // graphs can be requested in a single call.
+    const [reportRes, poolRes] = await Promise.all([
+      httpClient.post(
+        `${baseUrl}/api/v2.0/reporting/get_data`,
+        {
+          graphs: [{ name: "cpu" }, { name: "memory" }],
+          reporting_query: { start: "now-30s", end: "now", aggregate: true },
+        },
+        { headers },
+      ),
+      httpClient.get(`${baseUrl}/api/v2.0/pool`, { headers }),
+    ]);
 
-    // Memory
-    const memRes = await axios.get(`${baseUrl}/api/v2.0/reporting/get_data`, {
-      headers,
-      data: JSON.stringify({ graphs: [{ name: "memory" }], reporting_query: { start: "now-30s", end: "now" } }),
-      timeout: 5000,
-    }).catch(() => null);
+    const graphs = (reportRes.data ?? []) as Array<{ name?: string }>;
+    const cpuGraph = graphs.find((g) => g.name === "cpu") ?? graphs[0];
+    const memGraph = graphs.find((g) => g.name === "memory") ?? graphs[1];
 
-    // Pools
-    const poolRes = await axios.get(`${baseUrl}/api/v2.0/pool`, { headers, timeout: 5000 }).catch(() => null);
+    // CPU is reported per-state in percent; usage is everything that isn't idle.
+    const cpu = latestByLegend(cpuGraph);
+    const idle = cpu["idle"] ?? 0;
+    const cpuPercent = Math.min(100, Math.max(0, 100 - idle));
 
-    const cpuPercent = cpuRes?.data?.[0]?.data?.slice(-1)?.[0]?.[1] ?? 0;
-    const memData = memRes?.data?.[0]?.data?.slice(-1)?.[0];
-    const memUsedGb = memData ? (memData[1] ?? 0) / 1e9 : 0;
-    const memTotalGb = memData ? ((memData[1] ?? 0) + (memData[2] ?? 0)) / 1e9 : 0;
+    // Memory legend values are in bytes. "used" is real usage; total is the sum
+    // of the physical-memory buckets that are present.
+    const mem = latestByLegend(memGraph);
+    const memUsedBytes = mem["used"] ?? 0;
+    const memTotalBytes =
+      (mem["used"] ?? 0) +
+      (mem["free"] ?? 0) +
+      (mem["cached"] ?? 0) +
+      (mem["buffers"] ?? 0);
+    const memUsedGb = memUsedBytes / 1e9;
+    const memTotalGb = memTotalBytes / 1e9;
 
-    // TrueNAS pool stats: bytes[0] = used, bytes[1] = available (free)
-    const pools = (poolRes?.data ?? []).map((p: { name: string; status: string; topology?: { data?: Array<{ stats?: { bytes: number[] } }> } }) => {
-      const usedBytes = p.topology?.data?.[0]?.stats?.bytes?.[0] ?? 0;
-      const freeBytes = p.topology?.data?.[0]?.stats?.bytes?.[1] ?? 0;
-      return {
-        name: p.name,
-        status: p.status,
-        usedBytes,
-        totalBytes: usedBytes + freeBytes,
-      };
+    // Pool capacity comes from the ZFS vdev stats in the topology. Sum the data
+    // vdevs: `allocated`/`alloc` is used space, `size`/`space` is total.
+    const pools = ((poolRes.data ?? []) as Array<{
+      name: string;
+      status: string;
+      topology?: { data?: Array<{ stats?: { allocated?: number; alloc?: number; size?: number; space?: number } }> };
+    }>).map((p) => {
+      let usedBytes = 0;
+      let totalBytes = 0;
+      for (const vdev of p.topology?.data ?? []) {
+        const stats = vdev.stats ?? {};
+        usedBytes += stats.allocated ?? stats.alloc ?? 0;
+        totalBytes += stats.size ?? stats.space ?? 0;
+      }
+      return { name: p.name, status: p.status, usedBytes, totalBytes };
     });
 
-    res.json({ cpuPercent: Number(cpuPercent.toFixed(1)), memUsedGb, memTotalGb, pools });
+    res.json({
+      cpuPercent: Number(cpuPercent.toFixed(1)),
+      memUsedGb,
+      memTotalGb,
+      pools,
+    });
   } catch (err) {
-    console.error("TrueNAS error:", err);
+    logger.error({ err }, "TrueNAS widget error");
     res.status(502).json({ error: "Failed to fetch TrueNAS data" });
   }
 });
@@ -140,7 +191,7 @@ router.get("/media", requireAuth, async (_req, res) => {
 
   try {
     if (serverType === "jellyfin") {
-      const r = await axios.get(`${baseUrl}/Items`, {
+      const r = await httpClient.get(`${baseUrl}/Items`, {
         params: {
           SortBy: "DateCreated",
           SortOrder: "Descending",
@@ -152,7 +203,6 @@ router.get("/media", requireAuth, async (_req, res) => {
           EnableImageTypes: "Primary,Thumb",
           api_key: apiKey,
         },
-        timeout: 5000,
       });
       const items = (r.data?.Items ?? []).map((item: { Id: string; Name: string; Type: string; ProductionYear?: number; ImageTags?: { Primary?: string }; DateCreated?: string }) => ({
         id: item.Id,
@@ -166,10 +216,10 @@ router.get("/media", requireAuth, async (_req, res) => {
       }));
       res.json(items);
     } else {
-      // Plex
-      const r = await axios.get(`${baseUrl}/library/recentlyAdded`, {
+      // Plex — recently added items. The token rides as the X-Plex-Token header
+      // and is also appended to thumbnail URLs so the browser can load them.
+      const r = await httpClient.get(`${baseUrl}/library/recentlyAdded`, {
         headers: { "X-Plex-Token": apiKey, Accept: "application/json" },
-        timeout: 5000,
       });
       const items = (r.data?.MediaContainer?.Metadata ?? []).slice(0, 6).map((item: { ratingKey: string; title: string; type: string; year?: number; thumb?: string; addedAt?: number }) => ({
         id: String(item.ratingKey),
@@ -182,7 +232,7 @@ router.get("/media", requireAuth, async (_req, res) => {
       res.json(items);
     }
   } catch (err) {
-    console.error("Media server error:", err);
+    logger.error({ err }, "Media widget error");
     res.status(502).json({ error: "Failed to fetch media data" });
   }
 });
@@ -217,23 +267,33 @@ router.get("/sonarr", requireAuth, async (_req, res) => {
     const end = new Date(now.getTime() + 7 * 86400000);
 
     const [queueRes, calendarRes] = await Promise.all([
-      axios.get(`${baseUrl}/api/v3/queue`, { headers, timeout: 5000 }).catch(() => null),
-      axios.get(`${baseUrl}/api/v3/calendar`, {
+      // includeEpisode/includeSeries so each queue record carries the show and
+      // episode info; queue is paged and returns its rows under `records`.
+      httpClient.get(`${baseUrl}/api/v3/queue`, {
         headers,
-        params: { start: now.toISOString().split("T")[0], end: end.toISOString().split("T")[0] },
-        timeout: 5000,
-      }).catch(() => null),
+        params: { pageSize: 50, includeEpisode: true, includeSeries: true },
+      }),
+      // includeSeries so the calendar entries carry the series title (otherwise
+      // the upcoming list renders blank titles).
+      httpClient.get(`${baseUrl}/api/v3/calendar`, {
+        headers,
+        params: {
+          start: now.toISOString().split("T")[0],
+          end: end.toISOString().split("T")[0],
+          includeSeries: true,
+        },
+      }),
     ]);
 
-    const queue = (queueRes?.data?.records ?? []).slice(0, 5).map((item: { id: number; title: string; status: string; sizeleft?: number; size?: number }) => ({
+    const queue = (queueRes.data?.records ?? []).slice(0, 5).map((item: { id: number; title: string; status: string; sizeleft?: number; size?: number; series?: { title: string } }) => ({
       id: item.id,
-      title: item.title,
+      title: item.series?.title ?? item.title,
       status: item.status,
       progress: item.size ? Math.round((1 - (item.sizeleft ?? 0) / item.size) * 100) : 0,
       size: item.size ?? null,
     }));
 
-    const upcoming = (calendarRes?.data ?? []).slice(0, 5).map((ep: { id: number; title: string; series?: { title: string }; airDateUtc?: string; seasonNumber?: number; episodeNumber?: number }) => ({
+    const upcoming = (calendarRes.data ?? []).slice(0, 5).map((ep: { id: number; title: string; series?: { title: string }; airDateUtc?: string; seasonNumber?: number; episodeNumber?: number }) => ({
       id: ep.id,
       title: ep.title,
       seriesTitle: ep.series?.title ?? "",
@@ -244,8 +304,159 @@ router.get("/sonarr", requireAuth, async (_req, res) => {
 
     res.json({ queue, upcoming });
   } catch (err) {
-    console.error("Sonarr error:", err);
+    logger.error({ err }, "Sonarr widget error");
     res.status(502).json({ error: "Failed to fetch Sonarr data" });
+  }
+});
+
+// ────────────────────────────────────────────────
+// Radarr Widget
+// ────────────────────────────────────────────────
+router.get("/radarr", requireAuth, async (_req, res) => {
+  const saved = getSavedConnection("radarr");
+  const baseUrl = saved.url || process.env["RADARR_URL"];
+  const apiKey = saved.apiKey || process.env["RADARR_API_KEY"];
+
+  if (!baseUrl || !apiKey) {
+    const now = new Date();
+    const soon = new Date(now.getTime() + 3 * 86400000);
+    res.json({
+      queue: [
+        { id: 1, title: "Dune: Part Two", status: "downloading", progress: 42.1, size: 8.4e9 },
+        { id: 2, title: "The Batman", status: "paused", progress: 0, size: 6.0e9 },
+      ],
+      upcoming: [
+        { id: 201, title: "Furiosa", releaseDate: soon.toISOString().split("T")[0]!, year: 2024 },
+        { id: 202, title: "Deadpool & Wolverine", releaseDate: now.toISOString().split("T")[0]!, year: 2024 },
+      ],
+    });
+    return;
+  }
+
+  try {
+    const headers = { "X-Api-Key": apiKey };
+    const now = new Date();
+    const end = new Date(now.getTime() + 30 * 86400000);
+
+    const [queueRes, calendarRes] = await Promise.all([
+      // includeMovie so each queue record carries the movie title; paged rows
+      // live under `records`.
+      httpClient.get(`${baseUrl}/api/v3/queue`, {
+        headers,
+        params: { pageSize: 50, includeMovie: true },
+      }),
+      // includeMovie so calendar entries carry the movie details/titles.
+      httpClient.get(`${baseUrl}/api/v3/calendar`, {
+        headers,
+        params: {
+          start: now.toISOString().split("T")[0],
+          end: end.toISOString().split("T")[0],
+          includeMovie: true,
+        },
+      }),
+    ]);
+
+    const queue = (queueRes.data?.records ?? []).slice(0, 5).map((item: { id: number; title: string; status: string; sizeleft?: number; size?: number; movie?: { title: string } }) => ({
+      id: item.id,
+      title: item.movie?.title ?? item.title,
+      status: item.status,
+      progress: item.size ? Math.round((1 - (item.sizeleft ?? 0) / item.size) * 100) : 0,
+      size: item.size ?? null,
+    }));
+
+    const upcoming = (calendarRes.data ?? []).slice(0, 5).map((m: { id: number; title: string; year?: number; inCinemas?: string; physicalRelease?: string; digitalRelease?: string }) => {
+      const release = m.digitalRelease || m.physicalRelease || m.inCinemas || "";
+      return {
+        id: m.id,
+        title: m.title,
+        releaseDate: release ? release.split("T")[0] : "",
+        year: m.year ?? null,
+      };
+    });
+
+    res.json({ queue, upcoming });
+  } catch (err) {
+    logger.error({ err }, "Radarr widget error");
+    res.status(502).json({ error: "Failed to fetch Radarr data" });
+  }
+});
+
+// ────────────────────────────────────────────────
+// qBittorrent Widget
+// ────────────────────────────────────────────────
+// qBittorrent uses session-cookie auth: log in to obtain the SID cookie, then
+// reuse it for every subsequent call.
+function extractSid(setCookie: string[] | undefined): string | undefined {
+  for (const cookie of setCookie ?? []) {
+    const match = /SID=([^;]+)/.exec(cookie);
+    if (match) return match[1];
+  }
+  return undefined;
+}
+
+router.get("/qbittorrent", requireAuth, async (_req, res) => {
+  const saved = getSavedConnection("qbittorrent");
+  const baseUrl = saved.url || process.env["QBITTORRENT_URL"];
+  const username = saved.username || process.env["QBITTORRENT_USERNAME"];
+  const password = saved.password ?? process.env["QBITTORRENT_PASSWORD"];
+
+  if (!baseUrl || !username || password == null) {
+    res.json({
+      torrents: [
+        { name: "ubuntu-24.04-desktop-amd64.iso", progress: 73.5, state: "downloading", dlSpeed: 5.2e6, upSpeed: 1.1e5 },
+        { name: "archlinux-x86_64.iso", progress: 100, state: "uploading", dlSpeed: 0, upSpeed: 8.4e5 },
+      ],
+      downloadSpeed: 5.2e6,
+      uploadSpeed: 9.5e5,
+    });
+    return;
+  }
+
+  try {
+    // 1) Log in to obtain the SID session cookie.
+    const form = new URLSearchParams({ username, password });
+    const loginRes = await httpClient.post(`${baseUrl}/api/v2/auth/login`, form.toString(), {
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    });
+
+    if (typeof loginRes.data === "string" && loginRes.data.trim() === "Fails.") {
+      res.status(502).json({ error: "qBittorrent authentication failed" });
+      return;
+    }
+
+    const sid = extractSid(loginRes.headers["set-cookie"] as string[] | undefined);
+    if (!sid) {
+      res.status(502).json({ error: "qBittorrent did not return a session" });
+      return;
+    }
+    const cookieHeaders = { Cookie: `SID=${sid}` };
+
+    // 2) Fetch active torrents + global transfer stats, reusing the cookie.
+    const [torrentsRes, transferRes] = await Promise.all([
+      httpClient.get(`${baseUrl}/api/v2/torrents/info`, { headers: cookieHeaders }),
+      httpClient.get(`${baseUrl}/api/v2/transfer/info`, { headers: cookieHeaders }),
+    ]);
+
+    const torrents = ((torrentsRes.data ?? []) as Array<{ name: string; progress: number; state: string; dlspeed: number; upspeed: number }>)
+      .slice(0, 8)
+      .map((t) => ({
+        name: t.name,
+        progress: Math.round((t.progress ?? 0) * 100),
+        state: t.state,
+        dlSpeed: t.dlspeed ?? 0,
+        upSpeed: t.upspeed ?? 0,
+      }));
+
+    const transfer = (transferRes.data ?? {}) as { dl_info_speed?: number; up_info_speed?: number };
+
+    res.json({
+      torrents,
+      downloadSpeed: transfer.dl_info_speed ?? 0,
+      uploadSpeed: transfer.up_info_speed ?? 0,
+    });
+  } catch (err) {
+    logger.error({ err }, "qBittorrent widget error");
+    res.status(502).json({ error: "Failed to fetch qBittorrent data" });
   }
 });
 

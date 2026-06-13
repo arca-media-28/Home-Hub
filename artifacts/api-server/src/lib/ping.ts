@@ -1,4 +1,4 @@
-import axios from "axios";
+import { httpClient, normalizeHttpError, HTTP_TIMEOUT } from "./http.js";
 import type { DbServiceConnection } from "./db.js";
 
 export interface TestValues {
@@ -14,7 +14,7 @@ export interface TestResult {
   message: string;
 }
 
-const TIMEOUT = 6000;
+const TIMEOUT = HTTP_TIMEOUT;
 
 function trimSlash(url: string): string {
   return url.replace(/\/+$/, "");
@@ -33,27 +33,24 @@ export async function pingService(service: string, v: TestValues): Promise<TestR
   switch (service) {
     case "truenas": {
       if (!v.apiKey) return { ok: false, message: "Enter an API Key first." };
-      await axios.get(`${base}/api/v2.0/system/info`, {
+      await httpClient.get(`${base}/api/v2.0/system/info`, {
         headers: { Authorization: `Bearer ${v.apiKey}` },
-        timeout: TIMEOUT,
       });
       return { ok: true, message: "Connected" };
     }
     case "plex": {
       const plexToken = v.token?.trim() || v.apiKey?.trim();
       if (!plexToken) return { ok: false, message: "Enter a Plex Token or API Key first." };
-      await axios.get(`${base}/identity`, {
+      await httpClient.get(`${base}/identity`, {
         headers: { "X-Plex-Token": plexToken, Accept: "application/json" },
-        timeout: TIMEOUT,
       });
       return { ok: true, message: "Connected" };
     }
     case "sonarr":
     case "radarr": {
       if (!v.apiKey) return { ok: false, message: "Enter an API Key first." };
-      await axios.get(`${base}/api/v3/system/status`, {
+      await httpClient.get(`${base}/api/v3/system/status`, {
         headers: { "X-Api-Key": v.apiKey },
-        timeout: TIMEOUT,
       });
       return { ok: true, message: "Connected" };
     }
@@ -62,9 +59,8 @@ export async function pingService(service: string, v: TestValues): Promise<TestR
         return { ok: false, message: "Enter a username and password first." };
       }
       const form = new URLSearchParams({ username: v.username, password: v.password });
-      const r = await axios.post(`${base}/api/v2/auth/login`, form.toString(), {
+      const r = await httpClient.post(`${base}/api/v2/auth/login`, form.toString(), {
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        timeout: TIMEOUT,
       });
       if (typeof r.data === "string" && r.data.trim() === "Fails.") {
         return { ok: false, message: "Invalid username or password." };
@@ -82,21 +78,7 @@ export async function runPing(service: string, values: TestValues): Promise<Test
   try {
     return await pingService(service, values);
   } catch (err) {
-    let message = "Could not reach service";
-    if (axios.isAxiosError(err)) {
-      if (err.response) {
-        const status = err.response.status;
-        message =
-          status === 401 || status === 403
-            ? "Authentication failed — check your credentials."
-            : `Service responded with an error (${status}).`;
-      } else if (err.code === "ECONNABORTED") {
-        message = "Connection timed out.";
-      } else {
-        message = "Could not reach service — check the URL and port.";
-      }
-    }
-    return { ok: false, message };
+    return { ok: false, message: normalizeHttpError(err) };
   }
 }
 

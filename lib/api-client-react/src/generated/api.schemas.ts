@@ -38,6 +38,8 @@ export const TileType = {
   truenas: 'truenas',
   media: 'media',
   sonarr: 'sonarr',
+  radarr: 'radarr',
+  qbittorrent: 'qbittorrent',
 } as const;
 
 /**
@@ -82,6 +84,8 @@ export const TileInputType = {
   truenas: 'truenas',
   media: 'media',
   sonarr: 'sonarr',
+  radarr: 'radarr',
+  qbittorrent: 'qbittorrent',
 } as const;
 
 export interface TileInput {
@@ -218,5 +222,42 @@ export interface SonarrUpcomingItem {
 export interface SonarrData {
   queue: SonarrQueueItem[];
   upcoming: SonarrUpcomingItem[];
+}
+
+export interface RadarrQueueItem {
+  id: number;
+  title: string;
+  status: string;
+  /** @nullable */
+  progress?: number | null;
+  /** @nullable */
+  size?: number | null;
+}
+
+export interface RadarrUpcomingItem {
+  id: number;
+  title: string;
+  releaseDate: string;
+  /** @nullable */
+  year?: number | null;
+}
+
+export interface RadarrData {
+  queue: RadarrQueueItem[];
+  upcoming: RadarrUpcomingItem[];
+}
+
+export interface QbittorrentTorrent {
+  name: string;
+  progress: number;
+  state: string;
+  dlSpeed: number;
+  upSpeed: number;
+}
+
+export interface QbittorrentData {
+  torrents: QbittorrentTorrent[];
+  downloadSpeed: number;
+  uploadSpeed: number;
 }
 
