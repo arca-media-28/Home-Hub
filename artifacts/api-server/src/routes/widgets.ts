@@ -394,6 +394,46 @@ function extractSid(setCookie: string[] | undefined): string | undefined {
   return undefined;
 }
 
+// qBittorrent bans clients that log in too frequently, and the tile polls every
+// ~10s. Cache the SID per connection (keyed by baseUrl + username) and reuse it
+// across polls, re-authenticating only when the session has expired (403) or no
+// session is cached yet.
+const qbSidCache = new Map<string, string>();
+
+function qbCacheKey(baseUrl: string, username: string): string {
+  return `${baseUrl}\u0000${username}`;
+}
+
+// Log in to qBittorrent, cache the resulting SID, and return it. Throws a tagged
+// error when authentication is rejected or no session cookie is returned.
+async function qbLogin(baseUrl: string, username: string, password: string): Promise<string> {
+  const form = new URLSearchParams({ username, password });
+  const loginRes = await httpClient.post(`${baseUrl}/api/v2/auth/login`, form.toString(), {
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+  });
+
+  if (typeof loginRes.data === "string" && loginRes.data.trim() === "Fails.") {
+    throw new Error("qb-auth-failed");
+  }
+
+  const sid = extractSid(loginRes.headers["set-cookie"] as string[] | undefined);
+  if (!sid) {
+    throw new Error("qb-no-session");
+  }
+
+  qbSidCache.set(qbCacheKey(baseUrl, username), sid);
+  return sid;
+}
+
+function isAuthError(err: unknown): boolean {
+  return (
+    typeof err === "object" &&
+    err !== null &&
+    "response" in err &&
+    (err as { response?: { status?: number } }).response?.status === 403
+  );
+}
+
 router.get("/qbittorrent", requireAuth, async (_req, res) => {
   const saved = getSavedConnection("qbittorrent");
   const baseUrl = saved.url || process.env["QBITTORRENT_URL"];
@@ -412,30 +452,38 @@ router.get("/qbittorrent", requireAuth, async (_req, res) => {
     return;
   }
 
-  try {
-    // 1) Log in to obtain the SID session cookie.
-    const form = new URLSearchParams({ username, password });
-    const loginRes = await httpClient.post(`${baseUrl}/api/v2/auth/login`, form.toString(), {
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    });
-
-    if (typeof loginRes.data === "string" && loginRes.data.trim() === "Fails.") {
-      res.status(502).json({ error: "qBittorrent authentication failed" });
-      return;
-    }
-
-    const sid = extractSid(loginRes.headers["set-cookie"] as string[] | undefined);
-    if (!sid) {
-      res.status(502).json({ error: "qBittorrent did not return a session" });
-      return;
-    }
-    const cookieHeaders = { Cookie: `SID=${sid}` };
-
-    // 2) Fetch active torrents + global transfer stats, reusing the cookie.
-    const [torrentsRes, transferRes] = await Promise.all([
-      httpClient.get(`${baseUrl}/api/v2/torrents/info`, { headers: cookieHeaders }),
-      httpClient.get(`${baseUrl}/api/v2/transfer/info`, { headers: cookieHeaders }),
+  // Fetch torrents + transfer stats with a given SID. Lets 403s propagate so the
+  // caller can decide whether to re-authenticate.
+  const fetchData = (sid: string) =>
+    Promise.all([
+      httpClient.get(`${baseUrl}/api/v2/torrents/info`, { headers: { Cookie: `SID=${sid}` } }),
+      httpClient.get(`${baseUrl}/api/v2/transfer/info`, { headers: { Cookie: `SID=${sid}` } }),
     ]);
+
+  const key = qbCacheKey(baseUrl, username);
+
+  try {
+    // Reuse the cached SID when present; only log in when there is none.
+    let sid = qbSidCache.get(key);
+    if (!sid) {
+      sid = await qbLogin(baseUrl, username, password);
+    }
+
+    let torrentsRes;
+    let transferRes;
+    try {
+      [torrentsRes, transferRes] = await fetchData(sid);
+    } catch (err) {
+      // A cached session can expire server-side; on a 403 drop it, log in once
+      // more, and retry the data fetch a single time.
+      if (isAuthError(err)) {
+        qbSidCache.delete(key);
+        sid = await qbLogin(baseUrl, username, password);
+        [torrentsRes, transferRes] = await fetchData(sid);
+      } else {
+        throw err;
+      }
+    }
 
     const torrents = ((torrentsRes.data ?? []) as Array<{ name: string; progress: number; state: string; dlspeed: number; upspeed: number }>)
       .slice(0, 8)
@@ -455,6 +503,14 @@ router.get("/qbittorrent", requireAuth, async (_req, res) => {
       uploadSpeed: transfer.up_info_speed ?? 0,
     });
   } catch (err) {
+    if (err instanceof Error && err.message === "qb-auth-failed") {
+      res.status(502).json({ error: "qBittorrent authentication failed" });
+      return;
+    }
+    if (err instanceof Error && err.message === "qb-no-session") {
+      res.status(502).json({ error: "qBittorrent did not return a session" });
+      return;
+    }
     logger.error({ err }, "qBittorrent widget error");
     res.status(502).json({ error: "Failed to fetch qBittorrent data" });
   }
