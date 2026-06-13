@@ -1,16 +1,56 @@
 import { Router } from "express";
 import axios from "axios";
 import { requireAuth } from "../lib/auth.js";
+import { connectionStmts } from "../lib/db.js";
 
 const router = Router();
+
+// Saved connection details, normalized for widget consumption.
+interface SavedConnection {
+  url?: string;
+  apiKey?: string;
+  username?: string;
+  password?: string;
+  token?: string;
+}
+
+function trimSlash(url: string): string {
+  return url.replace(/\/+$/, "");
+}
+
+// Read a service's saved connection from the DB. Returns an empty object when
+// the service has no row or no values stored. The `extra` column holds a JSON
+// blob that may carry a Plex token.
+function getSavedConnection(service: string): SavedConnection {
+  const row = connectionStmts.findByService.get(service);
+  if (!row) return {};
+
+  let token: string | undefined;
+  if (row.extra) {
+    try {
+      token = (JSON.parse(row.extra) as { token?: string }).token ?? undefined;
+    } catch {
+      token = undefined;
+    }
+  }
+
+  return {
+    url: row.url?.trim() ? trimSlash(row.url.trim()) : undefined,
+    apiKey: row.api_key?.trim() || undefined,
+    username: row.username?.trim() || undefined,
+    password: row.password ?? undefined,
+    token,
+  };
+}
 
 // ────────────────────────────────────────────────
 // TrueNAS SCALE Widget
 // Uses JSON-RPC 2.0 over HTTP API
 // ────────────────────────────────────────────────
 router.get("/truenas", requireAuth, async (_req, res) => {
-  const baseUrl = process.env["TRUENAS_URL"];
-  const apiKey = process.env["TRUENAS_API_KEY"];
+  const saved = getSavedConnection("truenas");
+  const baseUrl = saved.url || process.env["TRUENAS_URL"];
+  const apiKey = saved.apiKey || process.env["TRUENAS_API_KEY"];
 
   if (!baseUrl || !apiKey) {
     // Return mock data when not configured
@@ -74,9 +114,20 @@ router.get("/truenas", requireAuth, async (_req, res) => {
 // Media Server Widget (Plex or Jellyfin)
 // ────────────────────────────────────────────────
 router.get("/media", requireAuth, async (_req, res) => {
-  const serverType = process.env["MEDIA_SERVER_TYPE"] || "jellyfin"; // "plex" | "jellyfin"
-  const baseUrl = process.env["MEDIA_SERVER_URL"];
-  const apiKey = process.env["MEDIA_SERVER_API_KEY"];
+  // Prefer saved Plex connection details; fall back to env-configured media
+  // server (which may be Plex or Jellyfin).
+  const saved = getSavedConnection("plex");
+  const savedToken = saved.token || saved.apiKey;
+
+  let serverType = process.env["MEDIA_SERVER_TYPE"] || "jellyfin"; // "plex" | "jellyfin"
+  let baseUrl = process.env["MEDIA_SERVER_URL"];
+  let apiKey = process.env["MEDIA_SERVER_API_KEY"];
+
+  if (saved.url && savedToken) {
+    serverType = "plex";
+    baseUrl = saved.url;
+    apiKey = savedToken;
+  }
 
   if (!baseUrl || !apiKey) {
     res.json([
@@ -140,8 +191,9 @@ router.get("/media", requireAuth, async (_req, res) => {
 // Sonarr Widget
 // ────────────────────────────────────────────────
 router.get("/sonarr", requireAuth, async (_req, res) => {
-  const baseUrl = process.env["SONARR_URL"];
-  const apiKey = process.env["SONARR_API_KEY"];
+  const saved = getSavedConnection("sonarr");
+  const baseUrl = saved.url || process.env["SONARR_URL"];
+  const apiKey = saved.apiKey || process.env["SONARR_API_KEY"];
 
   if (!baseUrl || !apiKey) {
     const now = new Date();
