@@ -82,26 +82,53 @@ async function pingService(service: string, v: TestValues): Promise<TestResult> 
   }
 }
 
-function formatConnection(c: DbServiceConnection) {
-  let token: string | null = null;
-  if (c.extra) {
-    try {
-      const parsed = JSON.parse(c.extra) as { token?: string };
-      token = parsed.token ?? null;
-    } catch {
-      token = null;
-    }
+function extractToken(extra: string | null): string | null {
+  if (!extra) return null;
+  try {
+    const parsed = JSON.parse(extra) as { token?: string };
+    return parsed.token ?? null;
+  } catch {
+    return null;
   }
+}
 
+function formatConnection(c: DbServiceConnection) {
   return {
     service: c.service,
     url: c.url,
     apiKey: c.api_key,
     username: c.username,
     password: c.password,
-    token,
+    token: extractToken(c.extra),
     updatedAt: c.updated_at,
   };
+}
+
+// Convert a stored connection row into the values pingService expects.
+function rowToTestValues(c: DbServiceConnection): TestValues {
+  return {
+    url: c.url ?? undefined,
+    apiKey: c.api_key ?? undefined,
+    username: c.username ?? undefined,
+    password: c.password ?? undefined,
+    token: extractToken(c.extra) ?? undefined,
+  };
+}
+
+// Translate a thrown error from pingService into a user-facing message,
+// mirroring the handling used by the on-demand test route.
+function pingErrorMessage(err: unknown): string {
+  if (axios.isAxiosError(err)) {
+    if (err.response) {
+      const status = err.response.status;
+      return status === 401 || status === 403
+        ? "Authentication failed — check your credentials."
+        : `Service responded with an error (${status}).`;
+    }
+    if (err.code === "ECONNABORTED") return "Connection timed out.";
+    return "Could not reach service — check the URL and port.";
+  }
+  return "Could not reach service";
 }
 
 // GET /api/connections — list all saved service connections
@@ -157,22 +184,33 @@ router.post("/:service/test", requireAuth, async (req, res) => {
     const result = await pingService(service, body);
     res.json(result);
   } catch (err) {
-    let message = "Could not reach service";
-    if (axios.isAxiosError(err)) {
-      if (err.response) {
-        const status = err.response.status;
-        message =
-          status === 401 || status === 403
-            ? "Authentication failed — check your credentials."
-            : `Service responded with an error (${status}).`;
-      } else if (err.code === "ECONNABORTED") {
-        message = "Connection timed out.";
-      } else {
-        message = "Could not reach service — check the URL and port.";
-      }
-    }
-    res.json({ ok: false, message });
+    res.json({ ok: false, message: pingErrorMessage(err) });
   }
+});
+
+// GET /api/connections/status — ping every saved connection and report whether
+// each backing service is currently reachable. Reuses pingService so the
+// dashboard shows the same status the on-demand test would.
+router.get("/status", requireAuth, async (_req, res) => {
+  const rows = connectionStmts.findAll.all();
+  const bySaved = new Map(rows.map((r) => [r.service, r]));
+
+  const statuses = await Promise.all(
+    SUPPORTED_SERVICES.map(async (service) => {
+      const row = bySaved.get(service);
+      if (!row) {
+        return { service, configured: false, ok: false, message: "Not configured" };
+      }
+      try {
+        const result = await pingService(service, rowToTestValues(row));
+        return { service, configured: true, ok: result.ok, message: result.message };
+      } catch (err) {
+        return { service, configured: true, ok: false, message: pingErrorMessage(err) };
+      }
+    })
+  );
+
+  res.json(statuses);
 });
 
 export default router;

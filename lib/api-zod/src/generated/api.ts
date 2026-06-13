@@ -268,6 +268,18 @@ export const GetConnectionsResponse = zod.array(GetConnectionsResponseItem)
 
 
 /**
+ * @summary Report current reachability of every saved service connection
+ */
+export const GetConnectionsStatusResponseItem = zod.object({
+  "service": zod.string(),
+  "configured": zod.boolean(),
+  "ok": zod.boolean(),
+  "message": zod.string()
+})
+export const GetConnectionsStatusResponse = zod.array(GetConnectionsStatusResponseItem)
+
+
+/**
  * @summary Test a service connection using the supplied values without saving
  */
 export const TestConnectionParams = zod.object({

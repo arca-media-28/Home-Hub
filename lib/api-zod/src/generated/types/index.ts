@@ -16,6 +16,7 @@ export * from './layoutUpdate';
 export * from './mediaItem';
 export * from './serviceConnection';
 export * from './serviceConnectionUpdate';
+export * from './serviceStatus';
 export * from './sonarrData';
 export * from './sonarrQueueItem';
 export * from './sonarrUpcomingItem';

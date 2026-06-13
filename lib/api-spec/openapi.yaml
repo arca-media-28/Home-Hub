@@ -295,6 +295,23 @@ paths:
                 items:
                   $ref: "#/components/schemas/ServiceConnection"
 
+  /connections/status:
+    get:
+      operationId: getConnectionsStatus
+      tags: [connections]
+      summary: Report current reachability of every saved service connection
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Per-service reachability status
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ServiceStatus"
+
   /connections/{service}/test:
     post:
       operationId: testConnection
@@ -563,6 +580,19 @@ components:
       type: object
       required: [ok, message]
       properties:
+        ok:
+          type: boolean
+        message:
+          type: string
+
+    ServiceStatus:
+      type: object
+      required: [service, configured, ok, message]
+      properties:
+        service:
+          type: string
+        configured:
+          type: boolean
         ok:
           type: boolean
         message:

@@ -6,6 +6,7 @@ import {
   useUpdateConnection,
   useTestConnection,
   getGetConnectionsQueryKey,
+  getGetConnectionsStatusQueryKey,
   getGetMeQueryKey,
   type ServiceConnection,
   type ServiceConnectionUpdate,
@@ -141,6 +142,8 @@ function ServiceCard({
           (old) =>
             old?.map((c) => (c.service === data.service ? data : c)) ?? [data],
         );
+        // Re-ping so the dashboard's reachability badge reflects the new settings.
+        queryClient.invalidateQueries({ queryKey: getGetConnectionsStatusQueryKey() });
         setSavedAt(true);
         setTimeout(() => setSavedAt(false), 2000);
       },

@@ -154,6 +154,13 @@ export interface ConnectionTestResult {
   message: string;
 }
 
+export interface ServiceStatus {
+  service: string;
+  configured: boolean;
+  ok: boolean;
+  message: string;
+}
+
 export interface ZfsPool {
   name: string;
   status: string;

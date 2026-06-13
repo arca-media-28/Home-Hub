@@ -6,10 +6,13 @@ import {
   useGetMe,
   useGetTiles,
   useSaveLayout,
+  useGetConnectionsStatus,
   TileType,
   getGetMeQueryKey,
   getGetTilesQueryKey,
+  getGetConnectionsStatusQueryKey,
   type Tile,
+  type ServiceStatus,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -71,6 +74,40 @@ function renderTileContent(tile: Tile) {
   }
 }
 
+// Maps a live-widget tile to the saved connection it pings. App tiles have no
+// backing service and so get no reachability badge.
+const TILE_SERVICE: Partial<Record<Tile["type"], string>> = {
+  [TileType.truenas]: "truenas",
+  [TileType.media]: "plex",
+  [TileType.sonarr]: "sonarr",
+};
+
+function StatusBadge({ status }: { status: ServiceStatus | undefined }) {
+  // No saved connection yet — nothing to report.
+  if (!status || !status.configured) return null;
+
+  const color = status.ok ? "bg-green-500" : "bg-red-500";
+  const label = status.ok ? "Reachable" : status.message;
+
+  return (
+    <div
+      className="absolute top-1.5 left-1.5 z-20 flex items-center gap-1 pointer-events-none"
+      title={status.message}
+      aria-label={`Service ${status.ok ? "reachable" : "unreachable"}: ${status.message}`}
+    >
+      <span className="relative flex h-2 w-2">
+        {status.ok && (
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-500/60" />
+        )}
+        <span className={`relative inline-flex h-2 w-2 rounded-full ${color}`} />
+      </span>
+      <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground bg-background/70 px-1 leading-tight">
+        {label}
+      </span>
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -110,6 +147,20 @@ export default function Dashboard() {
   const { data: tiles = [], isLoading } = useGetTiles({
     query: { queryKey: getGetTilesQueryKey(), enabled: Boolean(me) },
   });
+
+  // Poll service reachability so each live-widget tile shows an up/down badge.
+  // Refetches on a timer and whenever the dashboard regains focus (e.g. after
+  // saving a connection in Settings).
+  const { data: statuses } = useGetConnectionsStatus({
+    query: {
+      queryKey: getGetConnectionsStatusQueryKey(),
+      enabled: Boolean(me),
+      refetchInterval: 30_000,
+      refetchOnWindowFocus: true,
+    },
+  });
+
+  const statusByService = new Map((statuses ?? []).map((s) => [s.service, s]));
 
   const saveLayout = useSaveLayout({
     mutation: {
@@ -355,6 +406,9 @@ export default function Dashboard() {
                         <Pencil className="w-3 h-3" />
                       </button>
                     </div>
+                  )}
+                  {TILE_SERVICE[tile.type] && (
+                    <StatusBadge status={statusByService.get(TILE_SERVICE[tile.type]!)} />
                   )}
                   {renderTileContent(tile)}
                 </div>

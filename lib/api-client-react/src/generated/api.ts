@@ -29,6 +29,7 @@ import type {
   MediaItem,
   ServiceConnection,
   ServiceConnectionUpdate,
+  ServiceStatus,
   SonarrData,
   Tile,
   TileInput,
@@ -1079,6 +1080,83 @@ export function useGetConnections<TData = Awaited<ReturnType<typeof getConnectio
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetConnectionsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetConnectionsStatusUrl = () => {
+
+
+
+
+  return `/api/connections/status`
+}
+
+/**
+ * @summary Report current reachability of every saved service connection
+ */
+export const getConnectionsStatus = async ( options?: RequestInit): Promise<ServiceStatus[]> => {
+
+  return customFetch<ServiceStatus[]>(getGetConnectionsStatusUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetConnectionsStatusQueryKey = () => {
+    return [
+    `/api/connections/status`
+    ] as const;
+    }
+
+
+export const getGetConnectionsStatusQueryOptions = <TData = Awaited<ReturnType<typeof getConnectionsStatus>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getConnectionsStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetConnectionsStatusQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getConnectionsStatus>>> = ({ signal }) => getConnectionsStatus({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getConnectionsStatus>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetConnectionsStatusQueryResult = NonNullable<Awaited<ReturnType<typeof getConnectionsStatus>>>
+export type GetConnectionsStatusQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Report current reachability of every saved service connection
+ */
+
+export function useGetConnectionsStatus<TData = Awaited<ReturnType<typeof getConnectionsStatus>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getConnectionsStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetConnectionsStatusQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
