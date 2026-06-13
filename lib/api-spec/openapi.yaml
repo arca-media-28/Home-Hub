@@ -312,6 +312,23 @@ paths:
                 items:
                   $ref: "#/components/schemas/ServiceStatus"
 
+  /connections/health:
+    get:
+      operationId: getConnectionHealth
+      tags: [connections]
+      summary: Last-known health of each saved connection from the background scheduler
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Connection health snapshots
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ConnectionHealth"
+
   /connections/{service}/test:
     post:
       operationId: testConnection
@@ -596,6 +613,19 @@ components:
         ok:
           type: boolean
         message:
+          type: string
+
+    ConnectionHealth:
+      type: object
+      required: [service, ok, message, checkedAt]
+      properties:
+        service:
+          type: string
+        ok:
+          type: boolean
+        message:
+          type: string
+        checkedAt:
           type: string
 
     TruenasMetrics:

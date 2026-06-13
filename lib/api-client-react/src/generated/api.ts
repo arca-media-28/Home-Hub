@@ -22,6 +22,7 @@ import type {
 import type {
   AuthCredentials,
   AuthResponse,
+  ConnectionHealth,
   ConnectionTestResult,
   ErrorResponse,
   HealthStatus,
@@ -1157,6 +1158,83 @@ export function useGetConnectionsStatus<TData = Awaited<ReturnType<typeof getCon
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetConnectionsStatusQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetConnectionHealthUrl = () => {
+
+
+
+
+  return `/api/connections/health`
+}
+
+/**
+ * @summary Last-known health of each saved connection from the background scheduler
+ */
+export const getConnectionHealth = async ( options?: RequestInit): Promise<ConnectionHealth[]> => {
+
+  return customFetch<ConnectionHealth[]>(getGetConnectionHealthUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetConnectionHealthQueryKey = () => {
+    return [
+    `/api/connections/health`
+    ] as const;
+    }
+
+
+export const getGetConnectionHealthQueryOptions = <TData = Awaited<ReturnType<typeof getConnectionHealth>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getConnectionHealth>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetConnectionHealthQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getConnectionHealth>>> = ({ signal }) => getConnectionHealth({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getConnectionHealth>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetConnectionHealthQueryResult = NonNullable<Awaited<ReturnType<typeof getConnectionHealth>>>
+export type GetConnectionHealthQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Last-known health of each saved connection from the background scheduler
+ */
+
+export function useGetConnectionHealth<TData = Awaited<ReturnType<typeof getConnectionHealth>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getConnectionHealth>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetConnectionHealthQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

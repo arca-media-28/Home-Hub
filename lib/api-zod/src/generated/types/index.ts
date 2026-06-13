@@ -8,6 +8,7 @@
 
 export * from './authCredentials';
 export * from './authResponse';
+export * from './connectionHealth';
 export * from './connectionTestResult';
 export * from './errorResponse';
 export * from './healthStatus';

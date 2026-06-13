@@ -16,6 +16,7 @@ import {
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { useHealthAlerts } from "@/hooks/use-health-alerts";
 import AppTile from "@/components/tiles/AppTile";
 import TruenasTile from "@/components/tiles/TruenasTile";
 import MediaTile from "@/components/tiles/MediaTile";
@@ -161,6 +162,9 @@ export default function Dashboard() {
   });
 
   const statusByService = new Map((statuses ?? []).map((s) => [s.service, s]));
+
+  // Surface a toast whenever a previously-healthy service goes unreachable.
+  useHealthAlerts(Boolean(me));
 
   const saveLayout = useSaveLayout({
     mutation: {

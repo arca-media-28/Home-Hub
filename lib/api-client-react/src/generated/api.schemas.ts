@@ -161,6 +161,13 @@ export interface ServiceStatus {
   message: string;
 }
 
+export interface ConnectionHealth {
+  service: string;
+  ok: boolean;
+  message: string;
+  checkedAt: string;
+}
+
 export interface ZfsPool {
   name: string;
   status: string;

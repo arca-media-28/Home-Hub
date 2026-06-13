@@ -61,6 +61,13 @@ db.exec(`
     extra TEXT,
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
+
+  CREATE TABLE IF NOT EXISTS service_health (
+    service TEXT PRIMARY KEY,
+    ok INTEGER NOT NULL,
+    message TEXT NOT NULL,
+    checked_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
 `);
 
 // Instance-wide connection settings for the supported services. Seed an empty
@@ -179,5 +186,29 @@ export const connectionStmts = {
        password = excluded.password,
        extra = excluded.extra,
        updated_at = datetime('now')`
+  ),
+};
+
+export interface DbServiceHealth {
+  service: string;
+  ok: number;
+  message: string;
+  checked_at: string;
+}
+
+export const healthStmts = {
+  findAll: db.prepare<[], DbServiceHealth>(
+    "SELECT * FROM service_health ORDER BY service ASC"
+  ),
+  upsert: db.prepare<[string, number, string], void>(
+    `INSERT INTO service_health (service, ok, message, checked_at)
+     VALUES (?, ?, ?, datetime('now'))
+     ON CONFLICT(service) DO UPDATE SET
+       ok = excluded.ok,
+       message = excluded.message,
+       checked_at = datetime('now')`
+  ),
+  delete: db.prepare<[string], void>(
+    "DELETE FROM service_health WHERE service = ?"
   ),
 };

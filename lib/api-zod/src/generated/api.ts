@@ -280,6 +280,18 @@ export const GetConnectionsStatusResponse = zod.array(GetConnectionsStatusRespon
 
 
 /**
+ * @summary Last-known health of each saved connection from the background scheduler
+ */
+export const GetConnectionHealthResponseItem = zod.object({
+  "service": zod.string(),
+  "ok": zod.boolean(),
+  "message": zod.string(),
+  "checkedAt": zod.string()
+})
+export const GetConnectionHealthResponse = zod.array(GetConnectionHealthResponseItem)
+
+
+/**
  * @summary Test a service connection using the supplied values without saving
  */
 export const TestConnectionParams = zod.object({
