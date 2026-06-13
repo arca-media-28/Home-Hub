@@ -23,6 +23,7 @@ import {
   useUpdateTile,
   useDeleteTile,
   TileType,
+  TileIntegration,
   type Tile,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -36,13 +37,17 @@ interface TileEditModalProps {
   mode: EditMode;
 }
 
-const TILE_TYPES = [
-  { value: TileType.app, label: "App / Link" },
-  { value: TileType.truenas, label: "TrueNAS Metrics" },
-  { value: TileType.media, label: "Media Server" },
-  { value: TileType.sonarr, label: "Sonarr" },
-  { value: TileType.radarr, label: "Radarr" },
-  { value: TileType.qbittorrent, label: "qBittorrent" },
+const NONE = "none";
+
+// Optional integrations a tile can attach. "None" keeps the tile a plain
+// app/link shortcut.
+const INTEGRATIONS = [
+  { value: NONE, label: "None" },
+  { value: TileIntegration.media, label: "Plex / Media Server" },
+  { value: TileIntegration.sonarr, label: "Sonarr" },
+  { value: TileIntegration.radarr, label: "Radarr" },
+  { value: TileIntegration.qbittorrent, label: "qBittorrent" },
+  { value: TileIntegration.truenas, label: "TrueNAS" },
 ] as const;
 
 const IMAGE_FITS = [
@@ -56,7 +61,7 @@ export default function TileEditModal({ open, onOpenChange, tile, mode }: TileEd
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const [type, setType] = useState<string>(tile?.type ?? TileType.app);
+  const [integration, setIntegration] = useState<string>(tile?.integration ?? NONE);
   const [name, setName] = useState(tile?.name ?? "");
   const [url, setUrl] = useState(tile?.url ?? "");
   const [bgColor, setBgColor] = useState(tile?.bgColor ?? "#1c1c20");
@@ -67,7 +72,7 @@ export default function TileEditModal({ open, onOpenChange, tile, mode }: TileEd
 
   useEffect(() => {
     if (open) {
-      setType(tile?.type ?? TileType.app);
+      setIntegration(tile?.integration ?? NONE);
       setName(tile?.name ?? "");
       setUrl(tile?.url ?? "");
       setBgColor(tile?.bgColor ?? "#1c1c20");
@@ -145,7 +150,12 @@ export default function TileEditModal({ open, onOpenChange, tile, mode }: TileEd
 
   function handleSave() {
     const data = {
-      type: type as typeof TileType[keyof typeof TileType],
+      // Every tile is stored as an app/link with an optional integration.
+      type: TileType.app,
+      integration:
+        integration === NONE
+          ? null
+          : (integration as typeof TileIntegration[keyof typeof TileIntegration]),
       name: name || undefined,
       url: url || undefined,
       bgColor: bgColor || undefined,
@@ -179,110 +189,109 @@ export default function TileEditModal({ open, onOpenChange, tile, mode }: TileEd
 
         <div className="space-y-4 py-2">
           <div className="space-y-1.5">
-            <Label>Type</Label>
-            <Select value={type} onValueChange={setType}>
+            <Label>Name</Label>
+            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="My App" />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>URL</Label>
+            <Input
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              placeholder="https://example.com"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Background Color</Label>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                className="w-8 h-8 rounded-md border border-border flex-shrink-0 shadow-sm"
+                style={{ background: bgColor }}
+                onClick={() => setShowColorPicker((v) => !v)}
+                aria-label="Pick color"
+              />
+              <Input
+                value={bgColor}
+                onChange={(e) => setBgColor(e.target.value)}
+                placeholder="#1c1c20"
+                className="font-mono text-sm"
+              />
+            </div>
+            {showColorPicker && (
+              <div className="mt-2">
+                <HexColorPicker color={bgColor} onChange={setBgColor} />
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Image URL</Label>
+            <Input
+              value={imageUrl}
+              onChange={(e) => setImageUrl(e.target.value)}
+              placeholder="https://…/icon.png"
+            />
+            <div className="flex items-center gap-2 mt-1">
+              <Label
+                htmlFor="file-upload"
+                className="cursor-pointer text-xs px-3 py-1.5 rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors"
+              >
+                {uploading ? "Uploading…" : "Upload image"}
+              </Label>
+              <input
+                id="file-upload"
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleUpload}
+                disabled={uploading}
+              />
+              {imageUrl && (
+                <img
+                  src={imageUrl}
+                  alt="preview"
+                  className="w-8 h-8 rounded object-cover border border-border"
+                />
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Image Fit</Label>
+            <Select value={imageFit} onValueChange={(v) => setImageFit(v as typeof imageFit)}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {TILE_TYPES.map((t) => (
-                  <SelectItem key={t.value} value={t.value}>
-                    {t.label}
+                {IMAGE_FITS.map((f) => (
+                  <SelectItem key={f.value} value={f.value}>
+                    {f.label}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
 
-          <div className="space-y-1.5">
-            <Label>Name</Label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="My App" />
+          <div className="space-y-1.5 border-t border-border pt-4">
+            <Label>App integration</Label>
+            <Select value={integration} onValueChange={setIntegration}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {INTEGRATIONS.map((i) => (
+                  <SelectItem key={i.value} value={i.value}>
+                    {i.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Optional. Attach a service to show its live status on this tile.
+            </p>
           </div>
-
-          {type === TileType.app && (
-            <>
-              <div className="space-y-1.5">
-                <Label>URL</Label>
-                <Input
-                  value={url}
-                  onChange={(e) => setUrl(e.target.value)}
-                  placeholder="https://example.com"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label>Background Color</Label>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    className="w-8 h-8 rounded-md border border-border flex-shrink-0 shadow-sm"
-                    style={{ background: bgColor }}
-                    onClick={() => setShowColorPicker((v) => !v)}
-                    aria-label="Pick color"
-                  />
-                  <Input
-                    value={bgColor}
-                    onChange={(e) => setBgColor(e.target.value)}
-                    placeholder="#1c1c20"
-                    className="font-mono text-sm"
-                  />
-                </div>
-                {showColorPicker && (
-                  <div className="mt-2">
-                    <HexColorPicker color={bgColor} onChange={setBgColor} />
-                  </div>
-                )}
-              </div>
-
-              <div className="space-y-1.5">
-                <Label>Image URL</Label>
-                <Input
-                  value={imageUrl}
-                  onChange={(e) => setImageUrl(e.target.value)}
-                  placeholder="https://…/icon.png"
-                />
-                <div className="flex items-center gap-2 mt-1">
-                  <Label
-                    htmlFor="file-upload"
-                    className="cursor-pointer text-xs px-3 py-1.5 rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors"
-                  >
-                    {uploading ? "Uploading…" : "Upload image"}
-                  </Label>
-                  <input
-                    id="file-upload"
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={handleUpload}
-                    disabled={uploading}
-                  />
-                  {imageUrl && (
-                    <img
-                      src={imageUrl}
-                      alt="preview"
-                      className="w-8 h-8 rounded object-cover border border-border"
-                    />
-                  )}
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <Label>Image Fit</Label>
-                <Select value={imageFit} onValueChange={(v) => setImageFit(v as typeof imageFit)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {IMAGE_FITS.map((f) => (
-                      <SelectItem key={f.value} value={f.value}>
-                        {f.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </>
-          )}
         </div>
 
         <DialogFooter className="flex-col sm:flex-row gap-2">

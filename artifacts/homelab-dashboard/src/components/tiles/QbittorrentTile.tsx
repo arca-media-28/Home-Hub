@@ -33,20 +33,14 @@ export default function QbittorrentTile() {
 
   return (
     <div className="w-full h-full p-3 flex flex-col gap-2 overflow-hidden">
-      <div className="flex items-center justify-between text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-        <span className="flex items-center gap-1.5">
-          <ArrowDownToLine className="w-3.5 h-3.5" />
-          qBittorrent
+      <div className="flex items-center justify-end gap-2 text-xs">
+        <span className="flex items-center gap-0.5 text-green-500">
+          <Download className="w-3 h-3" />
+          {formatSpeed(data.downloadSpeed)}
         </span>
-        <span className="flex items-center gap-2 normal-case tracking-normal">
-          <span className="flex items-center gap-0.5 text-green-500">
-            <Download className="w-3 h-3" />
-            {formatSpeed(data.downloadSpeed)}
-          </span>
-          <span className="flex items-center gap-0.5 text-blue-400">
-            <Upload className="w-3 h-3" />
-            {formatSpeed(data.uploadSpeed)}
-          </span>
+        <span className="flex items-center gap-0.5 text-blue-400">
+          <Upload className="w-3 h-3" />
+          {formatSpeed(data.uploadSpeed)}
         </span>
       </div>
 

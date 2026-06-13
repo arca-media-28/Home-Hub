@@ -45,6 +45,20 @@ export const TileType = {
 /**
  * @nullable
  */
+export type TileIntegration = typeof TileIntegration[keyof typeof TileIntegration] | null;
+
+
+export const TileIntegration = {
+  truenas: 'truenas',
+  media: 'media',
+  sonarr: 'sonarr',
+  radarr: 'radarr',
+  qbittorrent: 'qbittorrent',
+} as const;
+
+/**
+ * @nullable
+ */
 export type TileImageFit = typeof TileImageFit[keyof typeof TileImageFit] | null;
 
 
@@ -59,6 +73,8 @@ export interface Tile {
   id: number;
   userId: number;
   type: TileType;
+  /** @nullable */
+  integration?: TileIntegration;
   gridX: number;
   gridY: number;
   gridW: number;
@@ -88,8 +104,24 @@ export const TileInputType = {
   qbittorrent: 'qbittorrent',
 } as const;
 
+/**
+ * @nullable
+ */
+export type TileInputIntegration = typeof TileInputIntegration[keyof typeof TileInputIntegration] | null;
+
+
+export const TileInputIntegration = {
+  truenas: 'truenas',
+  media: 'media',
+  sonarr: 'sonarr',
+  radarr: 'radarr',
+  qbittorrent: 'qbittorrent',
+} as const;
+
 export interface TileInput {
   type: TileInputType;
+  /** @nullable */
+  integration?: TileInputIntegration;
   gridX: number;
   gridY: number;
   gridW: number;
@@ -101,7 +133,23 @@ export interface TileInput {
   imageFit?: string;
 }
 
+/**
+ * @nullable
+ */
+export type TileUpdateIntegration = typeof TileUpdateIntegration[keyof typeof TileUpdateIntegration] | null;
+
+
+export const TileUpdateIntegration = {
+  truenas: 'truenas',
+  media: 'media',
+  sonarr: 'sonarr',
+  radarr: 'radarr',
+  qbittorrent: 'qbittorrent',
+} as const;
+
 export interface TileUpdate {
+  /** @nullable */
+  integration?: TileUpdateIntegration;
   gridX?: number;
   gridY?: number;
   gridW?: number;

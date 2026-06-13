@@ -489,6 +489,9 @@ components:
         type:
           type: string
           enum: [app, truenas, media, sonarr, radarr, qbittorrent]
+        integration:
+          type: ["string", "null"]
+          enum: [truenas, media, sonarr, radarr, qbittorrent, null]
         gridX:
           type: integer
         gridY:
@@ -518,6 +521,9 @@ components:
         type:
           type: string
           enum: [app, truenas, media, sonarr, radarr, qbittorrent]
+        integration:
+          type: ["string", "null"]
+          enum: [truenas, media, sonarr, radarr, qbittorrent, null]
         gridX:
           type: integer
         gridY:
@@ -540,6 +546,9 @@ components:
     TileUpdate:
       type: object
       properties:
+        integration:
+          type: ["string", "null"]
+          enum: [truenas, media, sonarr, radarr, qbittorrent, null]
         gridX:
           type: integer
         gridY:

@@ -7,7 +7,6 @@ import {
   useGetTiles,
   useSaveLayout,
   useGetConnectionsStatus,
-  TileType,
   getGetMeQueryKey,
   getGetTilesQueryKey,
   getGetConnectionsStatusQueryKey,
@@ -18,11 +17,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { useHealthAlerts } from "@/hooks/use-health-alerts";
 import AppTile from "@/components/tiles/AppTile";
-import TruenasTile from "@/components/tiles/TruenasTile";
-import MediaTile from "@/components/tiles/MediaTile";
-import SonarrTile from "@/components/tiles/SonarrTile";
-import RadarrTile from "@/components/tiles/RadarrTile";
-import QbittorrentTile from "@/components/tiles/QbittorrentTile";
+import IntegrationTile from "@/components/tiles/IntegrationTile";
 import TileEditModal, { type EditMode } from "@/components/TileEditModal";
 import { Button } from "@/components/ui/button";
 import {
@@ -64,57 +59,23 @@ function tileToLayout(tile: Tile) {
   };
 }
 
-function renderTileContent(tile: Tile) {
-  switch (tile.type) {
-    case TileType.truenas:
-      return <TruenasTile />;
-    case TileType.media:
-      return <MediaTile />;
-    case TileType.sonarr:
-      return <SonarrTile />;
-    case TileType.radarr:
-      return <RadarrTile />;
-    case TileType.qbittorrent:
-      return <QbittorrentTile />;
-    default:
-      return <AppTile tile={tile} />;
-  }
-}
-
-// Maps a live-widget tile to the saved connection it pings. App tiles have no
-// backing service and so get no reachability badge.
-const TILE_SERVICE: Partial<Record<Tile["type"], string>> = {
-  [TileType.truenas]: "truenas",
-  [TileType.media]: "plex",
-  [TileType.sonarr]: "sonarr",
-  [TileType.radarr]: "radarr",
-  [TileType.qbittorrent]: "qbittorrent",
+// Maps a tile's integration to the saved connection it pings. Plain app/link
+// tiles (no integration) have no backing service and so get no reachability dot.
+const INTEGRATION_SERVICE: Record<string, string> = {
+  truenas: "truenas",
+  media: "plex",
+  sonarr: "sonarr",
+  radarr: "radarr",
+  qbittorrent: "qbittorrent",
 };
 
-function StatusBadge({ status }: { status: ServiceStatus | undefined }) {
-  // No saved connection yet — nothing to report.
-  if (!status || !status.configured) return null;
-
-  const color = status.ok ? "bg-green-500" : "bg-red-500";
-  const label = status.ok ? "Reachable" : status.message;
-
-  return (
-    <div
-      className="absolute top-1.5 left-1.5 z-20 flex items-center gap-1 pointer-events-none"
-      title={status.message}
-      aria-label={`Service ${status.ok ? "reachable" : "unreachable"}: ${status.message}`}
-    >
-      <span className="relative flex h-2 w-2">
-        {status.ok && (
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-500/60" />
-        )}
-        <span className={`relative inline-flex h-2 w-2 rounded-full ${color}`} />
-      </span>
-      <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground bg-background/70 px-1 leading-tight">
-        {label}
-      </span>
-    </div>
-  );
+function renderTileContent(tile: Tile, status?: ServiceStatus) {
+  // Every tile renders as a styled app/link card. When an integration is
+  // attached it also shows a compact live-status section from that service.
+  if (tile.integration) {
+    return <IntegrationTile tile={tile} status={status} />;
+  }
+  return <AppTile tile={tile} />;
 }
 
 export default function Dashboard() {
@@ -419,10 +380,12 @@ export default function Dashboard() {
                       </button>
                     </div>
                   )}
-                  {TILE_SERVICE[tile.type] && (
-                    <StatusBadge status={statusByService.get(TILE_SERVICE[tile.type]!)} />
+                  {renderTileContent(
+                    tile,
+                    tile.integration
+                      ? statusByService.get(INTEGRATION_SERVICE[tile.integration])
+                      : undefined,
                   )}
-                  {renderTileContent(tile)}
                 </div>
               ))}
             </Grid>

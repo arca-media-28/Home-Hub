@@ -5,8 +5,11 @@
  * Homelab Dashboard API
  * OpenAPI spec version: 0.1.0
  */
+import type { TileUpdateIntegration } from './tileUpdateIntegration';
 
 export interface TileUpdate {
+  /** @nullable */
+  integration?: TileUpdateIntegration;
   gridX?: number;
   gridY?: number;
   gridW?: number;

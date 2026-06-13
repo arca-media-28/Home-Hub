@@ -5,10 +5,13 @@
  * Homelab Dashboard API
  * OpenAPI spec version: 0.1.0
  */
+import type { TileInputIntegration } from './tileInputIntegration';
 import type { TileInputType } from './tileInputType';
 
 export interface TileInput {
   type: TileInputType;
+  /** @nullable */
+  integration?: TileInputIntegration;
   gridX: number;
   gridY: number;
   gridW: number;

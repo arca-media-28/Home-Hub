@@ -34,11 +34,6 @@ export default function RadarrTile() {
 
   return (
     <div className="w-full h-full p-3 flex flex-col gap-2 overflow-hidden">
-      <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-        <Film className="w-3.5 h-3.5" />
-        Radarr
-      </div>
-
       {hasQueue && (
         <div className="space-y-1">
           <p className="text-xs text-muted-foreground">Downloading</p>

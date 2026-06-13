@@ -9,6 +9,7 @@ function formatTile(t: DbTile) {
     id: t.id,
     userId: t.user_id,
     type: t.type,
+    integration: t.integration,
     gridX: t.grid_x,
     gridY: t.grid_y,
     gridW: t.grid_w,
@@ -32,6 +33,7 @@ router.get("/", requireAuth, (req: AuthRequest, res) => {
 router.post("/", requireAuth, (req: AuthRequest, res) => {
   const body = req.body as {
     type?: string;
+    integration?: string | null;
     gridX?: number;
     gridY?: number;
     gridW?: number;
@@ -44,16 +46,17 @@ router.post("/", requireAuth, (req: AuthRequest, res) => {
   };
 
   const createTile = db.prepare<
-    [number, string, number, number, number, number, string | null, string | null, string | null, string | null, string | null],
+    [number, string, string | null, number, number, number, number, string | null, string | null, string | null, string | null, string | null],
     { id: number }
   >(
-    `INSERT INTO tiles (user_id, type, grid_x, grid_y, grid_w, grid_h, name, url, bg_color, image_url, image_fit)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`
+    `INSERT INTO tiles (user_id, type, integration, grid_x, grid_y, grid_w, grid_h, name, url, bg_color, image_url, image_fit)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`
   );
 
   const row = createTile.get(
     req.user!.userId,
     body.type ?? "app",
+    body.integration ?? null,
     body.gridX ?? 0,
     body.gridY ?? 0,
     body.gridW ?? 2,
@@ -90,6 +93,7 @@ router.put("/:id", requireAuth, (req: AuthRequest, res) => {
   }
 
   const body = req.body as {
+    integration?: string | null;
     gridX?: number;
     gridY?: number;
     gridW?: number;
@@ -104,6 +108,7 @@ router.put("/:id", requireAuth, (req: AuthRequest, res) => {
   const updates: string[] = [];
   const params: (string | number | null)[] = [];
 
+  if (body.integration !== undefined) { updates.push("integration = ?"); params.push(body.integration); }
   if (body.gridX !== undefined) { updates.push("grid_x = ?"); params.push(body.gridX); }
   if (body.gridY !== undefined) { updates.push("grid_y = ?"); params.push(body.gridY); }
   if (body.gridW !== undefined) { updates.push("grid_w = ?"); params.push(body.gridW); }

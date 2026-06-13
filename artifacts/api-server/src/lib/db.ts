@@ -70,6 +70,25 @@ db.exec(`
   );
 `);
 
+// ── Migrations ────────────────────────────────────────────────────────────────
+// Every tile is now stored as an app/link with an optional `integration`.
+// 1. Add the nullable `integration` column (guarded so it is idempotent —
+//    SQLite has no "ADD COLUMN IF NOT EXISTS").
+const tileColumns = db.prepare("PRAGMA table_info(tiles)").all() as { name: string }[];
+if (!tileColumns.some((c) => c.name === "integration")) {
+  db.exec("ALTER TABLE tiles ADD COLUMN integration TEXT");
+}
+
+// 2. One-time data migration: existing integration-typed tiles become app/link
+//    tiles whose `integration` carries the old type. Styling fields are left
+//    untouched. After this runs `type` is 'app' so it never matches again.
+db.exec(`
+  UPDATE tiles
+  SET integration = type, type = 'app'
+  WHERE type IN ('media', 'sonarr', 'radarr', 'qbittorrent', 'truenas')
+    AND integration IS NULL
+`);
+
 // Instance-wide connection settings for the supported services. Seed an empty
 // row for each on first run so the settings page always has something to render.
 const SERVICE_CONNECTION_KEYS = ["truenas", "plex", "sonarr", "radarr", "qbittorrent"] as const;
@@ -94,6 +113,7 @@ export interface DbTile {
   id: number;
   user_id: number;
   type: string;
+  integration: string | null;
   grid_x: number;
   grid_y: number;
   grid_w: number;
@@ -145,11 +165,11 @@ export const tileStmts = {
     "SELECT * FROM tiles WHERE id = ? AND user_id = ?"
   ),
   create: db.prepare<
-    [number, string, number, number, number, number, string | null, string | null, string | null, string | null, string | null],
+    [number, string, string | null, number, number, number, number, string | null, string | null, string | null, string | null, string | null],
     { id: number }
   >(
-    `INSERT INTO tiles (user_id, type, grid_x, grid_y, grid_w, grid_h, name, url, bg_color, image_url, image_fit)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`
+    `INSERT INTO tiles (user_id, type, integration, grid_x, grid_y, grid_w, grid_h, name, url, bg_color, image_url, image_fit)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`
   ),
   delete: db.prepare<[number, number], void>(
     "DELETE FROM tiles WHERE id = ? AND user_id = ?"

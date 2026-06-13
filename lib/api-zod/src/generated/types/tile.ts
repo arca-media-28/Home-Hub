@@ -6,12 +6,15 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { TileImageFit } from './tileImageFit';
+import type { TileIntegration } from './tileIntegration';
 import type { TileType } from './tileType';
 
 export interface Tile {
   id: number;
   userId: number;
   type: TileType;
+  /** @nullable */
+  integration?: TileIntegration;
   gridX: number;
   gridY: number;
   gridW: number;

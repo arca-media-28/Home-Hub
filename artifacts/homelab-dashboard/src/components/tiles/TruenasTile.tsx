@@ -45,10 +45,6 @@ export default function TruenasTile() {
 
   return (
     <div className="w-full h-full p-3 flex flex-col gap-2 overflow-hidden">
-      <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-        <HardDrive className="w-3.5 h-3.5" />
-        TrueNAS
-      </div>
       <div className="space-y-2 flex-1">
         <Bar value={data.cpuPercent} label="CPU" />
         <Bar
