@@ -9,6 +9,25 @@ import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 const port = Number(process.env.PORT ?? 3000);
 const basePath = process.env.BASE_PATH ?? "/";
 
+// Local-dev only: bridge `/api` to the local API Server.
+// On Replit the platform's path-based router proxies `/api` to the API Server
+// artifact before requests ever reach Vite, so this proxy is gated to run only
+// when NOT on Replit (REPL_ID is undefined). It also has no effect on the
+// production build — `server.proxy` applies solely to the `vite` dev server,
+// so the Docker single-container setup (Express serving the frontend and
+// `/api`) is untouched. Keep frontend requests relative (`/api/...`).
+const isReplit = process.env.REPL_ID !== undefined;
+const apiProxyTarget =
+  process.env.VITE_API_PROXY_TARGET ?? "http://localhost:5000";
+const devProxy = isReplit
+  ? undefined
+  : {
+      "/api": {
+        target: apiProxyTarget,
+        changeOrigin: true,
+      },
+    };
+
 export default defineConfig({
   base: basePath,
   plugins: [
@@ -46,6 +65,7 @@ export default defineConfig({
     strictPort: true,
     host: "0.0.0.0",
     allowedHosts: true,
+    proxy: devProxy,
     fs: {
       strict: true,
     },

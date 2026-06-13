@@ -1,7 +1,8 @@
 import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { build as esbuild } from "esbuild";
+import { spawn } from "node:child_process";
+import { build as esbuild, context as esbuildContext } from "esbuild";
 import esbuildPluginPino from "esbuild-plugin-pino";
 import { rm } from "node:fs/promises";
 
@@ -9,12 +10,48 @@ import { rm } from "node:fs/promises";
 globalThis.require = createRequire(import.meta.url);
 
 const artifactDir = path.dirname(fileURLToPath(import.meta.url));
+const watch = process.argv.includes("--watch");
+
+// Local-dev hot reload: after each successful rebuild, (re)spawn the server.
+// Only used when this script is invoked with `--watch` (the `dev:watch` script);
+// the normal one-shot build path is unaffected.
+function makeRestartPlugin(entryFile) {
+  let child = null;
+  const stop = () => {
+    if (child && !child.killed) child.kill("SIGTERM");
+    child = null;
+  };
+  process.on("SIGINT", () => {
+    stop();
+    process.exit(0);
+  });
+  process.on("SIGTERM", () => {
+    stop();
+    process.exit(0);
+  });
+  return {
+    name: "restart-server",
+    setup(build) {
+      build.onEnd((result) => {
+        if (result.errors.length > 0) {
+          console.error("[dev:watch] build failed — server not restarted");
+          return;
+        }
+        stop();
+        child = spawn("node", ["--enable-source-maps", entryFile], {
+          stdio: "inherit",
+          env: process.env,
+        });
+      });
+    },
+  };
+}
 
 async function buildAll() {
   const distDir = path.resolve(artifactDir, "dist");
   await rm(distDir, { recursive: true, force: true });
 
-  await esbuild({
+  const esbuildOptions = {
     entryPoints: [path.resolve(artifactDir, "src/index.ts")],
     platform: "node",
     bundle: true,
@@ -117,7 +154,23 @@ globalThis.__filename = __bannerUrl.fileURLToPath(import.meta.url);
 globalThis.__dirname = __bannerPath.dirname(globalThis.__filename);
     `,
     },
+  };
+
+  if (!watch) {
+    await esbuild(esbuildOptions);
+    return;
+  }
+
+  // Watch mode (local dev): rebuild on change and restart the server via the
+  // restart plugin's onEnd hook (which fires after the initial build too).
+  const entryFile = path.resolve(distDir, "index.mjs");
+  const ctx = await esbuildContext({
+    ...esbuildOptions,
+    logLevel: "silent",
+    plugins: [...esbuildOptions.plugins, makeRestartPlugin(entryFile)],
   });
+  await ctx.watch();
+  console.log("[dev:watch] watching for changes — press Ctrl+C to stop");
 }
 
 buildAll().catch((err) => {

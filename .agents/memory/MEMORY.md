@@ -5,3 +5,4 @@
 - [Homelab theming](homelab-theming.md) — reskin whole app via index.css tokens; mirror :root/.dark, set all --radius-* (not just --radius) for sharp corners, watch hardcoded color leaks, verify authed views with runTest.
 - [service_connections is global](service-connections-global.md) — table keyed by service only (no userId); rows shared across all users; PUT clobbers real settings, beware testing on live.
 - [Widget data + HTTP convention](widget-data-convention.md) — mock only when unconfigured, configured-failure→502; shared httpClient (self-signed TLS) in lib/http.ts; TrueNAS/Sonarr/Radarr/qBittorrent API gotchas.
+- [Local dev loop](local-dev-loop.md) — run on LAN box for real connections; Vite `/api` proxy gated on REPL_ID (off on Replit); API hot reload via build.mjs --watch; `pnpm run dev:local`.
