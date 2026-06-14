@@ -1,0 +1,100 @@
+Updating 8033d8b..71b93c7
+Fast-forward
+ Dockerfile                                                     |   2 +
+ ...Sapientia-ox-Applications-HomeHub-HomeHub_1781419717121.txt | 122 ++++++++++++++++++++++++++++
+ 2 files changed, 124 insertions(+)
+ create mode 100644 attached_assets/Pasted-truenas-admin-Sapientia-ox-Applications-HomeHub-HomeHub_1781419717121.txt
+truenas_admin@Sapientia[...ox/Applications/HomeHub/HomeHubConfig]$ sudo docker compose up -d --build
+WARN[0000] /mnt/Toolbox/Applications/HomeHub/HomeHubConfig/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion 
+[+] Building 45.6s (26/29)                                                                         
+ => [internal] load local bake definitions                                                    0.0s
+ => => reading from stdin 436B                                                                0.0s
+ => [internal] load build definition from Dockerfile                                          0.0s
+ => => transferring dockerfile: 2.64kB                                                        0.0s
+ => [internal] load metadata for docker.io/library/node:20-alpine                             0.3s
+ => [internal] load .dockerignore                                                             0.0s
+ => => transferring context: 2B                                                               0.0s
+ => [frontend-builder  1/10] FROM docker.io/library/node:20-alpine@sha256:fb4cd12c85ee03686f  0.0s
+ => [internal] load build context                                                             0.1s
+ => => transferring context: 3.23MB                                                           0.1s
+ => CACHED [frontend-builder  2/10] WORKDIR /build                                            0.0s
+ => CACHED [frontend-builder  3/10] RUN apk add --no-cache python3 make g++                   0.0s
+ => CACHED [production  2/12] WORKDIR /app                                                    0.0s
+ => CACHED [production  3/12] RUN apk add --no-cache python3 make g++                         0.0s
+ => [frontend-builder  4/10] RUN npm install -g pnpm@10                                       1.0s
+ => [production  4/12] RUN npm install -g pnpm@10                                             1.0s
+ => [frontend-builder  5/10] COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./          0.1s
+ => [production  5/12] COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./                0.1s
+ => [frontend-builder  6/10] COPY tsconfig.base.json tsconfig.json ./                         0.1s 
+ => [production  6/12] COPY tsconfig.base.json tsconfig.json ./                               0.1s
+ => [frontend-builder  7/10] COPY lib/ lib/                                                   0.1s
+ => [production  7/12] COPY lib/ lib/                                                         0.1s
+ => [frontend-builder  8/10] COPY artifacts/homelab-dashboard/ artifacts/homelab-dashboard/   0.2s
+ => [api-builder  8/10] COPY artifacts/api-server/ artifacts/api-server/                      0.1s
+ => [production  8/12] COPY artifacts/api-server/package.json artifacts/api-server/           0.1s
+ => [api-builder  9/10] RUN pnpm install --frozen-lockfile                                   42.4s
+ => [production  9/12] RUN pnpm install --filter @workspace/api-server --prod                41.8s
+ => [frontend-builder  9/10] RUN pnpm install --frozen-lockfile                              42.4s
+ => ERROR [frontend-builder 10/10] RUN pnpm --filter @workspace/homelab-dashboard run build   1.0s
+ => CANCELED [api-builder 10/10] RUN pnpm --filter @workspace/api-server run build            1.1s
+------                                                                                             
+ > [frontend-builder 10/10] RUN pnpm --filter @workspace/homelab-dashboard run build:              
+0.876                                                                                              
+0.876 > @workspace/homelab-dashboard@0.0.0 build /build/artifacts/homelab-dashboard                
+0.876 > vite build --config vite.config.ts                                                         
+0.876                                                                                              
+0.951 /build/node_modules/.pnpm/rollup@4.60.3/node_modules/rollup/dist/native.js:115               
+0.951           throw new Error(                                                                   
+0.951                 ^                                                                            
+0.951                                                                                              
+0.951 Error: Cannot find module @rollup/rollup-linux-x64-musl. npm has a bug related to optional dependencies (https://github.com/npm/cli/issues/4828). Please try `npm i` again after removing both package-lock.json and node_modules directory.                                                       
+0.951     at requireWithFriendlyError (/build/node_modules/.pnpm/rollup@4.60.3/node_modules/rollup/dist/native.js:115:9)                                                                              
+0.951     at Object.<anonymous> (/build/node_modules/.pnpm/rollup@4.60.3/node_modules/rollup/dist/native.js:124:76)
+0.951     ... 3 lines matching cause stack trace ...
+0.951     at Module._load (node:internal/modules/cjs/loader:1091:12)
+0.951     at cjsLoader (node:internal/modules/esm/translators:298:15)
+0.951     at ModuleWrap.<anonymous> (node:internal/modules/esm/translators:240:7)
+0.951     at ModuleJob.run (node:internal/modules/esm/module_job:325:25)
+0.951     at async ModuleLoader.import (node:internal/modules/esm/loader:606:24) {
+0.951   [cause]: Error: Cannot find module '@rollup/rollup-linux-x64-musl'
+0.951   Require stack:
+0.951   - /build/node_modules/.pnpm/rollup@4.60.3/node_modules/rollup/dist/native.js
+0.951       at Module._resolveFilename (node:internal/modules/cjs/loader:1207:15)
+0.951       at Module._load (node:internal/modules/cjs/loader:1038:27)
+0.951       at Module.require (node:internal/modules/cjs/loader:1289:19)
+0.951       at require (node:internal/modules/helpers:182:18)
+0.951       at requireWithFriendlyError (/build/node_modules/.pnpm/rollup@4.60.3/node_modules/rollup/dist/native.js:97:10)
+0.951       at Object.<anonymous> (/build/node_modules/.pnpm/rollup@4.60.3/node_modules/rollup/dist/native.js:124:76)
+0.951       at Module._compile (node:internal/modules/cjs/loader:1521:14)
+0.951       at Module._extensions..js (node:internal/modules/cjs/loader:1623:10)
+0.951       at Module.load (node:internal/modules/cjs/loader:1266:32)
+0.951       at Module._load (node:internal/modules/cjs/loader:1091:12) {
+0.951     code: 'MODULE_NOT_FOUND',
+0.951     requireStack: [
+0.951       '/build/node_modules/.pnpm/rollup@4.60.3/node_modules/rollup/dist/native.js'
+0.951     ]
+0.951   }
+0.951 }
+0.951 
+0.951 Node.js v20.20.2
+0.978 /build/artifacts/homelab-dashboard:
+0.978  ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  @workspace/homelab-dashboard@0.0.0 build: `vite build --config vite.config.ts`
+0.978 Exit status 1
+------
+Dockerfile:40
+
+--------------------
+
+  38 |     ENV NODE_ENV=production
+
+  39 |     
+
+  40 | >>> RUN pnpm --filter @workspace/homelab-dashboard run build
+
+  41 |     
+
+  42 |     ##############################################
+
+--------------------
+
+failed to solve: process "/bin/sh -c pnpm --filter @workspace/homelab-dashboard run build" did not complete successfully: exit code: 1

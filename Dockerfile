@@ -1,10 +1,11 @@
 ##############################################
 # Stage 1: Build API server
 ##############################################
-FROM node:20-alpine AS api-builder
+FROM node:20-slim AS api-builder
 WORKDIR /build
 
-RUN apk add --no-cache python3 make g++
+RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ \
+  && rm -rf /var/lib/apt/lists/*
 
 RUN npm install -g pnpm@10
 
@@ -19,10 +20,11 @@ RUN pnpm --filter @workspace/api-server run build
 ##############################################
 # Stage 2: Build frontend
 ##############################################
-FROM node:20-alpine AS frontend-builder
+FROM node:20-slim AS frontend-builder
 WORKDIR /build
 
-RUN apk add --no-cache python3 make g++
+RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ \
+  && rm -rf /var/lib/apt/lists/*
 
 RUN npm install -g pnpm@10
 
@@ -42,10 +44,11 @@ RUN pnpm --filter @workspace/homelab-dashboard run build
 ##############################################
 # Stage 3: Production image
 ##############################################
-FROM node:20-alpine AS production
+FROM node:20-slim AS production
 WORKDIR /app
 
-RUN apk add --no-cache python3 make g++
+RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ \
+  && rm -rf /var/lib/apt/lists/*
 RUN npm install -g pnpm@10
 
 # Copy package files for production deps
