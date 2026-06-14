@@ -34,7 +34,7 @@ export default function AppTile({ tile }: AppTileProps) {
       <div
         className={`absolute inset-0 z-10 flex flex-col gap-1 p-2 ${title.containerClass}`}
       >
-        {tile.name && (
+        {tile.name && !tile.hideTitle && (
           <span
             className={`font-bold leading-tight tracking-wide drop-shadow-sm max-w-full truncate ${title.sizeClass} ${title.textAlignClass}`}
             style={{ color: tile.titleColor || (hasImage ? "#fff" : "inherit") }}

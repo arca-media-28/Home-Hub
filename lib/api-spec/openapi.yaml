@@ -595,6 +595,12 @@ components:
             means the default (white over an image, theme color otherwise).
             Ignored by integration (widget) tiles.
           type: ["string", "null"]
+        hideTitle:
+          description: >-
+            When true, the tile renders without its title text (image/widget
+            content only). Defaults to false (title shown). Applies to both
+            plain app/link tiles and integration (widget) tiles.
+          type: boolean
         metrics:
           description: >-
             Enabled metric keys for this tile's integration. Null means "show
@@ -643,6 +649,8 @@ components:
           type: ["string", "null"]
         titleColor:
           type: ["string", "null"]
+        hideTitle:
+          type: boolean
         metrics:
           type: ["array", "null"]
           items:
@@ -682,6 +690,8 @@ components:
           type: ["string", "null"]
         titleColor:
           type: ["string", "null"]
+        hideTitle:
+          type: boolean
         metrics:
           type: ["array", "null"]
           items:

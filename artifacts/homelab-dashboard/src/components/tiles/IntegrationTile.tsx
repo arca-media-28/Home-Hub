@@ -68,55 +68,88 @@ export default function IntegrationTile({ tile, status }: IntegrationTileProps) 
   const enabled = resolveEnabledMetrics(integration, tile.metrics);
   const density = tileDensity(tile.gridW, tile.gridH);
 
+  // The reachability dot, shared between the header and the collapsed-header
+  // overlay so the indicator survives hiding the title.
+  const statusDot = showDot ? (
+    <span className="flex h-2 w-2 flex-shrink-0">
+      {status?.ok && (
+        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-500/60" />
+      )}
+      <span className={`relative inline-flex h-2 w-2 rounded-full ${dotColor}`} />
+    </span>
+  ) : null;
+
+  // With the title hidden the header only earns its fixed height when the tile
+  // image fills it (the image becomes the icon). Without an image the header
+  // would be an empty colored bar — an awkward gap — so we drop it and float
+  // the status dot / open-link affordance over the widget body instead.
+  const showHeader = !tile.hideTitle || hasImage;
+
   return (
     <div className="w-full h-full flex flex-col overflow-hidden">
       {/* Styled header carrying the tile's custom name, background and image. */}
-      <div
-        className="relative h-11 flex-shrink-0 overflow-hidden flex items-center px-3 gap-1.5 group/header select-none"
-        style={{ background: bg }}
-        onClick={() => openTileUrl(tile.url)}
-        role={tile.url ? "link" : undefined}
-        title={tile.url || undefined}
-        // eslint-disable-next-line jsx-a11y/no-static-element-interactions
-      >
-        {hasImage && (
-          <img
-            src={tile.imageUrl!}
-            alt={tile.name || "tile"}
-            className={`absolute inset-0 w-full h-full ${image.className}`}
-            style={image.style}
-            draggable={false}
-          />
-        )}
-        <div className="absolute inset-0 bg-black/20 group-hover/header:bg-black/30 transition-colors" />
-
-        {showDot && (
-          <span className="relative z-10 flex h-2 w-2 flex-shrink-0">
-            {status?.ok && (
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-500/60" />
-            )}
-            <span className={`relative inline-flex h-2 w-2 rounded-full ${dotColor}`} />
-          </span>
-        )}
-
-        <span
-          className="relative z-10 font-bold text-sm leading-tight tracking-wide truncate drop-shadow-sm"
-          style={{ color: hasImage ? "#fff" : "inherit" }}
+      {showHeader && (
+        <div
+          className="relative h-11 flex-shrink-0 overflow-hidden flex items-center px-3 gap-1.5 group/header select-none"
+          style={{ background: bg }}
+          onClick={() => openTileUrl(tile.url)}
+          role={tile.url ? "link" : undefined}
+          title={tile.url || undefined}
+          // eslint-disable-next-line jsx-a11y/no-static-element-interactions
         >
-          {label}
-        </span>
+          {hasImage && (
+            <img
+              src={tile.imageUrl!}
+              alt={tile.name || "tile"}
+              className={`absolute inset-0 w-full h-full ${image.className}`}
+              style={image.style}
+              draggable={false}
+            />
+          )}
+          <div className="absolute inset-0 bg-black/20 group-hover/header:bg-black/30 transition-colors" />
 
-        {tile.url && (
-          <ExternalLink
-            className="relative z-10 w-3 h-3 flex-shrink-0 opacity-0 group-hover/header:opacity-70 transition-opacity"
-            style={{ color: hasImage ? "#fff" : "inherit" }}
-          />
-        )}
-      </div>
+          {statusDot && <span className="relative z-10">{statusDot}</span>}
+
+          {!tile.hideTitle && (
+            <span
+              className="relative z-10 font-bold text-sm leading-tight tracking-wide truncate drop-shadow-sm"
+              style={{ color: hasImage ? "#fff" : "inherit" }}
+            >
+              {label}
+            </span>
+          )}
+
+          {tile.url && (
+            <ExternalLink
+              className="relative z-10 w-3 h-3 flex-shrink-0 opacity-0 group-hover/header:opacity-70 transition-opacity"
+              style={{ color: hasImage ? "#fff" : "inherit" }}
+            />
+          )}
+        </div>
+      )}
 
       {/* Live-status section sourced from the integration. Size + the user's
-          metric selection drive how much detail is shown. */}
-      <div className="flex-1 min-h-0 overflow-y-auto border-t border-border">
+          metric selection drive how much detail is shown. When the header is
+          collapsed, the status dot / open-link float here so neither is lost. */}
+      <div
+        className={`relative flex-1 min-h-0 overflow-y-auto ${showHeader ? "border-t border-border" : ""}`}
+      >
+        {!showHeader && (statusDot || tile.url) && (
+          <div className="absolute top-1.5 right-1.5 z-10 flex items-center gap-1.5">
+            {statusDot}
+            {tile.url && (
+              <button
+                type="button"
+                onClick={() => openTileUrl(tile.url)}
+                title={tile.url}
+                aria-label="Open"
+                className="text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <ExternalLink className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+        )}
         {renderStatusView(integration, { enabled, density })}
       </div>
     </div>

@@ -105,6 +105,8 @@ export default function TileEditModal({ open, onOpenChange, tile, mode }: TileEd
   );
   // null = automatic title color (white over image, theme color otherwise).
   const [titleColor, setTitleColor] = useState<string | null>(tile?.titleColor ?? null);
+  // When true, the tile renders without its title text (icon-only look).
+  const [hideTitle, setHideTitle] = useState<boolean>(tile?.hideTitle ?? false);
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [showTitleColorPicker, setShowTitleColorPicker] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -127,6 +129,7 @@ export default function TileEditModal({ open, onOpenChange, tile, mode }: TileEd
       setTitleSize((tile?.titleSize as TitleSize) ?? DEFAULT_TITLE_SIZE);
       setTitlePosition((tile?.titlePosition as PositionKey) ?? DEFAULT_TITLE_POSITION);
       setTitleColor(tile?.titleColor ?? null);
+      setHideTitle(tile?.hideTitle ?? false);
       setMetrics(tile?.metrics ?? null);
       setShowColorPicker(false);
       setShowTitleColorPicker(false);
@@ -322,6 +325,8 @@ export default function TileEditModal({ open, onOpenChange, tile, mode }: TileEd
       titleSize: integration === NONE ? titleSize : null,
       titlePosition: integration === NONE ? titlePosition : null,
       titleColor: integration === NONE ? titleColor : null,
+      // Applies to both plain and integration tiles.
+      hideTitle,
       // Plain app/link tiles carry no metric selection.
       metrics: integration === NONE ? null : metrics,
       gridX: tile?.gridX ?? 0,
@@ -364,6 +369,18 @@ export default function TileEditModal({ open, onOpenChange, tile, mode }: TileEd
               placeholder="https://example.com"
             />
           </div>
+
+          <label
+            htmlFor="hide-title"
+            className="flex items-center gap-2 cursor-pointer select-none"
+          >
+            <Checkbox
+              id="hide-title"
+              checked={hideTitle}
+              onCheckedChange={(c) => setHideTitle(c === true)}
+            />
+            <span className="text-sm">Hide title text</span>
+          </label>
 
           {integration === NONE && (
             <div className="space-y-1.5">
@@ -499,7 +516,7 @@ export default function TileEditModal({ open, onOpenChange, tile, mode }: TileEd
               {imageUrl && <div className="absolute inset-0 bg-black/20" />}
               {/* Title overlay mirrors AppTile placement for plain tiles; widget
                   tiles keep their fixed header so just show a simple label. */}
-              {integration === NONE ? (
+              {hideTitle ? null : integration === NONE ? (
                 <div className={`absolute inset-0 flex flex-col gap-1 p-2 ${titlePreview.containerClass}`}>
                   <span
                     className={`font-bold leading-tight tracking-wide drop-shadow-sm truncate max-w-full ${titlePreview.sizeClass} ${titlePreview.textAlignClass}`}

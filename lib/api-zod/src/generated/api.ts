@@ -85,6 +85,7 @@ export const GetTilesResponseItem = zod.object({
   "titleSize": zod.string().nullish().describe('Size key for the tile title on plain app\/link tiles (e.g. \"sm\", \"md\", \"lg\", \"xl\"). Null means the default. Ignored by integration (widget) tiles.'),
   "titlePosition": zod.string().nullish().describe('Anchor key for where the tile title sits on plain app\/link tiles (e.g. \"center\", \"top-left\"). Null means the default. Ignored by integration (widget) tiles.'),
   "titleColor": zod.string().nullish().describe('CSS color for the tile title text on plain app\/link tiles. Null means the default (white over an image, theme color otherwise). Ignored by integration (widget) tiles.'),
+  "hideTitle": zod.boolean().optional().describe('When true, the tile renders without its title text (image\/widget content only). Defaults to false (title shown). Applies to both plain app\/link tiles and integration (widget) tiles.'),
   "metrics": zod.array(zod.string()).nullish().describe('Enabled metric keys for this tile\'s integration. Null means \"show all\" (the default for tiles created before metric selection existed).'),
   "createdAt": zod.string().optional()
 })
@@ -111,6 +112,7 @@ export const CreateTileBody = zod.object({
   "titleSize": zod.string().nullish(),
   "titlePosition": zod.string().nullish(),
   "titleColor": zod.string().nullish(),
+  "hideTitle": zod.boolean().optional(),
   "metrics": zod.array(zod.string()).nullish()
 })
 
@@ -141,6 +143,7 @@ export const GetTileResponse = zod.object({
   "titleSize": zod.string().nullish().describe('Size key for the tile title on plain app\/link tiles (e.g. \"sm\", \"md\", \"lg\", \"xl\"). Null means the default. Ignored by integration (widget) tiles.'),
   "titlePosition": zod.string().nullish().describe('Anchor key for where the tile title sits on plain app\/link tiles (e.g. \"center\", \"top-left\"). Null means the default. Ignored by integration (widget) tiles.'),
   "titleColor": zod.string().nullish().describe('CSS color for the tile title text on plain app\/link tiles. Null means the default (white over an image, theme color otherwise). Ignored by integration (widget) tiles.'),
+  "hideTitle": zod.boolean().optional().describe('When true, the tile renders without its title text (image\/widget content only). Defaults to false (title shown). Applies to both plain app\/link tiles and integration (widget) tiles.'),
   "metrics": zod.array(zod.string()).nullish().describe('Enabled metric keys for this tile\'s integration. Null means \"show all\" (the default for tiles created before metric selection existed).'),
   "createdAt": zod.string().optional()
 })
@@ -169,6 +172,7 @@ export const UpdateTileBody = zod.object({
   "titleSize": zod.string().nullish(),
   "titlePosition": zod.string().nullish(),
   "titleColor": zod.string().nullish(),
+  "hideTitle": zod.boolean().optional(),
   "metrics": zod.array(zod.string()).nullish()
 })
 
@@ -191,6 +195,7 @@ export const UpdateTileResponse = zod.object({
   "titleSize": zod.string().nullish().describe('Size key for the tile title on plain app\/link tiles (e.g. \"sm\", \"md\", \"lg\", \"xl\"). Null means the default. Ignored by integration (widget) tiles.'),
   "titlePosition": zod.string().nullish().describe('Anchor key for where the tile title sits on plain app\/link tiles (e.g. \"center\", \"top-left\"). Null means the default. Ignored by integration (widget) tiles.'),
   "titleColor": zod.string().nullish().describe('CSS color for the tile title text on plain app\/link tiles. Null means the default (white over an image, theme color otherwise). Ignored by integration (widget) tiles.'),
+  "hideTitle": zod.boolean().optional().describe('When true, the tile renders without its title text (image\/widget content only). Defaults to false (title shown). Applies to both plain app\/link tiles and integration (widget) tiles.'),
   "metrics": zod.array(zod.string()).nullish().describe('Enabled metric keys for this tile\'s integration. Null means \"show all\" (the default for tiles created before metric selection existed).'),
   "createdAt": zod.string().optional()
 })
@@ -236,6 +241,7 @@ export const SaveLayoutResponseItem = zod.object({
   "titleSize": zod.string().nullish().describe('Size key for the tile title on plain app\/link tiles (e.g. \"sm\", \"md\", \"lg\", \"xl\"). Null means the default. Ignored by integration (widget) tiles.'),
   "titlePosition": zod.string().nullish().describe('Anchor key for where the tile title sits on plain app\/link tiles (e.g. \"center\", \"top-left\"). Null means the default. Ignored by integration (widget) tiles.'),
   "titleColor": zod.string().nullish().describe('CSS color for the tile title text on plain app\/link tiles. Null means the default (white over an image, theme color otherwise). Ignored by integration (widget) tiles.'),
+  "hideTitle": zod.boolean().optional().describe('When true, the tile renders without its title text (image\/widget content only). Defaults to false (title shown). Applies to both plain app\/link tiles and integration (widget) tiles.'),
   "metrics": zod.array(zod.string()).nullish().describe('Enabled metric keys for this tile\'s integration. Null means \"show all\" (the default for tiles created before metric selection existed).'),
   "createdAt": zod.string().optional()
 })

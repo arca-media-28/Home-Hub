@@ -30,6 +30,7 @@ export interface TileUpdate {
   titlePosition?: string | null;
   /** @nullable */
   titleColor?: string | null;
+  hideTitle?: boolean;
   /** @nullable */
   metrics?: string[] | null;
 }

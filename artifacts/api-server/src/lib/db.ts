@@ -113,6 +113,13 @@ if (!tileColumns.some((c) => c.name === "title_color")) {
   db.exec("ALTER TABLE tiles ADD COLUMN title_color TEXT");
 }
 
+// 1e. Per-tile "hide title text" toggle. Stored as 0/1; defaults to 0 (title
+//     shown) so existing tiles keep rendering their title. Applies to both
+//     plain app/link tiles and integration (widget) tiles.
+if (!tileColumns.some((c) => c.name === "hide_title")) {
+  db.exec("ALTER TABLE tiles ADD COLUMN hide_title INTEGER NOT NULL DEFAULT 0");
+}
+
 // 2. One-time data migration: existing integration-typed tiles become app/link
 //    tiles whose `integration` carries the old type. Styling fields are left
 //    untouched. After this runs `type` is 'app' so it never matches again.
@@ -162,6 +169,7 @@ export interface DbTile {
   title_size: string | null;
   title_position: string | null;
   title_color: string | null;
+  hide_title: number;
   metrics: string | null;
   created_at: string;
 }

@@ -54,6 +54,8 @@ export interface Tile {
      * @nullable
      */
   titleColor?: string | null;
+  /** When true, the tile renders without its title text (image/widget content only). Defaults to false (title shown). Applies to both plain app/link tiles and integration (widget) tiles. */
+  hideTitle?: boolean;
   /**
      * Enabled metric keys for this tile's integration. Null means "show all" (the default for tiles created before metric selection existed).
      * @nullable
