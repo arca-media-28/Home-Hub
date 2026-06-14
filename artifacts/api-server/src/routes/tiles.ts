@@ -30,6 +30,7 @@ function serializeMetrics(value: unknown): string | null {
 // integrations can stash their own keys here.
 interface TileSettings {
   categoryFilter?: string[] | null;
+  groupByCategory?: boolean | null;
 }
 
 // Parse the stored tile_settings JSON blob into an object (or null = "no extra
@@ -47,6 +48,11 @@ function parseTileSettings(raw: string | null): TileSettings | null {
         );
       } else if (obj["categoryFilter"] === null) {
         result.categoryFilter = null;
+      }
+      if (typeof obj["groupByCategory"] === "boolean") {
+        result.groupByCategory = obj["groupByCategory"];
+      } else if (obj["groupByCategory"] === null) {
+        result.groupByCategory = null;
       }
       return result;
     }
@@ -68,6 +74,11 @@ function serializeTileSettings(value: unknown): string | null {
     );
   } else if (obj["categoryFilter"] === null) {
     result.categoryFilter = null;
+  }
+  if (typeof obj["groupByCategory"] === "boolean") {
+    result.groupByCategory = obj["groupByCategory"];
+  } else if (obj["groupByCategory"] === null) {
+    result.groupByCategory = null;
   }
   return JSON.stringify(result);
 }

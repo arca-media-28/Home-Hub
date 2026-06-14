@@ -121,6 +121,11 @@ export default function TileEditModal({ open, onOpenChange, tile, mode }: TileEd
   const [categoryFilter, setCategoryFilter] = useState<string[] | null>(
     tile?.tileSettings?.categoryFilter ?? null,
   );
+  // When true, the qBittorrent tile groups torrents under category headers
+  // instead of a flat list. Defaults to false (flat list).
+  const [groupByCategory, setGroupByCategory] = useState<boolean>(
+    tile?.tileSettings?.groupByCategory ?? false,
+  );
 
   useEffect(() => {
     if (open) {
@@ -140,6 +145,7 @@ export default function TileEditModal({ open, onOpenChange, tile, mode }: TileEd
       setHideTitle(tile?.hideTitle ?? false);
       setMetrics(tile?.metrics ?? null);
       setCategoryFilter(tile?.tileSettings?.categoryFilter ?? null);
+      setGroupByCategory(tile?.tileSettings?.groupByCategory ?? false);
       setShowColorPicker(false);
       setShowTitleColorPicker(false);
     }
@@ -376,8 +382,8 @@ export default function TileEditModal({ open, onOpenChange, tile, mode }: TileEd
       // Plain app/link tiles carry no metric selection.
       metrics: integration === NONE ? null : metrics,
       // qBittorrent is the only integration that uses tileSettings (category
-      // filter) for now; every other tile clears it.
-      tileSettings: isQbittorrent ? { categoryFilter } : null,
+      // filter + grouping) for now; every other tile clears it.
+      tileSettings: isQbittorrent ? { categoryFilter, groupByCategory } : null,
       gridX: tile?.gridX ?? 0,
       gridY: tile?.gridY ?? 0,
       gridW: tile?.gridW ?? 2,
@@ -804,6 +810,25 @@ export default function TileEditModal({ open, onOpenChange, tile, mode }: TileEd
                   </label>
                 ))}
               </div>
+            </div>
+          )}
+
+          {isQbittorrent && torrentsMetricOn && (
+            <div className="space-y-2 border-t border-border pt-4">
+              <label
+                htmlFor="group-by-category"
+                className="flex items-center gap-2 cursor-pointer select-none"
+              >
+                <Checkbox
+                  id="group-by-category"
+                  checked={groupByCategory}
+                  onCheckedChange={(c) => setGroupByCategory(c === true)}
+                />
+                <span className="text-sm">Group torrents by category</span>
+              </label>
+              <p className="text-xs text-muted-foreground">
+                Show torrents under category headers instead of a flat list.
+              </p>
             </div>
           )}
 

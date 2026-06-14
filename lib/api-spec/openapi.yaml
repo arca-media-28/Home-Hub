@@ -733,6 +733,12 @@ components:
           type: ["array", "null"]
           items:
             type: string
+        groupByCategory:
+          description: >-
+            When true, the qBittorrent tile groups its torrents under category
+            headers instead of showing a flat list. Absent or false means a
+            flat list (the default).
+          type: ["boolean", "null"]
 
     LayoutItem:
       type: object

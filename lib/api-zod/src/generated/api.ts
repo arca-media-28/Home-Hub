@@ -88,7 +88,8 @@ export const GetTilesResponseItem = zod.object({
   "hideTitle": zod.boolean().optional().describe('When true, the tile renders without its title text (image\/widget content only). Defaults to false (title shown). Applies to both plain app\/link tiles and integration (widget) tiles.'),
   "metrics": zod.array(zod.string()).nullish().describe('Enabled metric keys for this tile\'s integration. Null means \"show all\" (the default for tiles created before metric selection existed).'),
   "tileSettings": zod.object({
-  "categoryFilter": zod.array(zod.string()).nullish().describe('Allow-list of qBittorrent categories to show on the tile. Null (or absent) means show all categories.')
+  "categoryFilter": zod.array(zod.string()).nullish().describe('Allow-list of qBittorrent categories to show on the tile. Null (or absent) means show all categories.'),
+  "groupByCategory": zod.boolean().nullish().describe('When true, the qBittorrent tile groups its torrents under category headers instead of showing a flat list. Absent or false means a flat list (the default).')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Currently carries the qBittorrent category filter; an absent or null categoryFilter means \"show all categories\".'),
   "createdAt": zod.string().optional()
 })
@@ -118,7 +119,8 @@ export const CreateTileBody = zod.object({
   "hideTitle": zod.boolean().optional(),
   "metrics": zod.array(zod.string()).nullish(),
   "tileSettings": zod.object({
-  "categoryFilter": zod.array(zod.string()).nullish().describe('Allow-list of qBittorrent categories to show on the tile. Null (or absent) means show all categories.')
+  "categoryFilter": zod.array(zod.string()).nullish().describe('Allow-list of qBittorrent categories to show on the tile. Null (or absent) means show all categories.'),
+  "groupByCategory": zod.boolean().nullish().describe('When true, the qBittorrent tile groups its torrents under category headers instead of showing a flat list. Absent or false means a flat list (the default).')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Currently carries the qBittorrent category filter; an absent or null categoryFilter means \"show all categories\".')
 })
 
@@ -152,7 +154,8 @@ export const GetTileResponse = zod.object({
   "hideTitle": zod.boolean().optional().describe('When true, the tile renders without its title text (image\/widget content only). Defaults to false (title shown). Applies to both plain app\/link tiles and integration (widget) tiles.'),
   "metrics": zod.array(zod.string()).nullish().describe('Enabled metric keys for this tile\'s integration. Null means \"show all\" (the default for tiles created before metric selection existed).'),
   "tileSettings": zod.object({
-  "categoryFilter": zod.array(zod.string()).nullish().describe('Allow-list of qBittorrent categories to show on the tile. Null (or absent) means show all categories.')
+  "categoryFilter": zod.array(zod.string()).nullish().describe('Allow-list of qBittorrent categories to show on the tile. Null (or absent) means show all categories.'),
+  "groupByCategory": zod.boolean().nullish().describe('When true, the qBittorrent tile groups its torrents under category headers instead of showing a flat list. Absent or false means a flat list (the default).')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Currently carries the qBittorrent category filter; an absent or null categoryFilter means \"show all categories\".'),
   "createdAt": zod.string().optional()
 })
@@ -184,7 +187,8 @@ export const UpdateTileBody = zod.object({
   "hideTitle": zod.boolean().optional(),
   "metrics": zod.array(zod.string()).nullish(),
   "tileSettings": zod.object({
-  "categoryFilter": zod.array(zod.string()).nullish().describe('Allow-list of qBittorrent categories to show on the tile. Null (or absent) means show all categories.')
+  "categoryFilter": zod.array(zod.string()).nullish().describe('Allow-list of qBittorrent categories to show on the tile. Null (or absent) means show all categories.'),
+  "groupByCategory": zod.boolean().nullish().describe('When true, the qBittorrent tile groups its torrents under category headers instead of showing a flat list. Absent or false means a flat list (the default).')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Currently carries the qBittorrent category filter; an absent or null categoryFilter means \"show all categories\".')
 })
 
@@ -210,7 +214,8 @@ export const UpdateTileResponse = zod.object({
   "hideTitle": zod.boolean().optional().describe('When true, the tile renders without its title text (image\/widget content only). Defaults to false (title shown). Applies to both plain app\/link tiles and integration (widget) tiles.'),
   "metrics": zod.array(zod.string()).nullish().describe('Enabled metric keys for this tile\'s integration. Null means \"show all\" (the default for tiles created before metric selection existed).'),
   "tileSettings": zod.object({
-  "categoryFilter": zod.array(zod.string()).nullish().describe('Allow-list of qBittorrent categories to show on the tile. Null (or absent) means show all categories.')
+  "categoryFilter": zod.array(zod.string()).nullish().describe('Allow-list of qBittorrent categories to show on the tile. Null (or absent) means show all categories.'),
+  "groupByCategory": zod.boolean().nullish().describe('When true, the qBittorrent tile groups its torrents under category headers instead of showing a flat list. Absent or false means a flat list (the default).')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Currently carries the qBittorrent category filter; an absent or null categoryFilter means \"show all categories\".'),
   "createdAt": zod.string().optional()
 })
@@ -259,7 +264,8 @@ export const SaveLayoutResponseItem = zod.object({
   "hideTitle": zod.boolean().optional().describe('When true, the tile renders without its title text (image\/widget content only). Defaults to false (title shown). Applies to both plain app\/link tiles and integration (widget) tiles.'),
   "metrics": zod.array(zod.string()).nullish().describe('Enabled metric keys for this tile\'s integration. Null means \"show all\" (the default for tiles created before metric selection existed).'),
   "tileSettings": zod.object({
-  "categoryFilter": zod.array(zod.string()).nullish().describe('Allow-list of qBittorrent categories to show on the tile. Null (or absent) means show all categories.')
+  "categoryFilter": zod.array(zod.string()).nullish().describe('Allow-list of qBittorrent categories to show on the tile. Null (or absent) means show all categories.'),
+  "groupByCategory": zod.boolean().nullish().describe('When true, the qBittorrent tile groups its torrents under category headers instead of showing a flat list. Absent or false means a flat list (the default).')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Currently carries the qBittorrent category filter; an absent or null categoryFilter means \"show all categories\".'),
   "createdAt": zod.string().optional()
 })

@@ -16,4 +16,9 @@ export type TileSettings = {
      * @nullable
      */
   categoryFilter?: string[] | null;
+  /**
+     * When true, the qBittorrent tile groups its torrents under category headers instead of showing a flat list. Absent or false means a flat list (the default).
+     * @nullable
+     */
+  groupByCategory?: boolean | null;
 } | null;
