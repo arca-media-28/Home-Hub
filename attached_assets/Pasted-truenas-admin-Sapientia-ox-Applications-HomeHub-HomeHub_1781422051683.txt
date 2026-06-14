@@ -1,0 +1,63 @@
+truenas_admin@Sapientia[...ox/Applications/HomeHub/HomeHubConfig]$ git pull
+sudo docker compose up -d --build
+remote: Enumerating objects: 23, done.
+remote: Counting objects: 100% (23/23), done.
+remote: Compressing objects: 100% (5/5), done.
+remote: Total 13 (delta 7), reused 13 (delta 7), pack-reused 0 (from 0)
+Unpacking objects: 100% (13/13), 3.23 KiB | 235.00 KiB/s, done.
+From https://github.com/arca-media-28/Home-Hub
+   572baea..2f1bca1  main       -> origin/main
+Updating 572baea..2f1bca1
+Fast-forward
+ .agents/memory/MEMORY.md                                 |  1 +
+ .agents/memory/express5-spa-wildcard.md                  | 24 ++++++++
+ .replit                                                  |  4 ++
+ artifacts/api-server/src/app.ts                          | 10 ++-
+ ...tia-ox-Applications-HomeHub-HomeHub_1781421836318.txt | 82 +++++++++++++++++++++++++
+ 5 files changed, 119 insertions(+), 2 deletions(-)
+ create mode 100644 .agents/memory/express5-spa-wildcard.md
+ create mode 100644 attached_assets/Pasted-truenas-admin-Sapientia-ox-Applications-HomeHub-HomeHub_1781421836318.txt
+WARN[0000] /mnt/Toolbox/Applications/HomeHub/HomeHubConfig/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion 
+[+] Building 39.1s (31/31) FINISHED                                                      
+ => [internal] load local bake definitions                                          0.0s
+ => => reading from stdin 436B                                                      0.0s
+ => [internal] load build definition from Dockerfile                                0.0s
+ => => transferring dockerfile: 2.87kB                                              0.0s
+ => [internal] load metadata for docker.io/library/node:20-slim                     0.5s
+ => [internal] load .dockerignore                                                   0.0s
+ => => transferring context: 2B                                                     0.0s
+ => [frontend-builder  1/10] FROM docker.io/library/node:20-slim@sha256:2cf067cfed  0.0s
+ => [internal] load build context                                                   0.2s
+ => => transferring context: 3.85MB                                                 0.1s
+ => CACHED [frontend-builder  2/10] WORKDIR /build                                  0.0s
+ => CACHED [frontend-builder  3/10] RUN apt-get update && apt-get install -y --no-  0.0s
+ => CACHED [frontend-builder  4/10] RUN npm install -g pnpm@10                      0.0s
+ => CACHED [frontend-builder  5/10] COPY package.json pnpm-workspace.yaml pnpm-loc  0.0s
+ => CACHED [frontend-builder  6/10] COPY tsconfig.base.json tsconfig.json ./        0.0s
+ => CACHED [frontend-builder  7/10] COPY lib/ lib/                                  0.0s
+ => [api-builder  8/10] COPY artifacts/api-server/ artifacts/api-server/            0.1s
+ => [api-builder  9/10] RUN pnpm install --frozen-lockfile                         36.5s
+ => [api-builder 10/10] RUN pnpm --filter @workspace/api-server run build           1.0s
+ => CACHED [production  2/12] WORKDIR /app                                          0.0s 
+ => CACHED [production  3/12] RUN apt-get update && apt-get install -y --no-instal  0.0s 
+ => CACHED [production  4/12] RUN npm install -g pnpm@10                            0.0s 
+ => CACHED [production  5/12] COPY package.json pnpm-workspace.yaml pnpm-lock.yaml  0.0s 
+ => CACHED [production  6/12] COPY tsconfig.base.json tsconfig.json ./              0.0s 
+ => CACHED [production  7/12] COPY lib/ lib/                                        0.0s
+ => CACHED [production  8/12] COPY artifacts/api-server/package.json artifacts/api  0.0s
+ => CACHED [production  9/12] RUN pnpm install --filter @workspace/api-server --pr  0.0s
+ => CACHED [frontend-builder  8/10] COPY artifacts/homelab-dashboard/ artifacts/ho  0.0s
+ => CACHED [frontend-builder  9/10] RUN pnpm install --frozen-lockfile              0.0s
+ => CACHED [frontend-builder 10/10] RUN pnpm --filter @workspace/homelab-dashboard  0.0s
+ => [production 10/12] COPY --from=api-builder /build/artifacts/api-server/dist ./  0.1s
+ => [production 11/12] COPY --from=frontend-builder /build/artifacts/homelab-dashb  0.1s
+ => [production 12/12] RUN mkdir -p /data/uploads                                   0.3s
+ => exporting to image                                                              0.1s
+ => => exporting layers                                                             0.1s
+ => => writing image sha256:3ac3f057ef2bb81baff3b4d1626b8c18a9a9fd252f985b47938b88  0.0s
+ => => naming to docker.io/library/homehubconfig-homelab-dashboard                  0.0s
+ => resolving provenance for metadata file                                          0.0s
+[+] Running 2/2
+ ✔ homelab-dashboard            Built                                               0.0s 
+ ✔ Container homelab-dashboard  Started                                             0.3s 
+truenas_admin@Sapientia[...ox/Applications/HomeHub/HomeHubConfig]$ 
