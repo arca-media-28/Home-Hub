@@ -22,6 +22,8 @@ RUN pnpm --filter @workspace/api-server run build
 FROM node:20-alpine AS frontend-builder
 WORKDIR /build
 
+RUN apk add --no-cache python3 make g++
+
 RUN npm install -g pnpm@10
 
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./

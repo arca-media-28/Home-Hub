@@ -1,0 +1,122 @@
+truenas_admin@Sapientia[...ox/Applications/HomeHub/HomeHubConfig]$ git pull
+Already up to date.
+truenas_admin@Sapientia[...ox/Applications/HomeHub/HomeHubConfig]$ sudo docker compose up -d --buil
+d
+[sudo] password for truenas_admin: 
+WARN[0000] /mnt/Toolbox/Applications/HomeHub/HomeHubConfig/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion 
+[+] Building 10.2s (18/33)                                                                         
+ => [internal] load local bake definitions                                                    0.0s
+ => => reading from stdin 436B                                                                0.0s
+ => [internal] load build definition from Dockerfile                                          0.1s
+ => => transferring dockerfile: 2.60kB                                                        0.0s
+ => [internal] load metadata for docker.io/library/node:20-alpine                             0.9s
+ => [internal] load .dockerignore                                                             0.0s
+ => => transferring context: 2B                                                               0.0s
+ => [internal] load build context                                                             0.3s
+ => => transferring context: 20.91MB                                                          0.2s
+ => [frontend-builder 1/9] FROM docker.io/library/node:20-alpine@sha256:fb4cd12c85ee03686f6a  1.5s
+ => => resolve docker.io/library/node:20-alpine@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c5  0.0s
+ => => sha256:fff4e2c1b189bf87d63ad8bd07f7f4eb288d6f2b6a07a8bb44c60e8c075d2096 445B / 445B    0.2s
+ => => sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f6093722 7.67kB / 7.67kB  0.0s
+ => => sha256:afdf98210b07b586eb71fa22ba2e432e058e4cd1304d31ed60888755b8c865 1.72kB / 1.72kB  0.0s
+ => => sha256:11cedc39e663e7c5d5cb9cc77a461a0d2adc25537b94e6831a6108f09cb200 6.52kB / 6.52kB  0.0s
+ => => sha256:4feea04c154301db6f4a496efa397b3db96603b1c009c797cfdde77bea8b 43.23MB / 43.23MB  0.5s
+ => => sha256:b2cbbfe903b0821005780971ddc5892edcc4ce74c5a48d82e1d2b382edac31 1.26MB / 1.26MB  0.3s
+ => => extracting sha256:4feea04c154301db6f4a496efa397b3db96603b1c009c797cfdde77bea8b3287     0.7s
+ => => extracting sha256:b2cbbfe903b0821005780971ddc5892edcc4ce74c5a48d82e1d2b382edac3122     0.0s
+ => => extracting sha256:fff4e2c1b189bf87d63ad8bd07f7f4eb288d6f2b6a07a8bb44c60e8c075d2096     0.0s
+ => [production  2/12] WORKDIR /app                                                           0.1s
+ => [frontend-builder 2/9] WORKDIR /build                                                     0.1s
+ => [frontend-builder 3/9] RUN npm install -g pnpm@10                                         1.2s
+ => [api-builder  3/10] RUN apk add --no-cache python3 make g++                               6.4s
+ => [production  3/12] RUN apk add --no-cache python3 make g++                                6.8s
+ => [frontend-builder 4/9] COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./            0.1s
+ => [frontend-builder 5/9] COPY tsconfig.base.json tsconfig.json ./                           0.1s
+ => [frontend-builder 6/9] COPY lib/ lib/                                                     0.1s
+ => [frontend-builder 7/9] COPY artifacts/homelab-dashboard/ artifacts/homelab-dashboard/     0.1s
+ => ERROR [frontend-builder 8/9] RUN pnpm install --frozen-lockfile                           5.7s
+ => CANCELED [api-builder  4/10] RUN npm install -g pnpm@10                                   0.9s
+ => CANCELED [production  4/12] RUN npm install -g pnpm@10                                    0.5s
+------                                                                                             
+ > [frontend-builder 8/9] RUN pnpm install --frozen-lockfile:                                      
+0.463 Scope: all 6 workspace projects                                                              
+0.550 Lockfile is up to date, resolution step is skipped                                           
+0.576 Progress: resolved 1, reused 0, downloaded 0, added 0                                        
+0.610 Packages: +484                                                                               
+0.610 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++             
+0.958                                                                                              
+0.958    ╭─────────────────────────────────────────╮                                               
+0.958    │                                         │                                               
+0.958    │   Update available! 10.34.3 → 11.6.0.   │                                               
+0.958    │   Changelog: https://pnpm.io/v/11.6.0   │                                               
+0.958    │    To update, run: pnpm add -g pnpm     │                                               
+0.958    │                                         │                                               
+0.958    ╰─────────────────────────────────────────╯                                               
+0.958                                                                                              
+1.576 Progress: resolved 484, reused 0, downloaded 462, added 0
+2.577 Progress: resolved 484, reused 0, downloaded 484, added 0
+4.462 Progress: resolved 484, reused 0, downloaded 484, added 1
+5.072 Progress: resolved 484, reused 0, downloaded 484, added 484, done
+5.161 .../node_modules/better-sqlite3 install$ prebuild-install || node-gyp rebuild --release
+5.161 .../esbuild@0.27.3/node_modules/esbuild postinstall$ node install.js
+5.210 .../esbuild@0.27.3/node_modules/esbuild postinstall: Done
+5.515 .../node_modules/better-sqlite3 install: prebuild-install warn install No prebuilt binaries found (target=20.20.2 runtime=node arch=x64 libc=musl platform=linux)
+5.541 .../node_modules/better-sqlite3 install: gyp info it worked if it ends with ok
+5.541 .../node_modules/better-sqlite3 install: gyp info using node-gyp@11.5.0
+5.541 .../node_modules/better-sqlite3 install: gyp info using node@20.20.2 | linux | x64
+5.561 .../node_modules/better-sqlite3 install: gyp ERR! find Python 
+5.561 .../node_modules/better-sqlite3 install: gyp ERR! find Python Python is not set from command line or npm configuration
+5.561 .../node_modules/better-sqlite3 install: gyp ERR! find Python Python is not set from environment variable PYTHON
+5.561 .../node_modules/better-sqlite3 install: gyp ERR! find Python checking if "python3" can be used
+5.561 .../node_modules/better-sqlite3 install: gyp ERR! find Python - executable path is ""
+5.561 .../node_modules/better-sqlite3 install: gyp ERR! find Python - "" could not be run
+5.561 .../node_modules/better-sqlite3 install: gyp ERR! find Python checking if "python" can be used
+5.561 .../node_modules/better-sqlite3 install: gyp ERR! find Python - executable path is ""
+5.561 .../node_modules/better-sqlite3 install: gyp ERR! find Python - "" could not be run
+5.561 .../node_modules/better-sqlite3 install: gyp ERR! find Python 
+5.561 .../node_modules/better-sqlite3 install: gyp ERR! find Python **********************************************************
+5.561 .../node_modules/better-sqlite3 install: gyp ERR! find Python You need to install the latest version of Python.
+5.562 .../node_modules/better-sqlite3 install: gyp ERR! find Python Node-gyp should be able to find and use Python. If not,
+5.562 .../node_modules/better-sqlite3 install: gyp ERR! find Python you can try one of the following options:
+5.562 .../node_modules/better-sqlite3 install: gyp ERR! find Python - Use the switch --python="/path/to/pythonexecutable"
+5.562 .../node_modules/better-sqlite3 install: gyp ERR! find Python (accepted by both node-gyp and npm)
+5.562 .../node_modules/better-sqlite3 install: gyp ERR! find Python - Set the environment variable PYTHON
+5.562 .../node_modules/better-sqlite3 install: gyp ERR! find Python - Set the npm configuration variable python:
+5.562 .../node_modules/better-sqlite3 install: gyp ERR! find Python npm config set python "/path/to/pythonexecutable"
+5.562 .../node_modules/better-sqlite3 install: gyp ERR! find Python For more information consult the documentation at:
+5.562 .../node_modules/better-sqlite3 install: gyp ERR! find Python https://github.com/nodejs/node-gyp#installation
+5.562 .../node_modules/better-sqlite3 install: gyp ERR! find Python **********************************************************
+5.562 .../node_modules/better-sqlite3 install: gyp ERR! find Python 
+5.562 .../node_modules/better-sqlite3 install: gyp ERR! configure error 
+5.562 .../node_modules/better-sqlite3 install: gyp ERR! stack Error: Could not find any Python installation to use
+5.562 .../node_modules/better-sqlite3 install: gyp ERR! stack at PythonFinder.fail (/usr/local/lib/node_modules/pnpm/dist/node_modules/node-gyp/lib/find-python.js:306:11)
+5.562 .../node_modules/better-sqlite3 install: gyp ERR! stack at PythonFinder.findPython (/usr/local/lib/node_modules/pnpm/dist/node_modules/node-gyp/lib/find-python.js:164:17)
+5.562 .../node_modules/better-sqlite3 install: gyp ERR! stack at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+5.562 .../node_modules/better-sqlite3 install: gyp ERR! stack at async configure (/usr/local/lib/node_modules/pnpm/dist/node_modules/node-gyp/lib/configure.js:27:18)
+5.562 .../node_modules/better-sqlite3 install: gyp ERR! stack at async run (/usr/local/lib/node_modules/pnpm/dist/node_modules/node-gyp/bin/node-gyp.js:81:18)
+5.562 .../node_modules/better-sqlite3 install: gyp ERR! System Linux 6.12.33-production+truenas
+5.562 .../node_modules/better-sqlite3 install: gyp ERR! command "/usr/local/bin/node" "/usr/local/lib/node_modules/pnpm/dist/node_modules/node-gyp/bin/node-gyp.js" "rebuild" "--release"
+5.563 .../node_modules/better-sqlite3 install: gyp ERR! cwd /build/node_modules/.pnpm/better-sqlite3@12.10.0/node_modules/better-sqlite3
+5.563 .../node_modules/better-sqlite3 install: gyp ERR! node -v v20.20.2
+5.563 .../node_modules/better-sqlite3 install: gyp ERR! node-gyp -v v11.5.0
+5.563 .../node_modules/better-sqlite3 install: gyp ERR! not ok 
+5.564 .../node_modules/better-sqlite3 install: Failed
+5.618  ELIFECYCLE  Command failed with exit code 1.
+------
+Dockerfile:32
+
+--------------------
+
+  30 |     COPY artifacts/homelab-dashboard/ artifacts/homelab-dashboard/
+
+  31 |     
+
+  32 | >>> RUN pnpm install --frozen-lockfile
+
+  33 |     
+
+  34 |     # BASE_PATH defaults to "/" (root); PORT is unused during build but must be valid
+
+--------------------
+
+failed to solve: process "/bin/sh -c pnpm install --frozen-lockfile" did not complete successfully: exit code: 1
