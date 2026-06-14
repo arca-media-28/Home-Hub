@@ -6,6 +6,7 @@ import MediaTile from "./MediaTile";
 import SonarrTile from "./SonarrTile";
 import RadarrTile from "./RadarrTile";
 import QbittorrentTile from "./QbittorrentTile";
+import { resolveEnabledMetrics, tileDensity, type TileDensity } from "./metrics";
 
 export const INTEGRATION_LABELS: Record<string, string> = {
   [TileIntegration.truenas]: "TrueNAS",
@@ -15,18 +16,25 @@ export const INTEGRATION_LABELS: Record<string, string> = {
   [TileIntegration.qbittorrent]: "qBittorrent",
 };
 
-function renderStatusView(integration: string) {
+// Props every integration widget receives: the resolved set of enabled metric
+// keys and the size-derived density.
+export interface WidgetProps {
+  enabled: Set<string>;
+  density: TileDensity;
+}
+
+function renderStatusView(integration: string, props: WidgetProps) {
   switch (integration) {
     case TileIntegration.truenas:
-      return <TruenasTile />;
+      return <TruenasTile {...props} />;
     case TileIntegration.media:
-      return <MediaTile />;
+      return <MediaTile {...props} />;
     case TileIntegration.sonarr:
-      return <SonarrTile />;
+      return <SonarrTile {...props} />;
     case TileIntegration.radarr:
-      return <RadarrTile />;
+      return <RadarrTile {...props} />;
     case TileIntegration.qbittorrent:
-      return <QbittorrentTile />;
+      return <QbittorrentTile {...props} />;
     default:
       return null;
   }
@@ -57,6 +65,10 @@ export default function IntegrationTile({ tile, status }: IntegrationTileProps) 
   // been saved for the backing service.
   const showDot = Boolean(status?.configured);
   const dotColor = status?.ok ? "bg-green-500" : "bg-red-500";
+
+  // Resolve which metrics this tile shows and how dense to render them.
+  const enabled = resolveEnabledMetrics(integration, tile.metrics);
+  const density = tileDensity(tile.gridW, tile.gridH);
 
   return (
     <div className="w-full h-full flex flex-col overflow-hidden">
@@ -103,9 +115,10 @@ export default function IntegrationTile({ tile, status }: IntegrationTileProps) 
         )}
       </div>
 
-      {/* Compact live-status section sourced from the integration. */}
-      <div className="flex-1 min-h-0 overflow-hidden border-t border-border">
-        {renderStatusView(integration)}
+      {/* Live-status section sourced from the integration. Size + the user's
+          metric selection drive how much detail is shown. */}
+      <div className="flex-1 min-h-0 overflow-y-auto border-t border-border">
+        {renderStatusView(integration, { enabled, density })}
       </div>
     </div>
   );

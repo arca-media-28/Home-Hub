@@ -1,5 +1,6 @@
 import { useGetTruenasMetrics, getGetTruenasMetricsQueryKey } from "@workspace/api-client-react";
-import { HardDrive, Cpu, MemoryStick } from "lucide-react";
+import { HardDrive } from "lucide-react";
+import type { WidgetProps } from "./IntegrationTile";
 
 function Bar({ value, label }: { value: number; label: string }) {
   const pct = Math.min(100, Math.max(0, value));
@@ -20,7 +21,7 @@ function Bar({ value, label }: { value: number; label: string }) {
   );
 }
 
-export default function TruenasTile() {
+export default function TruenasTile({ enabled, density }: WidgetProps) {
   const { data, isLoading, isError } = useGetTruenasMetrics({
     query: { queryKey: getGetTruenasMetricsQueryKey(), refetchInterval: 30_000 },
   });
@@ -43,18 +44,28 @@ export default function TruenasTile() {
 
   const memPct = (data.memUsedGb / data.memTotalGb) * 100;
 
+  const showCpu = enabled.has("cpu");
+  const showRam = enabled.has("ram");
+  // Pools are the verbose section: only reveal them once the tile has grown,
+  // unless the user has explicitly turned the lighter CPU/RAM metrics off.
+  const showPools =
+    enabled.has("pools") && data.pools.length > 0 && (density.expanded || (!showCpu && !showRam));
+  const pools = showPools ? data.pools.slice(0, density.listLimit) : [];
+
   return (
-    <div className="w-full h-full p-3 flex flex-col gap-2 overflow-hidden">
+    <div className="w-full h-full p-3 flex flex-col gap-2">
       <div className="space-y-2 flex-1">
-        <Bar value={data.cpuPercent} label="CPU" />
-        <Bar
-          value={memPct}
-          label={`RAM  ${data.memUsedGb.toFixed(1)}/${data.memTotalGb.toFixed(1)} GB`}
-        />
+        {showCpu && <Bar value={data.cpuPercent} label="CPU" />}
+        {showRam && (
+          <Bar
+            value={memPct}
+            label={`RAM  ${data.memUsedGb.toFixed(1)}/${data.memTotalGb.toFixed(1)} GB`}
+          />
+        )}
       </div>
-      {data.pools.length > 0 && (
+      {showPools && (
         <div className="space-y-1 border-t border-border pt-2 mt-auto">
-          {data.pools.map((pool) => {
+          {pools.map((pool) => {
             const pct = (pool.usedBytes / pool.totalBytes) * 100;
             return (
               <div key={pool.name} className="flex items-center justify-between text-xs">

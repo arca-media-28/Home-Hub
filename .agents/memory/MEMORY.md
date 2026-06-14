@@ -6,3 +6,4 @@
 - [service_connections is global](service-connections-global.md) — table keyed by service only (no userId); rows shared across all users; PUT clobbers real settings, beware testing on live.
 - [Widget data + HTTP convention](widget-data-convention.md) — mock only when unconfigured, configured-failure→502; shared httpClient (self-signed TLS) in lib/http.ts; TrueNAS/Sonarr/Radarr/qBittorrent API gotchas.
 - [Local dev loop](local-dev-loop.md) — run on LAN box for real connections; Vite `/api` proxy gated on REPL_ID (off on Replit); API hot reload via build.mjs --watch; `pnpm run dev:local`.
+- [Tile metrics + density](tile-metrics-density.md) — null=show-all, []=show-none; verbose section shows when large OR lighter metric off; layout-save route must return SAME full Tile shape or resize drops fields from cache.

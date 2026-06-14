@@ -79,6 +79,12 @@ if (!tileColumns.some((c) => c.name === "integration")) {
   db.exec("ALTER TABLE tiles ADD COLUMN integration TEXT");
 }
 
+// 1b. Per-tile metric selection. Stored as a JSON array of enabled metric keys.
+//     NULL means "show all" so tiles created before this column behave as before.
+if (!tileColumns.some((c) => c.name === "metrics")) {
+  db.exec("ALTER TABLE tiles ADD COLUMN metrics TEXT");
+}
+
 // 2. One-time data migration: existing integration-typed tiles become app/link
 //    tiles whose `integration` carries the old type. Styling fields are left
 //    untouched. After this runs `type` is 'app' so it never matches again.
@@ -123,6 +129,7 @@ export interface DbTile {
   bg_color: string | null;
   image_url: string | null;
   image_fit: string | null;
+  metrics: string | null;
   created_at: string;
 }
 

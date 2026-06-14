@@ -89,6 +89,11 @@ export interface Tile {
   imageUrl?: string | null;
   /** @nullable */
   imageFit?: TileImageFit;
+  /**
+     * Enabled metric keys for this tile's integration. Null means "show all" (the default for tiles created before metric selection existed).
+     * @nullable
+     */
+  metrics?: string[] | null;
   createdAt?: string;
 }
 
@@ -131,6 +136,8 @@ export interface TileInput {
   bgColor?: string;
   imageUrl?: string;
   imageFit?: string;
+  /** @nullable */
+  metrics?: string[] | null;
 }
 
 /**
@@ -159,6 +166,8 @@ export interface TileUpdate {
   bgColor?: string;
   imageUrl?: string;
   imageFit?: string;
+  /** @nullable */
+  metrics?: string[] | null;
 }
 
 export interface LayoutItem {

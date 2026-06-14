@@ -1,5 +1,6 @@
 import { useGetQbittorrentStatus, getGetQbittorrentStatusQueryKey } from "@workspace/api-client-react";
 import { Download, Upload, ArrowDownToLine } from "lucide-react";
+import type { WidgetProps } from "./IntegrationTile";
 
 function formatSpeed(bytesPerSec: number | null | undefined): string {
   const b = bytesPerSec ?? 0;
@@ -8,7 +9,7 @@ function formatSpeed(bytesPerSec: number | null | undefined): string {
   return `${b} B/s`;
 }
 
-export default function QbittorrentTile() {
+export default function QbittorrentTile({ enabled, density }: WidgetProps) {
   const { data, isLoading, isError } = useGetQbittorrentStatus({
     query: { queryKey: getGetQbittorrentStatusQueryKey(), refetchInterval: 10_000 },
   });
@@ -29,24 +30,28 @@ export default function QbittorrentTile() {
     );
   }
 
-  const hasTorrents = data.torrents && data.torrents.length > 0;
+  const showSpeeds = enabled.has("speeds");
+  const showTorrents = enabled.has("torrents");
+  const hasTorrents = showTorrents && data.torrents && data.torrents.length > 0;
 
   return (
-    <div className="w-full h-full p-3 flex flex-col gap-2 overflow-hidden">
-      <div className="flex items-center justify-end gap-2 text-xs">
-        <span className="flex items-center gap-0.5 text-green-500">
-          <Download className="w-3 h-3" />
-          {formatSpeed(data.downloadSpeed)}
-        </span>
-        <span className="flex items-center gap-0.5 text-blue-400">
-          <Upload className="w-3 h-3" />
-          {formatSpeed(data.uploadSpeed)}
-        </span>
-      </div>
+    <div className="w-full h-full p-3 flex flex-col gap-2">
+      {showSpeeds && (
+        <div className="flex items-center justify-end gap-2 text-xs">
+          <span className="flex items-center gap-0.5 text-green-500">
+            <Download className="w-3 h-3" />
+            {formatSpeed(data.downloadSpeed)}
+          </span>
+          <span className="flex items-center gap-0.5 text-blue-400">
+            <Upload className="w-3 h-3" />
+            {formatSpeed(data.uploadSpeed)}
+          </span>
+        </div>
+      )}
 
       {hasTorrents ? (
-        <div className="flex-1 overflow-hidden space-y-1.5">
-          {data.torrents.slice(0, 5).map((t, i) => (
+        <div className="flex-1 space-y-1.5">
+          {data.torrents.slice(0, density.listLimit).map((t, i) => (
             <div key={`${t.name}-${i}`} className="min-w-0">
               <div className="flex justify-between items-center">
                 <span className="text-xs font-medium truncate max-w-[70%]">{t.name}</span>
@@ -63,7 +68,11 @@ export default function QbittorrentTile() {
         </div>
       ) : (
         <div className="flex-1 flex items-center justify-center text-muted-foreground text-xs">
-          No active torrents
+          {showTorrents
+            ? "No active torrents"
+            : showSpeeds
+              ? ""
+              : "No metrics selected"}
         </div>
       )}
     </div>

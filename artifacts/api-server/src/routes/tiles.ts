@@ -4,7 +4,28 @@ import { requireAuth, type AuthRequest } from "../lib/auth.js";
 
 const router = Router();
 
-function formatTile(t: DbTile) {
+// Parse the stored metrics JSON blob into a string[] (or null = "show all").
+// Tolerates legacy/garbage values by falling back to null.
+function parseMetrics(raw: string | null): string[] | null {
+  if (raw == null) return null;
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (Array.isArray(parsed)) return parsed.filter((x): x is string => typeof x === "string");
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+// Serialize an incoming metrics value to a JSON blob (or null). Anything that
+// isn't an array of strings is stored as null ("show all").
+function serializeMetrics(value: unknown): string | null {
+  if (!Array.isArray(value)) return null;
+  const keys = value.filter((x): x is string => typeof x === "string");
+  return JSON.stringify(keys);
+}
+
+export function formatTile(t: DbTile) {
   return {
     id: t.id,
     userId: t.user_id,
@@ -19,6 +40,7 @@ function formatTile(t: DbTile) {
     bgColor: t.bg_color,
     imageUrl: t.image_url,
     imageFit: t.image_fit,
+    metrics: parseMetrics(t.metrics),
     createdAt: t.created_at,
   };
 }
@@ -43,14 +65,15 @@ router.post("/", requireAuth, (req: AuthRequest, res) => {
     bgColor?: string;
     imageUrl?: string;
     imageFit?: string;
+    metrics?: string[] | null;
   };
 
   const createTile = db.prepare<
-    [number, string, string | null, number, number, number, number, string | null, string | null, string | null, string | null, string | null],
+    [number, string, string | null, number, number, number, number, string | null, string | null, string | null, string | null, string | null, string | null],
     { id: number }
   >(
-    `INSERT INTO tiles (user_id, type, integration, grid_x, grid_y, grid_w, grid_h, name, url, bg_color, image_url, image_fit)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`
+    `INSERT INTO tiles (user_id, type, integration, grid_x, grid_y, grid_w, grid_h, name, url, bg_color, image_url, image_fit, metrics)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`
   );
 
   const row = createTile.get(
@@ -65,7 +88,8 @@ router.post("/", requireAuth, (req: AuthRequest, res) => {
     body.url ?? null,
     body.bgColor ?? null,
     body.imageUrl ?? null,
-    body.imageFit ?? null
+    body.imageFit ?? null,
+    body.metrics === undefined ? null : serializeMetrics(body.metrics)
   )!;
 
   const tile = db.prepare<[number], DbTile>("SELECT * FROM tiles WHERE id = ?").get(row.id)!;
@@ -103,6 +127,7 @@ router.put("/:id", requireAuth, (req: AuthRequest, res) => {
     bgColor?: string;
     imageUrl?: string;
     imageFit?: string;
+    metrics?: string[] | null;
   };
 
   const updates: string[] = [];
@@ -118,6 +143,7 @@ router.put("/:id", requireAuth, (req: AuthRequest, res) => {
   if (body.bgColor !== undefined) { updates.push("bg_color = ?"); params.push(body.bgColor); }
   if (body.imageUrl !== undefined) { updates.push("image_url = ?"); params.push(body.imageUrl); }
   if (body.imageFit !== undefined) { updates.push("image_fit = ?"); params.push(body.imageFit); }
+  if (body.metrics !== undefined) { updates.push("metrics = ?"); params.push(body.metrics === null ? null : serializeMetrics(body.metrics)); }
 
   if (updates.length > 0) {
     params.push(id);

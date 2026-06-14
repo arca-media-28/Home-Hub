@@ -29,5 +29,10 @@ export interface Tile {
   imageUrl?: string | null;
   /** @nullable */
   imageFit?: TileImageFit;
+  /**
+     * Enabled metric keys for this tile's integration. Null means "show all" (the default for tiles created before metric selection existed).
+     * @nullable
+     */
+  metrics?: string[] | null;
   createdAt?: string;
 }

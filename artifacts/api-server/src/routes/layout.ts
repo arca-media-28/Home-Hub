@@ -1,26 +1,9 @@
 import { Router } from "express";
-import { db, tileStmts, type DbTile } from "../lib/db.js";
+import { db, tileStmts } from "../lib/db.js";
 import { requireAuth, type AuthRequest } from "../lib/auth.js";
+import { formatTile } from "./tiles.js";
 
 const router = Router();
-
-function formatTile(t: DbTile) {
-  return {
-    id: t.id,
-    userId: t.user_id,
-    type: t.type,
-    gridX: t.grid_x,
-    gridY: t.grid_y,
-    gridW: t.grid_w,
-    gridH: t.grid_h,
-    name: t.name,
-    url: t.url,
-    bgColor: t.bg_color,
-    imageUrl: t.image_url,
-    imageFit: t.image_fit,
-    createdAt: t.created_at,
-  };
-}
 
 // PUT /api/tiles/layout — bulk-save layout positions
 router.put("/", requireAuth, (req: AuthRequest, res) => {

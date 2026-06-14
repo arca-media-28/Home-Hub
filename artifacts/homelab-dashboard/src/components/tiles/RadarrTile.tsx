@@ -1,5 +1,6 @@
 import { useGetRadarrQueue, getGetRadarrQueueQueryKey } from "@workspace/api-client-react";
 import { Film } from "lucide-react";
+import type { WidgetProps } from "./IntegrationTile";
 
 function formatBytes(bytes: number | null | undefined): string {
   if (!bytes) return "";
@@ -8,7 +9,7 @@ function formatBytes(bytes: number | null | undefined): string {
   return `${(bytes / 1e3).toFixed(0)} KB`;
 }
 
-export default function RadarrTile() {
+export default function RadarrTile({ enabled, density }: WidgetProps) {
   const { data, isLoading, isError } = useGetRadarrQueue({
     query: { queryKey: getGetRadarrQueueQueryKey(), refetchInterval: 30_000 },
   });
@@ -29,15 +30,20 @@ export default function RadarrTile() {
     );
   }
 
-  const hasQueue = data.queue && data.queue.length > 0;
-  const hasUpcoming = data.upcoming && data.upcoming.length > 0;
+  const showQueue = enabled.has("queue");
+  const showUpcoming = enabled.has("upcoming");
+  const hasQueue = showQueue && data.queue && data.queue.length > 0;
+  // Upcoming is the verbose section: reveal it as the tile grows, or when the
+  // queue metric is turned off so the tile still has something to show.
+  const hasUpcoming =
+    showUpcoming && data.upcoming && data.upcoming.length > 0 && (density.expanded || !showQueue);
 
   return (
-    <div className="w-full h-full p-3 flex flex-col gap-2 overflow-hidden">
+    <div className="w-full h-full p-3 flex flex-col gap-2">
       {hasQueue && (
         <div className="space-y-1">
           <p className="text-xs text-muted-foreground">Downloading</p>
-          {data.queue.slice(0, 3).map((item) => (
+          {data.queue.slice(0, density.listLimit).map((item) => (
             <div key={item.id} className="min-w-0">
               <div className="flex justify-between items-center">
                 <span className="text-xs font-medium truncate max-w-[70%]">{item.title}</span>
@@ -59,7 +65,7 @@ export default function RadarrTile() {
       {hasUpcoming && (
         <div className="space-y-1 border-t border-border pt-2 mt-auto">
           <p className="text-xs text-muted-foreground">Upcoming</p>
-          {data.upcoming.slice(0, 3).map((item) => (
+          {data.upcoming.slice(0, density.listLimit).map((item) => (
             <div key={item.id} className="flex justify-between text-xs">
               <span className="truncate max-w-[70%] font-medium">
                 {item.title}
@@ -73,7 +79,7 @@ export default function RadarrTile() {
 
       {!hasQueue && !hasUpcoming && (
         <div className="flex-1 flex items-center justify-center text-muted-foreground text-xs">
-          Nothing in queue
+          {showQueue || showUpcoming ? "Nothing in queue" : "No metrics selected"}
         </div>
       )}
     </div>

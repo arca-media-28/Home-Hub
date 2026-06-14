@@ -511,6 +511,13 @@ components:
         imageFit:
           type: ["string", "null"]
           enum: ["cover", "contain", "center", "top-left", null]
+        metrics:
+          description: >-
+            Enabled metric keys for this tile's integration. Null means "show
+            all" (the default for tiles created before metric selection existed).
+          type: ["array", "null"]
+          items:
+            type: string
         createdAt:
           type: string
 
@@ -542,6 +549,10 @@ components:
           type: string
         imageFit:
           type: string
+        metrics:
+          type: ["array", "null"]
+          items:
+            type: string
 
     TileUpdate:
       type: object
@@ -567,6 +578,10 @@ components:
           type: string
         imageFit:
           type: string
+        metrics:
+          type: ["array", "null"]
+          items:
+            type: string
 
     LayoutItem:
       type: object

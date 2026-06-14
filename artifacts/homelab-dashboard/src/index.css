@@ -294,3 +294,18 @@
 .react-resizable-handle-n, .react-resizable-handle-s { left:50%; margin-left:-10px; cursor:ns-resize; }
 .react-resizable-handle-n { top:0; transform:rotate(225deg); }
 .react-resizable-handle-s { bottom:0; transform:rotate(45deg); }
+
+/* Lift resize handles above the full-tile drag overlay (z-20) so they can be
+   grabbed, and make the bottom-right handle clearly visible while editing. */
+.react-resizable-handle { z-index: 30; }
+.react-resizable-handle-se {
+  width: 22px;
+  height: 22px;
+  background-image: none;
+  border-right: 3px solid hsl(var(--primary));
+  border-bottom: 3px solid hsl(var(--primary));
+  border-bottom-right-radius: 2px;
+  opacity: 0.55;
+  transition: opacity 0.15s ease;
+}
+.react-resizable-handle-se:hover { opacity: 1; }

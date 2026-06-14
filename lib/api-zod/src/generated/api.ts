@@ -80,6 +80,7 @@ export const GetTilesResponseItem = zod.object({
   "bgColor": zod.string().nullish(),
   "imageUrl": zod.string().nullish(),
   "imageFit": zod.union([zod.literal('cover'),zod.literal('contain'),zod.literal('center'),zod.literal('top-left'),zod.literal(null)]).nullish(),
+  "metrics": zod.array(zod.string()).nullish().describe('Enabled metric keys for this tile\'s integration. Null means \"show all\" (the default for tiles created before metric selection existed).'),
   "createdAt": zod.string().optional()
 })
 export const GetTilesResponse = zod.array(GetTilesResponseItem)
@@ -99,7 +100,8 @@ export const CreateTileBody = zod.object({
   "url": zod.string().optional(),
   "bgColor": zod.string().optional(),
   "imageUrl": zod.string().optional(),
-  "imageFit": zod.string().optional()
+  "imageFit": zod.string().optional(),
+  "metrics": zod.array(zod.string()).nullish()
 })
 
 
@@ -124,6 +126,7 @@ export const GetTileResponse = zod.object({
   "bgColor": zod.string().nullish(),
   "imageUrl": zod.string().nullish(),
   "imageFit": zod.union([zod.literal('cover'),zod.literal('contain'),zod.literal('center'),zod.literal('top-left'),zod.literal(null)]).nullish(),
+  "metrics": zod.array(zod.string()).nullish().describe('Enabled metric keys for this tile\'s integration. Null means \"show all\" (the default for tiles created before metric selection existed).'),
   "createdAt": zod.string().optional()
 })
 
@@ -145,7 +148,8 @@ export const UpdateTileBody = zod.object({
   "url": zod.string().optional(),
   "bgColor": zod.string().optional(),
   "imageUrl": zod.string().optional(),
-  "imageFit": zod.string().optional()
+  "imageFit": zod.string().optional(),
+  "metrics": zod.array(zod.string()).nullish()
 })
 
 export const UpdateTileResponse = zod.object({
@@ -162,6 +166,7 @@ export const UpdateTileResponse = zod.object({
   "bgColor": zod.string().nullish(),
   "imageUrl": zod.string().nullish(),
   "imageFit": zod.union([zod.literal('cover'),zod.literal('contain'),zod.literal('center'),zod.literal('top-left'),zod.literal(null)]).nullish(),
+  "metrics": zod.array(zod.string()).nullish().describe('Enabled metric keys for this tile\'s integration. Null means \"show all\" (the default for tiles created before metric selection existed).'),
   "createdAt": zod.string().optional()
 })
 
@@ -201,6 +206,7 @@ export const SaveLayoutResponseItem = zod.object({
   "bgColor": zod.string().nullish(),
   "imageUrl": zod.string().nullish(),
   "imageFit": zod.union([zod.literal('cover'),zod.literal('contain'),zod.literal('center'),zod.literal('top-left'),zod.literal(null)]).nullish(),
+  "metrics": zod.array(zod.string()).nullish().describe('Enabled metric keys for this tile\'s integration. Null means \"show all\" (the default for tiles created before metric selection existed).'),
   "createdAt": zod.string().optional()
 })
 export const SaveLayoutResponse = zod.array(SaveLayoutResponseItem)

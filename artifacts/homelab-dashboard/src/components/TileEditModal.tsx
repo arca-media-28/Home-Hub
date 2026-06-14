@@ -10,6 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -17,6 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { METRIC_CATALOG, allMetricKeys } from "@/components/tiles/metrics";
 import { useToast } from "@/hooks/use-toast";
 import {
   useCreateTile,
@@ -69,6 +71,9 @@ export default function TileEditModal({ open, onOpenChange, tile, mode }: TileEd
   const [imageFit, setImageFit] = useState(tile?.imageFit ?? "cover");
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [uploading, setUploading] = useState(false);
+  // Selected metric keys for the active integration. null = "show all"
+  // (backward-compatible default); an explicit array (incl. empty) is honored.
+  const [metrics, setMetrics] = useState<string[] | null>(tile?.metrics ?? null);
 
   useEffect(() => {
     if (open) {
@@ -78,9 +83,31 @@ export default function TileEditModal({ open, onOpenChange, tile, mode }: TileEd
       setBgColor(tile?.bgColor ?? "#1c1c20");
       setImageUrl(tile?.imageUrl ?? "");
       setImageFit(tile?.imageFit ?? "cover");
+      setMetrics(tile?.metrics ?? null);
       setShowColorPicker(false);
     }
   }, [open, tile]);
+
+  // The set of metric keys currently shown. A null selection means "show all",
+  // so reflect every catalog key as checked in the picker.
+  const catalog = integration === NONE ? [] : METRIC_CATALOG[integration] ?? [];
+  const enabledKeys = new Set(metrics ?? allMetricKeys(integration));
+
+  function handleIntegrationChange(next: string) {
+    setIntegration(next);
+    // Switching integrations invalidates the old metric keys; reset to "show
+    // all" for the newly chosen service.
+    setMetrics(null);
+  }
+
+  function toggleMetric(key: string, checked: boolean) {
+    const base = metrics ?? allMetricKeys(integration);
+    const set = new Set(base);
+    if (checked) set.add(key);
+    else set.delete(key);
+    // Persist an explicit ordered subset so widgets honor exactly this choice.
+    setMetrics(allMetricKeys(integration).filter((k) => set.has(k)));
+  }
 
   const createTile = useCreateTile({
     mutation: {
@@ -161,6 +188,8 @@ export default function TileEditModal({ open, onOpenChange, tile, mode }: TileEd
       bgColor: bgColor || undefined,
       imageUrl: imageUrl || undefined,
       imageFit: imageFit || undefined,
+      // Plain app/link tiles carry no metric selection.
+      metrics: integration === NONE ? null : metrics,
       gridX: tile?.gridX ?? 0,
       gridY: tile?.gridY ?? 0,
       gridW: tile?.gridW ?? 2,
@@ -276,7 +305,7 @@ export default function TileEditModal({ open, onOpenChange, tile, mode }: TileEd
 
           <div className="space-y-1.5 border-t border-border pt-4">
             <Label>App integration</Label>
-            <Select value={integration} onValueChange={setIntegration}>
+            <Select value={integration} onValueChange={handleIntegrationChange}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
@@ -292,6 +321,31 @@ export default function TileEditModal({ open, onOpenChange, tile, mode }: TileEd
               Optional. Attach a service to show its live status on this tile.
             </p>
           </div>
+
+          {catalog.length > 0 && (
+            <div className="space-y-2 border-t border-border pt-4">
+              <Label>Metrics shown</Label>
+              <p className="text-xs text-muted-foreground">
+                Pick what this tile displays. Larger tiles reveal more detail.
+              </p>
+              <div className="space-y-2 pt-1">
+                {catalog.map((m) => (
+                  <label
+                    key={m.key}
+                    htmlFor={`metric-${m.key}`}
+                    className="flex items-center gap-2 cursor-pointer select-none"
+                  >
+                    <Checkbox
+                      id={`metric-${m.key}`}
+                      checked={enabledKeys.has(m.key)}
+                      onCheckedChange={(c) => toggleMetric(m.key, c === true)}
+                    />
+                    <span className="text-sm">{m.label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         <DialogFooter className="flex-col sm:flex-row gap-2">

@@ -19,4 +19,6 @@ export interface TileUpdate {
   bgColor?: string;
   imageUrl?: string;
   imageFit?: string;
+  /** @nullable */
+  metrics?: string[] | null;
 }
