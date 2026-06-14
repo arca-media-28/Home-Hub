@@ -30,6 +30,31 @@ export interface Tile {
   /** @nullable */
   imageFit?: TileImageFit;
   /**
+     * Anchor key for how the image is aligned within the tile (e.g. "center", "top-left"). Null falls back to the legacy imageFit behavior.
+     * @nullable
+     */
+  imagePosition?: string | null;
+  /**
+     * Zoom percentage applied to the image (100 = native). Null means no scaling.
+     * @nullable
+     */
+  imageScale?: number | null;
+  /**
+     * Size key for the tile title on plain app/link tiles (e.g. "sm", "md", "lg", "xl"). Null means the default. Ignored by integration (widget) tiles.
+     * @nullable
+     */
+  titleSize?: string | null;
+  /**
+     * Anchor key for where the tile title sits on plain app/link tiles (e.g. "center", "top-left"). Null means the default. Ignored by integration (widget) tiles.
+     * @nullable
+     */
+  titlePosition?: string | null;
+  /**
+     * CSS color for the tile title text on plain app/link tiles. Null means the default (white over an image, theme color otherwise). Ignored by integration (widget) tiles.
+     * @nullable
+     */
+  titleColor?: string | null;
+  /**
      * Enabled metric keys for this tile's integration. Null means "show all" (the default for tiles created before metric selection existed).
      * @nullable
      */

@@ -21,6 +21,14 @@ export interface TileInput {
   bgColor?: string;
   imageUrl?: string;
   imageFit?: string;
+  imagePosition?: string;
+  imageScale?: number;
+  /** @nullable */
+  titleSize?: string | null;
+  /** @nullable */
+  titlePosition?: string | null;
+  /** @nullable */
+  titleColor?: string | null;
   /** @nullable */
   metrics?: string[] | null;
 }

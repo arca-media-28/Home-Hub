@@ -40,6 +40,11 @@ export function formatTile(t: DbTile) {
     bgColor: t.bg_color,
     imageUrl: t.image_url,
     imageFit: t.image_fit,
+    imagePosition: t.image_position,
+    imageScale: t.image_scale,
+    titleSize: t.title_size,
+    titlePosition: t.title_position,
+    titleColor: t.title_color,
     metrics: parseMetrics(t.metrics),
     createdAt: t.created_at,
   };
@@ -65,15 +70,20 @@ router.post("/", requireAuth, (req: AuthRequest, res) => {
     bgColor?: string;
     imageUrl?: string;
     imageFit?: string;
+    imagePosition?: string;
+    imageScale?: number;
+    titleSize?: string;
+    titlePosition?: string;
+    titleColor?: string;
     metrics?: string[] | null;
   };
 
   const createTile = db.prepare<
-    [number, string, string | null, number, number, number, number, string | null, string | null, string | null, string | null, string | null, string | null],
+    [number, string, string | null, number, number, number, number, string | null, string | null, string | null, string | null, string | null, string | null, number | null, string | null, string | null, string | null, string | null],
     { id: number }
   >(
-    `INSERT INTO tiles (user_id, type, integration, grid_x, grid_y, grid_w, grid_h, name, url, bg_color, image_url, image_fit, metrics)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`
+    `INSERT INTO tiles (user_id, type, integration, grid_x, grid_y, grid_w, grid_h, name, url, bg_color, image_url, image_fit, image_position, image_scale, title_size, title_position, title_color, metrics)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`
   );
 
   const row = createTile.get(
@@ -89,6 +99,11 @@ router.post("/", requireAuth, (req: AuthRequest, res) => {
     body.bgColor ?? null,
     body.imageUrl ?? null,
     body.imageFit ?? null,
+    body.imagePosition ?? null,
+    body.imageScale ?? null,
+    body.titleSize ?? null,
+    body.titlePosition ?? null,
+    body.titleColor ?? null,
     body.metrics === undefined ? null : serializeMetrics(body.metrics)
   )!;
 
@@ -127,6 +142,11 @@ router.put("/:id", requireAuth, (req: AuthRequest, res) => {
     bgColor?: string;
     imageUrl?: string;
     imageFit?: string;
+    imagePosition?: string | null;
+    imageScale?: number | null;
+    titleSize?: string | null;
+    titlePosition?: string | null;
+    titleColor?: string | null;
     metrics?: string[] | null;
   };
 
@@ -143,6 +163,11 @@ router.put("/:id", requireAuth, (req: AuthRequest, res) => {
   if (body.bgColor !== undefined) { updates.push("bg_color = ?"); params.push(body.bgColor); }
   if (body.imageUrl !== undefined) { updates.push("image_url = ?"); params.push(body.imageUrl); }
   if (body.imageFit !== undefined) { updates.push("image_fit = ?"); params.push(body.imageFit); }
+  if (body.imagePosition !== undefined) { updates.push("image_position = ?"); params.push(body.imagePosition); }
+  if (body.imageScale !== undefined) { updates.push("image_scale = ?"); params.push(body.imageScale); }
+  if (body.titleSize !== undefined) { updates.push("title_size = ?"); params.push(body.titleSize); }
+  if (body.titlePosition !== undefined) { updates.push("title_position = ?"); params.push(body.titlePosition); }
+  if (body.titleColor !== undefined) { updates.push("title_color = ?"); params.push(body.titleColor); }
   if (body.metrics !== undefined) { updates.push("metrics = ?"); params.push(body.metrics === null ? null : serializeMetrics(body.metrics)); }
 
   if (updates.length > 0) {

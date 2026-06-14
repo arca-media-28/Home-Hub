@@ -85,6 +85,34 @@ if (!tileColumns.some((c) => c.name === "metrics")) {
   db.exec("ALTER TABLE tiles ADD COLUMN metrics TEXT");
 }
 
+// 1c. Flexible image placement. `image_position` is an anchor key (e.g.
+//     "center", "top-left"); `image_scale` is a zoom percentage (100 = native).
+//     Both NULL means "use the legacy image_fit behavior" so existing tiles
+//     keep rendering exactly as before.
+if (!tileColumns.some((c) => c.name === "image_position")) {
+  db.exec("ALTER TABLE tiles ADD COLUMN image_position TEXT");
+}
+if (!tileColumns.some((c) => c.name === "image_scale")) {
+  db.exec("ALTER TABLE tiles ADD COLUMN image_scale INTEGER");
+}
+
+// 1d. Tile title styling for plain app/link tiles. `title_size` is a size key
+//     (e.g. "sm", "md", "lg", "xl"); `title_position` is an anchor key (e.g.
+//     "center", "top-left"). Both NULL means "use the default" so existing
+//     tiles keep rendering exactly as before. These do NOT affect integration
+//     (widget) tiles, whose header layout is fixed.
+if (!tileColumns.some((c) => c.name === "title_size")) {
+  db.exec("ALTER TABLE tiles ADD COLUMN title_size TEXT");
+}
+if (!tileColumns.some((c) => c.name === "title_position")) {
+  db.exec("ALTER TABLE tiles ADD COLUMN title_position TEXT");
+}
+// `title_color` is an optional CSS color for the title text. NULL means "use the
+// default" (white over an image, theme color otherwise).
+if (!tileColumns.some((c) => c.name === "title_color")) {
+  db.exec("ALTER TABLE tiles ADD COLUMN title_color TEXT");
+}
+
 // 2. One-time data migration: existing integration-typed tiles become app/link
 //    tiles whose `integration` carries the old type. Styling fields are left
 //    untouched. After this runs `type` is 'app' so it never matches again.
@@ -129,6 +157,11 @@ export interface DbTile {
   bg_color: string | null;
   image_url: string | null;
   image_fit: string | null;
+  image_position: string | null;
+  image_scale: number | null;
+  title_size: string | null;
+  title_position: string | null;
+  title_color: string | null;
   metrics: string | null;
   created_at: string;
 }
@@ -161,6 +194,12 @@ export const uploadStmts = {
   ),
   findAllByUser: db.prepare<[number], DbUploadedFile>(
     "SELECT * FROM uploaded_files WHERE user_id = ? ORDER BY created_at DESC"
+  ),
+  findById: db.prepare<[number, number], DbUploadedFile>(
+    "SELECT * FROM uploaded_files WHERE id = ? AND user_id = ?"
+  ),
+  delete: db.prepare<[number, number], void>(
+    "DELETE FROM uploaded_files WHERE id = ? AND user_id = ?"
   ),
 };
 

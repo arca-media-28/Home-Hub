@@ -17,8 +17,19 @@ export interface TileUpdate {
   name?: string;
   url?: string;
   bgColor?: string;
-  imageUrl?: string;
+  /** @nullable */
+  imageUrl?: string | null;
   imageFit?: string;
+  /** @nullable */
+  imagePosition?: string | null;
+  /** @nullable */
+  imageScale?: number | null;
+  /** @nullable */
+  titleSize?: string | null;
+  /** @nullable */
+  titlePosition?: string | null;
+  /** @nullable */
+  titleColor?: string | null;
   /** @nullable */
   metrics?: string[] | null;
 }

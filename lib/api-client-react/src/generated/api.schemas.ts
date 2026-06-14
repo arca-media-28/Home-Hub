@@ -65,6 +65,7 @@ export type TileImageFit = typeof TileImageFit[keyof typeof TileImageFit] | null
 export const TileImageFit = {
   cover: 'cover',
   contain: 'contain',
+  none: 'none',
   center: 'center',
   'top-left': 'top-left',
 } as const;
@@ -89,6 +90,31 @@ export interface Tile {
   imageUrl?: string | null;
   /** @nullable */
   imageFit?: TileImageFit;
+  /**
+     * Anchor key for how the image is aligned within the tile (e.g. "center", "top-left"). Null falls back to the legacy imageFit behavior.
+     * @nullable
+     */
+  imagePosition?: string | null;
+  /**
+     * Zoom percentage applied to the image (100 = native). Null means no scaling.
+     * @nullable
+     */
+  imageScale?: number | null;
+  /**
+     * Size key for the tile title on plain app/link tiles (e.g. "sm", "md", "lg", "xl"). Null means the default. Ignored by integration (widget) tiles.
+     * @nullable
+     */
+  titleSize?: string | null;
+  /**
+     * Anchor key for where the tile title sits on plain app/link tiles (e.g. "center", "top-left"). Null means the default. Ignored by integration (widget) tiles.
+     * @nullable
+     */
+  titlePosition?: string | null;
+  /**
+     * CSS color for the tile title text on plain app/link tiles. Null means the default (white over an image, theme color otherwise). Ignored by integration (widget) tiles.
+     * @nullable
+     */
+  titleColor?: string | null;
   /**
      * Enabled metric keys for this tile's integration. Null means "show all" (the default for tiles created before metric selection existed).
      * @nullable
@@ -136,6 +162,14 @@ export interface TileInput {
   bgColor?: string;
   imageUrl?: string;
   imageFit?: string;
+  imagePosition?: string;
+  imageScale?: number;
+  /** @nullable */
+  titleSize?: string | null;
+  /** @nullable */
+  titlePosition?: string | null;
+  /** @nullable */
+  titleColor?: string | null;
   /** @nullable */
   metrics?: string[] | null;
 }
@@ -164,8 +198,19 @@ export interface TileUpdate {
   name?: string;
   url?: string;
   bgColor?: string;
-  imageUrl?: string;
+  /** @nullable */
+  imageUrl?: string | null;
   imageFit?: string;
+  /** @nullable */
+  imagePosition?: string | null;
+  /** @nullable */
+  imageScale?: number | null;
+  /** @nullable */
+  titleSize?: string | null;
+  /** @nullable */
+  titlePosition?: string | null;
+  /** @nullable */
+  titleColor?: string | null;
   /** @nullable */
   metrics?: string[] | null;
 }
@@ -184,6 +229,19 @@ export interface LayoutUpdate {
 
 export interface UploadResult {
   url: string;
+}
+
+export interface UploadedFile {
+  id: number;
+  url: string;
+  /** @nullable */
+  originalName?: string | null;
+  /** @nullable */
+  mimetype?: string | null;
+  /** @nullable */
+  size?: number | null;
+  /** @nullable */
+  createdAt?: string | null;
 }
 
 export interface ServiceConnection {

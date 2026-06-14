@@ -15,6 +15,7 @@ export type TileImageFit = typeof TileImageFit[keyof typeof TileImageFit] | null
 export const TileImageFit = {
   cover: 'cover',
   contain: 'contain',
+  none: 'none',
   center: 'center',
   'top-left': 'top-left',
 } as const;

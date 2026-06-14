@@ -7,6 +7,7 @@ import SonarrTile from "./SonarrTile";
 import RadarrTile from "./RadarrTile";
 import QbittorrentTile from "./QbittorrentTile";
 import { resolveEnabledMetrics, tileDensity, type TileDensity } from "./metrics";
+import { resolveImageStyle } from "./imageStyle";
 import { openTileUrl } from "@/lib/utils";
 
 export const INTEGRATION_LABELS: Record<string, string> = {
@@ -52,15 +53,7 @@ export default function IntegrationTile({ tile, status }: IntegrationTileProps) 
   const bg = tile.bgColor || "hsl(240 6% 12%)";
   const label = tile.name || INTEGRATION_LABELS[integration] || "App";
 
-  const imageFitClass = (() => {
-    switch (tile.imageFit) {
-      case "cover": return "object-cover";
-      case "contain": return "object-contain";
-      case "center": return "object-none object-center";
-      case "top-left": return "object-none object-left-top";
-      default: return "object-cover";
-    }
-  })();
+  const image = resolveImageStyle(tile);
 
   // A small reachability dot in the header. Only shown once a connection has
   // been saved for the backing service.
@@ -76,7 +69,7 @@ export default function IntegrationTile({ tile, status }: IntegrationTileProps) 
       {/* Styled header carrying the tile's custom name, background and image. */}
       <div
         className="relative h-11 flex-shrink-0 overflow-hidden flex items-center px-3 gap-1.5 group/header select-none"
-        style={{ background: hasImage ? undefined : bg }}
+        style={{ background: bg }}
         onClick={() => openTileUrl(tile.url)}
         role={tile.url ? "link" : undefined}
         title={tile.url || undefined}
@@ -86,7 +79,8 @@ export default function IntegrationTile({ tile, status }: IntegrationTileProps) 
           <img
             src={tile.imageUrl!}
             alt={tile.name || "tile"}
-            className={`absolute inset-0 w-full h-full ${imageFitClass}`}
+            className={`absolute inset-0 w-full h-full ${image.className}`}
+            style={image.style}
             draggable={false}
           />
         )}

@@ -79,7 +79,12 @@ export const GetTilesResponseItem = zod.object({
   "url": zod.string().nullish(),
   "bgColor": zod.string().nullish(),
   "imageUrl": zod.string().nullish(),
-  "imageFit": zod.union([zod.literal('cover'),zod.literal('contain'),zod.literal('center'),zod.literal('top-left'),zod.literal(null)]).nullish(),
+  "imageFit": zod.union([zod.literal('cover'),zod.literal('contain'),zod.literal('none'),zod.literal('center'),zod.literal('top-left'),zod.literal(null)]).nullish(),
+  "imagePosition": zod.string().nullish().describe('Anchor key for how the image is aligned within the tile (e.g. \"center\", \"top-left\"). Null falls back to the legacy imageFit behavior.'),
+  "imageScale": zod.number().nullish().describe('Zoom percentage applied to the image (100 = native). Null means no scaling.'),
+  "titleSize": zod.string().nullish().describe('Size key for the tile title on plain app\/link tiles (e.g. \"sm\", \"md\", \"lg\", \"xl\"). Null means the default. Ignored by integration (widget) tiles.'),
+  "titlePosition": zod.string().nullish().describe('Anchor key for where the tile title sits on plain app\/link tiles (e.g. \"center\", \"top-left\"). Null means the default. Ignored by integration (widget) tiles.'),
+  "titleColor": zod.string().nullish().describe('CSS color for the tile title text on plain app\/link tiles. Null means the default (white over an image, theme color otherwise). Ignored by integration (widget) tiles.'),
   "metrics": zod.array(zod.string()).nullish().describe('Enabled metric keys for this tile\'s integration. Null means \"show all\" (the default for tiles created before metric selection existed).'),
   "createdAt": zod.string().optional()
 })
@@ -101,6 +106,11 @@ export const CreateTileBody = zod.object({
   "bgColor": zod.string().optional(),
   "imageUrl": zod.string().optional(),
   "imageFit": zod.string().optional(),
+  "imagePosition": zod.string().optional(),
+  "imageScale": zod.number().optional(),
+  "titleSize": zod.string().nullish(),
+  "titlePosition": zod.string().nullish(),
+  "titleColor": zod.string().nullish(),
   "metrics": zod.array(zod.string()).nullish()
 })
 
@@ -125,7 +135,12 @@ export const GetTileResponse = zod.object({
   "url": zod.string().nullish(),
   "bgColor": zod.string().nullish(),
   "imageUrl": zod.string().nullish(),
-  "imageFit": zod.union([zod.literal('cover'),zod.literal('contain'),zod.literal('center'),zod.literal('top-left'),zod.literal(null)]).nullish(),
+  "imageFit": zod.union([zod.literal('cover'),zod.literal('contain'),zod.literal('none'),zod.literal('center'),zod.literal('top-left'),zod.literal(null)]).nullish(),
+  "imagePosition": zod.string().nullish().describe('Anchor key for how the image is aligned within the tile (e.g. \"center\", \"top-left\"). Null falls back to the legacy imageFit behavior.'),
+  "imageScale": zod.number().nullish().describe('Zoom percentage applied to the image (100 = native). Null means no scaling.'),
+  "titleSize": zod.string().nullish().describe('Size key for the tile title on plain app\/link tiles (e.g. \"sm\", \"md\", \"lg\", \"xl\"). Null means the default. Ignored by integration (widget) tiles.'),
+  "titlePosition": zod.string().nullish().describe('Anchor key for where the tile title sits on plain app\/link tiles (e.g. \"center\", \"top-left\"). Null means the default. Ignored by integration (widget) tiles.'),
+  "titleColor": zod.string().nullish().describe('CSS color for the tile title text on plain app\/link tiles. Null means the default (white over an image, theme color otherwise). Ignored by integration (widget) tiles.'),
   "metrics": zod.array(zod.string()).nullish().describe('Enabled metric keys for this tile\'s integration. Null means \"show all\" (the default for tiles created before metric selection existed).'),
   "createdAt": zod.string().optional()
 })
@@ -147,8 +162,13 @@ export const UpdateTileBody = zod.object({
   "name": zod.string().optional(),
   "url": zod.string().optional(),
   "bgColor": zod.string().optional(),
-  "imageUrl": zod.string().optional(),
+  "imageUrl": zod.string().nullish(),
   "imageFit": zod.string().optional(),
+  "imagePosition": zod.string().nullish(),
+  "imageScale": zod.number().nullish(),
+  "titleSize": zod.string().nullish(),
+  "titlePosition": zod.string().nullish(),
+  "titleColor": zod.string().nullish(),
   "metrics": zod.array(zod.string()).nullish()
 })
 
@@ -165,7 +185,12 @@ export const UpdateTileResponse = zod.object({
   "url": zod.string().nullish(),
   "bgColor": zod.string().nullish(),
   "imageUrl": zod.string().nullish(),
-  "imageFit": zod.union([zod.literal('cover'),zod.literal('contain'),zod.literal('center'),zod.literal('top-left'),zod.literal(null)]).nullish(),
+  "imageFit": zod.union([zod.literal('cover'),zod.literal('contain'),zod.literal('none'),zod.literal('center'),zod.literal('top-left'),zod.literal(null)]).nullish(),
+  "imagePosition": zod.string().nullish().describe('Anchor key for how the image is aligned within the tile (e.g. \"center\", \"top-left\"). Null falls back to the legacy imageFit behavior.'),
+  "imageScale": zod.number().nullish().describe('Zoom percentage applied to the image (100 = native). Null means no scaling.'),
+  "titleSize": zod.string().nullish().describe('Size key for the tile title on plain app\/link tiles (e.g. \"sm\", \"md\", \"lg\", \"xl\"). Null means the default. Ignored by integration (widget) tiles.'),
+  "titlePosition": zod.string().nullish().describe('Anchor key for where the tile title sits on plain app\/link tiles (e.g. \"center\", \"top-left\"). Null means the default. Ignored by integration (widget) tiles.'),
+  "titleColor": zod.string().nullish().describe('CSS color for the tile title text on plain app\/link tiles. Null means the default (white over an image, theme color otherwise). Ignored by integration (widget) tiles.'),
   "metrics": zod.array(zod.string()).nullish().describe('Enabled metric keys for this tile\'s integration. Null means \"show all\" (the default for tiles created before metric selection existed).'),
   "createdAt": zod.string().optional()
 })
@@ -205,11 +230,38 @@ export const SaveLayoutResponseItem = zod.object({
   "url": zod.string().nullish(),
   "bgColor": zod.string().nullish(),
   "imageUrl": zod.string().nullish(),
-  "imageFit": zod.union([zod.literal('cover'),zod.literal('contain'),zod.literal('center'),zod.literal('top-left'),zod.literal(null)]).nullish(),
+  "imageFit": zod.union([zod.literal('cover'),zod.literal('contain'),zod.literal('none'),zod.literal('center'),zod.literal('top-left'),zod.literal(null)]).nullish(),
+  "imagePosition": zod.string().nullish().describe('Anchor key for how the image is aligned within the tile (e.g. \"center\", \"top-left\"). Null falls back to the legacy imageFit behavior.'),
+  "imageScale": zod.number().nullish().describe('Zoom percentage applied to the image (100 = native). Null means no scaling.'),
+  "titleSize": zod.string().nullish().describe('Size key for the tile title on plain app\/link tiles (e.g. \"sm\", \"md\", \"lg\", \"xl\"). Null means the default. Ignored by integration (widget) tiles.'),
+  "titlePosition": zod.string().nullish().describe('Anchor key for where the tile title sits on plain app\/link tiles (e.g. \"center\", \"top-left\"). Null means the default. Ignored by integration (widget) tiles.'),
+  "titleColor": zod.string().nullish().describe('CSS color for the tile title text on plain app\/link tiles. Null means the default (white over an image, theme color otherwise). Ignored by integration (widget) tiles.'),
   "metrics": zod.array(zod.string()).nullish().describe('Enabled metric keys for this tile\'s integration. Null means \"show all\" (the default for tiles created before metric selection existed).'),
   "createdAt": zod.string().optional()
 })
 export const SaveLayoutResponse = zod.array(SaveLayoutResponseItem)
+
+
+/**
+ * @summary List the authenticated user's uploaded images
+ */
+export const ListUploadsResponseItem = zod.object({
+  "id": zod.number(),
+  "url": zod.string(),
+  "originalName": zod.string().nullish(),
+  "mimetype": zod.string().nullish(),
+  "size": zod.number().nullish(),
+  "createdAt": zod.string().nullish()
+})
+export const ListUploadsResponse = zod.array(ListUploadsResponseItem)
+
+
+/**
+ * @summary Delete an uploaded image from the library
+ */
+export const DeleteUploadParams = zod.object({
+  "id": zod.coerce.number()
+})
 
 
 /**

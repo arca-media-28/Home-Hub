@@ -33,6 +33,15 @@ push → `git pull` on a LAN box → run there.
   `:5000` (`dev:watch`) + dashboard on `:3000`. Ports overridable with
   `API_PORT` / `WEB_PORT`.
 
+## On Replit, the API Server workflow does NOT hot-reload
+The workflow runs the `dev` script = `build && start` (one-shot esbuild, then
+`node dist/index.mjs`). It does **not** watch. So after editing any
+`artifacts/api-server/src/**` file, `dist/` is stale until you **restart the
+`artifacts/api-server: API Server` workflow** — your change will silently not
+take effect (e.g. an endpoint appears to ignore new logic) until then. Quick
+check: `rg -c <new-symbol> artifacts/api-server/dist/index.mjs`. (`dev:watch` /
+`dev:local` only run on a LAN box, not in the Replit workflow.)
+
 ## Verifying the proxy from this Replit env
 `REPL_ID` is set here, so the proxy is gated off. To test it, run the services
 with `REPL_ID` unset (`env -u REPL_ID ...`) from each artifact's own dir, then

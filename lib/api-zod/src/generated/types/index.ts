@@ -36,6 +36,7 @@ export * from './tileType';
 export * from './tileUpdate';
 export * from './tileUpdateIntegration';
 export * from './truenasMetrics';
+export * from './uploadedFile';
 export * from './uploadResult';
 export * from './userProfile';
 export * from './zfsPool';

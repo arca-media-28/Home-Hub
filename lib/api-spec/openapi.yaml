@@ -231,6 +231,46 @@ paths:
                 items:
                   $ref: "#/components/schemas/Tile"
 
+  /uploads:
+    get:
+      operationId: listUploads
+      tags: [uploads]
+      summary: List the authenticated user's uploaded images
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Uploaded image list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UploadedFile"
+
+  /uploads/{id}:
+    delete:
+      operationId: deleteUpload
+      tags: [uploads]
+      summary: Delete an uploaded image from the library
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /widgets/truenas:
     get:
       operationId: getTruenasMetrics
@@ -510,7 +550,36 @@ components:
           type: ["string", "null"]
         imageFit:
           type: ["string", "null"]
-          enum: ["cover", "contain", "center", "top-left", null]
+          enum: ["cover", "contain", "none", "center", "top-left", null]
+        imagePosition:
+          description: >-
+            Anchor key for how the image is aligned within the tile (e.g.
+            "center", "top-left"). Null falls back to the legacy imageFit
+            behavior.
+          type: ["string", "null"]
+        imageScale:
+          description: >-
+            Zoom percentage applied to the image (100 = native). Null means no
+            scaling.
+          type: ["integer", "null"]
+        titleSize:
+          description: >-
+            Size key for the tile title on plain app/link tiles (e.g. "sm",
+            "md", "lg", "xl"). Null means the default. Ignored by integration
+            (widget) tiles.
+          type: ["string", "null"]
+        titlePosition:
+          description: >-
+            Anchor key for where the tile title sits on plain app/link tiles
+            (e.g. "center", "top-left"). Null means the default. Ignored by
+            integration (widget) tiles.
+          type: ["string", "null"]
+        titleColor:
+          description: >-
+            CSS color for the tile title text on plain app/link tiles. Null
+            means the default (white over an image, theme color otherwise).
+            Ignored by integration (widget) tiles.
+          type: ["string", "null"]
         metrics:
           description: >-
             Enabled metric keys for this tile's integration. Null means "show
@@ -549,6 +618,16 @@ components:
           type: string
         imageFit:
           type: string
+        imagePosition:
+          type: string
+        imageScale:
+          type: integer
+        titleSize:
+          type: ["string", "null"]
+        titlePosition:
+          type: ["string", "null"]
+        titleColor:
+          type: ["string", "null"]
         metrics:
           type: ["array", "null"]
           items:
@@ -575,9 +654,19 @@ components:
         bgColor:
           type: string
         imageUrl:
-          type: string
+          type: ["string", "null"]
         imageFit:
           type: string
+        imagePosition:
+          type: ["string", "null"]
+        imageScale:
+          type: ["integer", "null"]
+        titleSize:
+          type: ["string", "null"]
+        titlePosition:
+          type: ["string", "null"]
+        titleColor:
+          type: ["string", "null"]
         metrics:
           type: ["array", "null"]
           items:
@@ -613,6 +702,23 @@ components:
       properties:
         url:
           type: string
+
+    UploadedFile:
+      type: object
+      required: [id, url]
+      properties:
+        id:
+          type: integer
+        url:
+          type: string
+        originalName:
+          type: ["string", "null"]
+        mimetype:
+          type: ["string", "null"]
+        size:
+          type: ["integer", "null"]
+        createdAt:
+          type: ["string", "null"]
 
     ServiceConnection:
       type: object
