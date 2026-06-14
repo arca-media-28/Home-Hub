@@ -384,12 +384,14 @@ router.get("/radarr", requireAuth, async (_req, res) => {
 // ────────────────────────────────────────────────
 // qBittorrent Widget
 // ────────────────────────────────────────────────
-// qBittorrent uses session-cookie auth: log in to obtain the SID cookie, then
-// reuse it for every subsequent call.
-function extractSid(setCookie: string[] | undefined): string | undefined {
+// qBittorrent uses session-cookie auth: log in to obtain the session cookie,
+// then reuse it for every subsequent call. The cookie is named "SID" in v4 but
+// was renamed to "QBT_SID_<port>" in v5.x, so match either and return the full
+// "name=value" pair to send back verbatim.
+function extractSessionCookie(setCookie: string[] | undefined): string | undefined {
   for (const cookie of setCookie ?? []) {
-    const match = /SID=([^;]+)/.exec(cookie);
-    if (match) return match[1];
+    const match = /((?:QBT_)?SID(?:_\d+)?)=([^;]+)/.exec(cookie);
+    if (match) return `${match[1]}=${match[2]}`;
   }
   return undefined;
 }
@@ -416,7 +418,7 @@ async function qbLogin(baseUrl: string, username: string, password: string): Pro
     throw new Error("qb-auth-failed");
   }
 
-  const sid = extractSid(loginRes.headers["set-cookie"] as string[] | undefined);
+  const sid = extractSessionCookie(loginRes.headers["set-cookie"] as string[] | undefined);
   if (!sid) {
     throw new Error("qb-no-session");
   }
@@ -456,8 +458,8 @@ router.get("/qbittorrent", requireAuth, async (_req, res) => {
   // caller can decide whether to re-authenticate.
   const fetchData = (sid: string) =>
     Promise.all([
-      httpClient.get(`${baseUrl}/api/v2/torrents/info`, { headers: { Cookie: `SID=${sid}` } }),
-      httpClient.get(`${baseUrl}/api/v2/transfer/info`, { headers: { Cookie: `SID=${sid}` } }),
+      httpClient.get(`${baseUrl}/api/v2/torrents/info`, { headers: { Cookie: sid } }),
+      httpClient.get(`${baseUrl}/api/v2/transfer/info`, { headers: { Cookie: sid } }),
     ]);
 
   const key = qbCacheKey(baseUrl, username);

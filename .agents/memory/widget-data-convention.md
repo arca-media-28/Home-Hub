@@ -43,6 +43,12 @@ failed before this. The same client backs both the test/ping and the widgets so
 - Sonarr/Radarr: queue needs `includeSeries`/`includeMovie` (+ `includeEpisode`
   for Sonarr) and returns rows under `records`; calendar needs the same include
   flags or titles render blank.
-- qBittorrent: cookie auth — `POST /api/v2/auth/login` (form body) → grab `SID`
-  from `set-cookie`, then send `Cookie: SID=...` to `/api/v2/torrents/info` and
-  `/api/v2/transfer/info`.
+- qBittorrent: cookie auth — `POST /api/v2/auth/login` (form body) → grab the
+  session cookie from `set-cookie`, then send it back as `Cookie:` on
+  `/api/v2/torrents/info` and `/api/v2/transfer/info`. **Cookie name is version-
+  dependent:** v4 uses `SID=...`; v5.x renamed it to `QBT_SID_<port>=...` (the
+  suffix is qB's *internal* WebUI port, which can differ from the reachable port
+  when behind Docker port-mapping/reverse-proxy). Capture and resend the full
+  `name=value` pair verbatim — do NOT hardcode `SID=`. Symptom of the v4-only
+  bug against a v5 server: login returns 200 but extract fails → "no session" →
+  tile shows unavailable.

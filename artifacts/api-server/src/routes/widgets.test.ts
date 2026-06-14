@@ -357,6 +357,29 @@ describe("GET /widgets/qbittorrent", () => {
     }
   });
 
+  it("handles the qBittorrent 5.x QBT_SID_<port> session cookie", async () => {
+    const baseUrl = "https://qb-v5.local";
+    findByService.mockReturnValue(
+      connRow({ service: "qbittorrent", url: baseUrl, username: "admin", password: "pw" }),
+    );
+    // qBittorrent 5.x renamed the session cookie to "QBT_SID_<port>".
+    httpPost.mockResolvedValue({
+      data: "Ok.",
+      headers: { "set-cookie": ["QBT_SID_8080=v5token; HttpOnly; SameSite=Strict; path=/"] },
+    });
+    httpGet
+      .mockResolvedValueOnce({ data: [] })
+      .mockResolvedValueOnce({ data: { dl_info_speed: 0, up_info_speed: 0 } });
+
+    const res = await request(app).get("/widgets/qbittorrent");
+    expect(res.status).toBe(200);
+    // The full name=value pair must be sent back verbatim on the data calls.
+    for (const call of httpGet.mock.calls) {
+      const opts = call[1] as { headers: Record<string, string> };
+      expect(opts.headers.Cookie).toBe("QBT_SID_8080=v5token");
+    }
+  });
+
   it("re-authenticates once when the cached session returns 403", async () => {
     const baseUrl = "https://qb-403.local";
     findByService.mockReturnValue(
