@@ -20,6 +20,17 @@ export const httpClient: AxiosInstance = axios.create({
   // on non-2xx) so individual routes can surface a clear error state.
 });
 
+// Normalize a user-entered base URL so axios always gets an absolute URL:
+// prepend "http://" when no scheme is present and strip trailing slashes.
+// Without a scheme, axios treats the value as a relative path and the request
+// fails before it leaves the process. Returns undefined for empty input.
+export function normalizeBaseUrl(url: string | undefined | null): string | undefined {
+  const trimmed = url?.trim();
+  if (!trimmed) return undefined;
+  const withScheme = /^https?:\/\//i.test(trimmed) ? trimmed : `http://${trimmed}`;
+  return withScheme.replace(/\/+$/, "");
+}
+
 // Turn an arbitrary thrown error (usually an AxiosError) into a short,
 // user-facing message. Shared so the on-demand test, the background scheduler,
 // and the widget routes all describe failures the same way.

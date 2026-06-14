@@ -1,4 +1,4 @@
-import { httpClient, normalizeHttpError, HTTP_TIMEOUT } from "./http.js";
+import { httpClient, normalizeHttpError, normalizeBaseUrl, HTTP_TIMEOUT } from "./http.js";
 import type { DbServiceConnection } from "./db.js";
 
 export interface TestValues {
@@ -16,19 +16,14 @@ export interface TestResult {
 
 const TIMEOUT = HTTP_TIMEOUT;
 
-function trimSlash(url: string): string {
-  return url.replace(/\/+$/, "");
-}
-
 // Ping a single service using the supplied values. Each branch hits a cheap,
 // auth-protected endpoint so a 2xx response confirms both reachability and
 // valid credentials.
 export async function pingService(service: string, v: TestValues): Promise<TestResult> {
-  const url = v.url?.trim();
-  if (!url) {
+  const base = normalizeBaseUrl(v.url);
+  if (!base) {
     return { ok: false, message: "Enter a Base URL first." };
   }
-  const base = trimSlash(url);
 
   switch (service) {
     case "truenas": {

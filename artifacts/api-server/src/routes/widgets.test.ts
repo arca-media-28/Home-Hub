@@ -27,6 +27,12 @@ vi.mock("../lib/http.js", () => ({
     get: (...args: unknown[]) => httpGet(...args),
     post: (...args: unknown[]) => httpPost(...args),
   },
+  normalizeBaseUrl: (url: string | undefined | null) => {
+    const trimmed = url?.trim();
+    if (!trimmed) return undefined;
+    const withScheme = /^https?:\/\//i.test(trimmed) ? trimmed : `http://${trimmed}`;
+    return withScheme.replace(/\/+$/, "");
+  },
 }));
 
 // Keep the logger quiet during tests.

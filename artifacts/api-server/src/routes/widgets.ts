@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { requireAuth } from "../lib/auth.js";
 import { connectionStmts } from "../lib/db.js";
-import { httpClient } from "../lib/http.js";
+import { httpClient, normalizeBaseUrl } from "../lib/http.js";
 import { logger } from "../lib/logger.js";
 
 const router = Router();
@@ -438,7 +438,7 @@ function isAuthError(err: unknown): boolean {
 
 router.get("/qbittorrent", requireAuth, async (_req, res) => {
   const saved = getSavedConnection("qbittorrent");
-  const baseUrl = saved.url || process.env["QBITTORRENT_URL"];
+  const baseUrl = normalizeBaseUrl(saved.url || process.env["QBITTORRENT_URL"]);
   const username = saved.username || process.env["QBITTORRENT_USERNAME"];
   const password = saved.password ?? process.env["QBITTORRENT_PASSWORD"];
 
@@ -506,10 +506,12 @@ router.get("/qbittorrent", requireAuth, async (_req, res) => {
     });
   } catch (err) {
     if (err instanceof Error && err.message === "qb-auth-failed") {
+      logger.warn({ baseUrl }, "qBittorrent authentication failed (check saved username/password)");
       res.status(502).json({ error: "qBittorrent authentication failed" });
       return;
     }
     if (err instanceof Error && err.message === "qb-no-session") {
+      logger.warn({ baseUrl }, "qBittorrent login returned no session cookie");
       res.status(502).json({ error: "qBittorrent did not return a session" });
       return;
     }
