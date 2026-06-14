@@ -28,11 +28,19 @@ import {
   Film,
   Download,
   Shield,
+  Network,
   Plug,
   X,
 } from "lucide-react";
 
-type ServiceKey = "truenas" | "plex" | "sonarr" | "radarr" | "qbittorrent" | "pihole";
+type ServiceKey =
+  | "truenas"
+  | "plex"
+  | "sonarr"
+  | "radarr"
+  | "qbittorrent"
+  | "pihole"
+  | "nginx-proxy-manager";
 
 type FieldKey = "url" | "apiKey" | "username" | "password" | "token";
 
@@ -106,6 +114,16 @@ const SERVICES: ServiceDef[] = [
     name: "Pi-hole",
     icon: Shield,
     fields: [URL_FIELD, API_KEY_FIELD],
+  },
+  {
+    key: "nginx-proxy-manager",
+    name: "Nginx Proxy Manager",
+    icon: Network,
+    fields: [
+      URL_FIELD,
+      { key: "username", label: "Email", placeholder: "admin@example.com" },
+      { key: "password", label: "Password", type: "password", placeholder: "••••••••" },
+    ],
   },
 ];
 

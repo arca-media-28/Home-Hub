@@ -363,6 +363,21 @@ paths:
               schema:
                 $ref: "#/components/schemas/PiholeData"
 
+  /widgets/nginx-proxy-manager:
+    get:
+      operationId: getNginxProxyManagerData
+      tags: [widgets]
+      summary: Get proxy host, dead host, and SSL certificate summary from Nginx Proxy Manager
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Nginx Proxy Manager summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NginxProxyManagerData"
+
   /connections:
     get:
       operationId: getConnections
@@ -427,7 +442,7 @@ paths:
           required: true
           schema:
             type: string
-            enum: [truenas, plex, sonarr, radarr, qbittorrent, pihole]
+            enum: [truenas, plex, sonarr, radarr, qbittorrent, pihole, nginx-proxy-manager]
       requestBody:
         required: true
         content:
@@ -461,7 +476,7 @@ paths:
           required: true
           schema:
             type: string
-            enum: [truenas, plex, sonarr, radarr, qbittorrent, pihole]
+            enum: [truenas, plex, sonarr, radarr, qbittorrent, pihole, nginx-proxy-manager]
       requestBody:
         required: true
         content:
@@ -546,7 +561,7 @@ components:
           enum: [app, truenas, media, sonarr, radarr, qbittorrent]
         integration:
           type: ["string", "null"]
-          enum: [truenas, media, sonarr, radarr, qbittorrent, pihole, null]
+          enum: [truenas, media, sonarr, radarr, qbittorrent, pihole, nginx-proxy-manager, null]
         gridX:
           type: integer
         gridY:
@@ -620,7 +635,7 @@ components:
           enum: [app, truenas, media, sonarr, radarr, qbittorrent]
         integration:
           type: ["string", "null"]
-          enum: [truenas, media, sonarr, radarr, qbittorrent, pihole, null]
+          enum: [truenas, media, sonarr, radarr, qbittorrent, pihole, nginx-proxy-manager, null]
         gridX:
           type: integer
         gridY:
@@ -661,7 +676,7 @@ components:
       properties:
         integration:
           type: ["string", "null"]
-          enum: [truenas, media, sonarr, radarr, qbittorrent, pihole, null]
+          enum: [truenas, media, sonarr, radarr, qbittorrent, pihole, nginx-proxy-manager, null]
         gridX:
           type: integer
         gridY:
@@ -987,3 +1002,48 @@ components:
         status:
           type: string
           enum: [enabled, disabled]
+
+    NginxProxyManagerData:
+      type: object
+      required: [total, enabled, offline, deadHostsCount, expiringCertsCount, proxyHosts]
+      properties:
+        total:
+          description: Total number of configured proxy hosts.
+          type: integer
+        enabled:
+          description: Number of enabled proxy hosts.
+          type: integer
+        offline:
+          description: Number of enabled proxy hosts Nginx reports as offline.
+          type: integer
+        deadHostsCount:
+          description: Number of 404 (dead) hosts configured.
+          type: integer
+        expiringCertsCount:
+          description: Number of proxy hosts whose SSL certificate is expired or expiring soon.
+          type: integer
+        proxyHosts:
+          type: array
+          items:
+            $ref: "#/components/schemas/NginxProxyHost"
+
+    NginxProxyHost:
+      type: object
+      required: [id, domainNames, enabled, online, ssl, sslExpiring]
+      properties:
+        id:
+          type: integer
+        domainNames:
+          type: array
+          items:
+            type: string
+        enabled:
+          type: boolean
+        online:
+          type: boolean
+        ssl:
+          description: Whether the host has an SSL certificate attached.
+          type: boolean
+        sslExpiring:
+          description: Whether the attached SSL certificate is expired or expiring soon.
+          type: boolean

@@ -7,6 +7,7 @@ import SonarrTile from "./SonarrTile";
 import RadarrTile from "./RadarrTile";
 import QbittorrentTile from "./QbittorrentTile";
 import PiholeTile from "./PiholeTile";
+import NginxProxyManagerTile from "./NginxProxyManagerTile";
 import { resolveEnabledMetrics, tileDensity, type TileDensity } from "./metrics";
 import { resolveImageStyle } from "./imageStyle";
 import { openTileUrl } from "@/lib/utils";
@@ -18,6 +19,7 @@ export const INTEGRATION_LABELS: Record<string, string> = {
   [TileIntegration.radarr]: "Radarr",
   [TileIntegration.qbittorrent]: "qBittorrent",
   [TileIntegration.pihole]: "Pi-hole",
+  [TileIntegration["nginx-proxy-manager"]]: "Nginx Proxy Manager",
 };
 
 // Props every integration widget receives: the resolved set of enabled metric
@@ -41,6 +43,8 @@ function renderStatusView(integration: string, props: WidgetProps) {
       return <QbittorrentTile {...props} />;
     case TileIntegration.pihole:
       return <PiholeTile {...props} />;
+    case TileIntegration["nginx-proxy-manager"]:
+      return <NginxProxyManagerTile {...props} />;
     default:
       return null;
   }

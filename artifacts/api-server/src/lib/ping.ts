@@ -62,6 +62,21 @@ export async function pingService(service: string, v: TestValues): Promise<TestR
       }
       return { ok: true, message: "Connected" };
     }
+    case "nginx-proxy-manager": {
+      if (!v.username || !v.password) {
+        return { ok: false, message: "Enter an email and password first." };
+      }
+      // NPM's v2 API mints a session token from email (identity) + password
+      // (secret). A token in the response confirms valid credentials.
+      const r = await httpClient.post(
+        `${base}/api/tokens`,
+        { identity: v.username, secret: v.password },
+        { headers: { "Content-Type": "application/json" } },
+      );
+      const token = (r.data as { token?: string } | undefined)?.token;
+      if (!token) return { ok: false, message: "Invalid email or password." };
+      return { ok: true, message: "Connected" };
+    }
     case "pihole": {
       if (!v.apiKey) return { ok: false, message: "Enter an API Key first." };
       // summaryRaw is a cheap, auth-protected endpoint. Pi-hole returns 200 with

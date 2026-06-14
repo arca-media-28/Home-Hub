@@ -55,6 +55,7 @@ export const TileIntegration = {
   radarr: 'radarr',
   qbittorrent: 'qbittorrent',
   pihole: 'pihole',
+  'nginx-proxy-manager': 'nginx-proxy-manager',
 } as const;
 
 /**
@@ -151,6 +152,7 @@ export const TileInputIntegration = {
   radarr: 'radarr',
   qbittorrent: 'qbittorrent',
   pihole: 'pihole',
+  'nginx-proxy-manager': 'nginx-proxy-manager',
 } as const;
 
 export interface TileInput {
@@ -192,6 +194,7 @@ export const TileUpdateIntegration = {
   radarr: 'radarr',
   qbittorrent: 'qbittorrent',
   pihole: 'pihole',
+  'nginx-proxy-manager': 'nginx-proxy-manager',
 } as const;
 
 export interface TileUpdate {
@@ -397,5 +400,30 @@ export interface PiholeData {
   adsPercentage: number;
   domainsBlocked: number;
   status: PiholeDataStatus;
+}
+
+export interface NginxProxyHost {
+  id: number;
+  domainNames: string[];
+  enabled: boolean;
+  online: boolean;
+  /** Whether the host has an SSL certificate attached. */
+  ssl: boolean;
+  /** Whether the attached SSL certificate is expired or expiring soon. */
+  sslExpiring: boolean;
+}
+
+export interface NginxProxyManagerData {
+  /** Total number of configured proxy hosts. */
+  total: number;
+  /** Number of enabled proxy hosts. */
+  enabled: number;
+  /** Number of enabled proxy hosts Nginx reports as offline. */
+  offline: number;
+  /** Number of 404 (dead) hosts configured. */
+  deadHostsCount: number;
+  /** Number of proxy hosts whose SSL certificate is expired or expiring soon. */
+  expiringCertsCount: number;
+  proxyHosts: NginxProxyHost[];
 }
 

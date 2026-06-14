@@ -19,4 +19,5 @@ export const TileIntegration = {
   radarr: 'radarr',
   qbittorrent: 'qbittorrent',
   pihole: 'pihole',
+  'nginx-proxy-manager': 'nginx-proxy-manager',
 } as const;

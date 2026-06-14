@@ -78,6 +78,7 @@ const INTEGRATIONS = [
   { value: TileIntegration.qbittorrent, label: "qBittorrent" },
   { value: TileIntegration.truenas, label: "TrueNAS" },
   { value: TileIntegration.pihole, label: "Pi-hole" },
+  { value: TileIntegration["nginx-proxy-manager"], label: "Nginx Proxy Manager" },
 ] as const;
 
 type ImageSource = "upload" | "library" | "url";

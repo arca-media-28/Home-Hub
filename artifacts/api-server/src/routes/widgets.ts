@@ -576,4 +576,181 @@ router.get("/pihole", requireAuth, async (_req, res) => {
   }
 });
 
+// ────────────────────────────────────────────────
+// Nginx Proxy Manager Widget
+// ────────────────────────────────────────────────
+// NPM's v2 API is token-based: POST /api/tokens with {identity, secret} returns
+// a short-lived bearer token (default ~1h). The tile polls every 60s, so cache
+// the token per connection (keyed by baseUrl + email) and reuse it until it is
+// near expiry, re-authenticating only when it has lapsed or is rejected (401).
+interface NpmToken {
+  token: string;
+  // Epoch ms after which the cached token should be considered stale.
+  expiresAt: number;
+}
+
+const npmTokenCache = new Map<string, NpmToken>();
+
+function npmCacheKey(baseUrl: string, email: string): string {
+  return `${baseUrl}\u0000${email}`;
+}
+
+// Authenticate against NPM, cache the resulting token with its expiry, and
+// return it. Throws a tagged error when credentials are rejected.
+async function npmLogin(baseUrl: string, email: string, password: string): Promise<string> {
+  const r = await httpClient.post(
+    `${baseUrl}/api/tokens`,
+    { identity: email, secret: password },
+    { headers: { "Content-Type": "application/json" } },
+  );
+  const body = (r.data ?? {}) as { token?: string; expires?: string };
+  if (!body.token) {
+    throw new Error("npm-auth-failed");
+  }
+
+  // NPM returns an ISO `expires` timestamp; fall back to a 1h lifetime and
+  // refresh 60s early so a request never rides an about-to-expire token.
+  const parsed = body.expires ? new Date(body.expires).getTime() : NaN;
+  const expiresAt = (Number.isNaN(parsed) ? Date.now() + 3600_000 : parsed) - 60_000;
+  npmTokenCache.set(npmCacheKey(baseUrl, email), { token: body.token, expiresAt });
+  return body.token;
+}
+
+// Return a valid cached token when one is present and unexpired; otherwise log
+// in fresh.
+async function npmGetToken(baseUrl: string, email: string, password: string): Promise<string> {
+  const cached = npmTokenCache.get(npmCacheKey(baseUrl, email));
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.token;
+  }
+  return npmLogin(baseUrl, email, password);
+}
+
+function isUnauthorized(err: unknown): boolean {
+  const status = (err as { response?: { status?: number } })?.response?.status;
+  return status === 401 || status === 403;
+}
+
+router.get("/nginx-proxy-manager", requireAuth, async (_req, res) => {
+  const saved = getSavedConnection("nginx-proxy-manager");
+  const baseUrl = normalizeBaseUrl(saved.url || process.env["NPM_URL"]);
+  // The NPM connection stores the login email in the `username` field.
+  const email = saved.username || process.env["NPM_EMAIL"];
+  const password = saved.password ?? process.env["NPM_PASSWORD"];
+
+  if (!baseUrl || !email || password == null) {
+    // Realistic sample data so the tile/layout can be previewed unconfigured.
+    res.json({
+      total: 5,
+      enabled: 4,
+      offline: 1,
+      deadHostsCount: 2,
+      expiringCertsCount: 1,
+      proxyHosts: [
+        { id: 1, domainNames: ["jellyfin.example.com"], enabled: true, online: true, ssl: true, sslExpiring: false },
+        { id: 2, domainNames: ["nextcloud.example.com"], enabled: true, online: true, ssl: true, sslExpiring: true },
+        { id: 3, domainNames: ["grafana.example.com"], enabled: true, online: false, ssl: true, sslExpiring: false },
+        { id: 4, domainNames: ["home.example.com"], enabled: true, online: true, ssl: false, sslExpiring: false },
+      ],
+    });
+    return;
+  }
+
+  // Fetch proxy hosts (with their certificate expanded for SSL expiry) and the
+  // 404/dead hosts in parallel. Lets 401s propagate so the caller can decide to
+  // re-authenticate.
+  const fetchData = (token: string) =>
+    Promise.all([
+      httpClient.get(`${baseUrl}/api/nginx/proxy-hosts`, {
+        headers: { Authorization: `Bearer ${token}` },
+        params: { expand: "certificate" },
+      }),
+      httpClient.get(`${baseUrl}/api/nginx/dead_hosts`, {
+        headers: { Authorization: `Bearer ${token}` },
+      }),
+    ]);
+
+  const key = npmCacheKey(baseUrl, email);
+
+  try {
+    let token = await npmGetToken(baseUrl, email, password);
+
+    let proxyRes;
+    let deadRes;
+    try {
+      [proxyRes, deadRes] = await fetchData(token);
+    } catch (err) {
+      // A cached token can lapse server-side; on a 401/403 drop it, log in once
+      // more, and retry the data fetch a single time.
+      if (isUnauthorized(err)) {
+        npmTokenCache.delete(key);
+        token = await npmLogin(baseUrl, email, password);
+        [proxyRes, deadRes] = await fetchData(token);
+      } else {
+        throw err;
+      }
+    }
+
+    // A cert counts as a warning if it is expired or expires within 30 days.
+    const EXPIRY_WINDOW_MS = 30 * 86400000;
+    const now = Date.now();
+    let expiringCertsCount = 0;
+
+    const rawHosts = (proxyRes.data ?? []) as Array<{
+      id: number;
+      domain_names?: string[];
+      enabled?: boolean | number;
+      certificate_id?: number;
+      certificate?: { expires_on?: string } | null;
+      meta?: { nginx_online?: boolean };
+    }>;
+
+    const proxyHosts = rawHosts.map((h) => {
+      const enabled = Boolean(h.enabled);
+      // NPM records reachability in meta.nginx_online; treat a missing value as
+      // online so hosts that have never been polled don't read as down.
+      const online = h.meta?.nginx_online !== false;
+      const ssl = Boolean(h.certificate_id);
+      let sslExpiring = false;
+      const expiresOn = h.certificate?.expires_on;
+      if (ssl && expiresOn) {
+        const exp = new Date(expiresOn).getTime();
+        if (!Number.isNaN(exp) && exp - now < EXPIRY_WINDOW_MS) {
+          sslExpiring = true;
+          expiringCertsCount++;
+        }
+      }
+      return {
+        id: h.id,
+        domainNames: h.domain_names ?? [],
+        enabled,
+        online,
+        ssl,
+        sslExpiring,
+      };
+    });
+
+    const enabledHosts = proxyHosts.filter((h) => h.enabled);
+    const offline = enabledHosts.filter((h) => !h.online).length;
+    const deadHostsCount = ((deadRes.data ?? []) as unknown[]).length;
+
+    res.json({
+      total: proxyHosts.length,
+      enabled: enabledHosts.length,
+      offline,
+      deadHostsCount,
+      expiringCertsCount,
+      proxyHosts,
+    });
+  } catch (err) {
+    if (err instanceof Error && err.message === "npm-auth-failed") {
+      logger.warn({ baseUrl }, "Nginx Proxy Manager authentication failed (check saved email/password)");
+      res.status(502).json({ error: "Nginx Proxy Manager authentication failed" });
+      return;
+    }
+    logger.error({ err }, "Nginx Proxy Manager widget error");
+    res.status(502).json({ error: "Failed to fetch Nginx Proxy Manager data" });
+  }
+});
+
 export default router;

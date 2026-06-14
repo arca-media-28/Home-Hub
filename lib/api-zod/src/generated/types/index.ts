@@ -15,6 +15,8 @@ export * from './healthStatus';
 export * from './layoutItem';
 export * from './layoutUpdate';
 export * from './mediaItem';
+export * from './nginxProxyHost';
+export * from './nginxProxyManagerData';
 export * from './piholeData';
 export * from './piholeDataStatus';
 export * from './qbittorrentData';

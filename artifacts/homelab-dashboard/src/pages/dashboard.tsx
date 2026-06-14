@@ -68,6 +68,7 @@ const INTEGRATION_SERVICE: Record<string, string> = {
   radarr: "radarr",
   qbittorrent: "qbittorrent",
   pihole: "pihole",
+  "nginx-proxy-manager": "nginx-proxy-manager",
 };
 
 function renderTileContent(tile: Tile, status?: ServiceStatus) {

@@ -35,6 +35,11 @@ export const METRIC_CATALOG: Record<string, MetricDef[]> = {
     { key: "blocked", label: "Ads blocked today" },
     { key: "status", label: "Pi-hole status" },
   ],
+  [TileIntegration["nginx-proxy-manager"]]: [
+    { key: "hosts", label: "Proxy hosts" },
+    { key: "dead", label: "Dead hosts" },
+    { key: "ssl", label: "SSL warnings" },
+  ],
 };
 
 // All metric keys for an integration (used as the default "show all" set).
