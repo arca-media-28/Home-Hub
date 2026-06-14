@@ -36,6 +36,7 @@ export * from './tileInput';
 export * from './tileInputIntegration';
 export * from './tileInputType';
 export * from './tileIntegration';
+export * from './tileSettings';
 export * from './tileType';
 export * from './tileUpdate';
 export * from './tileUpdateIntegration';

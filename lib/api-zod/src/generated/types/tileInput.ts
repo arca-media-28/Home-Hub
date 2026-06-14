@@ -7,6 +7,7 @@
  */
 import type { TileInputIntegration } from './tileInputIntegration';
 import type { TileInputType } from './tileInputType';
+import type { TileSettings } from './tileSettings';
 
 export interface TileInput {
   type: TileInputType;
@@ -32,4 +33,5 @@ export interface TileInput {
   hideTitle?: boolean;
   /** @nullable */
   metrics?: string[] | null;
+  tileSettings?: TileSettings | null;
 }

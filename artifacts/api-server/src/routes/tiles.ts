@@ -25,6 +25,53 @@ function serializeMetrics(value: unknown): string | null {
   return JSON.stringify(keys);
 }
 
+// Per-integration extra config. Currently only carries the qBittorrent
+// category filter, but the column is a generic JSON object so future
+// integrations can stash their own keys here.
+interface TileSettings {
+  categoryFilter?: string[] | null;
+}
+
+// Parse the stored tile_settings JSON blob into an object (or null = "no extra
+// settings"). Tolerates legacy/garbage values by falling back to null.
+function parseTileSettings(raw: string | null): TileSettings | null {
+  if (raw == null) return null;
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      const obj = parsed as Record<string, unknown>;
+      const result: TileSettings = {};
+      if (Array.isArray(obj["categoryFilter"])) {
+        result.categoryFilter = obj["categoryFilter"].filter(
+          (x): x is string => typeof x === "string",
+        );
+      } else if (obj["categoryFilter"] === null) {
+        result.categoryFilter = null;
+      }
+      return result;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+// Serialize an incoming tile settings value to a JSON blob (or null). Anything
+// that isn't a plain object is stored as null ("no extra settings").
+function serializeTileSettings(value: unknown): string | null {
+  if (value == null || typeof value !== "object" || Array.isArray(value)) return null;
+  const obj = value as Record<string, unknown>;
+  const result: TileSettings = {};
+  if (Array.isArray(obj["categoryFilter"])) {
+    result.categoryFilter = obj["categoryFilter"].filter(
+      (x): x is string => typeof x === "string",
+    );
+  } else if (obj["categoryFilter"] === null) {
+    result.categoryFilter = null;
+  }
+  return JSON.stringify(result);
+}
+
 export function formatTile(t: DbTile) {
   return {
     id: t.id,
@@ -47,6 +94,7 @@ export function formatTile(t: DbTile) {
     titleColor: t.title_color,
     hideTitle: Boolean(t.hide_title),
     metrics: parseMetrics(t.metrics),
+    tileSettings: parseTileSettings(t.tile_settings),
     createdAt: t.created_at,
   };
 }
@@ -78,14 +126,15 @@ router.post("/", requireAuth, (req: AuthRequest, res) => {
     titleColor?: string;
     hideTitle?: boolean;
     metrics?: string[] | null;
+    tileSettings?: TileSettings | null;
   };
 
   const createTile = db.prepare<
-    [number, string, string | null, number, number, number, number, string | null, string | null, string | null, string | null, string | null, string | null, number | null, string | null, string | null, string | null, number, string | null],
+    [number, string, string | null, number, number, number, number, string | null, string | null, string | null, string | null, string | null, string | null, number | null, string | null, string | null, string | null, number, string | null, string | null],
     { id: number }
   >(
-    `INSERT INTO tiles (user_id, type, integration, grid_x, grid_y, grid_w, grid_h, name, url, bg_color, image_url, image_fit, image_position, image_scale, title_size, title_position, title_color, hide_title, metrics)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`
+    `INSERT INTO tiles (user_id, type, integration, grid_x, grid_y, grid_w, grid_h, name, url, bg_color, image_url, image_fit, image_position, image_scale, title_size, title_position, title_color, hide_title, metrics, tile_settings)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`
   );
 
   const row = createTile.get(
@@ -107,7 +156,8 @@ router.post("/", requireAuth, (req: AuthRequest, res) => {
     body.titlePosition ?? null,
     body.titleColor ?? null,
     body.hideTitle ? 1 : 0,
-    body.metrics === undefined ? null : serializeMetrics(body.metrics)
+    body.metrics === undefined ? null : serializeMetrics(body.metrics),
+    body.tileSettings === undefined ? null : serializeTileSettings(body.tileSettings)
   )!;
 
   const tile = db.prepare<[number], DbTile>("SELECT * FROM tiles WHERE id = ?").get(row.id)!;
@@ -152,6 +202,7 @@ router.put("/:id", requireAuth, (req: AuthRequest, res) => {
     titleColor?: string | null;
     hideTitle?: boolean;
     metrics?: string[] | null;
+    tileSettings?: TileSettings | null;
   };
 
   const updates: string[] = [];
@@ -174,6 +225,7 @@ router.put("/:id", requireAuth, (req: AuthRequest, res) => {
   if (body.titleColor !== undefined) { updates.push("title_color = ?"); params.push(body.titleColor); }
   if (body.hideTitle !== undefined) { updates.push("hide_title = ?"); params.push(body.hideTitle ? 1 : 0); }
   if (body.metrics !== undefined) { updates.push("metrics = ?"); params.push(body.metrics === null ? null : serializeMetrics(body.metrics)); }
+  if (body.tileSettings !== undefined) { updates.push("tile_settings = ?"); params.push(body.tileSettings === null ? null : serializeTileSettings(body.tileSettings)); }
 
   if (updates.length > 0) {
     params.push(id);

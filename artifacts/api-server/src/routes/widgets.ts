@@ -445,8 +445,9 @@ router.get("/qbittorrent", requireAuth, async (_req, res) => {
   if (!baseUrl || !username || password == null) {
     res.json({
       torrents: [
-        { name: "ubuntu-24.04-desktop-amd64.iso", progress: 73.5, state: "downloading", dlSpeed: 5.2e6, upSpeed: 1.1e5 },
-        { name: "archlinux-x86_64.iso", progress: 100, state: "uploading", dlSpeed: 0, upSpeed: 8.4e5 },
+        { name: "ubuntu-24.04-desktop-amd64.iso", progress: 73.5, state: "downloading", dlSpeed: 5.2e6, upSpeed: 1.1e5, category: "Linux ISOs" },
+        { name: "archlinux-x86_64.iso", progress: 100, state: "uploading", dlSpeed: 0, upSpeed: 8.4e5, category: "Linux ISOs" },
+        { name: "Blender Open Movie - Sintel (2010)", progress: 100, state: "uploading", dlSpeed: 0, upSpeed: 2.3e5, category: "Movies" },
       ],
       downloadSpeed: 5.2e6,
       uploadSpeed: 9.5e5,
@@ -487,7 +488,7 @@ router.get("/qbittorrent", requireAuth, async (_req, res) => {
       }
     }
 
-    const torrents = ((torrentsRes.data ?? []) as Array<{ name: string; progress: number; state: string; dlspeed: number; upspeed: number }>)
+    const torrents = ((torrentsRes.data ?? []) as Array<{ name: string; progress: number; state: string; dlspeed: number; upspeed: number; category?: string }>)
       .slice(0, 8)
       .map((t) => ({
         name: t.name,
@@ -495,6 +496,7 @@ router.get("/qbittorrent", requireAuth, async (_req, res) => {
         state: t.state,
         dlSpeed: t.dlspeed ?? 0,
         upSpeed: t.upspeed ?? 0,
+        category: t.category ?? "",
       }));
 
     const transfer = (transferRes.data ?? {}) as { dl_info_speed?: number; up_info_speed?: number };

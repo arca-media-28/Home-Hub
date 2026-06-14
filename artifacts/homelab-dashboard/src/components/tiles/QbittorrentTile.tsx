@@ -9,7 +9,7 @@ function formatSpeed(bytesPerSec: number | null | undefined): string {
   return `${b} B/s`;
 }
 
-export default function QbittorrentTile({ enabled, density }: WidgetProps) {
+export default function QbittorrentTile({ enabled, density, tileSettings }: WidgetProps) {
   const { data, isLoading, isError } = useGetQbittorrentStatus({
     query: { queryKey: getGetQbittorrentStatusQueryKey(), refetchInterval: 10_000 },
   });
@@ -32,7 +32,15 @@ export default function QbittorrentTile({ enabled, density }: WidgetProps) {
 
   const showSpeeds = enabled.has("speeds");
   const showTorrents = enabled.has("torrents");
-  const hasTorrents = showTorrents && data.torrents && data.torrents.length > 0;
+
+  // A null/undefined categoryFilter means "show all categories". An explicit
+  // array narrows the list to only torrents whose category is in the allow-list.
+  const categoryFilter = tileSettings?.categoryFilter ?? null;
+  const filterActive = Array.isArray(categoryFilter);
+  const torrents = (data.torrents ?? []).filter((t) =>
+    filterActive ? categoryFilter!.includes(t.category) : true,
+  );
+  const hasTorrents = showTorrents && torrents.length > 0;
 
   return (
     <div className="w-full h-full p-3 flex flex-col gap-2">
@@ -51,11 +59,18 @@ export default function QbittorrentTile({ enabled, density }: WidgetProps) {
 
       {hasTorrents ? (
         <div className="flex-1 space-y-1.5">
-          {data.torrents.slice(0, density.listLimit).map((t, i) => (
+          {torrents.slice(0, density.listLimit).map((t, i) => (
             <div key={`${t.name}-${i}`} className="min-w-0">
-              <div className="flex justify-between items-center">
-                <span className="text-xs font-medium truncate max-w-[70%]">{t.name}</span>
-                <span className="text-xs text-muted-foreground capitalize">{t.state}</span>
+              <div className="flex justify-between items-center gap-1">
+                <span className="text-xs font-medium truncate max-w-[55%]">{t.name}</span>
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  {filterActive && t.category && (
+                    <span className="text-[10px] leading-none px-1 py-0.5 rounded-sm bg-secondary text-secondary-foreground max-w-[80px] truncate">
+                      {t.category}
+                    </span>
+                  )}
+                  <span className="text-xs text-muted-foreground capitalize">{t.state}</span>
+                </div>
               </div>
               <div className="h-1 bg-muted overflow-hidden mt-0.5">
                 <div

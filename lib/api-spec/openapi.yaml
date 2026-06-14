@@ -623,6 +623,8 @@ components:
           type: ["array", "null"]
           items:
             type: string
+        tileSettings:
+          $ref: "#/components/schemas/TileSettings"
         createdAt:
           type: string
 
@@ -670,6 +672,8 @@ components:
           type: ["array", "null"]
           items:
             type: string
+        tileSettings:
+          $ref: "#/components/schemas/TileSettings"
 
     TileUpdate:
       type: object
@@ -708,6 +712,24 @@ components:
         hideTitle:
           type: boolean
         metrics:
+          type: ["array", "null"]
+          items:
+            type: string
+        tileSettings:
+          $ref: "#/components/schemas/TileSettings"
+
+    TileSettings:
+      description: >-
+        Per-tile extra configuration for integration widgets. Null means no
+        extra settings (the default). Currently carries the qBittorrent
+        category filter; an absent or null categoryFilter means "show all
+        categories".
+      type: ["object", "null"]
+      properties:
+        categoryFilter:
+          description: >-
+            Allow-list of qBittorrent categories to show on the tile. Null (or
+            absent) means show all categories.
           type: ["array", "null"]
           items:
             type: string
@@ -974,7 +996,7 @@ components:
 
     QbittorrentTorrent:
       type: object
-      required: [name, progress, state, dlSpeed, upSpeed]
+      required: [name, progress, state, dlSpeed, upSpeed, category]
       properties:
         name:
           type: string
@@ -986,6 +1008,11 @@ components:
           type: number
         upSpeed:
           type: number
+        category:
+          description: >-
+            The qBittorrent category assigned to this torrent, or an empty
+            string when uncategorized.
+          type: string
 
     PiholeData:
       type: object

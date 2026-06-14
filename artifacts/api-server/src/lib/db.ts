@@ -120,6 +120,13 @@ if (!tileColumns.some((c) => c.name === "hide_title")) {
   db.exec("ALTER TABLE tiles ADD COLUMN hide_title INTEGER NOT NULL DEFAULT 0");
 }
 
+// 1f. Generic per-integration extra config, stored as a JSON object. NULL means
+//     "no extra settings" so existing tiles behave as before. Currently carries
+//     the qBittorrent category filter ({ categoryFilter: string[] | null }).
+if (!tileColumns.some((c) => c.name === "tile_settings")) {
+  db.exec("ALTER TABLE tiles ADD COLUMN tile_settings TEXT");
+}
+
 // 2. One-time data migration: existing integration-typed tiles become app/link
 //    tiles whose `integration` carries the old type. Styling fields are left
 //    untouched. After this runs `type` is 'app' so it never matches again.
@@ -171,6 +178,7 @@ export interface DbTile {
   title_color: string | null;
   hide_title: number;
   metrics: string | null;
+  tile_settings: string | null;
   created_at: string;
 }
 

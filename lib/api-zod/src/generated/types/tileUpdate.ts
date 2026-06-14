@@ -5,6 +5,7 @@
  * Homelab Dashboard API
  * OpenAPI spec version: 0.1.0
  */
+import type { TileSettings } from './tileSettings';
 import type { TileUpdateIntegration } from './tileUpdateIntegration';
 
 export interface TileUpdate {
@@ -33,4 +34,5 @@ export interface TileUpdate {
   hideTitle?: boolean;
   /** @nullable */
   metrics?: string[] | null;
+  tileSettings?: TileSettings | null;
 }

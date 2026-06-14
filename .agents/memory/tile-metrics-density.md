@@ -30,3 +30,13 @@ Integration tiles show a user-chosen subset of metrics, scaled by tile size.
 **How to apply:** when extending the Tile shape, update the shared formatter and
 confirm both `/tiles` and `/tiles/layout` responses carry the new field; add a
 layout-save round-trip test asserting the field survives a resize.
+
+## Generic per-integration extra config
+- `tile_settings` (DB col) / `tileSettings` (API, schema `TileSettings`) is the
+  generic JSON-object extension point for per-integration widget config, distinct
+  from `metrics`. **null = no extra settings.** First consumer is qBittorrent's
+  `categoryFilter: string[] | null` (null = all categories), passed to widgets via
+  `WidgetProps.tileSettings` from `IntegrationTile`.
+- **Why:** avoids a new column per integration knob. Add new keys to the
+  `TileSettings` schema + the parse/serialize allow-list in `routes/tiles.ts`
+  (both only copy known keys, so unknown keys are dropped on write).

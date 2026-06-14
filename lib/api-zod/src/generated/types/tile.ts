@@ -7,6 +7,7 @@
  */
 import type { TileImageFit } from './tileImageFit';
 import type { TileIntegration } from './tileIntegration';
+import type { TileSettings } from './tileSettings';
 import type { TileType } from './tileType';
 
 export interface Tile {
@@ -61,5 +62,6 @@ export interface Tile {
      * @nullable
      */
   metrics?: string[] | null;
+  tileSettings?: TileSettings | null;
   createdAt?: string;
 }

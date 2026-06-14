@@ -72,6 +72,18 @@ export const TileImageFit = {
   'top-left': 'top-left',
 } as const;
 
+/**
+ * Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Currently carries the qBittorrent category filter; an absent or null categoryFilter means "show all categories".
+ * @nullable
+ */
+export type TileSettings = {
+  /**
+     * Allow-list of qBittorrent categories to show on the tile. Null (or absent) means show all categories.
+     * @nullable
+     */
+  categoryFilter?: string[] | null;
+} | null;
+
 export interface Tile {
   id: number;
   userId: number;
@@ -124,6 +136,7 @@ export interface Tile {
      * @nullable
      */
   metrics?: string[] | null;
+  tileSettings?: TileSettings | null;
   createdAt?: string;
 }
 
@@ -179,6 +192,7 @@ export interface TileInput {
   hideTitle?: boolean;
   /** @nullable */
   metrics?: string[] | null;
+  tileSettings?: TileSettings | null;
 }
 
 /**
@@ -223,6 +237,7 @@ export interface TileUpdate {
   hideTitle?: boolean;
   /** @nullable */
   metrics?: string[] | null;
+  tileSettings?: TileSettings | null;
 }
 
 export interface LayoutItem {
@@ -378,6 +393,8 @@ export interface QbittorrentTorrent {
   state: string;
   dlSpeed: number;
   upSpeed: number;
+  /** The qBittorrent category assigned to this torrent, or an empty string when uncategorized. */
+  category: string;
 }
 
 export interface QbittorrentData {

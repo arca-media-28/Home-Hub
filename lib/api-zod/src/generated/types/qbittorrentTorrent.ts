@@ -12,4 +12,6 @@ export interface QbittorrentTorrent {
   state: string;
   dlSpeed: number;
   upSpeed: number;
+  /** The qBittorrent category assigned to this torrent, or an empty string when uncategorized. */
+  category: string;
 }

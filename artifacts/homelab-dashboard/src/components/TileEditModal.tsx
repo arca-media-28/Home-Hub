@@ -46,7 +46,9 @@ import {
   useDeleteTile,
   useListUploads,
   useDeleteUpload,
+  useGetQbittorrentStatus,
   getListUploadsQueryKey,
+  getGetQbittorrentStatusQueryKey,
   TileType,
   TileIntegration,
   type Tile,
@@ -114,6 +116,11 @@ export default function TileEditModal({ open, onOpenChange, tile, mode }: TileEd
   // Selected metric keys for the active integration. null = "show all"
   // (backward-compatible default); an explicit array (incl. empty) is honored.
   const [metrics, setMetrics] = useState<string[] | null>(tile?.metrics ?? null);
+  // qBittorrent category allow-list. null = "show all categories"; an explicit
+  // array narrows the tile's torrent list to those categories.
+  const [categoryFilter, setCategoryFilter] = useState<string[] | null>(
+    tile?.tileSettings?.categoryFilter ?? null,
+  );
 
   useEffect(() => {
     if (open) {
@@ -132,6 +139,7 @@ export default function TileEditModal({ open, onOpenChange, tile, mode }: TileEd
       setTitleColor(tile?.titleColor ?? null);
       setHideTitle(tile?.hideTitle ?? false);
       setMetrics(tile?.metrics ?? null);
+      setCategoryFilter(tile?.tileSettings?.categoryFilter ?? null);
       setShowColorPicker(false);
       setShowTitleColorPicker(false);
     }
@@ -157,8 +165,45 @@ export default function TileEditModal({ open, onOpenChange, tile, mode }: TileEd
   const catalog = integration === NONE ? [] : METRIC_CATALOG[integration] ?? [];
   const enabledKeys = new Set(metrics ?? allMetricKeys(integration));
 
+  // qBittorrent category discovery — only fetch live status when the editor is
+  // open and qBittorrent is the selected integration. Categories are derived
+  // client-side from the current torrent list (no dedicated endpoint).
+  const isQbittorrent = integration === TileIntegration.qbittorrent;
+  const qbStatusQuery = useGetQbittorrentStatus({
+    query: {
+      queryKey: getGetQbittorrentStatusQueryKey(),
+      enabled: open && isQbittorrent,
+    },
+  });
+  const availableCategories = Array.from(
+    new Set(
+      (qbStatusQuery.data?.torrents ?? [])
+        .map((t) => t.category)
+        .filter((c): c is string => typeof c === "string" && c.length > 0),
+    ),
+  ).sort((a, b) => a.localeCompare(b));
+
+  // A null filter means "all categories" — reflect every discovered category as
+  // checked. An explicit array is honored as-is.
+  const checkedCategories = new Set(categoryFilter ?? availableCategories);
+  const torrentsMetricOn = enabledKeys.has("torrents");
+
+  function toggleCategory(category: string, checked: boolean) {
+    const base = categoryFilter ?? availableCategories;
+    const set = new Set(base);
+    if (checked) set.add(category);
+    else set.delete(category);
+    // Persist the explicit subset, ordered by the discovered category list so
+    // it stays stable. When every category is selected, collapse back to null
+    // ("show all") so newly-added categories appear automatically.
+    const next = availableCategories.filter((c) => set.has(c));
+    setCategoryFilter(next.length === availableCategories.length ? null : next);
+  }
+
   function handleIntegrationChange(next: string) {
     setIntegration(next);
+    // Switching integrations invalidates the old category filter too.
+    setCategoryFilter(null);
     // Switching integrations invalidates the old metric keys; reset to "show
     // all" for the newly chosen service.
     setMetrics(null);
@@ -330,6 +375,9 @@ export default function TileEditModal({ open, onOpenChange, tile, mode }: TileEd
       hideTitle,
       // Plain app/link tiles carry no metric selection.
       metrics: integration === NONE ? null : metrics,
+      // qBittorrent is the only integration that uses tileSettings (category
+      // filter) for now; every other tile clears it.
+      tileSettings: isQbittorrent ? { categoryFilter } : null,
       gridX: tile?.gridX ?? 0,
       gridY: tile?.gridY ?? 0,
       gridW: tile?.gridW ?? 2,
@@ -756,6 +804,54 @@ export default function TileEditModal({ open, onOpenChange, tile, mode }: TileEd
                   </label>
                 ))}
               </div>
+            </div>
+          )}
+
+          {isQbittorrent && torrentsMetricOn && (
+            <div className="space-y-2 border-t border-border pt-4">
+              <Label>Filter categories</Label>
+              <p className="text-xs text-muted-foreground">
+                Show only torrents in the selected categories. Leave all checked
+                to show every category.
+              </p>
+              {qbStatusQuery.isLoading ? (
+                <p className="text-xs text-muted-foreground pt-1">Loading categories…</p>
+              ) : availableCategories.length === 0 ? (
+                <p className="text-xs text-muted-foreground pt-1">
+                  No categories found among the current torrents.
+                </p>
+              ) : (
+                <div className="space-y-2 pt-1">
+                  <label
+                    htmlFor="category-all"
+                    className="flex items-center gap-2 cursor-pointer select-none"
+                  >
+                    <Checkbox
+                      id="category-all"
+                      checked={categoryFilter === null}
+                      onCheckedChange={(c) => {
+                        if (c === true) setCategoryFilter(null);
+                        else setCategoryFilter([]);
+                      }}
+                    />
+                    <span className="text-sm font-medium">All categories</span>
+                  </label>
+                  {availableCategories.map((cat) => (
+                    <label
+                      key={cat}
+                      htmlFor={`category-${cat}`}
+                      className="flex items-center gap-2 cursor-pointer select-none pl-5"
+                    >
+                      <Checkbox
+                        id={`category-${cat}`}
+                        checked={checkedCategories.has(cat)}
+                        onCheckedChange={(c) => toggleCategory(cat, c === true)}
+                      />
+                      <span className="text-sm">{cat}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>

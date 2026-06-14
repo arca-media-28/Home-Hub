@@ -1,4 +1,4 @@
-import type { Tile, ServiceStatus } from "@workspace/api-client-react";
+import type { Tile, ServiceStatus, TileSettings } from "@workspace/api-client-react";
 import { TileIntegration } from "@workspace/api-client-react";
 import { ExternalLink } from "lucide-react";
 import TruenasTile from "./TruenasTile";
@@ -27,6 +27,9 @@ export const INTEGRATION_LABELS: Record<string, string> = {
 export interface WidgetProps {
   enabled: Set<string>;
   density: TileDensity;
+  // Per-tile extra config. Only qBittorrent uses it (category filter) for now;
+  // other widgets ignore it.
+  tileSettings?: TileSettings | null;
 }
 
 function renderStatusView(integration: string, props: WidgetProps) {
@@ -154,7 +157,7 @@ export default function IntegrationTile({ tile, status }: IntegrationTileProps) 
             )}
           </div>
         )}
-        {renderStatusView(integration, { enabled, density })}
+        {renderStatusView(integration, { enabled, density, tileSettings: tile.tileSettings })}
       </div>
     </div>
   );
