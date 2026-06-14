@@ -67,6 +67,7 @@ const INTEGRATION_SERVICE: Record<string, string> = {
   sonarr: "sonarr",
   radarr: "radarr",
   qbittorrent: "qbittorrent",
+  pihole: "pihole",
 };
 
 function renderTileContent(tile: Tile, status?: ServiceStatus) {

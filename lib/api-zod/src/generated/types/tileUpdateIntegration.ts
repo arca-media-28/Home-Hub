@@ -18,4 +18,5 @@ export const TileUpdateIntegration = {
   sonarr: 'sonarr',
   radarr: 'radarr',
   qbittorrent: 'qbittorrent',
+  pihole: 'pihole',
 } as const;

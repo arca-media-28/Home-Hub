@@ -18,4 +18,5 @@ export const TileInputIntegration = {
   sonarr: 'sonarr',
   radarr: 'radarr',
   qbittorrent: 'qbittorrent',
+  pihole: 'pihole',
 } as const;

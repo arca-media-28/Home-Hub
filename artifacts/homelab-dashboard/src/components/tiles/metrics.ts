@@ -30,6 +30,11 @@ export const METRIC_CATALOG: Record<string, MetricDef[]> = {
     { key: "torrents", label: "Active torrents" },
   ],
   [TileIntegration.media]: [{ key: "recent", label: "Recently added" }],
+  [TileIntegration.pihole]: [
+    { key: "queries", label: "DNS queries today" },
+    { key: "blocked", label: "Ads blocked today" },
+    { key: "status", label: "Pi-hole status" },
+  ],
 };
 
 // All metric keys for an integration (used as the default "show all" set).

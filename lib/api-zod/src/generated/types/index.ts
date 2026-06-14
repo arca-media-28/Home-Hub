@@ -15,6 +15,8 @@ export * from './healthStatus';
 export * from './layoutItem';
 export * from './layoutUpdate';
 export * from './mediaItem';
+export * from './piholeData';
+export * from './piholeDataStatus';
 export * from './qbittorrentData';
 export * from './qbittorrentTorrent';
 export * from './radarrData';

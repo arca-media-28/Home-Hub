@@ -6,6 +6,7 @@ import MediaTile from "./MediaTile";
 import SonarrTile from "./SonarrTile";
 import RadarrTile from "./RadarrTile";
 import QbittorrentTile from "./QbittorrentTile";
+import PiholeTile from "./PiholeTile";
 import { resolveEnabledMetrics, tileDensity, type TileDensity } from "./metrics";
 import { resolveImageStyle } from "./imageStyle";
 import { openTileUrl } from "@/lib/utils";
@@ -16,6 +17,7 @@ export const INTEGRATION_LABELS: Record<string, string> = {
   [TileIntegration.sonarr]: "Sonarr",
   [TileIntegration.radarr]: "Radarr",
   [TileIntegration.qbittorrent]: "qBittorrent",
+  [TileIntegration.pihole]: "Pi-hole",
 };
 
 // Props every integration widget receives: the resolved set of enabled metric
@@ -37,6 +39,8 @@ function renderStatusView(integration: string, props: WidgetProps) {
       return <RadarrTile {...props} />;
     case TileIntegration.qbittorrent:
       return <QbittorrentTile {...props} />;
+    case TileIntegration.pihole:
+      return <PiholeTile {...props} />;
     default:
       return null;
   }

@@ -77,6 +77,7 @@ const INTEGRATIONS = [
   { value: TileIntegration.radarr, label: "Radarr" },
   { value: TileIntegration.qbittorrent, label: "qBittorrent" },
   { value: TileIntegration.truenas, label: "TrueNAS" },
+  { value: TileIntegration.pihole, label: "Pi-hole" },
 ] as const;
 
 type ImageSource = "upload" | "library" | "url";

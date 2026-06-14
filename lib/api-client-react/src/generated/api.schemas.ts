@@ -54,6 +54,7 @@ export const TileIntegration = {
   sonarr: 'sonarr',
   radarr: 'radarr',
   qbittorrent: 'qbittorrent',
+  pihole: 'pihole',
 } as const;
 
 /**
@@ -147,6 +148,7 @@ export const TileInputIntegration = {
   sonarr: 'sonarr',
   radarr: 'radarr',
   qbittorrent: 'qbittorrent',
+  pihole: 'pihole',
 } as const;
 
 export interface TileInput {
@@ -186,6 +188,7 @@ export const TileUpdateIntegration = {
   sonarr: 'sonarr',
   radarr: 'radarr',
   qbittorrent: 'qbittorrent',
+  pihole: 'pihole',
 } as const;
 
 export interface TileUpdate {
@@ -374,5 +377,21 @@ export interface QbittorrentData {
   torrents: QbittorrentTorrent[];
   downloadSpeed: number;
   uploadSpeed: number;
+}
+
+export type PiholeDataStatus = typeof PiholeDataStatus[keyof typeof PiholeDataStatus];
+
+
+export const PiholeDataStatus = {
+  enabled: 'enabled',
+  disabled: 'disabled',
+} as const;
+
+export interface PiholeData {
+  queriesTotal: number;
+  adsBlocked: number;
+  adsPercentage: number;
+  domainsBlocked: number;
+  status: PiholeDataStatus;
 }
 

@@ -10,7 +10,7 @@ import {
 
 const router = Router();
 
-const SUPPORTED_SERVICES = ["truenas", "plex", "sonarr", "radarr", "qbittorrent"];
+const SUPPORTED_SERVICES = ["truenas", "plex", "sonarr", "radarr", "qbittorrent", "pihole"];
 
 function formatConnection(c: DbServiceConnection) {
   let token: string | null = null;

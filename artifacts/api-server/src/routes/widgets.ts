@@ -520,4 +520,60 @@ router.get("/qbittorrent", requireAuth, async (_req, res) => {
   }
 });
 
+// ────────────────────────────────────────────────
+// Pi-hole Widget
+// ────────────────────────────────────────────────
+// Targets the Pi-hole v5 `admin/api.php` endpoint. `summaryRaw` returns numeric
+// (un-formatted) values so we don't have to parse comma-grouped strings, and the
+// auth token gates the privileged fields (status, query/block counts).
+router.get("/pihole", requireAuth, async (_req, res) => {
+  const saved = getSavedConnection("pihole");
+  const baseUrl = normalizeBaseUrl(saved.url || process.env["PIHOLE_URL"]);
+  const apiKey = saved.apiKey || process.env["PIHOLE_API_KEY"];
+
+  // Unconfigured (no base URL): report not-configured so the tile shows its
+  // placeholder rather than stale/sample numbers.
+  if (!baseUrl) {
+    res.status(503).json({ error: "Pi-hole is not configured" });
+    return;
+  }
+
+  try {
+    const r = await httpClient.get(`${baseUrl}/admin/api.php`, {
+      params: { summaryRaw: "", auth: apiKey ?? "" },
+    });
+
+    const data = (r.data ?? {}) as {
+      dns_queries_today?: unknown;
+      ads_blocked_today?: unknown;
+      ads_percentage_today?: unknown;
+      domains_being_blocked?: unknown;
+      status?: unknown;
+    };
+
+    // Pi-hole answers 200 even when the auth token is wrong or the request hit a
+    // non-Pi-hole host; in those cases the privileged summary fields are absent.
+    // Treat a missing `status` string or non-numeric query count as a failure so
+    // the tile surfaces an error instead of zeros.
+    const status = data.status;
+    const queries = Number(data.dns_queries_today);
+    if (typeof status !== "string" || Number.isNaN(queries)) {
+      logger.warn({ baseUrl }, "Pi-hole returned an unexpected payload (check API key/URL)");
+      res.status(502).json({ error: "Invalid Pi-hole response — check the URL and API key" });
+      return;
+    }
+
+    res.json({
+      queriesTotal: queries,
+      adsBlocked: Number(data.ads_blocked_today) || 0,
+      adsPercentage: Number(data.ads_percentage_today) || 0,
+      domainsBlocked: Number(data.domains_being_blocked) || 0,
+      status: status === "enabled" ? "enabled" : "disabled",
+    });
+  } catch (err) {
+    logger.error({ err }, "Pi-hole widget error");
+    res.status(502).json({ error: "Failed to fetch Pi-hole data" });
+  }
+});
+
 export default router;

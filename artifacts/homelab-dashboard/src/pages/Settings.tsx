@@ -27,11 +27,12 @@ import {
   Tv,
   Film,
   Download,
+  Shield,
   Plug,
   X,
 } from "lucide-react";
 
-type ServiceKey = "truenas" | "plex" | "sonarr" | "radarr" | "qbittorrent";
+type ServiceKey = "truenas" | "plex" | "sonarr" | "radarr" | "qbittorrent" | "pihole";
 
 type FieldKey = "url" | "apiKey" | "username" | "password" | "token";
 
@@ -99,6 +100,12 @@ const SERVICES: ServiceDef[] = [
       { key: "username", label: "Username", placeholder: "admin" },
       { key: "password", label: "Password", type: "password", placeholder: "••••••••" },
     ],
+  },
+  {
+    key: "pihole",
+    name: "Pi-hole",
+    icon: Shield,
+    fields: [URL_FIELD, API_KEY_FIELD],
   },
 ];
 

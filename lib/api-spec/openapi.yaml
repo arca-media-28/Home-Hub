@@ -348,6 +348,21 @@ paths:
               schema:
                 $ref: "#/components/schemas/QbittorrentData"
 
+  /widgets/pihole:
+    get:
+      operationId: getPiholeMetrics
+      tags: [widgets]
+      summary: Get DNS query/ad-block summary stats from Pi-hole
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Pi-hole DNS stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PiholeData"
+
   /connections:
     get:
       operationId: getConnections
@@ -412,7 +427,7 @@ paths:
           required: true
           schema:
             type: string
-            enum: [truenas, plex, sonarr, radarr, qbittorrent]
+            enum: [truenas, plex, sonarr, radarr, qbittorrent, pihole]
       requestBody:
         required: true
         content:
@@ -446,7 +461,7 @@ paths:
           required: true
           schema:
             type: string
-            enum: [truenas, plex, sonarr, radarr, qbittorrent]
+            enum: [truenas, plex, sonarr, radarr, qbittorrent, pihole]
       requestBody:
         required: true
         content:
@@ -531,7 +546,7 @@ components:
           enum: [app, truenas, media, sonarr, radarr, qbittorrent]
         integration:
           type: ["string", "null"]
-          enum: [truenas, media, sonarr, radarr, qbittorrent, null]
+          enum: [truenas, media, sonarr, radarr, qbittorrent, pihole, null]
         gridX:
           type: integer
         gridY:
@@ -599,7 +614,7 @@ components:
           enum: [app, truenas, media, sonarr, radarr, qbittorrent]
         integration:
           type: ["string", "null"]
-          enum: [truenas, media, sonarr, radarr, qbittorrent, null]
+          enum: [truenas, media, sonarr, radarr, qbittorrent, pihole, null]
         gridX:
           type: integer
         gridY:
@@ -638,7 +653,7 @@ components:
       properties:
         integration:
           type: ["string", "null"]
-          enum: [truenas, media, sonarr, radarr, qbittorrent, null]
+          enum: [truenas, media, sonarr, radarr, qbittorrent, pihole, null]
         gridX:
           type: integer
         gridY:
@@ -946,3 +961,19 @@ components:
           type: number
         upSpeed:
           type: number
+
+    PiholeData:
+      type: object
+      required: [queriesTotal, adsBlocked, adsPercentage, domainsBlocked, status]
+      properties:
+        queriesTotal:
+          type: number
+        adsBlocked:
+          type: number
+        adsPercentage:
+          type: number
+        domainsBlocked:
+          type: number
+        status:
+          type: string
+          enum: [enabled, disabled]

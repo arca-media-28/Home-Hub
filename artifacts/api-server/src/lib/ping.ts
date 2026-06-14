@@ -62,6 +62,20 @@ export async function pingService(service: string, v: TestValues): Promise<TestR
       }
       return { ok: true, message: "Connected" };
     }
+    case "pihole": {
+      if (!v.apiKey) return { ok: false, message: "Enter an API Key first." };
+      // summaryRaw is a cheap, auth-protected endpoint. Pi-hole returns 200 with
+      // an empty/zeroed body when the auth token is wrong, so confirm the token
+      // is accepted by checking for the FTL `status` field in the response.
+      const r = await httpClient.get(`${base}/admin/api.php`, {
+        params: { summaryRaw: "", auth: v.apiKey },
+      });
+      const data = r.data as { status?: string } | undefined;
+      if (!data || typeof data.status !== "string") {
+        return { ok: false, message: "Invalid API key." };
+      }
+      return { ok: true, message: "Connected" };
+    }
     default:
       return { ok: false, message: `Unsupported service: ${service}` };
   }

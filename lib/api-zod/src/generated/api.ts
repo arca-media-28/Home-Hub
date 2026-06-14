@@ -70,7 +70,7 @@ export const GetTilesResponseItem = zod.object({
   "id": zod.number(),
   "userId": zod.number(),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -96,7 +96,7 @@ export const GetTilesResponse = zod.array(GetTilesResponseItem)
  */
 export const CreateTileBody = zod.object({
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -126,7 +126,7 @@ export const GetTileResponse = zod.object({
   "id": zod.number(),
   "userId": zod.number(),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -154,7 +154,7 @@ export const UpdateTileParams = zod.object({
 })
 
 export const UpdateTileBody = zod.object({
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal(null)]).nullish(),
   "gridX": zod.number().optional(),
   "gridY": zod.number().optional(),
   "gridW": zod.number().optional(),
@@ -176,7 +176,7 @@ export const UpdateTileResponse = zod.object({
   "id": zod.number(),
   "userId": zod.number(),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -221,7 +221,7 @@ export const SaveLayoutResponseItem = zod.object({
   "id": zod.number(),
   "userId": zod.number(),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -353,6 +353,18 @@ export const GetQbittorrentStatusResponse = zod.object({
 
 
 /**
+ * @summary Get DNS query/ad-block summary stats from Pi-hole
+ */
+export const GetPiholeMetricsResponse = zod.object({
+  "queriesTotal": zod.number(),
+  "adsBlocked": zod.number(),
+  "adsPercentage": zod.number(),
+  "domainsBlocked": zod.number(),
+  "status": zod.enum(['enabled', 'disabled'])
+})
+
+
+/**
  * @summary List saved service connection settings
  */
 export const GetConnectionsResponseItem = zod.object({
@@ -395,7 +407,7 @@ export const GetConnectionHealthResponse = zod.array(GetConnectionHealthResponse
  * @summary Test a service connection using the supplied values without saving
  */
 export const TestConnectionParams = zod.object({
-  "service": zod.enum(['truenas', 'plex', 'sonarr', 'radarr', 'qbittorrent'])
+  "service": zod.enum(['truenas', 'plex', 'sonarr', 'radarr', 'qbittorrent', 'pihole'])
 })
 
 export const TestConnectionBody = zod.object({
@@ -416,7 +428,7 @@ export const TestConnectionResponse = zod.object({
  * @summary Save connection settings for a single service
  */
 export const UpdateConnectionParams = zod.object({
-  "service": zod.enum(['truenas', 'plex', 'sonarr', 'radarr', 'qbittorrent'])
+  "service": zod.enum(['truenas', 'plex', 'sonarr', 'radarr', 'qbittorrent', 'pihole'])
 })
 
 export const UpdateConnectionBody = zod.object({
