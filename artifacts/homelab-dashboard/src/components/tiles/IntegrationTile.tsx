@@ -7,6 +7,7 @@ import SonarrTile from "./SonarrTile";
 import RadarrTile from "./RadarrTile";
 import QbittorrentTile from "./QbittorrentTile";
 import { resolveEnabledMetrics, tileDensity, type TileDensity } from "./metrics";
+import { openTileUrl } from "@/lib/utils";
 
 export const INTEGRATION_LABELS: Record<string, string> = {
   [TileIntegration.truenas]: "TrueNAS",
@@ -76,7 +77,7 @@ export default function IntegrationTile({ tile, status }: IntegrationTileProps) 
       <div
         className="relative h-11 flex-shrink-0 overflow-hidden flex items-center px-3 gap-1.5 group/header select-none"
         style={{ background: hasImage ? undefined : bg }}
-        onClick={() => tile.url && window.open(tile.url, "_blank", "noopener,noreferrer")}
+        onClick={() => openTileUrl(tile.url)}
         role={tile.url ? "link" : undefined}
         title={tile.url || undefined}
         // eslint-disable-next-line jsx-a11y/no-static-element-interactions

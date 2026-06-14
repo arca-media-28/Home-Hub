@@ -1,5 +1,6 @@
 import type { Tile } from "@workspace/api-client-react";
 import { ExternalLink } from "lucide-react";
+import { openTileUrl } from "@/lib/utils";
 
 interface AppTileProps {
   tile: Tile;
@@ -23,7 +24,7 @@ export default function AppTile({ tile }: AppTileProps) {
     <div
       className="w-full h-full overflow-hidden flex flex-col items-center justify-center relative group cursor-pointer select-none"
       style={{ background: hasImage ? undefined : bg }}
-      onClick={() => tile.url && window.open(tile.url, "_blank", "noopener,noreferrer")}
+      onClick={() => openTileUrl(tile.url)}
     >
       {hasImage && (
         <img
