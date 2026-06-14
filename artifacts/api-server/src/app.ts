@@ -48,8 +48,14 @@ const frontendDistDir =
 if (process.env["NODE_ENV"] === "production" && fs.existsSync(frontendDistDir)) {
   app.use(express.static(frontendDistDir));
 
-  // SPA fallback — serve index.html for any non-API route
-  app.get("*", (_req, res) => {
+  // SPA fallback — serve index.html for any non-API GET route.
+  // Express 5 (path-to-regexp 8) rejects a bare "*" path, so use a final
+  // middleware that filters method/path manually instead of a wildcard route.
+  app.use((req, res, next) => {
+    if (req.method !== "GET" || req.path.startsWith("/api")) {
+      next();
+      return;
+    }
     const indexHtml = path.join(frontendDistDir, "index.html");
     if (fs.existsSync(indexHtml)) {
       res.sendFile(indexHtml);

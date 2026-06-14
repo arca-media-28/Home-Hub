@@ -1,0 +1,82 @@
+truenas_admin@Sapientia[...ox/Applications/HomeHub/HomeHubConfig]$ sudo docker compose logs --tail=80 homelab-dashboard
+WARN[0000] /mnt/Toolbox/Applications/HomeHub/HomeHubConfig/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion 
+homelab-dashboard  | /app/node_modules/.pnpm/path-to-regexp@8.4.2/node_modules/path-to-regexp/src/index.ts:218
+homelab-dashboard  |           throw new PathError(`Missing parameter name at index ${index}`, str);
+homelab-dashboard  |                 ^
+homelab-dashboard  | 
+homelab-dashboard  | 
+homelab-dashboard  | PathError [TypeError]: Missing parameter name at index 1: *; visit https://git.new/pathToRegexpError for info
+homelab-dashboard  |     at consumeUntil (/app/node_modules/.pnpm/path-to-regexp@8.4.2/node_modules/path-to-regexp/src/index.ts:218:17)
+homelab-dashboard  |     at parse (/app/node_modules/.pnpm/path-to-regexp@8.4.2/node_modules/path-to-regexp/src/index.ts:262:24)
+homelab-dashboard  |     at process (/app/node_modules/.pnpm/path-to-regexp@8.4.2/node_modules/path-to-regexp/src/index.ts:466:52)
+homelab-dashboard  |     at pathToRegexp (/app/node_modules/.pnpm/path-to-regexp@8.4.2/node_modules/path-to-regexp/src/index.ts:478:3)
+homelab-dashboard  |     at Object.match (/app/node_modules/.pnpm/path-to-regexp@8.4.2/node_modules/path-to-regexp/src/index.ts:416:28)
+homelab-dashboard  |     at matcher (/app/node_modules/.pnpm/router@2.2.0/node_modules/router/lib/layer.js:86:23)
+homelab-dashboard  |     at new Layer (/app/node_modules/.pnpm/router@2.2.0/node_modules/router/lib/layer.js:93:62)
+homelab-dashboard  |     at Function.route (/app/node_modules/.pnpm/router@2.2.0/node_modules/router/index.js:428:17)
+homelab-dashboard  |     at Function.route (/app/node_modules/.pnpm/express@5.2.1/node_modules/express/lib/application.js:257:22)
+homelab-dashboard  |     at Function.app2.<computed> (/app/node_modules/.pnpm/express@5.2.1/node_modules/express/lib/application.js:478:22) {
+homelab-dashboard  |   originalPath: '*'
+homelab-dashboard  | }
+homelab-dashboard  | 
+homelab-dashboard  | Node.js v20.20.2
+homelab-dashboard  | /app/node_modules/.pnpm/path-to-regexp@8.4.2/node_modules/path-to-regexp/src/index.ts:218
+homelab-dashboard  |           throw new PathError(`Missing parameter name at index ${index}`, str);
+homelab-dashboard  |                 ^
+homelab-dashboard  | 
+homelab-dashboard  | 
+homelab-dashboard  | PathError [TypeError]: Missing parameter name at index 1: *; visit https://git.new/pathToRegexpError for info
+homelab-dashboard  |     at consumeUntil (/app/node_modules/.pnpm/path-to-regexp@8.4.2/node_modules/path-to-regexp/src/index.ts:218:17)
+homelab-dashboard  |     at parse (/app/node_modules/.pnpm/path-to-regexp@8.4.2/node_modules/path-to-regexp/src/index.ts:262:24)
+homelab-dashboard  |     at process (/app/node_modules/.pnpm/path-to-regexp@8.4.2/node_modules/path-to-regexp/src/index.ts:466:52)
+homelab-dashboard  |     at pathToRegexp (/app/node_modules/.pnpm/path-to-regexp@8.4.2/node_modules/path-to-regexp/src/index.ts:478:3)
+homelab-dashboard  |     at Object.match (/app/node_modules/.pnpm/path-to-regexp@8.4.2/node_modules/path-to-regexp/src/index.ts:416:28)
+homelab-dashboard  |     at matcher (/app/node_modules/.pnpm/router@2.2.0/node_modules/router/lib/layer.js:86:23)
+homelab-dashboard  |     at new Layer (/app/node_modules/.pnpm/router@2.2.0/node_modules/router/lib/layer.js:93:62)
+homelab-dashboard  |     at Function.route (/app/node_modules/.pnpm/router@2.2.0/node_modules/router/index.js:428:17)
+homelab-dashboard  |     at Function.route (/app/node_modules/.pnpm/express@5.2.1/node_modules/express/lib/application.js:257:22)
+homelab-dashboard  |     at Function.app2.<computed> (/app/node_modules/.pnpm/express@5.2.1/node_modules/express/lib/application.js:478:22) {
+homelab-dashboard  |   originalPath: '*'
+homelab-dashboard  | }
+homelab-dashboard  | 
+homelab-dashboard  | Node.js v20.20.2
+homelab-dashboard  | /app/node_modules/.pnpm/path-to-regexp@8.4.2/node_modules/path-to-regexp/src/index.ts:218
+homelab-dashboard  |           throw new PathError(`Missing parameter name at index ${index}`, str);
+homelab-dashboard  |                 ^
+homelab-dashboard  | 
+homelab-dashboard  | 
+homelab-dashboard  | PathError [TypeError]: Missing parameter name at index 1: *; visit https://git.new/pathToRegexpError for info
+homelab-dashboard  |     at consumeUntil (/app/node_modules/.pnpm/path-to-regexp@8.4.2/node_modules/path-to-regexp/src/index.ts:218:17)
+homelab-dashboard  |     at parse (/app/node_modules/.pnpm/path-to-regexp@8.4.2/node_modules/path-to-regexp/src/index.ts:262:24)
+homelab-dashboard  |     at process (/app/node_modules/.pnpm/path-to-regexp@8.4.2/node_modules/path-to-regexp/src/index.ts:466:52)
+homelab-dashboard  |     at pathToRegexp (/app/node_modules/.pnpm/path-to-regexp@8.4.2/node_modules/path-to-regexp/src/index.ts:478:3)
+homelab-dashboard  |     at Object.match (/app/node_modules/.pnpm/path-to-regexp@8.4.2/node_modules/path-to-regexp/src/index.ts:416:28)
+homelab-dashboard  |     at matcher (/app/node_modules/.pnpm/router@2.2.0/node_modules/router/lib/layer.js:86:23)
+homelab-dashboard  |     at new Layer (/app/node_modules/.pnpm/router@2.2.0/node_modules/router/lib/layer.js:93:62)
+homelab-dashboard  |     at Function.route (/app/node_modules/.pnpm/router@2.2.0/node_modules/router/index.js:428:17)
+homelab-dashboard  |     at Function.route (/app/node_modules/.pnpm/express@5.2.1/node_modules/express/lib/application.js:257:22)
+homelab-dashboard  |     at Function.app2.<computed> (/app/node_modules/.pnpm/express@5.2.1/node_modules/express/lib/application.js:478:22) {
+homelab-dashboard  |   originalPath: '*'
+homelab-dashboard  | }
+homelab-dashboard  | 
+homelab-dashboard  | Node.js v20.20.2
+homelab-dashboard  | /app/node_modules/.pnpm/path-to-regexp@8.4.2/node_modules/path-to-regexp/src/index.ts:218
+homelab-dashboard  |           throw new PathError(`Missing parameter name at index ${index}`, str);
+homelab-dashboard  |                 ^
+homelab-dashboard  | 
+homelab-dashboard  | 
+homelab-dashboard  | PathError [TypeError]: Missing parameter name at index 1: *; visit https://git.new/pathToRegexpError for info
+homelab-dashboard  |     at consumeUntil (/app/node_modules/.pnpm/path-to-regexp@8.4.2/node_modules/path-to-regexp/src/index.ts:218:17)
+homelab-dashboard  |     at parse (/app/node_modules/.pnpm/path-to-regexp@8.4.2/node_modules/path-to-regexp/src/index.ts:262:24)
+homelab-dashboard  |     at process (/app/node_modules/.pnpm/path-to-regexp@8.4.2/node_modules/path-to-regexp/src/index.ts:466:52)
+homelab-dashboard  |     at pathToRegexp (/app/node_modules/.pnpm/path-to-regexp@8.4.2/node_modules/path-to-regexp/src/index.ts:478:3)
+homelab-dashboard  |     at Object.match (/app/node_modules/.pnpm/path-to-regexp@8.4.2/node_modules/path-to-regexp/src/index.ts:416:28)
+homelab-dashboard  |     at matcher (/app/node_modules/.pnpm/router@2.2.0/node_modules/router/lib/layer.js:86:23)
+homelab-dashboard  |     at new Layer (/app/node_modules/.pnpm/router@2.2.0/node_modules/router/lib/layer.js:93:62)
+homelab-dashboard  |     at Function.route (/app/node_modules/.pnpm/router@2.2.0/node_modules/router/index.js:428:17)
+homelab-dashboard  |     at Function.route (/app/node_modules/.pnpm/express@5.2.1/node_modules/express/lib/application.js:257:22)
+homelab-dashboard  |     at Function.app2.<computed> (/app/node_modules/.pnpm/express@5.2.1/node_modules/express/lib/application.js:478:22) {
+homelab-dashboard  |   originalPath: '*'
+homelab-dashboard  | }
+homelab-dashboard  | 
+homelab-dashboard  | Node.js v20.20.2
