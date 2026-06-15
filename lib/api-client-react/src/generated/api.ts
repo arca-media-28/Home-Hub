@@ -24,6 +24,7 @@ import type {
   AuthResponse,
   ConnectionHealth,
   ConnectionTestResult,
+  ContinueWatchingItem,
   ErrorResponse,
   HealthStatus,
   LayoutUpdate,
@@ -1079,6 +1080,83 @@ export function useGetMediaRecent<TData = Awaited<ReturnType<typeof getMediaRece
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetMediaRecentQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetMediaContinueUrl = () => {
+
+
+
+
+  return `/api/widgets/media/continue`
+}
+
+/**
+ * @summary Get in-progress / on-deck media to continue watching from Plex
+ */
+export const getMediaContinue = async ( options?: RequestInit): Promise<ContinueWatchingItem[]> => {
+
+  return customFetch<ContinueWatchingItem[]>(getGetMediaContinueUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMediaContinueQueryKey = () => {
+    return [
+    `/api/widgets/media/continue`
+    ] as const;
+    }
+
+
+export const getGetMediaContinueQueryOptions = <TData = Awaited<ReturnType<typeof getMediaContinue>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMediaContinue>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMediaContinueQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMediaContinue>>> = ({ signal }) => getMediaContinue({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMediaContinue>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMediaContinueQueryResult = NonNullable<Awaited<ReturnType<typeof getMediaContinue>>>
+export type GetMediaContinueQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get in-progress / on-deck media to continue watching from Plex
+ */
+
+export function useGetMediaContinue<TData = Awaited<ReturnType<typeof getMediaContinue>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMediaContinue>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMediaContinueQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

@@ -45,6 +45,16 @@ function getSavedConnection(service: string): SavedConnection {
   };
 }
 
+// Build an app.plex.tv deep link for a single item so clicking its cover opens
+// it directly in Plex. Needs the server's machineIdentifier (from the Plex
+// MediaContainer root) and the item's ratingKey. Returns null when either is
+// missing so callers can omit the link gracefully.
+function plexDeepLink(machineId: string | undefined, ratingKey: string | undefined): string | null {
+  if (!machineId || ratingKey == null) return null;
+  const key = encodeURIComponent(`/library/metadata/${ratingKey}`);
+  return `https://app.plex.tv/desktop/#!/server/${machineId}/details?key=${key}`;
+}
+
 // ────────────────────────────────────────────────
 // TrueNAS SCALE Widget
 // ────────────────────────────────────────────────
@@ -205,16 +215,29 @@ router.get("/media", requireAuth, async (_req, res) => {
           api_key: apiKey,
         },
       });
-      const items = (r.data?.Items ?? []).map((item: { Id: string; Name: string; Type: string; ProductionYear?: number; ImageTags?: { Primary?: string }; DateCreated?: string }) => ({
-        id: item.Id,
-        title: item.Name,
-        type: item.Type.toLowerCase(),
-        year: item.ProductionYear ?? null,
-        thumb: item.ImageTags?.Primary
-          ? `${baseUrl}/Items/${item.Id}/Images/Primary?api_key=${apiKey}&maxHeight=200`
-          : null,
-        addedAt: item.DateCreated ?? null,
-      }));
+      const items = (r.data?.Items ?? []).map((item: { Id: string; Name: string; Type: string; ProductionYear?: number; ImageTags?: { Primary?: string }; DateCreated?: string; SeriesName?: string; ParentIndexNumber?: number; IndexNumber?: number }) => {
+        const type = item.Type.toLowerCase();
+        // Jellyfin episodes carry the show name in SeriesName; build an SxxEyy
+        // season label when the numbers are available.
+        const seriesName = type === "episode" ? item.SeriesName ?? null : null;
+        const seasonLabel =
+          type === "episode" && item.ParentIndexNumber != null && item.IndexNumber != null
+            ? `S${item.ParentIndexNumber}E${item.IndexNumber}`
+            : null;
+        return {
+          id: item.Id,
+          title: item.Name,
+          type,
+          year: item.ProductionYear ?? null,
+          thumb: item.ImageTags?.Primary
+            ? `${baseUrl}/Items/${item.Id}/Images/Primary?api_key=${apiKey}&maxHeight=200`
+            : null,
+          addedAt: item.DateCreated ?? null,
+          seriesName,
+          seasonLabel,
+          url: null,
+        };
+      });
       res.json(items);
     } else {
       // Plex — recently added items. The token rides as the X-Plex-Token header
@@ -222,19 +245,123 @@ router.get("/media", requireAuth, async (_req, res) => {
       const r = await httpClient.get(`${baseUrl}/library/recentlyAdded`, {
         headers: { "X-Plex-Token": apiKey, Accept: "application/json" },
       });
-      const items = (r.data?.MediaContainer?.Metadata ?? []).slice(0, 6).map((item: { ratingKey: string; title: string; type: string; year?: number; thumb?: string; addedAt?: number }) => ({
-        id: String(item.ratingKey),
-        title: item.title,
-        type: item.type,
-        year: item.year ?? null,
-        thumb: item.thumb ? `${baseUrl}${item.thumb}?X-Plex-Token=${apiKey}` : null,
-        addedAt: item.addedAt ? new Date(item.addedAt * 1000).toISOString() : null,
-      }));
+      // The server's machineIdentifier (on the container root) is needed to build
+      // app.plex.tv deep links for each item.
+      const machineId: string | undefined = r.data?.MediaContainer?.machineIdentifier;
+      const items = (r.data?.MediaContainer?.Metadata ?? []).slice(0, 6).map(
+        (item: {
+          ratingKey: string;
+          title: string;
+          type: string;
+          year?: number;
+          thumb?: string;
+          addedAt?: number;
+          parentTitle?: string;
+          grandparentTitle?: string;
+          index?: number;
+        }) => {
+          // Plex "recently added" returns seasons for TV (type "season", with the
+          // show name in parentTitle and a "Season N" title) or episodes (show
+          // name in grandparentTitle). Surface the show name + a season label so
+          // the tile shows e.g. "Severance · Season 2" instead of just "Season 1".
+          let seriesName: string | null = null;
+          let seasonLabel: string | null = null;
+          if (item.type === "season") {
+            seriesName = item.parentTitle ?? null;
+            seasonLabel = item.title ?? null;
+          } else if (item.type === "episode") {
+            seriesName = item.grandparentTitle ?? null;
+            seasonLabel = item.parentTitle ?? null;
+          }
+          return {
+            id: String(item.ratingKey),
+            title: item.title,
+            type: item.type,
+            year: item.year ?? null,
+            thumb: item.thumb ? `${baseUrl}${item.thumb}?X-Plex-Token=${apiKey}` : null,
+            addedAt: item.addedAt ? new Date(item.addedAt * 1000).toISOString() : null,
+            seriesName,
+            seasonLabel,
+            url: plexDeepLink(machineId, item.ratingKey),
+          };
+        },
+      );
       res.json(items);
     }
   } catch (err) {
     logger.error({ reason: normalizeHttpError(err) }, "Media widget error");
     res.status(502).json({ error: "Failed to fetch media data" });
+  }
+});
+
+// ────────────────────────────────────────────────
+// Continue Watching Widget (Plex On Deck)
+// ────────────────────────────────────────────────
+router.get("/media/continue", requireAuth, async (_req, res) => {
+  // Resolve the connection the same way the /media route does. Continue Watching
+  // is a Plex-only feature, so we only act on a Plex-typed connection.
+  const saved = getSavedConnection("plex");
+  const savedToken = saved.token || saved.apiKey;
+
+  let serverType = process.env["MEDIA_SERVER_TYPE"] || "jellyfin";
+  let baseUrl = process.env["MEDIA_SERVER_URL"];
+  let apiKey = process.env["MEDIA_SERVER_API_KEY"];
+
+  if (saved.url && savedToken) {
+    serverType = "plex";
+    baseUrl = saved.url;
+    apiKey = savedToken;
+  }
+
+  // Unconfigured (or non-Plex env server) → return built-in sample data so the
+  // tile has something to show, consistent with the /media convention.
+  if (serverType !== "plex" || !baseUrl || !apiKey) {
+    res.json([
+      { id: "1", title: "Chapter 7", type: "episode", seriesName: "Severance", thumb: null, progress: 42, url: null },
+      { id: "2", title: "Dune: Part Two", type: "movie", seriesName: null, thumb: null, progress: 18, url: null },
+    ]);
+    return;
+  }
+
+  try {
+    const r = await httpClient.get(`${baseUrl}/library/onDeck`, {
+      headers: { "X-Plex-Token": apiKey, Accept: "application/json" },
+    });
+    const machineId: string | undefined = r.data?.MediaContainer?.machineIdentifier;
+    const items = (r.data?.MediaContainer?.Metadata ?? []).map(
+      (item: {
+        ratingKey: string;
+        title: string;
+        type: string;
+        thumb?: string;
+        grandparentThumb?: string;
+        grandparentTitle?: string;
+        viewOffset?: number;
+        duration?: number;
+      }) => {
+        // Episodes carry the show name in grandparentTitle. Progress is the
+        // played fraction (viewOffset / duration), as a 0–100 percentage.
+        const seriesName = item.type === "episode" ? item.grandparentTitle ?? null : null;
+        const progress =
+          item.viewOffset != null && item.duration
+            ? Math.round((item.viewOffset / item.duration) * 100)
+            : null;
+        const thumbPath = item.thumb || item.grandparentThumb;
+        return {
+          id: String(item.ratingKey),
+          title: item.title,
+          type: item.type ?? null,
+          seriesName,
+          thumb: thumbPath ? `${baseUrl}${thumbPath}?X-Plex-Token=${apiKey}` : null,
+          progress,
+          url: plexDeepLink(machineId, item.ratingKey),
+        };
+      },
+    );
+    res.json(items);
+  } catch (err) {
+    logger.error({ reason: normalizeHttpError(err) }, "Continue watching widget error");
+    res.status(502).json({ error: "Failed to fetch continue watching data" });
   }
 });
 

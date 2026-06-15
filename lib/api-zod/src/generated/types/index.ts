@@ -10,6 +10,7 @@ export * from './authCredentials';
 export * from './authResponse';
 export * from './connectionHealth';
 export * from './connectionTestResult';
+export * from './continueWatchingItem';
 export * from './errorResponse';
 export * from './healthStatus';
 export * from './layoutItem';

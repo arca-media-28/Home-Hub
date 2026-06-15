@@ -6,20 +6,17 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface MediaItem {
+export interface ContinueWatchingItem {
   id: string;
   title: string;
-  type: string;
   /** @nullable */
-  year?: number | null;
-  /** @nullable */
-  thumb?: string | null;
-  /** @nullable */
-  addedAt?: string | null;
+  type?: string | null;
   /** @nullable */
   seriesName?: string | null;
   /** @nullable */
-  seasonLabel?: string | null;
+  thumb?: string | null;
+  /** @nullable */
+  progress?: number | null;
   /** @nullable */
   url?: string | null;
 }

@@ -319,9 +319,27 @@ export const GetMediaRecentResponseItem = zod.object({
   "type": zod.string(),
   "year": zod.number().nullish(),
   "thumb": zod.string().nullish(),
-  "addedAt": zod.string().nullish()
+  "addedAt": zod.string().nullish(),
+  "seriesName": zod.string().nullish(),
+  "seasonLabel": zod.string().nullish(),
+  "url": zod.string().nullish()
 })
 export const GetMediaRecentResponse = zod.array(GetMediaRecentResponseItem)
+
+
+/**
+ * @summary Get in-progress / on-deck media to continue watching from Plex
+ */
+export const GetMediaContinueResponseItem = zod.object({
+  "id": zod.string(),
+  "title": zod.string(),
+  "type": zod.string().nullish(),
+  "seriesName": zod.string().nullish(),
+  "thumb": zod.string().nullish(),
+  "progress": zod.number().nullish(),
+  "url": zod.string().nullish()
+})
+export const GetMediaContinueResponse = zod.array(GetMediaContinueResponseItem)
 
 
 /**

@@ -303,6 +303,23 @@ paths:
                 items:
                   $ref: "#/components/schemas/MediaItem"
 
+  /widgets/media/continue:
+    get:
+      operationId: getMediaContinue
+      tags: [widgets]
+      summary: Get in-progress / on-deck media to continue watching from Plex
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Continue watching items
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ContinueWatchingItem"
+
   /widgets/sonarr:
     get:
       operationId: getSonarrQueue
@@ -899,6 +916,31 @@ components:
         thumb:
           type: ["string", "null"]
         addedAt:
+          type: ["string", "null"]
+        seriesName:
+          type: ["string", "null"]
+        seasonLabel:
+          type: ["string", "null"]
+        url:
+          type: ["string", "null"]
+
+    ContinueWatchingItem:
+      type: object
+      required: [id, title]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        type:
+          type: ["string", "null"]
+        seriesName:
+          type: ["string", "null"]
+        thumb:
+          type: ["string", "null"]
+        progress:
+          type: ["number", "null"]
+        url:
           type: ["string", "null"]
 
     SonarrData:

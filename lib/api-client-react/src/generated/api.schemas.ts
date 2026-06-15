@@ -341,6 +341,27 @@ export interface MediaItem {
   thumb?: string | null;
   /** @nullable */
   addedAt?: string | null;
+  /** @nullable */
+  seriesName?: string | null;
+  /** @nullable */
+  seasonLabel?: string | null;
+  /** @nullable */
+  url?: string | null;
+}
+
+export interface ContinueWatchingItem {
+  id: string;
+  title: string;
+  /** @nullable */
+  type?: string | null;
+  /** @nullable */
+  seriesName?: string | null;
+  /** @nullable */
+  thumb?: string | null;
+  /** @nullable */
+  progress?: number | null;
+  /** @nullable */
+  url?: string | null;
 }
 
 export interface SonarrQueueItem {
