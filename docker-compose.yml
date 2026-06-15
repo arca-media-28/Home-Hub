@@ -27,6 +27,22 @@ services:
       # ── Optional: Sonarr ──────────────────────────────────────
       # - SONARR_URL=http://your-sonarr:8989
       # - SONARR_API_KEY=your-sonarr-api-key
+      # ── Optional: Radarr ──────────────────────────────────────
+      # - RADARR_URL=http://your-radarr:7878
+      # - RADARR_API_KEY=your-radarr-api-key
+      # ── Optional: qBittorrent ─────────────────────────────────
+      # - QBITTORRENT_URL=http://your-qbittorrent:8080
+      # - QBITTORRENT_USERNAME=admin
+      # - QBITTORRENT_PASSWORD=your-qbittorrent-password
+      # ── Optional: Pi-hole ─────────────────────────────────────
+      # - PIHOLE_URL=http://your-pihole
+      # - PIHOLE_API_KEY=your-pihole-api-token
+      # ── Optional: Nginx Proxy Manager ─────────────────────────
+      # NPM_URL must point at the ADMIN/API port (81 by default),
+      # NOT the proxied site on 80/443.
+      # - NPM_URL=http://your-npm-host:81
+      # - NPM_EMAIL=admin@example.com
+      # - NPM_PASSWORD=your-npm-admin-password
     volumes:
       # SQLite database file and uploaded images persist here
       - homelab-data:/data
