@@ -52,6 +52,14 @@ failed before this. The same client backs both the test/ping and the widgets so
   `name=value` pair verbatim — do NOT hardcode `SID=`. Symptom of the v4-only
   bug against a v5 server: login returns 200 but extract fails → "no session" →
   tile shows unavailable.
+- NPM (Nginx Proxy Manager) v2 API: auth via `POST /api/tokens`
+  ({identity:email, secret:password}) → bearer token. Data endpoints use
+  **hyphens**: `/api/nginx/proxy-hosts` and `/api/nginx/dead-hosts` (NOT
+  `dead_hosts`). Symptom of the underscore typo: "Test connection" shows
+  **Connected** (ping only does the token login) but the tile shows
+  **unavailable** — the widget logs in fine, then the dead-hosts call 404s,
+  `Promise.all` rejects (not a 401), and the route 502s. Lesson: a passing test
+  + failing tile means the bug is in a widget-only data call, not auth/config.
 - **Error logging:** widget catch-all branches must log
   `logger.error({ reason: normalizeHttpError(err) }, "...")`, NOT
   `logger.error({ err }, ...)`. Logging the raw axios error serializes a

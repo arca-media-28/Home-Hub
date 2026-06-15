@@ -667,7 +667,7 @@ router.get("/nginx-proxy-manager", requireAuth, async (_req, res) => {
         headers: { Authorization: `Bearer ${token}` },
         params: { expand: "certificate" },
       }),
-      httpClient.get(`${baseUrl}/api/nginx/dead_hosts`, {
+      httpClient.get(`${baseUrl}/api/nginx/dead-hosts`, {
         headers: { Authorization: `Bearer ${token}` },
       }),
     ]);
