@@ -110,7 +110,7 @@ export interface Tile {
   /** @nullable */
   imageFit?: TileImageFit;
   /**
-     * Anchor key for how the image is aligned within the tile (e.g. "center", "top-left"). Null falls back to the legacy imageFit behavior.
+     * How the image is positioned within the tile. Newer tiles store a free drag-set pan as "pan(<x>,<y>)" — a CSS translate in percent of the tile box (e.g. "pan(-12.5,30)"), which works on both axes at any zoom. Legacy values are also honored: a named anchor key (e.g. "center", "top-left") or a focal point as a CSS object-position "<x>% <y>%". Null falls back to the legacy imageFit behavior.
      * @nullable
      */
   imagePosition?: string | null;

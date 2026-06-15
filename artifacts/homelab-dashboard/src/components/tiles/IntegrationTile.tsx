@@ -105,13 +105,15 @@ export default function IntegrationTile({ tile, status }: IntegrationTileProps) 
           // eslint-disable-next-line jsx-a11y/no-static-element-interactions
         >
           {hasImage && (
-            <img
-              src={tile.imageUrl!}
-              alt={tile.name || "tile"}
-              className={`absolute inset-0 w-full h-full ${image.className}`}
-              style={image.style}
-              draggable={false}
-            />
+            <div className={image.wrapperClassName} style={image.wrapperStyle}>
+              <img
+                src={tile.imageUrl!}
+                alt={tile.name || "tile"}
+                className={image.className}
+                style={image.style}
+                draggable={false}
+              />
+            </div>
           )}
           <div className="absolute inset-0 bg-black/20 group-hover/header:bg-black/30 transition-colors" />
 

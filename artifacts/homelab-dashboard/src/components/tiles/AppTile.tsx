@@ -21,13 +21,15 @@ export default function AppTile({ tile }: AppTileProps) {
       onClick={() => openTileUrl(tile.url)}
     >
       {hasImage && (
-        <img
-          src={tile.imageUrl!}
-          alt={tile.name || "tile"}
-          className={`absolute inset-0 w-full h-full ${image.className}`}
-          style={image.style}
-          draggable={false}
-        />
+        <div className={image.wrapperClassName} style={image.wrapperStyle}>
+          <img
+            src={tile.imageUrl!}
+            alt={tile.name || "tile"}
+            className={image.className}
+            style={image.style}
+            draggable={false}
+          />
+        </div>
       )}
       <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
 

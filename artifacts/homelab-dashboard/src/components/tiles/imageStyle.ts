@@ -21,17 +21,117 @@ const POSITION_MAP: Record<string, string> = Object.fromEntries(
   POSITION_OPTIONS.map((p) => [p.key, p.objectPosition]),
 );
 
+// Each discrete anchor maps to an (x, y) percentage pair — the same coordinate
+// space CSS `object-position` uses (0% 0% = top-left, 50% 50% = center,
+// 100% 100% = bottom-right). Drag-to-pan produces arbitrary points in between.
+const ANCHOR_PERCENT: Record<string, { x: number; y: number }> = {
+  "top-left": { x: 0, y: 0 },
+  top: { x: 50, y: 0 },
+  "top-right": { x: 100, y: 0 },
+  left: { x: 0, y: 50 },
+  center: { x: 50, y: 50 },
+  right: { x: 100, y: 50 },
+  "bottom-left": { x: 0, y: 100 },
+  bottom: { x: 50, y: 100 },
+  "bottom-right": { x: 100, y: 100 },
+};
+
+// A custom focal point is stored in imagePosition as a CSS object-position value
+// of the form "<x>% <y>%" (e.g. "37.5% 62%"), distinguishing it from the named
+// anchor keys above. This keeps the existing string column doing double duty.
+const FOCAL_POINT_RE = /^(\d+(?:\.\d+)?)%\s+(\d+(?:\.\d+)?)%$/;
+
+export function isFocalPoint(position: string | null | undefined): boolean {
+  return typeof position === "string" && FOCAL_POINT_RE.test(position);
+}
+
+export function parseFocalPoint(
+  position: string | null | undefined,
+): { x: number; y: number } | null {
+  if (typeof position !== "string") return null;
+  const m = FOCAL_POINT_RE.exec(position);
+  if (!m) return null;
+  return { x: Number(m[1]), y: Number(m[2]) };
+}
+
+// Format an (x, y) percentage pair into the stored focal-point string. Values
+// are clamped to [0, 100] and rounded to one decimal to keep the string short.
+export function formatFocalPoint(x: number, y: number): string {
+  const clamp = (n: number) => Math.min(100, Math.max(0, n));
+  const round = (n: number) => Math.round(clamp(n) * 10) / 10;
+  return `${round(x)}% ${round(y)}%`;
+}
+
+// Resolve any stored imagePosition (named anchor or custom focal point) into the
+// (x, y) percentages used by the drag interaction. Falls back to center.
+export function positionToPercent(
+  position: string | null | undefined,
+): { x: number; y: number } {
+  const focal = parseFocalPoint(position);
+  if (focal) return focal;
+  return ANCHOR_PERCENT[position ?? "center"] ?? ANCHOR_PERCENT["center"];
+}
+
+// Resolve any stored imagePosition into a CSS object-position value: a custom
+// focal point passes through verbatim; a named anchor maps through POSITION_MAP.
+export function resolveObjectPosition(position: string | null | undefined): string {
+  if (isFocalPoint(position)) return position as string;
+  return POSITION_MAP[position ?? "center"] ?? POSITION_MAP["center"];
+}
+
+// ── Free-transform pan (drag-to-reposition) ───────────────────────────────────
+// Newer tiles store placement as a free 2D pan instead of a bounded anchor: the
+// image is treated as a canvas and the tile as a viewport over it. The pan is a
+// translate offset in percentages of the tile box (so it scales with the tile),
+// stored as "pan(<x>,<y>)". Combined with imageScale it gives full freedom —
+// drag works on both axes at any zoom, and the whole image stays manipulable
+// (nothing is force-cropped to the tile's aspect ratio).
+const PAN_RE = /^pan\(\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*\)$/;
+
+// How far (in % of the tile box) the image may be panned in any direction.
+// Keeps at least part of the image within view rather than letting it vanish.
+export const PAN_LIMIT = 100;
+
+export const DEFAULT_PAN = "pan(0,0)";
+
+export function isPan(position: string | null | undefined): boolean {
+  return typeof position === "string" && PAN_RE.test(position);
+}
+
+export function parsePan(
+  position: string | null | undefined,
+): { x: number; y: number } | null {
+  if (typeof position !== "string") return null;
+  const m = PAN_RE.exec(position);
+  if (!m) return null;
+  return { x: Number(m[1]), y: Number(m[2]) };
+}
+
+// Format an (x, y) translate pair (in % of the tile box) into the stored pan
+// string. Values are clamped to ±PAN_LIMIT and rounded to one decimal.
+export function formatPan(x: number, y: number): string {
+  const clamp = (n: number) => Math.min(PAN_LIMIT, Math.max(-PAN_LIMIT, n));
+  const round = (n: number) => Math.round(clamp(n) * 10) / 10;
+  return `pan(${round(x)},${round(y)})`;
+}
+
 // The object-fit modes offered in the editor. Legacy "center"/"top-left" fit
 // values still render (see resolveImageStyle) but are no longer offered.
 export const FIT_OPTIONS = [
-  { value: "cover", label: "Cover" },
-  { value: "contain", label: "Contain" },
+  { value: "contain", label: "Fit whole image" },
+  { value: "cover", label: "Fill tile (crop)" },
   { value: "none", label: "Actual size" },
 ] as const;
 
 export type FitValue = (typeof FIT_OPTIONS)[number]["value"];
 
+// Fallback for legacy tiles whose imageFit was never set — keep the historical
+// "cover" behavior so their appearance doesn't shift.
 export const DEFAULT_FIT: FitValue = "cover";
+
+// Default for a freshly chosen image in the editor: show the whole image so the
+// user can pan/zoom the full picture rather than a forced crop.
+export const DEFAULT_NEW_FIT: FitValue = "contain";
 export const DEFAULT_POSITION: PositionKey = "center";
 export const DEFAULT_SCALE = 100;
 export const MIN_SCALE = 25;
@@ -107,11 +207,12 @@ export interface ImagePlacement {
 // model: a real object-fit mode + an anchor key + a zoom percentage.
 export function normalizePlacement(p: ImagePlacement): {
   fit: FitValue;
-  position: PositionKey;
+  // Either a named anchor key or a custom focal-point string ("<x>% <y>%").
+  position: string;
   scale: number;
 } {
   let fit: FitValue = DEFAULT_FIT;
-  let position: PositionKey = (p.imagePosition as PositionKey) ?? DEFAULT_POSITION;
+  let position: string = p.imagePosition ?? DEFAULT_POSITION;
 
   switch (p.imageFit) {
     case "cover":
@@ -136,24 +237,85 @@ export function normalizePlacement(p: ImagePlacement): {
   return { fit, position, scale };
 }
 
-// Build the className + inline style for a tile image, honoring fit, anchor
-// position and zoom — and staying backward-compatible with legacy fit values.
-export function resolveImageStyle(p: ImagePlacement): {
+// The rendering of a tile image is split into a box-sized wrapper that carries
+// the pan/zoom transform and the <img> that lives inside it. Keeping the wrapper
+// box-sized means a pan translate of N% is always N% of the tile (not of the
+// image), so drag stays 1:1 across fits and zoom levels; the image itself is
+// free to overflow the wrapper (the tile container clips it), which is what lets
+// "Actual size" reveal hidden parts as you pan instead of clipping at the box.
+export interface ResolvedImageStyle {
+  // Box-sized layer carrying the pan/zoom transform; the tile container clips it.
+  wrapperClassName: string;
+  wrapperStyle: CSSProperties;
+  // The <img> rendered inside the wrapper.
   className: string;
   style: CSSProperties;
-} {
+}
+
+// Build the wrapper + img styling for a tile image, honoring fit, position and
+// zoom. Two positioning models are supported:
+//   • Free pan ("pan(x,y)") — the image is a canvas freely translated within the
+//     tile viewport and scaled about its center. Drag works on both axes at any
+//     zoom and the whole image stays manipulable (no forced aspect crop). For
+//     "Actual size" the image renders at its natural size and overflows the
+//     wrapper so the container clips it — panning reveals the off-screen parts.
+//   • Legacy anchor / focal-point — kept so existing saved tiles render exactly
+//     as before (object-position + scale about that point).
+export function resolveImageStyle(p: ImagePlacement): ResolvedImageStyle {
   const { fit, position, scale } = normalizePlacement(p);
 
   const objectFitClass =
     fit === "contain" ? "object-contain" : fit === "none" ? "object-none" : "object-cover";
 
-  const objectPosition = POSITION_MAP[position] ?? POSITION_MAP["center"];
+  const z = scale / 100;
+  const pan = parsePan(position);
+  if (pan) {
+    // translate is resolved against the box-sized wrapper, so the pan is
+    // independent of zoom and gives a 1:1 drag in either direction.
+    const wrapperStyle: CSSProperties = {
+      transform: `translate(${pan.x}%, ${pan.y}%) scale(${z})`,
+      transformOrigin: "center",
+    };
 
+    if (fit === "none") {
+      // Natural pixel size, centered, allowed to overflow the wrapper so the
+      // tile container (overflow-hidden) clips it and panning reveals more.
+      return {
+        wrapperClassName: "absolute inset-0",
+        wrapperStyle,
+        className: "max-w-none max-h-none",
+        style: {
+          position: "absolute",
+          left: "50%",
+          top: "50%",
+          transform: "translate(-50%, -50%)",
+          width: "auto",
+          height: "auto",
+        },
+      };
+    }
+
+    // contain / cover fill the box; zooming past 100% overflows and is clipped
+    // by the tile container.
+    return {
+      wrapperClassName: "absolute inset-0",
+      wrapperStyle,
+      className: `absolute inset-0 w-full h-full ${objectFitClass}`,
+      style: { objectPosition: "center" },
+    };
+  }
+
+  const objectPosition = resolveObjectPosition(position);
   const style: CSSProperties = { objectPosition };
   if (scale !== 100) {
-    style.transform = `scale(${scale / 100})`;
+    style.transform = `scale(${z})`;
     style.transformOrigin = objectPosition;
   }
 
-  return { className: objectFitClass, style };
+  return {
+    wrapperClassName: "absolute inset-0",
+    wrapperStyle: {},
+    className: `absolute inset-0 w-full h-full ${objectFitClass}`,
+    style,
+  };
 }

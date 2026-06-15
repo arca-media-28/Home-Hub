@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { HexColorPicker } from "react-colorful";
 import {
   Dialog,
@@ -25,10 +25,13 @@ import {
   resolveImageStyle,
   resolveTitleStyle,
   normalizePlacement,
+  isPan,
+  parsePan,
+  formatPan,
   FIT_OPTIONS,
   POSITION_OPTIONS,
-  DEFAULT_FIT,
-  DEFAULT_POSITION,
+  DEFAULT_NEW_FIT,
+  DEFAULT_PAN,
   DEFAULT_SCALE,
   MIN_SCALE,
   MAX_SCALE,
@@ -97,7 +100,7 @@ export default function TileEditModal({ open, onOpenChange, tile, mode }: TileEd
   const [bgColor, setBgColor] = useState(tile?.bgColor ?? DEFAULT_BG_COLOR);
   const [imageUrl, setImageUrl] = useState(tile?.imageUrl ?? "");
   const [imageFit, setImageFit] = useState<FitValue>(initialPlacement.fit);
-  const [imagePosition, setImagePosition] = useState<PositionKey>(initialPlacement.position);
+  const [imagePosition, setImagePosition] = useState<string>(initialPlacement.position);
   const [imageScale, setImageScale] = useState<number>(initialPlacement.scale);
   const [imageSource, setImageSource] = useState<ImageSource>("upload");
   const [titleSize, setTitleSize] = useState<TitleSize>(
@@ -288,9 +291,10 @@ export default function TileEditModal({ open, onOpenChange, tile, mode }: TileEd
       if (!res.ok) throw new Error(await res.text());
       const { url: uploadedUrl } = await res.json();
       setImageUrl(uploadedUrl);
-      // Reset placement to sensible defaults for the freshly chosen image.
-      setImageFit(DEFAULT_FIT);
-      setImagePosition(DEFAULT_POSITION);
+      // Reset placement to sensible defaults for the freshly chosen image:
+      // show the whole image, centered, at 100% so it can be freely panned.
+      setImageFit(DEFAULT_NEW_FIT);
+      setImagePosition(DEFAULT_PAN);
       setImageScale(DEFAULT_SCALE);
       // Refresh the library so the new image appears there too.
       queryClient.invalidateQueries({ queryKey: getListUploadsQueryKey() });
@@ -307,19 +311,19 @@ export default function TileEditModal({ open, onOpenChange, tile, mode }: TileEd
   }
 
   // Pick an image from the library / URL and reset placement to defaults so the
-  // new image starts cleanly anchored.
+  // new image starts centered with the whole picture visible.
   function pickImage(nextUrl: string) {
     setImageUrl(nextUrl);
-    setImageFit(DEFAULT_FIT);
-    setImagePosition(DEFAULT_POSITION);
+    setImageFit(DEFAULT_NEW_FIT);
+    setImagePosition(DEFAULT_PAN);
     setImageScale(DEFAULT_SCALE);
   }
 
   // Clear the tile's image entirely.
   function clearImage() {
     setImageUrl("");
-    setImageFit(DEFAULT_FIT);
-    setImagePosition(DEFAULT_POSITION);
+    setImageFit(DEFAULT_NEW_FIT);
+    setImagePosition(DEFAULT_PAN);
     setImageScale(DEFAULT_SCALE);
   }
 
@@ -364,6 +368,72 @@ export default function TileEditModal({ open, onOpenChange, tile, mode }: TileEd
   // Live placement preview for the editor (mirrors how tiles render).
   const preview = resolveImageStyle({ imageFit, imagePosition, imageScale });
   const titlePreview = resolveTitleStyle({ titleSize, titlePosition });
+
+  // ── Drag-to-reposition (free pan) ─────────────────────────────────────────
+  // The user drags the preview image to pan it anywhere within the tile: the
+  // image is a canvas and the tile a viewport over it. The pan is stored in
+  // imagePosition as "pan(<x>,<y>)" — a translate in % of the tile box — so it
+  // works on both axes at any zoom and never force-crops the image. The drag is
+  // 1:1 in pixels because translate is resolved against the box the img fills.
+  const previewRef = useRef<HTMLDivElement>(null);
+  const dragState = useRef<{
+    pointerId: number;
+    startClientX: number;
+    startClientY: number;
+    startX: number;
+    startY: number;
+    boxW: number;
+    boxH: number;
+  } | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+
+  function handlePreviewPointerDown(e: React.PointerEvent<HTMLDivElement>) {
+    if (!imageUrl) return;
+    const box = previewRef.current;
+    if (!box) return;
+    const boxW = box.clientWidth;
+    const boxH = box.clientHeight;
+    if (!boxW || !boxH) return;
+    // Start from the current pan; a legacy anchor/focal value has no pan, so we
+    // begin from center and the drag recalibrates it into the free-pan model.
+    const start = parsePan(imagePosition) ?? { x: 0, y: 0 };
+    dragState.current = {
+      pointerId: e.pointerId,
+      startClientX: e.clientX,
+      startClientY: e.clientY,
+      startX: start.x,
+      startY: start.y,
+      boxW,
+      boxH,
+    };
+    setIsDragging(true);
+    e.currentTarget.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  }
+
+  function handlePreviewPointerMove(e: React.PointerEvent<HTMLDivElement>) {
+    const s = dragState.current;
+    if (!s || e.pointerId !== s.pointerId) return;
+    const dx = e.clientX - s.startClientX;
+    const dy = e.clientY - s.startClientY;
+    // translate is % of the box, so a px delta maps to (dx / boxW) * 100.
+    const nx = s.startX + (dx / s.boxW) * 100;
+    const ny = s.startY + (dy / s.boxH) * 100;
+    setImagePosition(formatPan(nx, ny));
+  }
+
+  function endDrag(e: React.PointerEvent<HTMLDivElement>) {
+    const s = dragState.current;
+    if (!s || e.pointerId !== s.pointerId) return;
+    dragState.current = null;
+    setIsDragging(false);
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    }
+  }
+
+  // Whether the image has been panned away from its centered default.
+  const isCentered = !isPan(imagePosition) || imagePosition === DEFAULT_PAN;
 
   function handleSave() {
     const data = {
@@ -564,19 +634,33 @@ export default function TileEditModal({ open, onOpenChange, tile, mode }: TileEd
               )}
             </div>
 
-            {/* Live preview of how the tile image will look. */}
+            {/* Live preview of how the tile image will look. Drag it to set a
+                custom focal point when the image overflows the box. */}
             <div
-              className="relative w-full h-28 rounded-md overflow-hidden border border-border"
+              ref={previewRef}
+              className={`relative w-full h-28 rounded-md overflow-hidden border border-border ${
+                imageUrl
+                  ? isDragging
+                    ? "cursor-grabbing touch-none select-none"
+                    : "cursor-grab touch-none select-none"
+                  : ""
+              }`}
               style={{ background: bgColor }}
+              onPointerDown={handlePreviewPointerDown}
+              onPointerMove={handlePreviewPointerMove}
+              onPointerUp={endDrag}
+              onPointerCancel={endDrag}
             >
               {imageUrl ? (
-                <img
-                  src={imageUrl}
-                  alt="preview"
-                  className={`absolute inset-0 w-full h-full ${preview.className}`}
-                  style={preview.style}
-                  draggable={false}
-                />
+                <div className={preview.wrapperClassName} style={preview.wrapperStyle}>
+                  <img
+                    src={imageUrl}
+                    alt="preview"
+                    className={preview.className}
+                    style={preview.style}
+                    draggable={false}
+                  />
+                </div>
               ) : null}
               {imageUrl && <div className="absolute inset-0 bg-black/20" />}
               {/* Title overlay mirrors AppTile placement for plain tiles; widget
@@ -704,23 +788,24 @@ export default function TileEditModal({ open, onOpenChange, tile, mode }: TileEd
               </div>
 
               <div className="space-y-1.5">
-                <Label>Position</Label>
-                <div className="grid grid-cols-3 gap-1 w-[88px]">
-                  {POSITION_OPTIONS.map((p) => (
-                    <button
-                      key={p.key}
-                      type="button"
-                      onClick={() => setImagePosition(p.key)}
-                      title={p.label}
-                      aria-label={p.label}
-                      className={`h-7 rounded border transition-colors ${
-                        imagePosition === p.key
-                          ? "bg-primary border-primary"
-                          : "bg-secondary border-border hover:bg-secondary/70"
-                      }`}
-                    />
-                  ))}
+                <div className="flex items-center justify-between">
+                  <Label>Position</Label>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-xs"
+                    onClick={() => setImagePosition(DEFAULT_PAN)}
+                    disabled={isCentered}
+                  >
+                    <RotateCcw className="w-3.5 h-3.5 mr-1" />
+                    Recenter
+                  </Button>
                 </div>
+                <p className="text-xs text-muted-foreground">
+                  Drag the image in the preview above to position it, and use Scale
+                  to zoom in or out.
+                </p>
               </div>
 
               <div className="space-y-1.5">
