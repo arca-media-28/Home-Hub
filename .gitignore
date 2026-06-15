@@ -48,6 +48,10 @@ Thumbs.db
 .cache/
 .local/
 
+# Local environment — real secrets, never commit (.env.example is the tracked template)
+.env
+!.env.example
+
 # Runtime data — SQLite DB, WAL/SHM files, generated secret, and user uploads must never be committed
 artifacts/api-server/data/*.sqlite
 artifacts/api-server/data/*.sqlite-wal
