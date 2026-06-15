@@ -64,6 +64,20 @@ failed before this. The same client backs both the test/ping and the widgets so
   **unavailable** — the widget logs in fine, then the dead-hosts call 404s,
   `Promise.all` rejects (not a 401), and the route 502s. Lesson: a passing test
   + failing tile means the bug is in a widget-only data call, not auth/config.
+- Pi-hole supports BOTH v5 and v6 via auto-detect in `lib/pihole.ts`
+  (`fetchPiholeData`), shared by the widget route, ping, and health check. v6
+  removed `admin/api.php` (returns HTTP 400) and uses a session REST API: `POST
+  /api/auth` {password} → `{session:{valid,sid}}`; pass `sid` in the `X-FTL-SID`
+  header to `GET /api/stats/summary` (queries.total/blocked/percent_blocked,
+  gravity.domains_being_blocked) and `GET /api/dns/blocking` (blocking:enabled).
+  Detection: try v6 first; on the /api/auth catch, read `err.response?.status`
+  DIRECTLY (do NOT rely on `axios.isAxiosError` — the test harness fakes errors
+  without the `isAxiosError` flag) → 401 = wrong password (throw PiholeError),
+  any other status = fall back to v5 `admin/api.php`, no `.response` = real
+  network error (rethrow). Passwordless v6 returns `sid:null` → skip the header.
+  Best-effort `DELETE /api/auth` to free the session (FTL caps concurrent
+  sessions). Expected failures throw `PiholeError` (name checked by
+  `normalizeHttpError` to surface its message verbatim — avoids an import cycle).
 - **Error logging:** widget catch-all branches must log
   `logger.error({ reason: normalizeHttpError(err) }, "...")`, NOT
   `logger.error({ err }, ...)`. Logging the raw axios error serializes a

@@ -1,4 +1,5 @@
 import { httpClient, normalizeHttpError, normalizeBaseUrl, HTTP_TIMEOUT } from "./http.js";
+import { fetchPiholeData } from "./pihole.js";
 import type { DbServiceConnection } from "./db.js";
 
 export interface TestValues {
@@ -79,16 +80,11 @@ export async function pingService(service: string, v: TestValues): Promise<TestR
     }
     case "pihole": {
       if (!v.apiKey) return { ok: false, message: "Enter an API Key first." };
-      // summaryRaw is a cheap, auth-protected endpoint. Pi-hole returns 200 with
-      // an empty/zeroed body when the auth token is wrong, so confirm the token
-      // is accepted by checking for the FTL `status` field in the response.
-      const r = await httpClient.get(`${base}/admin/api.php`, {
-        params: { summaryRaw: "", auth: v.apiKey },
-      });
-      const data = r.data as { status?: string } | undefined;
-      if (!data || typeof data.status !== "string") {
-        return { ok: false, message: "Invalid API key." };
-      }
+      // Auto-detect v6 (REST API) vs v5 (admin/api.php). A successful fetch
+      // confirms both reachability and valid credentials; bad credentials or an
+      // unrecognizable payload throw a PiholeError that runPing turns into a
+      // clear message.
+      await fetchPiholeData(base, v.apiKey);
       return { ok: true, message: "Connected" };
     }
     default:

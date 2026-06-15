@@ -2,6 +2,7 @@ import { Router } from "express";
 import { requireAuth } from "../lib/auth.js";
 import { connectionStmts } from "../lib/db.js";
 import { httpClient, normalizeBaseUrl, normalizeHttpError } from "../lib/http.js";
+import { fetchPiholeData } from "../lib/pihole.js";
 import { logger } from "../lib/logger.js";
 
 const router = Router();
@@ -554,9 +555,10 @@ router.get("/qbittorrent", requireAuth, async (_req, res) => {
 // ────────────────────────────────────────────────
 // Pi-hole Widget
 // ────────────────────────────────────────────────
-// Targets the Pi-hole v5 `admin/api.php` endpoint. `summaryRaw` returns numeric
-// (un-formatted) values so we don't have to parse comma-grouped strings, and the
-// auth token gates the privileged fields (status, query/block counts).
+// Auto-detects the Pi-hole API version: it tries the v6 REST API (session login
+// at `/api/auth`, stats at `/api/...`) first and falls back to the legacy v5
+// `admin/api.php` endpoint, so one saved connection works for both. See
+// lib/pihole.ts for the detection + mapping details.
 router.get("/pihole", requireAuth, async (_req, res) => {
   const saved = getSavedConnection("pihole");
   const baseUrl = normalizeBaseUrl(saved.url || process.env["PIHOLE_URL"]);
@@ -570,40 +572,12 @@ router.get("/pihole", requireAuth, async (_req, res) => {
   }
 
   try {
-    const r = await httpClient.get(`${baseUrl}/admin/api.php`, {
-      params: { summaryRaw: "", auth: apiKey ?? "" },
-    });
-
-    const data = (r.data ?? {}) as {
-      dns_queries_today?: unknown;
-      ads_blocked_today?: unknown;
-      ads_percentage_today?: unknown;
-      domains_being_blocked?: unknown;
-      status?: unknown;
-    };
-
-    // Pi-hole answers 200 even when the auth token is wrong or the request hit a
-    // non-Pi-hole host; in those cases the privileged summary fields are absent.
-    // Treat a missing `status` string or non-numeric query count as a failure so
-    // the tile surfaces an error instead of zeros.
-    const status = data.status;
-    const queries = Number(data.dns_queries_today);
-    if (typeof status !== "string" || Number.isNaN(queries)) {
-      logger.warn({ baseUrl }, "Pi-hole returned an unexpected payload (check API key/URL)");
-      res.status(502).json({ error: "Invalid Pi-hole response — check the URL and API key" });
-      return;
-    }
-
-    res.json({
-      queriesTotal: queries,
-      adsBlocked: Number(data.ads_blocked_today) || 0,
-      adsPercentage: Number(data.ads_percentage_today) || 0,
-      domainsBlocked: Number(data.domains_being_blocked) || 0,
-      status: status === "enabled" ? "enabled" : "disabled",
-    });
+    const data = await fetchPiholeData(baseUrl, apiKey);
+    res.json(data);
   } catch (err) {
-    logger.error({ reason: normalizeHttpError(err) }, "Pi-hole widget error");
-    res.status(502).json({ error: "Failed to fetch Pi-hole data" });
+    const message = normalizeHttpError(err);
+    logger.warn({ baseUrl, reason: message }, "Pi-hole widget error");
+    res.status(502).json({ error: message });
   }
 });
 

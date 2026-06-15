@@ -22,10 +22,12 @@ vi.mock("../lib/db.js", () => ({
 // never hit the network.
 const httpGet = vi.fn();
 const httpPost = vi.fn();
+const httpDelete = vi.fn();
 vi.mock("../lib/http.js", () => ({
   httpClient: {
     get: (...args: unknown[]) => httpGet(...args),
     post: (...args: unknown[]) => httpPost(...args),
+    delete: (...args: unknown[]) => httpDelete(...args),
   },
   normalizeBaseUrl: (url: string | undefined | null) => {
     const trimmed = url?.trim();
@@ -78,6 +80,8 @@ beforeEach(() => {
   findByService.mockReset();
   httpGet.mockReset();
   httpPost.mockReset();
+  httpDelete.mockReset();
+  httpDelete.mockResolvedValue({ data: {} });
   // Default: every service is unconfigured unless a test says otherwise.
   findByService.mockReturnValue(undefined);
 });
@@ -468,5 +472,100 @@ describe("GET /widgets/qbittorrent", () => {
     const res = await request(app).get("/widgets/qbittorrent");
     expect(res.status).toBe(502);
     expect(res.body.error).toMatch(/qBittorrent/);
+  });
+});
+
+// ── Pi-hole ─────────────────────────────────────────────────────────────────
+describe("GET /widgets/pihole", () => {
+  it("returns 503 (not configured) when no base URL is saved", async () => {
+    const res = await request(app).get("/widgets/pihole");
+    expect(res.status).toBe(503);
+    expect(httpPost).not.toHaveBeenCalled();
+    expect(httpGet).not.toHaveBeenCalled();
+  });
+
+  it("reads stats from a v6 instance (session login + REST API)", async () => {
+    const baseUrl = "https://pi6.local";
+    findByService.mockReturnValue(connRow({ service: "pihole", url: baseUrl, api_key: "app-pw" }));
+    // v6 login succeeds and returns a session id.
+    httpPost.mockResolvedValue({ data: { session: { valid: true, sid: "sid-123" } } });
+    httpGet
+      .mockResolvedValueOnce({
+        data: {
+          queries: { total: 5000, blocked: 1000, percent_blocked: 20 },
+          gravity: { domains_being_blocked: 123456 },
+        },
+      })
+      .mockResolvedValueOnce({ data: { blocking: "enabled" } });
+
+    const res = await request(app).get("/widgets/pihole");
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({
+      queriesTotal: 5000,
+      adsBlocked: 1000,
+      adsPercentage: 20,
+      domainsBlocked: 123456,
+      status: "enabled",
+    });
+    // v6 path: POST /api/auth, GET stats + blocking carrying the SID header.
+    expect(httpPost.mock.calls[0]![0]).toBe(`${baseUrl}/api/auth`);
+    for (const call of httpGet.mock.calls) {
+      const opts = call[1] as { headers: Record<string, string> };
+      expect(opts.headers["X-FTL-SID"]).toBe("sid-123");
+    }
+    // The session is cleaned up afterward.
+    expect(httpDelete.mock.calls[0]![0]).toBe(`${baseUrl}/api/auth`);
+    // Never touched the legacy endpoint.
+    expect(httpGet.mock.calls.some((c) => String(c[0]).includes("admin/api.php"))).toBe(false);
+  });
+
+  it("falls back to the v5 endpoint when /api/auth is absent (404)", async () => {
+    const baseUrl = "https://pi5.local";
+    findByService.mockReturnValue(connRow({ service: "pihole", url: baseUrl, api_key: "token" }));
+    // v5 hosts have no /api/auth — lighttpd answers 404.
+    httpPost.mockRejectedValue(httpError(404));
+    httpGet.mockResolvedValue({
+      data: {
+        dns_queries_today: 4200,
+        ads_blocked_today: 800,
+        ads_percentage_today: 19.04,
+        domains_being_blocked: 99999,
+        status: "enabled",
+      },
+    });
+
+    const res = await request(app).get("/widgets/pihole");
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({
+      queriesTotal: 4200,
+      adsBlocked: 800,
+      domainsBlocked: 99999,
+      status: "enabled",
+    });
+    expect(String(httpGet.mock.calls[0]![0])).toContain("admin/api.php");
+  });
+
+  it("surfaces a clear error when the v6 password is wrong (401)", async () => {
+    const baseUrl = "https://pi6-bad.local";
+    findByService.mockReturnValue(connRow({ service: "pihole", url: baseUrl, api_key: "wrong" }));
+    httpPost.mockRejectedValue(httpError(401));
+
+    const res = await request(app).get("/widgets/pihole");
+    expect(res.status).toBe(502);
+    expect(res.body.error).toMatch(/invalid api key\/password/i);
+    // Did not fall back to v5 on an auth failure.
+    expect(httpGet).not.toHaveBeenCalled();
+  });
+
+  it("surfaces a clear error on a bad/zeroed v5 payload (no zeros tile)", async () => {
+    const baseUrl = "https://pi5-bad.local";
+    findByService.mockReturnValue(connRow({ service: "pihole", url: baseUrl, api_key: "nope" }));
+    httpPost.mockRejectedValue(httpError(404));
+    // v5 returns 200 with the privileged fields absent when the token is wrong.
+    httpGet.mockResolvedValue({ data: [] });
+
+    const res = await request(app).get("/widgets/pihole");
+    expect(res.status).toBe(502);
+    expect(res.body.error).toMatch(/invalid pi-hole response/i);
   });
 });

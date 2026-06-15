@@ -35,6 +35,12 @@ export function normalizeBaseUrl(url: string | undefined | null): string | undef
 // user-facing message. Shared so the on-demand test, the background scheduler,
 // and the widget routes all describe failures the same way.
 export function normalizeHttpError(err: unknown): string {
+  // Service-specific expected failures (e.g. PiholeError) carry a ready-to-show
+  // message. Surface it verbatim instead of a generic string. Checked by name
+  // to avoid an import cycle with the service helpers.
+  if (err instanceof Error && err.name === "PiholeError") {
+    return err.message;
+  }
   if (axios.isAxiosError(err)) {
     if (err.response) {
       const status = err.response.status;
