@@ -11,4 +11,6 @@ export interface QbittorrentData {
   torrents: QbittorrentTorrent[];
   downloadSpeed: number;
   uploadSpeed: number;
+  /** All category names defined in qBittorrent, including categories that currently have no active torrents. Sourced from qBittorrent's dedicated categories endpoint so the tile filter can list every category even when nothing is downloading or seeding. */
+  categories: string[];
 }

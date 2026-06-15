@@ -172,8 +172,10 @@ export default function TileEditModal({ open, onOpenChange, tile, mode }: TileEd
   const enabledKeys = new Set(metrics ?? allMetricKeys(integration));
 
   // qBittorrent category discovery — only fetch live status when the editor is
-  // open and qBittorrent is the selected integration. Categories are derived
-  // client-side from the current torrent list (no dedicated endpoint).
+  // open and qBittorrent is the selected integration. The list of selectable
+  // categories comes from the widget's `categories` field, which reflects
+  // qBittorrent's full category catalog (every defined category, even ones with
+  // no active torrents) rather than being derived from the live torrent list.
   const isQbittorrent = integration === TileIntegration.qbittorrent;
   const qbStatusQuery = useGetQbittorrentStatus({
     query: {
@@ -183,27 +185,35 @@ export default function TileEditModal({ open, onOpenChange, tile, mode }: TileEd
   });
   const availableCategories = Array.from(
     new Set(
-      (qbStatusQuery.data?.torrents ?? [])
-        .map((t) => t.category)
-        .filter((c): c is string => typeof c === "string" && c.length > 0),
+      (qbStatusQuery.data?.categories ?? []).filter(
+        (c): c is string => typeof c === "string" && c.length > 0,
+      ),
     ),
   ).sort((a, b) => a.localeCompare(b));
 
-  // A null filter means "all categories" — reflect every discovered category as
-  // checked. An explicit array is honored as-is.
+  // The set of categories the saved filter currently covers. A null filter
+  // means "all categories" — reflect every catalog category as checked. An
+  // explicit array is honored as-is so a saved selection survives even when the
+  // live catalog is empty (e.g. the categories fetch transiently failed).
   const checkedCategories = new Set(categoryFilter ?? availableCategories);
   const torrentsMetricOn = enabledKeys.has("torrents");
 
   function toggleCategory(category: string, checked: boolean) {
+    // Start from the saved selection when present; otherwise (null = "all")
+    // start from the full catalog so unchecking one leaves the rest selected.
     const base = categoryFilter ?? availableCategories;
     const set = new Set(base);
     if (checked) set.add(category);
     else set.delete(category);
-    // Persist the explicit subset, ordered by the discovered category list so
-    // it stays stable. When every category is selected, collapse back to null
-    // ("show all") so newly-added categories appear automatically.
-    const next = availableCategories.filter((c) => set.has(c));
-    setCategoryFilter(next.length === availableCategories.length ? null : next);
+    // Collapse back to null ("show all") only when every catalog category is
+    // selected, so newly-added categories appear automatically. This is
+    // computed against the full catalog — never an empty live list — so a
+    // transiently-empty catalog can't silently wipe an explicit selection.
+    const next = Array.from(set).sort((a, b) => a.localeCompare(b));
+    const coversFullCatalog =
+      availableCategories.length > 0 &&
+      availableCategories.every((c) => set.has(c));
+    setCategoryFilter(coversFullCatalog ? null : next);
   }
 
   function handleIntegrationChange(next: string) {
@@ -843,7 +853,7 @@ export default function TileEditModal({ open, onOpenChange, tile, mode }: TileEd
                 <p className="text-xs text-muted-foreground pt-1">Loading categories…</p>
               ) : availableCategories.length === 0 ? (
                 <p className="text-xs text-muted-foreground pt-1">
-                  No categories found among the current torrents.
+                  No categories are defined in qBittorrent.
                 </p>
               ) : (
                 <div className="space-y-2 pt-1">

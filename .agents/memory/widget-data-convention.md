@@ -51,7 +51,11 @@ failed before this. The same client backs both the test/ping and the widgets so
   when behind Docker port-mapping/reverse-proxy). Capture and resend the full
   `name=value` pair verbatim — do NOT hardcode `SID=`. Symptom of the v4-only
   bug against a v5 server: login returns 200 but extract fails → "no session" →
-  tile shows unavailable.
+  tile shows unavailable. The **full category catalog** (incl. categories with
+  no active torrents) comes from `GET /api/v2/torrents/categories` — an OBJECT
+  keyed by category name (use `Object.keys`), NOT derivable from torrents/info.
+  Fetch it best-effort (own try/catch → empty list on failure) so it never
+  breaks the torrents/transfer response; the widget exposes it as `categories`.
 - NPM (Nginx Proxy Manager) v2 API: auth via `POST /api/tokens`
   ({identity:email, secret:password}) → bearer token. Data endpoints use
   **hyphens**: `/api/nginx/proxy-hosts` and `/api/nginx/dead-hosts` (NOT

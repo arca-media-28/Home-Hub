@@ -451,6 +451,7 @@ router.get("/qbittorrent", requireAuth, async (_req, res) => {
       ],
       downloadSpeed: 5.2e6,
       uploadSpeed: 9.5e5,
+      categories: ["Linux ISOs", "Movies", "TV Shows", "Music"],
     });
     return;
   }
@@ -462,6 +463,14 @@ router.get("/qbittorrent", requireAuth, async (_req, res) => {
       httpClient.get(`${baseUrl}/api/v2/torrents/info`, { headers: { Cookie: sid } }),
       httpClient.get(`${baseUrl}/api/v2/transfer/info`, { headers: { Cookie: sid } }),
     ]);
+
+  // Fetch the full category catalog separately. qBittorrent's dedicated
+  // categories endpoint returns every defined category — even ones with no
+  // active torrents — so the tile filter can list them all. Failures here must
+  // not break the rest of the response, so callers handle errors and fall back
+  // to an empty catalog.
+  const fetchCategories = (sid: string) =>
+    httpClient.get(`${baseUrl}/api/v2/torrents/categories`, { headers: { Cookie: sid } });
 
   const key = qbCacheKey(baseUrl, username);
 
@@ -501,10 +510,30 @@ router.get("/qbittorrent", requireAuth, async (_req, res) => {
 
     const transfer = (transferRes.data ?? {}) as { dl_info_speed?: number; up_info_speed?: number };
 
+    // Pull the full category catalog with the (now-valid) session. This is
+    // best-effort: any failure or empty/unexpected payload just yields an empty
+    // list rather than breaking the torrents/transfer response.
+    let categories: string[] = [];
+    try {
+      const categoriesRes = await fetchCategories(sid);
+      const raw = categoriesRes.data;
+      if (raw && typeof raw === "object") {
+        categories = Object.keys(raw as Record<string, unknown>).sort((a, b) =>
+          a.localeCompare(b),
+        );
+      }
+    } catch (err) {
+      logger.warn(
+        { reason: normalizeHttpError(err) },
+        "qBittorrent categories fetch failed; returning empty category catalog",
+      );
+    }
+
     res.json({
       torrents,
       downloadSpeed: transfer.dl_info_speed ?? 0,
       uploadSpeed: transfer.up_info_speed ?? 0,
+      categories,
     });
   } catch (err) {
     if (err instanceof Error && err.message === "qb-auth-failed") {

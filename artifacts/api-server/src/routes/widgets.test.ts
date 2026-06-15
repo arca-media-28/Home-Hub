@@ -333,6 +333,10 @@ describe("GET /widgets/qbittorrent", () => {
     const res = await request(app).get("/widgets/qbittorrent");
     expect(res.status).toBe(200);
     expect(res.body.torrents).toHaveLength(3);
+    // The mock fallback advertises a representative category catalog so the
+    // tile filter has something to list even without a live qBittorrent.
+    expect(Array.isArray(res.body.categories)).toBe(true);
+    expect(res.body.categories.length).toBeGreaterThan(0);
     expect(httpPost).not.toHaveBeenCalled();
   });
 
@@ -348,12 +352,22 @@ describe("GET /widgets/qbittorrent", () => {
       .mockResolvedValueOnce({
         data: [{ name: "ubuntu.iso", progress: 0.5, state: "downloading", dlspeed: 1000, upspeed: 50 }],
       })
-      .mockResolvedValueOnce({ data: { dl_info_speed: 1000, up_info_speed: 50 } });
+      .mockResolvedValueOnce({ data: { dl_info_speed: 1000, up_info_speed: 50 } })
+      // Categories endpoint: the dedicated catalog includes a category with no
+      // active torrents ("Archive") that must still surface in the response.
+      .mockResolvedValueOnce({
+        data: {
+          "Linux ISOs": { name: "Linux ISOs", savePath: "" },
+          Archive: { name: "Archive", savePath: "" },
+        },
+      });
 
     const res = await request(app).get("/widgets/qbittorrent");
     expect(res.status).toBe(200);
     expect(res.body.torrents[0]).toMatchObject({ name: "ubuntu.iso", progress: 50, state: "downloading" });
     expect(res.body.downloadSpeed).toBe(1000);
+    // Sorted catalog of all defined categories, including the empty "Archive".
+    expect(res.body.categories).toEqual(["Archive", "Linux ISOs"]);
 
     // Login posts a form to the auth/login endpoint.
     expect(httpPost.mock.calls[0]![0]).toBe(`${baseUrl}/api/v2/auth/login`);
@@ -376,11 +390,13 @@ describe("GET /widgets/qbittorrent", () => {
     });
     httpGet
       .mockResolvedValueOnce({ data: [] })
-      .mockResolvedValueOnce({ data: { dl_info_speed: 0, up_info_speed: 0 } });
+      .mockResolvedValueOnce({ data: { dl_info_speed: 0, up_info_speed: 0 } })
+      .mockResolvedValueOnce({ data: {} });
 
     const res = await request(app).get("/widgets/qbittorrent");
     expect(res.status).toBe(200);
-    // The full name=value pair must be sent back verbatim on the data calls.
+    // The full name=value pair must be sent back verbatim on the data calls
+    // (torrents, transfer, and the categories catalog call).
     for (const call of httpGet.mock.calls) {
       const opts = call[1] as { headers: Record<string, string> };
       expect(opts.headers.Cookie).toBe("QBT_SID_8080=v5token");
@@ -400,12 +416,34 @@ describe("GET /widgets/qbittorrent", () => {
       .mockRejectedValueOnce(httpError(403))
       .mockRejectedValueOnce(httpError(403))
       .mockResolvedValueOnce({ data: [] })
-      .mockResolvedValueOnce({ data: { dl_info_speed: 0, up_info_speed: 0 } });
+      .mockResolvedValueOnce({ data: { dl_info_speed: 0, up_info_speed: 0 } })
+      .mockResolvedValueOnce({ data: {} });
 
     const res = await request(app).get("/widgets/qbittorrent");
     expect(res.status).toBe(200);
     // Logged in twice: initial + after the 403.
     expect(httpPost).toHaveBeenCalledTimes(2);
+  });
+
+  it("still returns torrents/transfer when the categories fetch fails", async () => {
+    const baseUrl = "https://qb-cats-fail.local";
+    findByService.mockReturnValue(
+      connRow({ service: "qbittorrent", url: baseUrl, username: "admin", password: "pw" }),
+    );
+    httpPost.mockResolvedValue({ data: "Ok.", headers: { "set-cookie": ["SID=cats; path=/"] } });
+    // Torrents + transfer succeed, but the dedicated categories call errors.
+    // The catalog must degrade to an empty list without failing the response.
+    httpGet
+      .mockResolvedValueOnce({
+        data: [{ name: "ubuntu.iso", progress: 0.5, state: "downloading", dlspeed: 1000, upspeed: 50 }],
+      })
+      .mockResolvedValueOnce({ data: { dl_info_speed: 1000, up_info_speed: 50 } })
+      .mockRejectedValueOnce(httpError(500));
+
+    const res = await request(app).get("/widgets/qbittorrent");
+    expect(res.status).toBe(200);
+    expect(res.body.torrents).toHaveLength(1);
+    expect(res.body.categories).toEqual([]);
   });
 
   it("returns 502 when authentication fails", async () => {

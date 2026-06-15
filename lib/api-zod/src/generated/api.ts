@@ -379,7 +379,8 @@ export const GetQbittorrentStatusResponse = zod.object({
   "category": zod.string().describe('The qBittorrent category assigned to this torrent, or an empty string when uncategorized.')
 })),
   "downloadSpeed": zod.number(),
-  "uploadSpeed": zod.number()
+  "uploadSpeed": zod.number(),
+  "categories": zod.array(zod.string()).describe('All category names defined in qBittorrent, including categories that currently have no active torrents. Sourced from qBittorrent\'s dedicated categories endpoint so the tile filter can list every category even when nothing is downloading or seeding.')
 })
 
 

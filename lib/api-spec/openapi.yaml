@@ -989,7 +989,7 @@ components:
 
     QbittorrentData:
       type: object
-      required: [torrents, downloadSpeed, uploadSpeed]
+      required: [torrents, downloadSpeed, uploadSpeed, categories]
       properties:
         torrents:
           type: array
@@ -999,6 +999,15 @@ components:
           type: number
         uploadSpeed:
           type: number
+        categories:
+          description: >-
+            All category names defined in qBittorrent, including categories
+            that currently have no active torrents. Sourced from qBittorrent's
+            dedicated categories endpoint so the tile filter can list every
+            category even when nothing is downloading or seeding.
+          type: array
+          items:
+            type: string
 
     QbittorrentTorrent:
       type: object
