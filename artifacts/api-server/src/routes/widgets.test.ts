@@ -219,6 +219,120 @@ describe("GET /widgets/media", () => {
     expect(opts.headers["X-Plex-Token"]).toBe("plex-token");
   });
 
+  it("derives the show name + season label from parentTitle for season items", async () => {
+    findByService.mockReturnValue(
+      connRow({
+        service: "plex",
+        url: "https://plex.local",
+        extra: JSON.stringify({ token: "plex-token" }),
+      }),
+    );
+    // Plex "recently added" surfaces TV as a season item: the show name lives in
+    // parentTitle and the per-season label is the item's own title.
+    httpGet.mockResolvedValue({
+      data: {
+        MediaContainer: {
+          Metadata: [
+            { ratingKey: 7, title: "Season 2", type: "season", parentTitle: "Severance" },
+          ],
+        },
+      },
+    });
+
+    const res = await request(app).get("/widgets/media");
+    expect(res.status).toBe(200);
+    expect(res.body[0]).toMatchObject({
+      title: "Season 2",
+      type: "season",
+      seriesName: "Severance",
+      seasonLabel: "Season 2",
+    });
+  });
+
+  it("derives the show name from grandparentTitle for episode items", async () => {
+    findByService.mockReturnValue(
+      connRow({
+        service: "plex",
+        url: "https://plex.local",
+        extra: JSON.stringify({ token: "plex-token" }),
+      }),
+    );
+    // Episodes carry the show name in grandparentTitle and the season label in
+    // parentTitle ("Severance · Season 3").
+    httpGet.mockResolvedValue({
+      data: {
+        MediaContainer: {
+          Metadata: [
+            {
+              ratingKey: 9,
+              title: "Chapter 7",
+              type: "episode",
+              grandparentTitle: "Severance",
+              parentTitle: "Season 3",
+            },
+          ],
+        },
+      },
+    });
+
+    const res = await request(app).get("/widgets/media");
+    expect(res.status).toBe(200);
+    expect(res.body[0]).toMatchObject({
+      title: "Chapter 7",
+      type: "episode",
+      seriesName: "Severance",
+      seasonLabel: "Season 3",
+    });
+  });
+
+  it("builds a Plex deep link from machineIdentifier + ratingKey", async () => {
+    findByService.mockReturnValue(
+      connRow({
+        service: "plex",
+        url: "https://plex.local",
+        extra: JSON.stringify({ token: "plex-token" }),
+      }),
+    );
+    httpGet.mockResolvedValue({
+      data: {
+        MediaContainer: {
+          machineIdentifier: "abc123",
+          Metadata: [{ ratingKey: 42, title: "Severance", type: "show" }],
+        },
+      },
+    });
+
+    const res = await request(app).get("/widgets/media");
+    expect(res.status).toBe(200);
+    // The cover deep link points at app.plex.tv with the server id and an
+    // encoded /library/metadata/<ratingKey> key.
+    expect(res.body[0].url).toBe(
+      "https://app.plex.tv/desktop/#!/server/abc123/details?key=%2Flibrary%2Fmetadata%2F42",
+    );
+  });
+
+  it("omits the deep link when the server machineIdentifier is missing", async () => {
+    findByService.mockReturnValue(
+      connRow({
+        service: "plex",
+        url: "https://plex.local",
+        extra: JSON.stringify({ token: "plex-token" }),
+      }),
+    );
+    // No machineIdentifier on the container root → no deep link can be built.
+    httpGet.mockResolvedValue({
+      data: {
+        MediaContainer: {
+          Metadata: [{ ratingKey: 42, title: "Severance", type: "show" }],
+        },
+      },
+    });
+
+    const res = await request(app).get("/widgets/media");
+    expect(res.status).toBe(200);
+    expect(res.body[0].url).toBeNull();
+  });
+
   it("returns 502 on upstream failure (no mock fallback)", async () => {
     findByService.mockReturnValue(
       connRow({
@@ -232,6 +346,102 @@ describe("GET /widgets/media", () => {
     const res = await request(app).get("/widgets/media");
     expect(res.status).toBe(502);
     expect(res.body.error).toMatch(/media/);
+  });
+});
+
+// ── Media: Continue Watching (Plex On Deck) ───────────────────────────────────
+describe("GET /widgets/media/continue", () => {
+  it("returns sample data when unconfigured", async () => {
+    const res = await request(app).get("/widgets/media/continue");
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body)).toBe(true);
+    expect(res.body).toHaveLength(2);
+    expect(res.body[0]).toMatchObject({ title: "Chapter 7", seriesName: "Severance", progress: 42 });
+    expect(httpGet).not.toHaveBeenCalled();
+  });
+
+  it("normalizes On Deck: grandparentTitle show name + viewOffset/duration progress", async () => {
+    findByService.mockReturnValue(
+      connRow({
+        service: "plex",
+        url: "https://plex.local",
+        extra: JSON.stringify({ token: "plex-token" }),
+      }),
+    );
+    httpGet.mockResolvedValue({
+      data: {
+        MediaContainer: {
+          machineIdentifier: "srv-1",
+          Metadata: [
+            {
+              ratingKey: 55,
+              title: "Chapter 7",
+              type: "episode",
+              grandparentTitle: "Severance",
+              viewOffset: 600000,
+              duration: 1200000,
+              thumb: "/t.jpg",
+            },
+          ],
+        },
+      },
+    });
+
+    const res = await request(app).get("/widgets/media/continue");
+    expect(res.status).toBe(200);
+    expect(res.body[0]).toMatchObject({
+      id: "55",
+      title: "Chapter 7",
+      type: "episode",
+      seriesName: "Severance",
+      progress: 50, // 600000 / 1200000 → 50%
+    });
+    // Deep link is built from machineIdentifier + ratingKey.
+    expect(res.body[0].url).toBe(
+      "https://app.plex.tv/desktop/#!/server/srv-1/details?key=%2Flibrary%2Fmetadata%2F55",
+    );
+    // Token rides as the X-Plex-Token header against the onDeck endpoint.
+    const [url, opts] = httpGet.mock.calls[0]!;
+    expect(String(url)).toContain("/library/onDeck");
+    expect(opts.headers["X-Plex-Token"]).toBe("plex-token");
+  });
+
+  it("leaves progress null when viewOffset or duration is missing", async () => {
+    findByService.mockReturnValue(
+      connRow({
+        service: "plex",
+        url: "https://plex.local",
+        extra: JSON.stringify({ token: "plex-token" }),
+      }),
+    );
+    // Movies (non-episode) carry no series name; without a duration there is no
+    // played fraction to compute.
+    httpGet.mockResolvedValue({
+      data: {
+        MediaContainer: {
+          Metadata: [{ ratingKey: 8, title: "Dune: Part Two", type: "movie", viewOffset: 1000 }],
+        },
+      },
+    });
+
+    const res = await request(app).get("/widgets/media/continue");
+    expect(res.status).toBe(200);
+    expect(res.body[0]).toMatchObject({ title: "Dune: Part Two", type: "movie", seriesName: null, progress: null });
+  });
+
+  it("returns 502 on upstream failure (no mock fallback)", async () => {
+    findByService.mockReturnValue(
+      connRow({
+        service: "plex",
+        url: "https://plex.local",
+        extra: JSON.stringify({ token: "plex-token" }),
+      }),
+    );
+    httpGet.mockRejectedValue(httpError(500));
+
+    const res = await request(app).get("/widgets/media/continue");
+    expect(res.status).toBe(502);
+    expect(res.body.error).toMatch(/continue watching/i);
   });
 });
 
