@@ -52,3 +52,8 @@ failed before this. The same client backs both the test/ping and the widgets so
   `name=value` pair verbatim — do NOT hardcode `SID=`. Symptom of the v4-only
   bug against a v5 server: login returns 200 but extract fails → "no session" →
   tile shows unavailable.
+- **Error logging:** widget catch-all branches must log
+  `logger.error({ reason: normalizeHttpError(err) }, "...")`, NOT
+  `logger.error({ err }, ...)`. Logging the raw axios error serializes a
+  ~2000-line object per failure (floods the LAN container logs and buries the
+  real cause). normalizeHttpError gives a one-line reason (timeout/refused/4xx).

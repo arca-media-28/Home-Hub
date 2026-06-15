@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { requireAuth } from "../lib/auth.js";
 import { connectionStmts } from "../lib/db.js";
-import { httpClient, normalizeBaseUrl } from "../lib/http.js";
+import { httpClient, normalizeBaseUrl, normalizeHttpError } from "../lib/http.js";
 import { logger } from "../lib/logger.js";
 
 const router = Router();
@@ -156,7 +156,7 @@ router.get("/truenas", requireAuth, async (_req, res) => {
       pools,
     });
   } catch (err) {
-    logger.error({ err }, "TrueNAS widget error");
+    logger.error({ reason: normalizeHttpError(err) }, "TrueNAS widget error");
     res.status(502).json({ error: "Failed to fetch TrueNAS data" });
   }
 });
@@ -232,7 +232,7 @@ router.get("/media", requireAuth, async (_req, res) => {
       res.json(items);
     }
   } catch (err) {
-    logger.error({ err }, "Media widget error");
+    logger.error({ reason: normalizeHttpError(err) }, "Media widget error");
     res.status(502).json({ error: "Failed to fetch media data" });
   }
 });
@@ -304,7 +304,7 @@ router.get("/sonarr", requireAuth, async (_req, res) => {
 
     res.json({ queue, upcoming });
   } catch (err) {
-    logger.error({ err }, "Sonarr widget error");
+    logger.error({ reason: normalizeHttpError(err) }, "Sonarr widget error");
     res.status(502).json({ error: "Failed to fetch Sonarr data" });
   }
 });
@@ -376,7 +376,7 @@ router.get("/radarr", requireAuth, async (_req, res) => {
 
     res.json({ queue, upcoming });
   } catch (err) {
-    logger.error({ err }, "Radarr widget error");
+    logger.error({ reason: normalizeHttpError(err) }, "Radarr widget error");
     res.status(502).json({ error: "Failed to fetch Radarr data" });
   }
 });
@@ -517,7 +517,7 @@ router.get("/qbittorrent", requireAuth, async (_req, res) => {
       res.status(502).json({ error: "qBittorrent did not return a session" });
       return;
     }
-    logger.error({ err }, "qBittorrent widget error");
+    logger.error({ reason: normalizeHttpError(err) }, "qBittorrent widget error");
     res.status(502).json({ error: "Failed to fetch qBittorrent data" });
   }
 });
@@ -573,7 +573,7 @@ router.get("/pihole", requireAuth, async (_req, res) => {
       status: status === "enabled" ? "enabled" : "disabled",
     });
   } catch (err) {
-    logger.error({ err }, "Pi-hole widget error");
+    logger.error({ reason: normalizeHttpError(err) }, "Pi-hole widget error");
     res.status(502).json({ error: "Failed to fetch Pi-hole data" });
   }
 });
@@ -750,7 +750,7 @@ router.get("/nginx-proxy-manager", requireAuth, async (_req, res) => {
       res.status(502).json({ error: "Nginx Proxy Manager authentication failed" });
       return;
     }
-    logger.error({ err }, "Nginx Proxy Manager widget error");
+    logger.error({ reason: normalizeHttpError(err) }, "Nginx Proxy Manager widget error");
     res.status(502).json({ error: "Failed to fetch Nginx Proxy Manager data" });
   }
 });

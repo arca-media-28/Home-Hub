@@ -33,6 +33,7 @@ vi.mock("../lib/http.js", () => ({
     const withScheme = /^https?:\/\//i.test(trimmed) ? trimmed : `http://${trimmed}`;
     return withScheme.replace(/\/+$/, "");
   },
+  normalizeHttpError: (err: unknown) => (err instanceof Error ? err.message : String(err)),
 }));
 
 // Keep the logger quiet during tests.
@@ -331,7 +332,7 @@ describe("GET /widgets/qbittorrent", () => {
   it("returns sample data when unconfigured", async () => {
     const res = await request(app).get("/widgets/qbittorrent");
     expect(res.status).toBe(200);
-    expect(res.body.torrents).toHaveLength(2);
+    expect(res.body.torrents).toHaveLength(3);
     expect(httpPost).not.toHaveBeenCalled();
   });
 
