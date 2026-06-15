@@ -1,0 +1,66 @@
+truenas_admin@Sapientia[~]$ cd /mnt/Toolbox/Applications/HomeHub/HomeHubConfig
+truenas_admin@Sapientia[...ox/Applications/HomeHub/HomeHubConfig]$ git pull && sudo docker compose up -d --build     
+sudo docker compose logs --tail=40 homelab-dashboard | grep -i nginx
+Already up to date.
+[sudo] password for truenas_admin: 
+WARN[0000] /mnt/Toolbox/Applications/HomeHub/HomeHubConfig/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion 
+[+] Building 2.4s (13/29)                                                                                                                                                                                                                                                             
+ => [internal] load local bake definitions                                                                                                                                                                                                                                       0.0s
+ => => reading from stdin 436B                                                                                                                                                                                                                                                   0.0s
+ => [internal] load build definition from Dockerfile                                                                                                                                                                                                                             0.0s
+ => => transferring dockerfile: 2.87kB                                                                                                                                                                                                                                           0.0s
+ => [internal] load metadata for docker.io/library/node:20-slim                                                                                                                                                                                                                  0.4s
+ => [internal] load .dockerignore                                                                                                                                                                                                                                                0.0s
+ => => transferring context: 2B                                                                                                                                                                                                                                                  0.0s
+ => [frontend-builder  1/10] FROM docker.io/library/node:20-slim@sha256:2cf067cfed83d5ea958367df9f966191a942351a2df77d6f0193e162b5febfc0                                                                                                                                         0.0s
+ => [internal] load build context                                                                                                                                                                                                                                                0.1s
+ => => transferring context: 4.33MB                                                                                                                                                                                                                                              0.1s
+ => CACHED [frontend-builder  2/10] WORKDIR /build                                                                                                                                                                                                                               0.0s
+ => CACHED [frontend-builder  3/10] RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++   && rm -rf /var/lib/apt/lists/*                                                                                                                           0.0s
+ => CACHED [frontend-builder  4/10] RUN npm install -g pnpm@10                                                                                                                                                                                                                   0.0s
+ => CACHED [frontend-builder  5/10] COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./                                                                                                                                                                                      0.0s
+ => CACHED [frontend-builder  6/10] COPY tsconfig.base.json tsconfig.json ./                                                                                                                                                                                                     0.0s
+ => CACHED [frontend-builder  7/10] COPY lib/ lib/                                                                                                                                                                                          [+] Building 2.8s (13/29)               [+] Building 38.2s (31/31) FINISHED                                                                                                       
+ => [internal] load local bake definitions                                                                                           0.0s
+ => => reading from stdin 436B                                                                                                       0.0s
+ => [internal] load build definition from Dockerfile                                                                                 0.0s
+ => => transferring dockerfile: 2.87kB                                                                                               0.0s
+ => [internal] load metadata for docker.io/library/node:20-slim                                                                      0.4s
+ => [internal] load .dockerignore                                                                                                    0.0s
+ => => transferring context: 2B                                                                                                      0.0s
+ => [frontend-builder  1/10] FROM docker.io/library/node:20-slim@sha256:2cf067cfed83d5ea958367df9f966191a942351a2df77d6f0193e162b5f  0.0s
+ => [internal] load build context                                                                                                    0.1s
+ => => transferring context: 4.33MB                                                                                                  0.1s
+ => CACHED [frontend-builder  2/10] WORKDIR /build                                                                                   0.0s
+ => CACHED [frontend-builder  3/10] RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++   && rm -rf /  0.0s
+ => CACHED [frontend-builder  4/10] RUN npm install -g pnpm@10                                                                       0.0s
+ => CACHED [frontend-builder  5/10] COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./                                          0.0s
+ => CACHED [frontend-builder  6/10] COPY tsconfig.base.json tsconfig.json ./                                                         0.0s
+ => CACHED [frontend-builder  7/10] COPY lib/ lib/                                                                                   0.0s
+ => [api-builder  8/10] COPY artifacts/api-server/ artifacts/api-server/                                                             0.1s
+ => [api-builder  9/10] RUN pnpm install --frozen-lockfile                                                                          36.4s
+ => [api-builder 10/10] RUN pnpm --filter @workspace/api-server run build                                                            0.9s
+ => CACHED [production  2/12] WORKDIR /app                                                                                           0.0s 
+ => CACHED [production  3/12] RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++   && rm -rf /var/li  0.0s 
+ => CACHED [production  4/12] RUN npm install -g pnpm@10                                                                             0.0s 
+ => CACHED [production  5/12] COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./                                                0.0s 
+ => CACHED [production  6/12] COPY tsconfig.base.json tsconfig.json ./                                                               0.0s 
+ => CACHED [production  7/12] COPY lib/ lib/                                                                                         0.0s
+ => CACHED [production  8/12] COPY artifacts/api-server/package.json artifacts/api-server/                                           0.0s
+ => CACHED [production  9/12] RUN pnpm install --filter @workspace/api-server --prod                                                 0.0s
+ => CACHED [production 10/12] COPY --from=api-builder /build/artifacts/api-server/dist ./artifacts/api-server/dist                   0.0s
+ => CACHED [frontend-builder  8/10] COPY artifacts/homelab-dashboard/ artifacts/homelab-dashboard/                                   0.0s
+ => CACHED [frontend-builder  9/10] RUN pnpm install --frozen-lockfile                                                               0.0s
+ => CACHED [frontend-builder 10/10] RUN pnpm --filter @workspace/homelab-dashboard run build                                         0.0s
+ => CACHED [production 11/12] COPY --from=frontend-builder /build/artifacts/homelab-dashboard/dist/public ./frontend-dist            0.0s
+ => CACHED [production 12/12] RUN mkdir -p /data/uploads                                                                             0.0s
+ => exporting to image                                                                                                               0.0s
+ => => exporting layers                                                                                                              0.0s
+ => => writing image sha256:c9f41afc2f734ff8fa2ed709944abb3f957c2a4ad297ce8ccd73758b78da17b6                                         0.0s
+ => => naming to docker.io/library/homehubconfig-homelab-dashboard                                                                   0.0s
+ => resolving provenance for metadata file                                                                                           0.0s
+[+] Running 2/2
+ ✔ homelab-dashboard            Built                                                                                                0.0s 
+ ✔ Container homelab-dashboard  Running                                                                                              0.0s 
+WARN[0000] /mnt/Toolbox/Applications/HomeHub/HomeHubConfig/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion 
+truenas_admin@Sapientia[...ox/Applications/HomeHub/HomeHubConfig]$ 
