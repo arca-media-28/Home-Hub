@@ -84,6 +84,8 @@ const INTEGRATIONS = [
   { value: TileIntegration.truenas, label: "TrueNAS" },
   { value: TileIntegration.pihole, label: "Pi-hole" },
   { value: TileIntegration["nginx-proxy-manager"], label: "Nginx Proxy Manager" },
+  { value: TileIntegration.clock, label: "Local Time" },
+  { value: TileIntegration.weather, label: "Weather" },
 ] as const;
 
 type ImageSource = "upload" | "library" | "url";
@@ -129,6 +131,26 @@ export default function TileEditModal({ open, onOpenChange, tile, mode }: TileEd
   const [groupByCategory, setGroupByCategory] = useState<boolean>(
     tile?.tileSettings?.groupByCategory ?? false,
   );
+  // Local Time (clock) widget options.
+  const [clockFormat, setClockFormat] = useState<"12" | "24">(
+    tile?.tileSettings?.clockFormat ?? "24",
+  );
+  const [clockShowSeconds, setClockShowSeconds] = useState<boolean>(
+    tile?.tileSettings?.clockShowSeconds ?? false,
+  );
+  const [clockShowDate, setClockShowDate] = useState<boolean>(
+    tile?.tileSettings?.clockShowDate ?? false,
+  );
+  // Weather widget options.
+  const [weatherAutoLocate, setWeatherAutoLocate] = useState<boolean>(
+    tile?.tileSettings?.weatherAutoLocate ?? true,
+  );
+  const [weatherLocation, setWeatherLocation] = useState<string>(
+    tile?.tileSettings?.weatherLocation ?? "",
+  );
+  const [weatherUnits, setWeatherUnits] = useState<"c" | "f">(
+    tile?.tileSettings?.weatherUnits ?? "c",
+  );
 
   useEffect(() => {
     if (open) {
@@ -149,6 +171,12 @@ export default function TileEditModal({ open, onOpenChange, tile, mode }: TileEd
       setMetrics(tile?.metrics ?? null);
       setCategoryFilter(tile?.tileSettings?.categoryFilter ?? null);
       setGroupByCategory(tile?.tileSettings?.groupByCategory ?? false);
+      setClockFormat(tile?.tileSettings?.clockFormat ?? "24");
+      setClockShowSeconds(tile?.tileSettings?.clockShowSeconds ?? false);
+      setClockShowDate(tile?.tileSettings?.clockShowDate ?? false);
+      setWeatherAutoLocate(tile?.tileSettings?.weatherAutoLocate ?? true);
+      setWeatherLocation(tile?.tileSettings?.weatherLocation ?? "");
+      setWeatherUnits(tile?.tileSettings?.weatherUnits ?? "c");
       setShowColorPicker(false);
       setShowTitleColorPicker(false);
     }
@@ -180,6 +208,10 @@ export default function TileEditModal({ open, onOpenChange, tile, mode }: TileEd
   // qBittorrent's full category catalog (every defined category, even ones with
   // no active torrents) rather than being derived from the live torrent list.
   const isQbittorrent = integration === TileIntegration.qbittorrent;
+  // The no-connection built-in widgets (clock/weather) have their own config UI
+  // and no metric catalog or backing service.
+  const isClock = integration === TileIntegration.clock;
+  const isWeather = integration === TileIntegration.weather;
   const qbStatusQuery = useGetQbittorrentStatus({
     query: {
       queryKey: getGetQbittorrentStatusQueryKey(),
@@ -461,9 +493,20 @@ export default function TileEditModal({ open, onOpenChange, tile, mode }: TileEd
       hideTitle,
       // Plain app/link tiles carry no metric selection.
       metrics: integration === NONE ? null : metrics,
-      // qBittorrent is the only integration that uses tileSettings (category
-      // filter + grouping) for now; every other tile clears it.
-      tileSettings: isQbittorrent ? { categoryFilter, groupByCategory } : null,
+      // tileSettings carries per-widget config: the qBittorrent category
+      // filter, the clock format options, or the weather options. Every other
+      // tile clears it.
+      tileSettings: isQbittorrent
+        ? { categoryFilter, groupByCategory }
+        : isClock
+          ? { clockFormat, clockShowSeconds, clockShowDate }
+          : isWeather
+            ? {
+                weatherAutoLocate,
+                weatherLocation: weatherLocation.trim() || null,
+                weatherUnits,
+              }
+            : null,
       gridX: tile?.gridX ?? 0,
       gridY: tile?.gridY ?? 0,
       gridW: tile?.gridW ?? 2,
@@ -972,6 +1015,97 @@ export default function TileEditModal({ open, onOpenChange, tile, mode }: TileEd
                   ))}
                 </div>
               )}
+            </div>
+          )}
+
+          {isClock && (
+            <div className="space-y-3 border-t border-border pt-4">
+              <div className="space-y-1.5">
+                <Label>Time format</Label>
+                <Select
+                  value={clockFormat}
+                  onValueChange={(v) => setClockFormat(v as "12" | "24")}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="24">24-hour (14:30)</SelectItem>
+                    <SelectItem value="12">12-hour (2:30 PM)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <label
+                htmlFor="clock-seconds"
+                className="flex items-center gap-2 cursor-pointer select-none"
+              >
+                <Checkbox
+                  id="clock-seconds"
+                  checked={clockShowSeconds}
+                  onCheckedChange={(c) => setClockShowSeconds(c === true)}
+                />
+                <span className="text-sm">Show seconds</span>
+              </label>
+              <label
+                htmlFor="clock-date"
+                className="flex items-center gap-2 cursor-pointer select-none"
+              >
+                <Checkbox
+                  id="clock-date"
+                  checked={clockShowDate}
+                  onCheckedChange={(c) => setClockShowDate(c === true)}
+                />
+                <span className="text-sm">Show date</span>
+              </label>
+              <p className="text-xs text-muted-foreground">
+                The clock uses your browser's local time zone.
+              </p>
+            </div>
+          )}
+
+          {isWeather && (
+            <div className="space-y-3 border-t border-border pt-4">
+              <label
+                htmlFor="weather-auto"
+                className="flex items-center gap-2 cursor-pointer select-none"
+              >
+                <Checkbox
+                  id="weather-auto"
+                  checked={weatherAutoLocate}
+                  onCheckedChange={(c) => setWeatherAutoLocate(c === true)}
+                />
+                <span className="text-sm">Auto-detect my location</span>
+              </label>
+
+              <div className="space-y-1.5">
+                <Label>City</Label>
+                <Input
+                  value={weatherLocation}
+                  onChange={(e) => setWeatherLocation(e.target.value)}
+                  placeholder="e.g. London"
+                />
+                <p className="text-xs text-muted-foreground">
+                  {weatherAutoLocate
+                    ? "Used if location access is denied or unavailable."
+                    : "Enter a city to show its weather."}
+                </p>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>Units</Label>
+                <Select
+                  value={weatherUnits}
+                  onValueChange={(v) => setWeatherUnits(v as "c" | "f")}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="c">Celsius (°C)</SelectItem>
+                    <SelectItem value="f">Fahrenheit (°F)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           )}
         </div>

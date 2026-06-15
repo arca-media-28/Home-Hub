@@ -20,4 +20,6 @@ export const TileIntegration = {
   qbittorrent: 'qbittorrent',
   pihole: 'pihole',
   'nginx-proxy-manager': 'nginx-proxy-manager',
+  clock: 'clock',
+  weather: 'weather',
 } as const;

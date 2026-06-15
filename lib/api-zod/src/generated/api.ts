@@ -70,7 +70,7 @@ export const GetTilesResponseItem = zod.object({
   "id": zod.number(),
   "userId": zod.number(),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('clock'),zod.literal('weather'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -89,8 +89,14 @@ export const GetTilesResponseItem = zod.object({
   "metrics": zod.array(zod.string()).nullish().describe('Enabled metric keys for this tile\'s integration. Null means \"show all\" (the default for tiles created before metric selection existed).'),
   "tileSettings": zod.object({
   "categoryFilter": zod.array(zod.string()).nullish().describe('Allow-list of qBittorrent categories to show on the tile. Null (or absent) means show all categories.'),
-  "groupByCategory": zod.boolean().nullish().describe('When true, the qBittorrent tile groups its torrents under category headers instead of showing a flat list. Absent or false means a flat list (the default).')
-}).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Currently carries the qBittorrent category filter; an absent or null categoryFilter means \"show all categories\".'),
+  "groupByCategory": zod.boolean().nullish().describe('When true, the qBittorrent tile groups its torrents under category headers instead of showing a flat list. Absent or false means a flat list (the default).'),
+  "clockFormat": zod.union([zod.literal('12'),zod.literal('24'),zod.literal(null)]).nullish().describe('Time format for the Local Time tile: \"12\" for 12-hour with AM\/PM, \"24\" for 24-hour. Absent or null defaults to \"24\".'),
+  "clockShowSeconds": zod.boolean().nullish().describe('When true, the Local Time tile shows seconds. Absent or false hides them (the default).'),
+  "clockShowDate": zod.boolean().nullish().describe('When true, the Local Time tile shows the current date. Absent or false hides it (the default).'),
+  "weatherAutoLocate": zod.boolean().nullish().describe('When true, the Weather tile auto-detects the user\'s location via the browser. Absent or true defaults to auto-detect; false uses the typed weatherLocation instead.'),
+  "weatherLocation": zod.string().nullish().describe('City\/place name to geocode for the Weather tile when auto-detect is off (or as a fallback). Null or absent means none set.'),
+  "weatherUnits": zod.union([zod.literal('c'),zod.literal('f'),zod.literal(null)]).nullish().describe('Temperature units for the Weather tile: \"c\" for Celsius, \"f\" for Fahrenheit. Absent or null defaults to \"c\".')
+}).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, and the Weather tile options.'),
   "createdAt": zod.string().optional()
 })
 export const GetTilesResponse = zod.array(GetTilesResponseItem)
@@ -101,7 +107,7 @@ export const GetTilesResponse = zod.array(GetTilesResponseItem)
  */
 export const CreateTileBody = zod.object({
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('clock'),zod.literal('weather'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -120,8 +126,14 @@ export const CreateTileBody = zod.object({
   "metrics": zod.array(zod.string()).nullish(),
   "tileSettings": zod.object({
   "categoryFilter": zod.array(zod.string()).nullish().describe('Allow-list of qBittorrent categories to show on the tile. Null (or absent) means show all categories.'),
-  "groupByCategory": zod.boolean().nullish().describe('When true, the qBittorrent tile groups its torrents under category headers instead of showing a flat list. Absent or false means a flat list (the default).')
-}).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Currently carries the qBittorrent category filter; an absent or null categoryFilter means \"show all categories\".')
+  "groupByCategory": zod.boolean().nullish().describe('When true, the qBittorrent tile groups its torrents under category headers instead of showing a flat list. Absent or false means a flat list (the default).'),
+  "clockFormat": zod.union([zod.literal('12'),zod.literal('24'),zod.literal(null)]).nullish().describe('Time format for the Local Time tile: \"12\" for 12-hour with AM\/PM, \"24\" for 24-hour. Absent or null defaults to \"24\".'),
+  "clockShowSeconds": zod.boolean().nullish().describe('When true, the Local Time tile shows seconds. Absent or false hides them (the default).'),
+  "clockShowDate": zod.boolean().nullish().describe('When true, the Local Time tile shows the current date. Absent or false hides it (the default).'),
+  "weatherAutoLocate": zod.boolean().nullish().describe('When true, the Weather tile auto-detects the user\'s location via the browser. Absent or true defaults to auto-detect; false uses the typed weatherLocation instead.'),
+  "weatherLocation": zod.string().nullish().describe('City\/place name to geocode for the Weather tile when auto-detect is off (or as a fallback). Null or absent means none set.'),
+  "weatherUnits": zod.union([zod.literal('c'),zod.literal('f'),zod.literal(null)]).nullish().describe('Temperature units for the Weather tile: \"c\" for Celsius, \"f\" for Fahrenheit. Absent or null defaults to \"c\".')
+}).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, and the Weather tile options.')
 })
 
 
@@ -136,7 +148,7 @@ export const GetTileResponse = zod.object({
   "id": zod.number(),
   "userId": zod.number(),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('clock'),zod.literal('weather'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -155,8 +167,14 @@ export const GetTileResponse = zod.object({
   "metrics": zod.array(zod.string()).nullish().describe('Enabled metric keys for this tile\'s integration. Null means \"show all\" (the default for tiles created before metric selection existed).'),
   "tileSettings": zod.object({
   "categoryFilter": zod.array(zod.string()).nullish().describe('Allow-list of qBittorrent categories to show on the tile. Null (or absent) means show all categories.'),
-  "groupByCategory": zod.boolean().nullish().describe('When true, the qBittorrent tile groups its torrents under category headers instead of showing a flat list. Absent or false means a flat list (the default).')
-}).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Currently carries the qBittorrent category filter; an absent or null categoryFilter means \"show all categories\".'),
+  "groupByCategory": zod.boolean().nullish().describe('When true, the qBittorrent tile groups its torrents under category headers instead of showing a flat list. Absent or false means a flat list (the default).'),
+  "clockFormat": zod.union([zod.literal('12'),zod.literal('24'),zod.literal(null)]).nullish().describe('Time format for the Local Time tile: \"12\" for 12-hour with AM\/PM, \"24\" for 24-hour. Absent or null defaults to \"24\".'),
+  "clockShowSeconds": zod.boolean().nullish().describe('When true, the Local Time tile shows seconds. Absent or false hides them (the default).'),
+  "clockShowDate": zod.boolean().nullish().describe('When true, the Local Time tile shows the current date. Absent or false hides it (the default).'),
+  "weatherAutoLocate": zod.boolean().nullish().describe('When true, the Weather tile auto-detects the user\'s location via the browser. Absent or true defaults to auto-detect; false uses the typed weatherLocation instead.'),
+  "weatherLocation": zod.string().nullish().describe('City\/place name to geocode for the Weather tile when auto-detect is off (or as a fallback). Null or absent means none set.'),
+  "weatherUnits": zod.union([zod.literal('c'),zod.literal('f'),zod.literal(null)]).nullish().describe('Temperature units for the Weather tile: \"c\" for Celsius, \"f\" for Fahrenheit. Absent or null defaults to \"c\".')
+}).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, and the Weather tile options.'),
   "createdAt": zod.string().optional()
 })
 
@@ -169,7 +187,7 @@ export const UpdateTileParams = zod.object({
 })
 
 export const UpdateTileBody = zod.object({
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('clock'),zod.literal('weather'),zod.literal(null)]).nullish(),
   "gridX": zod.number().optional(),
   "gridY": zod.number().optional(),
   "gridW": zod.number().optional(),
@@ -188,15 +206,21 @@ export const UpdateTileBody = zod.object({
   "metrics": zod.array(zod.string()).nullish(),
   "tileSettings": zod.object({
   "categoryFilter": zod.array(zod.string()).nullish().describe('Allow-list of qBittorrent categories to show on the tile. Null (or absent) means show all categories.'),
-  "groupByCategory": zod.boolean().nullish().describe('When true, the qBittorrent tile groups its torrents under category headers instead of showing a flat list. Absent or false means a flat list (the default).')
-}).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Currently carries the qBittorrent category filter; an absent or null categoryFilter means \"show all categories\".')
+  "groupByCategory": zod.boolean().nullish().describe('When true, the qBittorrent tile groups its torrents under category headers instead of showing a flat list. Absent or false means a flat list (the default).'),
+  "clockFormat": zod.union([zod.literal('12'),zod.literal('24'),zod.literal(null)]).nullish().describe('Time format for the Local Time tile: \"12\" for 12-hour with AM\/PM, \"24\" for 24-hour. Absent or null defaults to \"24\".'),
+  "clockShowSeconds": zod.boolean().nullish().describe('When true, the Local Time tile shows seconds. Absent or false hides them (the default).'),
+  "clockShowDate": zod.boolean().nullish().describe('When true, the Local Time tile shows the current date. Absent or false hides it (the default).'),
+  "weatherAutoLocate": zod.boolean().nullish().describe('When true, the Weather tile auto-detects the user\'s location via the browser. Absent or true defaults to auto-detect; false uses the typed weatherLocation instead.'),
+  "weatherLocation": zod.string().nullish().describe('City\/place name to geocode for the Weather tile when auto-detect is off (or as a fallback). Null or absent means none set.'),
+  "weatherUnits": zod.union([zod.literal('c'),zod.literal('f'),zod.literal(null)]).nullish().describe('Temperature units for the Weather tile: \"c\" for Celsius, \"f\" for Fahrenheit. Absent or null defaults to \"c\".')
+}).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, and the Weather tile options.')
 })
 
 export const UpdateTileResponse = zod.object({
   "id": zod.number(),
   "userId": zod.number(),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('clock'),zod.literal('weather'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -215,8 +239,14 @@ export const UpdateTileResponse = zod.object({
   "metrics": zod.array(zod.string()).nullish().describe('Enabled metric keys for this tile\'s integration. Null means \"show all\" (the default for tiles created before metric selection existed).'),
   "tileSettings": zod.object({
   "categoryFilter": zod.array(zod.string()).nullish().describe('Allow-list of qBittorrent categories to show on the tile. Null (or absent) means show all categories.'),
-  "groupByCategory": zod.boolean().nullish().describe('When true, the qBittorrent tile groups its torrents under category headers instead of showing a flat list. Absent or false means a flat list (the default).')
-}).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Currently carries the qBittorrent category filter; an absent or null categoryFilter means \"show all categories\".'),
+  "groupByCategory": zod.boolean().nullish().describe('When true, the qBittorrent tile groups its torrents under category headers instead of showing a flat list. Absent or false means a flat list (the default).'),
+  "clockFormat": zod.union([zod.literal('12'),zod.literal('24'),zod.literal(null)]).nullish().describe('Time format for the Local Time tile: \"12\" for 12-hour with AM\/PM, \"24\" for 24-hour. Absent or null defaults to \"24\".'),
+  "clockShowSeconds": zod.boolean().nullish().describe('When true, the Local Time tile shows seconds. Absent or false hides them (the default).'),
+  "clockShowDate": zod.boolean().nullish().describe('When true, the Local Time tile shows the current date. Absent or false hides it (the default).'),
+  "weatherAutoLocate": zod.boolean().nullish().describe('When true, the Weather tile auto-detects the user\'s location via the browser. Absent or true defaults to auto-detect; false uses the typed weatherLocation instead.'),
+  "weatherLocation": zod.string().nullish().describe('City\/place name to geocode for the Weather tile when auto-detect is off (or as a fallback). Null or absent means none set.'),
+  "weatherUnits": zod.union([zod.literal('c'),zod.literal('f'),zod.literal(null)]).nullish().describe('Temperature units for the Weather tile: \"c\" for Celsius, \"f\" for Fahrenheit. Absent or null defaults to \"c\".')
+}).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, and the Weather tile options.'),
   "createdAt": zod.string().optional()
 })
 
@@ -246,7 +276,7 @@ export const SaveLayoutResponseItem = zod.object({
   "id": zod.number(),
   "userId": zod.number(),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('clock'),zod.literal('weather'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -265,8 +295,14 @@ export const SaveLayoutResponseItem = zod.object({
   "metrics": zod.array(zod.string()).nullish().describe('Enabled metric keys for this tile\'s integration. Null means \"show all\" (the default for tiles created before metric selection existed).'),
   "tileSettings": zod.object({
   "categoryFilter": zod.array(zod.string()).nullish().describe('Allow-list of qBittorrent categories to show on the tile. Null (or absent) means show all categories.'),
-  "groupByCategory": zod.boolean().nullish().describe('When true, the qBittorrent tile groups its torrents under category headers instead of showing a flat list. Absent or false means a flat list (the default).')
-}).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Currently carries the qBittorrent category filter; an absent or null categoryFilter means \"show all categories\".'),
+  "groupByCategory": zod.boolean().nullish().describe('When true, the qBittorrent tile groups its torrents under category headers instead of showing a flat list. Absent or false means a flat list (the default).'),
+  "clockFormat": zod.union([zod.literal('12'),zod.literal('24'),zod.literal(null)]).nullish().describe('Time format for the Local Time tile: \"12\" for 12-hour with AM\/PM, \"24\" for 24-hour. Absent or null defaults to \"24\".'),
+  "clockShowSeconds": zod.boolean().nullish().describe('When true, the Local Time tile shows seconds. Absent or false hides them (the default).'),
+  "clockShowDate": zod.boolean().nullish().describe('When true, the Local Time tile shows the current date. Absent or false hides it (the default).'),
+  "weatherAutoLocate": zod.boolean().nullish().describe('When true, the Weather tile auto-detects the user\'s location via the browser. Absent or true defaults to auto-detect; false uses the typed weatherLocation instead.'),
+  "weatherLocation": zod.string().nullish().describe('City\/place name to geocode for the Weather tile when auto-detect is off (or as a fallback). Null or absent means none set.'),
+  "weatherUnits": zod.union([zod.literal('c'),zod.literal('f'),zod.literal(null)]).nullish().describe('Temperature units for the Weather tile: \"c\" for Celsius, \"f\" for Fahrenheit. Absent or null defaults to \"c\".')
+}).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, and the Weather tile options.'),
   "createdAt": zod.string().optional()
 })
 export const SaveLayoutResponse = zod.array(SaveLayoutResponseItem)

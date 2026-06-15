@@ -7,7 +7,7 @@
  */
 
 /**
- * Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Currently carries the qBittorrent category filter; an absent or null categoryFilter means "show all categories".
+ * Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, and the Weather tile options.
  * @nullable
  */
 export type TileSettings = {
@@ -21,4 +21,34 @@ export type TileSettings = {
      * @nullable
      */
   groupByCategory?: boolean | null;
-} | null;
+  /**
+     * Time format for the Local Time tile: "12" for 12-hour with AM/PM, "24" for 24-hour. Absent or null defaults to "24".
+     * @nullable
+     */
+  clockFormat?: '12' | '24' | null;
+  /**
+     * When true, the Local Time tile shows seconds. Absent or false hides them (the default).
+     * @nullable
+     */
+  clockShowSeconds?: boolean | null;
+  /**
+     * When true, the Local Time tile shows the current date. Absent or false hides it (the default).
+     * @nullable
+     */
+  clockShowDate?: boolean | null;
+  /**
+     * When true, the Weather tile auto-detects the user's location via the browser. Absent or true defaults to auto-detect; false uses the typed weatherLocation instead.
+     * @nullable
+     */
+  weatherAutoLocate?: boolean | null;
+  /**
+     * City/place name to geocode for the Weather tile when auto-detect is off (or as a fallback). Null or absent means none set.
+     * @nullable
+     */
+  weatherLocation?: string | null;
+  /**
+     * Temperature units for the Weather tile: "c" for Celsius, "f" for Fahrenheit. Absent or null defaults to "c".
+     * @nullable
+     */
+  weatherUnits?: 'c' | 'f' | null;
+} | null | null;

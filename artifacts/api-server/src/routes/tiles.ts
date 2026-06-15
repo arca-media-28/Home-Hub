@@ -31,42 +31,18 @@ function serializeMetrics(value: unknown): string | null {
 interface TileSettings {
   categoryFilter?: string[] | null;
   groupByCategory?: boolean | null;
+  clockFormat?: "12" | "24" | null;
+  clockShowSeconds?: boolean | null;
+  clockShowDate?: boolean | null;
+  weatherAutoLocate?: boolean | null;
+  weatherLocation?: string | null;
+  weatherUnits?: "c" | "f" | null;
 }
 
-// Parse the stored tile_settings JSON blob into an object (or null = "no extra
-// settings"). Tolerates legacy/garbage values by falling back to null.
-function parseTileSettings(raw: string | null): TileSettings | null {
-  if (raw == null) return null;
-  try {
-    const parsed = JSON.parse(raw) as unknown;
-    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-      const obj = parsed as Record<string, unknown>;
-      const result: TileSettings = {};
-      if (Array.isArray(obj["categoryFilter"])) {
-        result.categoryFilter = obj["categoryFilter"].filter(
-          (x): x is string => typeof x === "string",
-        );
-      } else if (obj["categoryFilter"] === null) {
-        result.categoryFilter = null;
-      }
-      if (typeof obj["groupByCategory"] === "boolean") {
-        result.groupByCategory = obj["groupByCategory"];
-      } else if (obj["groupByCategory"] === null) {
-        result.groupByCategory = null;
-      }
-      return result;
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-// Serialize an incoming tile settings value to a JSON blob (or null). Anything
-// that isn't a plain object is stored as null ("no extra settings").
-function serializeTileSettings(value: unknown): string | null {
-  if (value == null || typeof value !== "object" || Array.isArray(value)) return null;
-  const obj = value as Record<string, unknown>;
+// Copy the known keys of a tile-settings object into a clean TileSettings,
+// dropping anything unrecognized. Shared by parse (from DB) and serialize (from
+// request body) so both honor exactly the same allow-list.
+function pickTileSettings(obj: Record<string, unknown>): TileSettings {
   const result: TileSettings = {};
   if (Array.isArray(obj["categoryFilter"])) {
     result.categoryFilter = obj["categoryFilter"].filter(
@@ -80,7 +56,59 @@ function serializeTileSettings(value: unknown): string | null {
   } else if (obj["groupByCategory"] === null) {
     result.groupByCategory = null;
   }
-  return JSON.stringify(result);
+  if (obj["clockFormat"] === "12" || obj["clockFormat"] === "24") {
+    result.clockFormat = obj["clockFormat"];
+  } else if (obj["clockFormat"] === null) {
+    result.clockFormat = null;
+  }
+  if (typeof obj["clockShowSeconds"] === "boolean") {
+    result.clockShowSeconds = obj["clockShowSeconds"];
+  } else if (obj["clockShowSeconds"] === null) {
+    result.clockShowSeconds = null;
+  }
+  if (typeof obj["clockShowDate"] === "boolean") {
+    result.clockShowDate = obj["clockShowDate"];
+  } else if (obj["clockShowDate"] === null) {
+    result.clockShowDate = null;
+  }
+  if (typeof obj["weatherAutoLocate"] === "boolean") {
+    result.weatherAutoLocate = obj["weatherAutoLocate"];
+  } else if (obj["weatherAutoLocate"] === null) {
+    result.weatherAutoLocate = null;
+  }
+  if (typeof obj["weatherLocation"] === "string") {
+    result.weatherLocation = obj["weatherLocation"];
+  } else if (obj["weatherLocation"] === null) {
+    result.weatherLocation = null;
+  }
+  if (obj["weatherUnits"] === "c" || obj["weatherUnits"] === "f") {
+    result.weatherUnits = obj["weatherUnits"];
+  } else if (obj["weatherUnits"] === null) {
+    result.weatherUnits = null;
+  }
+  return result;
+}
+
+// Parse the stored tile_settings JSON blob into an object (or null = "no extra
+// settings"). Tolerates legacy/garbage values by falling back to null.
+function parseTileSettings(raw: string | null): TileSettings | null {
+  if (raw == null) return null;
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return pickTileSettings(parsed as Record<string, unknown>);
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+// Serialize an incoming tile settings value to a JSON blob (or null). Anything
+// that isn't a plain object is stored as null ("no extra settings").
+function serializeTileSettings(value: unknown): string | null {
+  if (value == null || typeof value !== "object" || Array.isArray(value)) return null;
+  return JSON.stringify(pickTileSettings(value as Record<string, unknown>));
 }
 
 export function formatTile(t: DbTile) {

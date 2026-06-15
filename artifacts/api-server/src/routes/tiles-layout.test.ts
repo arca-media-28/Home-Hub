@@ -110,4 +110,74 @@ describe("PUT /tiles/layout", () => {
     expect(tile.integration).toBe("sonarr");
     expect(tile.metrics).toBeNull();
   });
+
+  it("preserves clock tileSettings through a layout save", async () => {
+    const created = await request(app)
+      .post("/tiles")
+      .send({
+        type: "app",
+        integration: "clock",
+        name: "Local Time",
+        tileSettings: { clockFormat: "12", clockShowSeconds: true, clockShowDate: true },
+        gridW: 2,
+        gridH: 2,
+      });
+    expect(created.status).toBe(201);
+    expect(created.body.tileSettings).toEqual({
+      clockFormat: "12",
+      clockShowSeconds: true,
+      clockShowDate: true,
+    });
+
+    const id = created.body.id as number;
+    const saved = await request(app)
+      .put("/tiles/layout")
+      .send({ tiles: [{ id, gridX: 0, gridY: 0, gridW: 3, gridH: 3 }] });
+
+    const tile = (saved.body as Array<{ id: number }>).find((t) => t.id === id) as Record<
+      string,
+      unknown
+    >;
+    expect(tile.integration).toBe("clock");
+    expect(tile.tileSettings).toEqual({
+      clockFormat: "12",
+      clockShowSeconds: true,
+      clockShowDate: true,
+    });
+  });
+
+  it("preserves weather tileSettings through a layout save", async () => {
+    const created = await request(app)
+      .post("/tiles")
+      .send({
+        type: "app",
+        integration: "weather",
+        name: "Weather",
+        tileSettings: { weatherAutoLocate: false, weatherLocation: "London", weatherUnits: "f" },
+        gridW: 2,
+        gridH: 2,
+      });
+    expect(created.status).toBe(201);
+    expect(created.body.tileSettings).toEqual({
+      weatherAutoLocate: false,
+      weatherLocation: "London",
+      weatherUnits: "f",
+    });
+
+    const id = created.body.id as number;
+    const saved = await request(app)
+      .put("/tiles/layout")
+      .send({ tiles: [{ id, gridX: 0, gridY: 0, gridW: 4, gridH: 4 }] });
+
+    const tile = (saved.body as Array<{ id: number }>).find((t) => t.id === id) as Record<
+      string,
+      unknown
+    >;
+    expect(tile.integration).toBe("weather");
+    expect(tile.tileSettings).toEqual({
+      weatherAutoLocate: false,
+      weatherLocation: "London",
+      weatherUnits: "f",
+    });
+  });
 });

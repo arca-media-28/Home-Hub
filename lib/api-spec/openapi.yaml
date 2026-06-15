@@ -578,7 +578,7 @@ components:
           enum: [app, truenas, media, sonarr, radarr, qbittorrent]
         integration:
           type: ["string", "null"]
-          enum: [truenas, media, sonarr, radarr, qbittorrent, pihole, nginx-proxy-manager, null]
+          enum: [truenas, media, sonarr, radarr, qbittorrent, pihole, nginx-proxy-manager, clock, weather, null]
         gridX:
           type: integer
         gridY:
@@ -657,7 +657,7 @@ components:
           enum: [app, truenas, media, sonarr, radarr, qbittorrent]
         integration:
           type: ["string", "null"]
-          enum: [truenas, media, sonarr, radarr, qbittorrent, pihole, nginx-proxy-manager, null]
+          enum: [truenas, media, sonarr, radarr, qbittorrent, pihole, nginx-proxy-manager, clock, weather, null]
         gridX:
           type: integer
         gridY:
@@ -700,7 +700,7 @@ components:
       properties:
         integration:
           type: ["string", "null"]
-          enum: [truenas, media, sonarr, radarr, qbittorrent, pihole, nginx-proxy-manager, null]
+          enum: [truenas, media, sonarr, radarr, qbittorrent, pihole, nginx-proxy-manager, clock, weather, null]
         gridX:
           type: integer
         gridY:
@@ -741,9 +741,8 @@ components:
     TileSettings:
       description: >-
         Per-tile extra configuration for integration widgets. Null means no
-        extra settings (the default). Currently carries the qBittorrent
-        category filter; an absent or null categoryFilter means "show all
-        categories".
+        extra settings (the default). Carries the qBittorrent category filter,
+        the Local Time clock options, and the Weather tile options.
       type: ["object", "null"]
       properties:
         categoryFilter:
@@ -759,6 +758,39 @@ components:
             headers instead of showing a flat list. Absent or false means a
             flat list (the default).
           type: ["boolean", "null"]
+        clockFormat:
+          description: >-
+            Time format for the Local Time tile: "12" for 12-hour with AM/PM,
+            "24" for 24-hour. Absent or null defaults to "24".
+          type: ["string", "null"]
+          enum: ["12", "24", null]
+        clockShowSeconds:
+          description: >-
+            When true, the Local Time tile shows seconds. Absent or false hides
+            them (the default).
+          type: ["boolean", "null"]
+        clockShowDate:
+          description: >-
+            When true, the Local Time tile shows the current date. Absent or
+            false hides it (the default).
+          type: ["boolean", "null"]
+        weatherAutoLocate:
+          description: >-
+            When true, the Weather tile auto-detects the user's location via the
+            browser. Absent or true defaults to auto-detect; false uses the
+            typed weatherLocation instead.
+          type: ["boolean", "null"]
+        weatherLocation:
+          description: >-
+            City/place name to geocode for the Weather tile when auto-detect is
+            off (or as a fallback). Null or absent means none set.
+          type: ["string", "null"]
+        weatherUnits:
+          description: >-
+            Temperature units for the Weather tile: "c" for Celsius, "f" for
+            Fahrenheit. Absent or null defaults to "c".
+          type: ["string", "null"]
+          enum: ["c", "f", null]
 
     LayoutItem:
       type: object
