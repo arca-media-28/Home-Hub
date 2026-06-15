@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import type { Tile, ServiceStatus, TileSettings } from "@workspace/api-client-react";
 import { TileIntegration } from "@workspace/api-client-react";
 import { ExternalLink } from "lucide-react";
@@ -79,9 +80,24 @@ export default function IntegrationTile({ tile, status }: IntegrationTileProps) 
   const showDot = Boolean(status?.configured);
   const dotColor = status?.ok ? "bg-green-500" : "bg-red-500";
 
-  // Resolve which metrics this tile shows and how dense to render them.
+  // Resolve which metrics this tile shows.
   const enabled = resolveEnabledMetrics(integration, tile.metrics);
-  const density = tileDensity(tile.gridW, tile.gridH);
+
+  // Measure the live-status body's real pixel size so reveal decisions are based
+  // on the room content actually has, not a grid-unit approximation. The grid
+  // dimensions seed the first paint before the observer reports a measurement.
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const [measured, setMeasured] = useState<{ width: number; height: number } | null>(null);
+  useEffect(() => {
+    const el = bodyRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      const cr = entries[0]?.contentRect;
+      if (cr) setMeasured({ width: cr.width, height: cr.height });
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   // The reachability dot, shared between the header and the collapsed-header
   // overlay so the indicator survives hiding the title.
@@ -99,6 +115,10 @@ export default function IntegrationTile({ tile, status }: IntegrationTileProps) 
   // would be an empty colored bar — an awkward gap — so we drop it and float
   // the status dot / open-link affordance over the widget body instead.
   const showHeader = !tile.hideTitle || hasImage;
+
+  // Density from the measured body (or grid-seeded for first paint). The seed
+  // needs to know whether the header occupies space.
+  const density = tileDensity(tile.gridW, tile.gridH, measured, showHeader);
 
   return (
     <div className="w-full h-full flex flex-col overflow-hidden">
@@ -149,7 +169,8 @@ export default function IntegrationTile({ tile, status }: IntegrationTileProps) 
           metric selection drive how much detail is shown. When the header is
           collapsed, the status dot / open-link float here so neither is lost. */}
       <div
-        className={`relative flex-1 min-h-0 overflow-y-auto ${showHeader ? "border-t border-border" : ""}`}
+        ref={bodyRef}
+        className={`relative flex-1 min-h-0 overflow-hidden ${showHeader ? "border-t border-border" : ""}`}
       >
         {!showHeader && (statusDot || tile.url) && (
           <div className="absolute top-1.5 right-1.5 z-10 flex items-center gap-1.5">

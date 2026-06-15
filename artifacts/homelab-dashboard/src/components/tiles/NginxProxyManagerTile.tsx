@@ -4,6 +4,7 @@ import {
 } from "@workspace/api-client-react";
 import { Network, Lock, LockOpen, ShieldAlert } from "lucide-react";
 import type { WidgetProps } from "./IntegrationTile";
+import { tileBudget, STAT_ROW_PX, SECTION_PX, ROW_PX } from "./metrics";
 
 function Stat({
   label,
@@ -56,13 +57,19 @@ export default function NginxProxyManagerTile({ enabled, density }: WidgetProps)
   const showSsl = enabled.has("ssl");
   const anyMetric = showHosts || showDead || showSsl;
 
-  // The host list is the verbose section: reveal it once the tile has grown.
-  const showList = showHosts && density.expanded && data.proxyHosts.length > 0;
-  const hosts = showList ? data.proxyHosts.slice(0, density.listLimit) : [];
+  // Reveal the summary stats row first, then the proxy-host list, fitting as
+  // many host rows as the measured body allows. Rows that don't fit are hidden.
+  const budget = tileBudget(density);
+  const showStats = anyMetric && budget.block(STAT_ROW_PX);
+  const hostCount = showHosts
+    ? budget.list(SECTION_PX, ROW_PX, data.proxyHosts.length)
+    : 0;
+  const showList = hostCount > 0;
+  const hosts = data.proxyHosts.slice(0, hostCount);
 
   return (
     <div className="w-full h-full p-3 flex flex-col gap-2">
-      {anyMetric ? (
+      {showStats ? (
         <div className="flex items-stretch gap-1">
           {showHosts && <Stat label="Enabled" value={data.enabled} tone="default" />}
           {showDead && <Stat label="Offline" value={data.offline + data.deadHostsCount} tone="danger" />}
@@ -75,7 +82,7 @@ export default function NginxProxyManagerTile({ enabled, density }: WidgetProps)
       )}
 
       {showList && (
-        <div className="space-y-1 border-t border-border pt-2 mt-auto overflow-y-auto">
+        <div className="space-y-1 border-t border-border pt-2 mt-auto">
           {hosts.map((host) => {
             const domain = host.domainNames[0] ?? `Host #${host.id}`;
             return (

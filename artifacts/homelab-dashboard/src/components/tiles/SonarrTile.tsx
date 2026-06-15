@@ -1,6 +1,7 @@
 import { useGetSonarrQueue, getGetSonarrQueueQueryKey } from "@workspace/api-client-react";
 import { Radio } from "lucide-react";
 import type { WidgetProps } from "./IntegrationTile";
+import { tileBudget, SECTION_PX, ROW_PX, TWO_LINE_ROW_PX } from "./metrics";
 
 function formatBytes(bytes: number | null | undefined): string {
   if (!bytes) return "";
@@ -32,18 +33,29 @@ export default function SonarrTile({ enabled, density }: WidgetProps) {
 
   const showQueue = enabled.has("queue");
   const showUpcoming = enabled.has("upcoming");
-  const hasQueue = showQueue && data.queue && data.queue.length > 0;
-  // Upcoming is the verbose section: reveal it as the tile grows, or when the
-  // queue metric is turned off so the tile still has something to show.
-  const hasUpcoming =
-    showUpcoming && data.upcoming && data.upcoming.length > 0 && (density.expanded || !showQueue);
+
+  // Reveal the download queue first, then upcoming releases, fitting as many
+  // rows as the measured body allows. Sections that don't fit are hidden whole.
+  const budget = tileBudget(density);
+  const queueCount = budget.list(
+    SECTION_PX,
+    TWO_LINE_ROW_PX,
+    showQueue && data.queue ? data.queue.length : 0,
+  );
+  const upcomingCount = budget.list(
+    SECTION_PX,
+    ROW_PX,
+    showUpcoming && data.upcoming ? data.upcoming.length : 0,
+  );
+  const hasQueue = queueCount > 0;
+  const hasUpcoming = upcomingCount > 0;
 
   return (
     <div className="w-full h-full p-3 flex flex-col gap-2">
       {hasQueue && (
         <div className="space-y-1">
           <p className="text-xs text-muted-foreground">Downloading</p>
-          {data.queue.slice(0, density.listLimit).map((item) => (
+          {data.queue.slice(0, queueCount).map((item) => (
             <div key={item.id} className="min-w-0">
               <div className="flex justify-between items-center">
                 <span className="text-xs font-medium truncate max-w-[70%]">{item.title}</span>
@@ -65,7 +77,7 @@ export default function SonarrTile({ enabled, density }: WidgetProps) {
       {hasUpcoming && (
         <div className="space-y-1 border-t border-border pt-2 mt-auto">
           <p className="text-xs text-muted-foreground">Upcoming</p>
-          {data.upcoming.slice(0, density.listLimit).map((item) => (
+          {data.upcoming.slice(0, upcomingCount).map((item) => (
             <div key={item.id} className="flex justify-between text-xs">
               <span className="truncate max-w-[70%] font-medium">
                 {item.seriesTitle || item.title}

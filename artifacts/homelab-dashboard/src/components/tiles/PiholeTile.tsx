@@ -2,6 +2,7 @@ import { useGetPiholeMetrics, getGetPiholeMetricsQueryKey } from "@workspace/api
 import { ApiError } from "@workspace/api-client-react";
 import { Shield, ShieldCheck, ShieldOff } from "lucide-react";
 import type { WidgetProps } from "./IntegrationTile";
+import { tileBudget, STAT_ROW_PX, ROW_PX } from "./metrics";
 
 function formatCount(n: number | null | undefined): string {
   const v = n ?? 0;
@@ -35,9 +36,14 @@ export default function PiholeTile({ enabled, density }: WidgetProps) {
     );
   }
 
-  const showQueries = enabled.has("queries");
-  const showBlocked = enabled.has("blocked");
-  const showStatus = enabled.has("status");
+  // Reveal in catalog priority — DNS queries, then ads blocked, then status —
+  // showing as many as fit the measured body. The "On blocklist" sub-line is the
+  // lowest-priority extra and only appears when there's room left over.
+  const budget = tileBudget(density);
+  const showQueries = enabled.has("queries") && budget.block(STAT_ROW_PX);
+  const showBlocked = enabled.has("blocked") && budget.block(STAT_ROW_PX);
+  const showStatus = enabled.has("status") && budget.block(ROW_PX);
+  const showBlocklistLine = showQueries && budget.block(ROW_PX);
 
   const pct = Math.min(100, Math.max(0, data.adsPercentage));
   const isEnabled = data.status === "enabled";
@@ -73,7 +79,7 @@ export default function PiholeTile({ enabled, density }: WidgetProps) {
                 {formatCount(data.queriesTotal)}
               </span>
             </div>
-            {density.expanded && (
+            {showBlocklistLine && (
               <div className="flex justify-between text-xs text-muted-foreground mt-0.5">
                 <span>On blocklist</span>
                 <span className="tabular-nums">{formatCount(data.domainsBlocked)}</span>

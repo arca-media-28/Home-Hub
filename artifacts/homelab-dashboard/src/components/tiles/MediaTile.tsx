@@ -8,6 +8,7 @@ import {
 } from "@workspace/api-client-react";
 import { Tv, PlayCircle } from "lucide-react";
 import type { WidgetProps } from "./IntegrationTile";
+import { tileBudget, SECTION_PX, MEDIA_ROW_PX } from "./metrics";
 
 // A media cover. When the item carries a Plex deep link, it becomes a link that
 // opens the item directly in Plex in a new tab; otherwise it renders inert.
@@ -86,11 +87,18 @@ export default function MediaTile({ enabled, density }: WidgetProps) {
   const recentItems: MediaItem[] = showRecent && recent.data ? recent.data : [];
   const continueItems: ContinueWatchingItem[] = showContinue && cont.data ? cont.data : [];
 
-  const hasRecent = showRecent && recentItems.length > 0;
-  const hasContinue = showContinue && continueItems.length > 0;
+  // Reveal "Recently added" first (catalog priority), then "Continue Watching",
+  // fitting as many rows as the measured body allows. Sections that don't fit
+  // are hidden whole so the body never scrolls.
+  const budget = tileBudget(density);
+  const recentCount = budget.list(SECTION_PX, MEDIA_ROW_PX, recentItems.length);
+  const continueCount = budget.list(SECTION_PX, MEDIA_ROW_PX, continueItems.length);
+
+  const hasRecent = recentCount > 0;
+  const hasContinue = continueCount > 0;
 
   // Everything we asked for failed / is empty → single unavailable state.
-  if (!hasRecent && !hasContinue) {
+  if (!recentItems.length && !continueItems.length) {
     const recentFailed = showRecent && (recent.isError || !recent.data?.length);
     const continueFailed = showContinue && (cont.isError || !cont.data?.length);
     return (
@@ -109,7 +117,7 @@ export default function MediaTile({ enabled, density }: WidgetProps) {
             <PlayCircle className="w-3.5 h-3.5" />
             Continue Watching
           </div>
-          {continueItems.slice(0, density.listLimit).map((item) => (
+          {continueItems.slice(0, continueCount).map((item) => (
             <div key={item.id} className="flex items-center gap-2 min-w-0">
               <Cover thumb={item.thumb} title={item.title} url={item.url} />
               <div className="min-w-0 flex-1">
@@ -135,7 +143,7 @@ export default function MediaTile({ enabled, density }: WidgetProps) {
             <Tv className="w-3.5 h-3.5" />
             Recently Added
           </div>
-          {recentItems.slice(0, density.listLimit).map((item) => {
+          {recentItems.slice(0, recentCount).map((item) => {
             const { primary, secondary } = recentLines(item);
             return (
               <div key={item.id} className="flex items-center gap-2 min-w-0">

@@ -66,29 +66,129 @@ export function resolveEnabledMetrics(
 }
 
 // ── Size-aware density ────────────────────────────────────────────────────────
-// Translate a tile's grid dimensions into a density used by widgets to decide
-// how compact/expanded to render. Height drives vertical room; width nudges the
-// list length up a touch on wide tiles.
+// Density is driven by the *measured* pixel size of a tile's live-status body
+// (via a ResizeObserver in IntegrationTile), not by coarse grid units. Widgets
+// turn this into a vertical "budget" and reveal as many sections/rows as fit,
+// hiding the rest — so growing a tile reveals more detail and a tile never needs
+// a scroll bar. Grid units only seed the first paint before measurement settles.
+
+// Grid → pixel seed constants, matching the dashboard's GridLayout config.
+const SEED_ROW_HEIGHT = 80;
+const SEED_MARGIN = 12;
+const SEED_COLS = 12;
+const SEED_GRID_WIDTH = 1200;
+// Header is h-11 (44px) plus a 1px top border on the body when shown.
+const SEED_HEADER_PX = 45;
 
 export type DensityLevel = "sm" | "md" | "lg";
 
 export interface TileDensity {
+  // Measured (or seeded) available pixel space of the live-status body. These
+  // are the content-box dimensions of the body container (no padding/border),
+  // i.e. the room a widget actually has to fill.
+  bodyHeight: number;
+  bodyWidth: number;
+  // Coarse hint derived from bodyHeight, kept for any width/layout tweaks.
   level: DensityLevel;
-  // How many rows a list-style section should show before clipping/scrolling.
-  listLimit: number;
-  // Whether to render the verbose/expanded form of a section.
-  expanded: boolean;
 }
 
-export function tileDensity(gridW: number, gridH: number): TileDensity {
-  let level: DensityLevel;
-  if (gridH >= 5) level = "lg";
-  else if (gridH >= 3) level = "md";
-  else level = "sm";
+// Estimate the body's pixel height from grid units, used only as a seed for the
+// first paint before the ResizeObserver reports a real measurement.
+export function seedBodyHeight(gridH: number, showHeader: boolean): number {
+  const total = gridH * SEED_ROW_HEIGHT + Math.max(0, gridH - 1) * SEED_MARGIN;
+  return Math.max(0, total - (showHeader ? SEED_HEADER_PX : 0));
+}
 
-  const base = level === "lg" ? 8 : level === "md" ? 5 : 2;
-  // Wider tiles get a little more room for list rows.
-  const listLimit = gridW >= 4 ? base + 2 : base;
+// Rough seed for the body width from grid units (replaced by the measured width
+// almost immediately, so precision here is not important).
+export function seedBodyWidth(gridW: number): number {
+  const colW = (SEED_GRID_WIDTH - SEED_MARGIN * (SEED_COLS + 1)) / SEED_COLS;
+  return Math.max(0, gridW * colW + Math.max(0, gridW - 1) * SEED_MARGIN);
+}
 
-  return { level, listLimit, expanded: level !== "sm" };
+function levelFor(bodyHeight: number): DensityLevel {
+  if (bodyHeight >= 320) return "lg";
+  if (bodyHeight >= 160) return "md";
+  return "sm";
+}
+
+// Build the density for a tile. When `measured` is provided (the body's real
+// content-box size) it wins; otherwise we seed from grid units so first paint is
+// reasonable.
+export function tileDensity(
+  gridW: number,
+  gridH: number,
+  measured?: { width: number; height: number } | null,
+  showHeader = true,
+): TileDensity {
+  const bodyHeight = measured ? measured.height : seedBodyHeight(gridH, showHeader);
+  const bodyWidth = measured ? measured.width : seedBodyWidth(gridW);
+  return { bodyHeight, bodyWidth, level: levelFor(bodyHeight) };
+}
+
+// ── Reveal budget ─────────────────────────────────────────────────────────────
+// A small stateful helper a widget builds once per render from its density. The
+// widget calls `block`/`list` in metric-priority order; each call reveals the
+// item only if it still fits the remaining vertical space (and deducts its
+// cost). To avoid an empty body on the smallest tiles, the *first* requested
+// item is always revealed even if it slightly overflows the measured space.
+
+// Shared, deliberately slightly-generous pixel estimates for common elements.
+// Leaning generous means we under-fill rather than clip, since the body now
+// clips overflow instead of scrolling.
+export const BAR_PX = 34; // labelled progress bar (label line + bar + spacing)
+export const ROW_PX = 24; // single-line list row (text-xs)
+export const TWO_LINE_ROW_PX = 38; // two-line list row
+export const MEDIA_ROW_PX = 44; // list row with a 32px cover thumbnail
+export const STAT_ROW_PX = 50; // big-number stat block
+export const SECTION_PX = 26; // a section label/header incl. top spacing
+
+export interface TileBudget {
+  // Measured body width, for any width-dependent layout choices.
+  readonly width: number;
+  // Remaining vertical pixels (after the widget's own padding).
+  readonly remaining: number;
+  // Reveal a fixed-height block. Returns true (and deducts) if it fits or if it
+  // is the first item requested; false otherwise.
+  block(px: number): boolean;
+  // Reveal a list section with `headerPx` of fixed chrome and `available` rows
+  // of `rowPx` each. Returns the number of rows to render (0 hides the whole
+  // section). Guarantees at least one row if nothing has been shown yet.
+  list(headerPx: number, rowPx: number, available: number): number;
+}
+
+// Build a budget from a density. `paddingY` is the widget root's own vertical
+// padding (p-3 → 24px) which is not part of the content space for reveal.
+export function tileBudget(density: TileDensity, paddingY = 24): TileBudget {
+  let remaining = Math.max(0, density.bodyHeight - paddingY);
+  let shown = 0;
+
+  return {
+    width: density.bodyWidth,
+    get remaining() {
+      return remaining;
+    },
+    block(px: number): boolean {
+      const force = shown === 0;
+      if (force || px <= remaining) {
+        remaining -= px;
+        shown++;
+        return true;
+      }
+      return false;
+    },
+    list(headerPx: number, rowPx: number, available: number): number {
+      if (available <= 0) return 0;
+      const force = shown === 0;
+      if (!force && headerPx > remaining) return 0;
+      const afterHeader = remaining - headerPx;
+      let rows = Math.floor(afterHeader / Math.max(1, rowPx));
+      if (rows < 1 && force) rows = 1; // never leave the body empty
+      rows = Math.max(0, Math.min(available, rows));
+      if (rows === 0) return 0; // header alone is useless — hide the section
+      remaining = afterHeader - rows * rowPx;
+      shown += 1 + rows;
+      return rows;
+    },
+  };
 }

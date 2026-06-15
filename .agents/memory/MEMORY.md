@@ -10,3 +10,4 @@
 - [Local dev loop](local-dev-loop.md) — run on LAN box for real connections; Vite `/api` proxy gated on REPL_ID (off on Replit); API hot reload via build.mjs --watch; `pnpm run dev:local`.
 - [Tile metrics + density](tile-metrics-density.md) — null=show-all, []=show-none; verbose section shows when large OR lighter metric off; layout-save route must return SAME full Tile shape or resize drops fields from cache.
 - [imagePosition dual-use](imageposition-focal-point.md) — imagePosition holds EITHER a named anchor key OR a custom focal point "X% Y%"; resolveObjectPosition/positionToPercent branch on isFocalPoint, no schema/enum change needed.
+- [tsc refs serve stale .d.ts](tsc-project-references-stale-dts.md) — workspace typecheck "missing export/field" that exists in src? rebuild lib refs (tsc --build lib/*/tsconfig.json) first; dist/*.d.ts is stale.

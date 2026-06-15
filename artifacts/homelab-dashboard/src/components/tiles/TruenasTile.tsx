@@ -1,6 +1,7 @@
 import { useGetTruenasMetrics, getGetTruenasMetricsQueryKey } from "@workspace/api-client-react";
 import { HardDrive } from "lucide-react";
 import type { WidgetProps } from "./IntegrationTile";
+import { tileBudget, BAR_PX, ROW_PX, SECTION_PX } from "./metrics";
 
 function Bar({ value, label }: { value: number; label: string }) {
   const pct = Math.min(100, Math.max(0, value));
@@ -44,13 +45,18 @@ export default function TruenasTile({ enabled, density }: WidgetProps) {
 
   const memPct = (data.memUsedGb / data.memTotalGb) * 100;
 
-  const showCpu = enabled.has("cpu");
-  const showRam = enabled.has("ram");
-  // Pools are the verbose section: only reveal them once the tile has grown,
-  // unless the user has explicitly turned the lighter CPU/RAM metrics off.
-  const showPools =
-    enabled.has("pools") && data.pools.length > 0 && (density.expanded || (!showCpu && !showRam));
-  const pools = showPools ? data.pools.slice(0, density.listLimit) : [];
+  // Reveal CPU, then RAM, then the ZFS pool list in priority order, showing as
+  // many as fit the measured body height. Each section is hidden entirely once
+  // the budget runs out — the body never scrolls.
+  const budget = tileBudget(density);
+  const showCpu = enabled.has("cpu") && budget.block(BAR_PX);
+  const showRam = enabled.has("ram") && budget.block(BAR_PX);
+  const poolCount =
+    enabled.has("pools") && data.pools.length > 0
+      ? budget.list(SECTION_PX, ROW_PX, data.pools.length)
+      : 0;
+  const showPools = poolCount > 0;
+  const pools = data.pools.slice(0, poolCount);
 
   return (
     <div className="w-full h-full p-3 flex flex-col gap-2">

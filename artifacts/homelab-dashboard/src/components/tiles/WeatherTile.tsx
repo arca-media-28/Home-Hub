@@ -261,6 +261,11 @@ export default function WeatherTile({ density, tileSettings }: WidgetProps) {
   const unit = units === "f" ? "°F" : "°C";
   const round = (n: number) => Math.round(n);
 
+  // The icon/temperature and city name always show; the extra "feels like / high
+  // · low" line is revealed only when the measured body has room for it, so the
+  // tile fills its space without ever overflowing.
+  const showDetail = density.bodyHeight >= 122;
+
   return (
     <div className="w-full h-full flex flex-col justify-center p-3 gap-1 text-foreground">
       <div className="flex items-center gap-3">
@@ -276,7 +281,7 @@ export default function WeatherTile({ density, tileSettings }: WidgetProps) {
 
       <div className="text-sm font-medium truncate">{data.name}</div>
 
-      {density.expanded && (
+      {showDetail && (
         <div className="flex items-center gap-3 text-xs text-muted-foreground pt-0.5">
           <span className="tabular-nums">Feels {round(data.feels)}{unit}</span>
           {data.high != null && data.low != null && (

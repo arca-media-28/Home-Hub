@@ -1,6 +1,7 @@
 import { useGetQbittorrentStatus, getGetQbittorrentStatusQueryKey } from "@workspace/api-client-react";
 import { Download, Upload, ArrowDownToLine } from "lucide-react";
 import type { WidgetProps } from "./IntegrationTile";
+import { tileBudget, SECTION_PX, ROW_PX, TWO_LINE_ROW_PX } from "./metrics";
 
 function formatSpeed(bytesPerSec: number | null | undefined): string {
   const b = bytesPerSec ?? 0;
@@ -74,20 +75,24 @@ export default function QbittorrentTile({ enabled, density, tileSettings }: Widg
   const torrents = (data.torrents ?? []).filter((t) =>
     filterActive ? categoryFilter!.includes(t.category) : true,
   );
-  const hasTorrents = showTorrents && torrents.length > 0;
+
+  // Reveal the global speeds line first (priority), then as many torrent rows as
+  // the measured body allows. Anything that doesn't fit is hidden — no scroll.
+  const budget = tileBudget(density);
+  const speedsVisible = showSpeeds && budget.block(ROW_PX);
 
   // Group torrents under category headers when the per-tile toggle is on and
   // more than one distinct category is present (a single category reads better
-  // as a flat list). Respects the size-aware density limit by capping the total
-  // number of torrent rows across all groups.
+  // as a flat list).
   const groupByCategory = tileSettings?.groupByCategory ?? false;
   const distinctCategories = new Set(
     torrents.map((t) => (t.category && t.category.length > 0 ? t.category : "Uncategorized")),
   );
-  const grouped = groupByCategory && distinctCategories.size > 1;
+  const grouped = showTorrents && groupByCategory && distinctCategories.size > 1;
 
-  // Build ordered groups (alphabetical, with "Uncategorized" last) limited to
-  // density.listLimit total rows so small tiles never overflow.
+  // Build ordered groups (alphabetical, with "Uncategorized" last), each a list
+  // section that reveals only the rows that fit the remaining budget. Groups
+  // that don't fit at all are dropped.
   function buildGroups() {
     const map = new Map<string, typeof torrents>();
     for (const t of torrents) {
@@ -102,20 +107,24 @@ export default function QbittorrentTile({ enabled, density, tileSettings }: Widg
       return a.localeCompare(b);
     });
     const result: { category: string; items: typeof torrents }[] = [];
-    let remaining = density.listLimit;
     for (const name of names) {
-      if (remaining <= 0) break;
-      const items = map.get(name)!.slice(0, remaining);
-      remaining -= items.length;
-      result.push({ category: name, items });
+      const items = map.get(name)!;
+      const n = budget.list(SECTION_PX, TWO_LINE_ROW_PX, items.length);
+      if (n === 0) break;
+      result.push({ category: name, items: items.slice(0, n) });
     }
     return result;
   }
   const groups = grouped ? buildGroups() : [];
 
+  // Flat list: how many rows fit (no section header).
+  const flatCount =
+    !grouped && showTorrents ? budget.list(0, TWO_LINE_ROW_PX, torrents.length) : 0;
+  const hasTorrents = grouped ? groups.length > 0 : flatCount > 0;
+
   return (
     <div className="w-full h-full p-3 flex flex-col gap-2">
-      {showSpeeds && (
+      {speedsVisible && (
         <div className="flex items-center justify-end gap-2 text-xs">
           <span className="flex items-center gap-0.5 text-green-500">
             <Download className="w-3 h-3" />
@@ -146,7 +155,7 @@ export default function QbittorrentTile({ enabled, density, tileSettings }: Widg
           </div>
         ) : (
           <div className="flex-1 space-y-1.5">
-            {torrents.slice(0, density.listLimit).map((t, i) => (
+            {torrents.slice(0, flatCount).map((t, i) => (
               <TorrentRow key={`${t.name}-${i}`} torrent={t} showCategory={filterActive} />
             ))}
           </div>
