@@ -55,10 +55,12 @@ import {
   getGetQbittorrentStatusQueryKey,
   useSearchStocks,
   getSearchStocksQueryKey,
+  getNewsWidget,
   TileType,
   TileIntegration,
   type Tile,
   type StockWatchEntry,
+  type NewsItem,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Trash2, X, Pipette, RotateCcw } from "lucide-react";
@@ -190,6 +192,14 @@ export default function TileEditModal({ open, onOpenChange, tile, mode }: TileEd
   const [newsShowTimestamp, setNewsShowTimestamp] = useState<boolean>(
     tile?.tileSettings?.newsShowTimestamp ?? false,
   );
+  // Inline "Test feed" preview state for the News config block. Lets the user
+  // verify a feed URL resolves to real headlines before saving.
+  const [newsTestState, setNewsTestState] = useState<
+    "idle" | "loading" | "success" | "error"
+  >("idle");
+  const [newsTestItems, setNewsTestItems] = useState<NewsItem[]>([]);
+  const [newsTestTitle, setNewsTestTitle] = useState<string | null>(null);
+  const [newsTestError, setNewsTestError] = useState<string | null>(null);
   // Stocks (watchlist) widget options. Each entry holds a symbol plus optional
   // share quantity and cost basis (turning the watchlist into a portfolio).
   const [stockWatchlist, setStockWatchlist] = useState<StockWatchEntry[]>(
@@ -229,6 +239,10 @@ export default function TileEditModal({ open, onOpenChange, tile, mode }: TileEd
       setNewsFeedUrl(tile?.tileSettings?.newsFeedUrl ?? "");
       setNewsMaxItems(tile?.tileSettings?.newsMaxItems ?? 8);
       setNewsShowTimestamp(tile?.tileSettings?.newsShowTimestamp ?? false);
+      setNewsTestState("idle");
+      setNewsTestItems([]);
+      setNewsTestTitle(null);
+      setNewsTestError(null);
       setStockWatchlist(tile?.tileSettings?.stockWatchlist ?? []);
       setStockSearch("");
       setShowColorPicker(false);
@@ -298,6 +312,39 @@ export default function TileEditModal({ open, onOpenChange, tile, mode }: TileEd
       else set.delete(teamKeyValue);
       return Array.from(set);
     });
+  }
+
+  // Fetch a few headlines from the entered feed URL so the user can confirm it
+  // resolves to a real feed before saving. Reuses GET /api/widgets/news (the
+  // same route the tile uses): a bad/unreachable URL throws (502) and surfaces
+  // inline, a valid one returns items shown as a small preview.
+  async function handleTestFeed() {
+    const trimmed = newsFeedUrl.trim();
+    if (!trimmed) return;
+    setNewsTestState("loading");
+    setNewsTestError(null);
+    try {
+      const data = await getNewsWidget({ url: trimmed, limit: 5 });
+      if (data.items.length === 0) {
+        setNewsTestState("error");
+        setNewsTestError(
+          "That URL loaded but contained no headlines — check it points to an RSS or Atom feed.",
+        );
+        setNewsTestItems([]);
+        setNewsTestTitle(null);
+        return;
+      }
+      setNewsTestItems(data.items);
+      setNewsTestTitle(data.feedTitle);
+      setNewsTestState("success");
+    } catch {
+      setNewsTestState("error");
+      setNewsTestError(
+        "Couldn't load that feed. Double-check the URL is a reachable RSS or Atom feed.",
+      );
+      setNewsTestItems([]);
+      setNewsTestTitle(null);
+    }
   }
 
   const qbStatusQuery = useGetQbittorrentStatus({
@@ -1327,15 +1374,63 @@ export default function TileEditModal({ open, onOpenChange, tile, mode }: TileEd
             <div className="space-y-3 border-t border-border pt-4">
               <div className="space-y-1.5">
                 <Label>Feed URL</Label>
-                <Input
-                  value={newsFeedUrl}
-                  onChange={(e) => setNewsFeedUrl(e.target.value)}
-                  placeholder="https://feeds.bbci.co.uk/news/rss.xml"
-                />
+                <div className="flex gap-2">
+                  <Input
+                    value={newsFeedUrl}
+                    onChange={(e) => {
+                      setNewsFeedUrl(e.target.value);
+                      // Stale results no longer describe the edited URL.
+                      if (newsTestState !== "idle") {
+                        setNewsTestState("idle");
+                        setNewsTestItems([]);
+                        setNewsTestTitle(null);
+                        setNewsTestError(null);
+                      }
+                    }}
+                    placeholder="https://feeds.bbci.co.uk/news/rss.xml"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleTestFeed}
+                    disabled={
+                      newsFeedUrl.trim().length === 0 ||
+                      newsTestState === "loading"
+                    }
+                    className="shrink-0"
+                  >
+                    {newsTestState === "loading" ? "Testing…" : "Test feed"}
+                  </Button>
+                </div>
                 <p className="text-xs text-muted-foreground">
                   Paste any RSS or Atom feed URL (e.g. BBC, Hacker News, a
                   subreddit, a blog). Leave blank to preview demo headlines.
                 </p>
+
+                {newsTestState === "error" && newsTestError && (
+                  <div className="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                    {newsTestError}
+                  </div>
+                )}
+
+                {newsTestState === "success" && (
+                  <div className="rounded-md border border-border bg-muted/40 px-3 py-2 space-y-1.5">
+                    <p className="text-xs font-medium text-foreground">
+                      ✓ Feed looks good
+                      {newsTestTitle ? ` — ${newsTestTitle}` : ""}
+                    </p>
+                    <ul className="space-y-1">
+                      {newsTestItems.map((item, i) => (
+                        <li
+                          key={i}
+                          className="text-xs text-muted-foreground truncate"
+                        >
+                          • {item.title}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-1.5">
