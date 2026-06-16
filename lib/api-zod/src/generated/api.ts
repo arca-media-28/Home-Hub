@@ -414,6 +414,11 @@ export const GetTruenasMetricsResponse = zod.object({
   "status": zod.string(),
   "usedBytes": zod.number(),
   "totalBytes": zod.number()
+})),
+  "disks": zod.array(zod.object({
+  "name": zod.string(),
+  "temperatureC": zod.number().nullable(),
+  "smartPassed": zod.boolean().nullable()
 }))
 })
 

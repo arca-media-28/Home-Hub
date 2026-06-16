@@ -58,6 +58,14 @@ export default function TruenasTile({ enabled, density }: WidgetProps) {
   const showPools = poolCount > 0;
   const pools = data.pools.slice(0, poolCount);
 
+  const allDisks = data.disks ?? [];
+  const diskCount =
+    enabled.has("disks") && allDisks.length > 0
+      ? budget.list(SECTION_PX, ROW_PX, allDisks.length)
+      : 0;
+  const showDisks = diskCount > 0;
+  const disks = allDisks.slice(0, diskCount);
+
   return (
     <div className="w-full h-full p-3 flex flex-col gap-2">
       <div className="space-y-2 flex-1">
@@ -78,6 +86,41 @@ export default function TruenasTile({ enabled, density }: WidgetProps) {
                 <span className="text-muted-foreground truncate max-w-[55%]">{pool.name}</span>
                 <span className={`font-medium ${pool.status === "ONLINE" ? "text-green-500" : "text-red-500"}`}>
                   {pool.status} &middot; {pct.toFixed(0)}%
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {showDisks && (
+        <div className={`space-y-1 border-t border-border pt-2 ${showPools ? "" : "mt-auto"}`}>
+          {disks.map((disk) => {
+            // A drive is degraded when SMART reports failure or it runs hot
+            // (≥50°C). Hot-but-passing reads as a warning; a SMART failure is an
+            // error — mirroring the pool ONLINE/offline color cues.
+            const hot = disk.temperatureC != null && disk.temperatureC >= 50;
+            const failed = disk.smartPassed === false;
+            const tempColor = failed
+              ? "text-red-500"
+              : hot
+                ? "text-amber-500"
+                : "text-foreground";
+            const smartLabel =
+              disk.smartPassed == null ? "—" : disk.smartPassed ? "OK" : "FAIL";
+            const smartColor =
+              disk.smartPassed == null
+                ? "text-muted-foreground"
+                : disk.smartPassed
+                  ? "text-green-500"
+                  : "text-red-500";
+            return (
+              <div key={disk.name} className="flex items-center justify-between text-xs gap-2">
+                <span className="text-muted-foreground truncate max-w-[45%]">{disk.name}</span>
+                <span className="flex items-center gap-2 font-medium">
+                  <span className={tempColor}>
+                    {disk.temperatureC != null ? `${disk.temperatureC.toFixed(0)}°C` : "—"}
+                  </span>
+                  <span className={smartColor}>{smartLabel}</span>
                 </span>
               </div>
             );

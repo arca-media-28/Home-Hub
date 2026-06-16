@@ -150,6 +150,45 @@ function parseTruenasPools(poolData: unknown) {
   });
 }
 
+// Merge a TrueNAS `GET /api/v2.0/disk` inventory (names + temperatures) with the
+// `GET /api/v2.0/smart/test/results` SMART history into a per-disk health row:
+// `{ name, temperatureC, smartPassed }`. Both inputs are best-effort — either may
+// be missing/empty — so each field defaults to null ("unknown") when absent.
+function parseTruenasDisks(diskData: unknown, smartData: unknown) {
+  // Latest SMART verdict per disk. A disk's most recent test result decides the
+  // pass/fail: SUCCESS → passed, anything else with a known status → failed,
+  // an unrecognized/empty status → unknown (null).
+  const smartByDisk = new Map<string, boolean | null>();
+  for (const entry of (smartData ?? []) as Array<{
+    disk?: string;
+    tests?: Array<{ status?: string }>;
+  }>) {
+    if (!entry.disk) continue;
+    const tests = entry.tests ?? [];
+    const latest = tests[tests.length - 1];
+    const status = latest?.status?.toUpperCase();
+    let passed: boolean | null = null;
+    if (status === "SUCCESS") passed = true;
+    else if (status === "FAILED" || status === "FAILURE" || status === "ERROR") passed = false;
+    smartByDisk.set(entry.disk, passed);
+  }
+
+  return ((diskData ?? []) as Array<{
+    name?: string;
+    devname?: string;
+    temperature?: number;
+    temp?: number;
+  }>)
+    .map((d) => {
+      const name = d.name ?? d.devname ?? "";
+      const rawTemp = d.temperature ?? d.temp;
+      const temperatureC = typeof rawTemp === "number" ? rawTemp : null;
+      const smartPassed = smartByDisk.has(name) ? smartByDisk.get(name)! : null;
+      return { name, temperatureC, smartPassed };
+    })
+    .filter((d) => d.name);
+}
+
 router.get("/truenas", requireAuth, async (_req, res) => {
   const saved = getSavedConnection("truenas");
   const baseUrl = saved.url || process.env["TRUENAS_URL"];
@@ -164,6 +203,11 @@ router.get("/truenas", requireAuth, async (_req, res) => {
       pools: [
         { name: "tank", status: "ONLINE", usedBytes: 2.1e12, totalBytes: 10e12 },
         { name: "backup", status: "ONLINE", usedBytes: 500e9, totalBytes: 4e12 },
+      ],
+      disks: [
+        { name: "sda", temperatureC: 34, smartPassed: true },
+        { name: "sdb", temperatureC: 38, smartPassed: true },
+        { name: "sdc", temperatureC: 52, smartPassed: false },
       ],
     });
     return;
@@ -185,13 +229,17 @@ router.get("/truenas", requireAuth, async (_req, res) => {
     reporting_query: { start: nowSec - 90, end: nowSec - 30, aggregate: true },
   };
 
-  // The reporting (CPU/RAM) and pool (storage) calls are independent. Settle
-  // them separately so one failing source no longer blanks the whole tile —
-  // whatever data is available still renders. Only a fully-unreachable server
-  // (both calls fail) returns the 502 "unavailable" state.
-  const [reportResult, poolResult] = await Promise.allSettled([
+  // The reporting (CPU/RAM), pool (storage) and disk-health (temperature +
+  // SMART) calls are all independent. Settle them separately so one failing
+  // source no longer blanks the whole tile — whatever data is available still
+  // renders. The disk and SMART calls are purely additive: they never count
+  // toward the 502 "unavailable" decision, which is reserved for a fully
+  // unreachable server (both the reporting and pool calls failing).
+  const [reportResult, poolResult, diskResult, smartResult] = await Promise.allSettled([
     httpClient.post(`${baseUrl}/api/v2.0/reporting/get_data`, reportingBody, { headers }),
     httpClient.get(`${baseUrl}/api/v2.0/pool`, { headers }),
+    httpClient.get(`${baseUrl}/api/v2.0/disk`, { headers }),
+    httpClient.get(`${baseUrl}/api/v2.0/smart/test/results`, { headers }),
   ]);
 
   if (reportResult.status === "rejected" && poolResult.status === "rejected") {
@@ -228,7 +276,26 @@ router.get("/truenas", requireAuth, async (_req, res) => {
     );
   }
 
-  res.json({ ...reporting, pools });
+  // Disk health (temperature + SMART) is best-effort and built from two
+  // optional sources. A failure in either only drops that signal — temperatures
+  // without SMART, or SMART without temperatures, still render usefully.
+  const diskData = diskResult.status === "fulfilled" ? diskResult.value.data : undefined;
+  const smartData = smartResult.status === "fulfilled" ? smartResult.value.data : undefined;
+  if (diskResult.status === "rejected") {
+    logger.error(
+      { reason: normalizeHttpError(diskResult.reason) },
+      "TrueNAS widget: disk call failed (temperatures unavailable)",
+    );
+  }
+  if (smartResult.status === "rejected") {
+    logger.error(
+      { reason: normalizeHttpError(smartResult.reason) },
+      "TrueNAS widget: SMART call failed (drive health unavailable)",
+    );
+  }
+  const disks = parseTruenasDisks(diskData, smartData);
+
+  res.json({ ...reporting, pools, disks });
 });
 
 // ────────────────────────────────────────────────

@@ -16,6 +16,7 @@ export const METRIC_CATALOG: Record<string, MetricDef[]> = {
     { key: "cpu", label: "CPU usage" },
     { key: "ram", label: "RAM usage" },
     { key: "pools", label: "ZFS pools" },
+    { key: "disks", label: "Disk health" },
   ],
   [TileIntegration.sonarr]: [
     { key: "queue", label: "Download queue" },

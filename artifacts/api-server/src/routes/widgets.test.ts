@@ -93,6 +93,10 @@ describe("GET /widgets/truenas", () => {
     expect(res.status).toBe(200);
     expect(res.body.cpuPercent).toBe(12.4);
     expect(res.body.pools).toHaveLength(2);
+    // Sample disks include a hot, SMART-failed drive so the tile preview shows
+    // the degraded styling without a live connection.
+    expect(res.body.disks).toHaveLength(3);
+    expect(res.body.disks.some((d: { smartPassed: boolean | null }) => d.smartPassed === false)).toBe(true);
     // No upstream calls should be made for sample data.
     expect(httpGet).not.toHaveBeenCalled();
     expect(httpPost).not.toHaveBeenCalled();
@@ -234,6 +238,101 @@ describe("GET /widgets/truenas", () => {
     const res = await request(app).get("/widgets/truenas");
     expect(res.status).toBe(502);
     expect(res.body.error).toMatch(/TrueNAS/);
+  });
+
+  // Route GET responses by URL so the pool, disk-inventory and SMART-results
+  // calls each return their own payload.
+  function mockTruenasGets(opts: {
+    pool?: unknown;
+    poolError?: Error;
+    disk?: unknown;
+    diskError?: Error;
+    smart?: unknown;
+    smartError?: Error;
+  }) {
+    httpGet.mockImplementation((url: string) => {
+      if (url.endsWith("/api/v2.0/pool")) {
+        return opts.poolError ? Promise.reject(opts.poolError) : Promise.resolve({ data: opts.pool ?? [] });
+      }
+      if (url.endsWith("/api/v2.0/disk")) {
+        return opts.diskError ? Promise.reject(opts.diskError) : Promise.resolve({ data: opts.disk ?? [] });
+      }
+      if (url.endsWith("/api/v2.0/smart/test/results")) {
+        return opts.smartError ? Promise.reject(opts.smartError) : Promise.resolve({ data: opts.smart ?? [] });
+      }
+      return Promise.resolve({ data: [] });
+    });
+  }
+
+  it("merges disk temperatures with SMART test results into per-disk health", async () => {
+    findByService.mockReturnValue(
+      connRow({ service: "truenas", url: "https://nas.local", api_key: "key" }),
+    );
+    httpPost.mockResolvedValue({
+      data: [
+        { name: "cpu", legend: ["time", "idle"], data: [[1000, 80]] },
+        { name: "memory", legend: ["time", "used", "free"], data: [[1000, 1e9, 1e9]] },
+      ],
+    });
+    mockTruenasGets({
+      pool: [],
+      disk: [
+        { name: "sda", temperature: 34 },
+        { name: "sdb", temperature: 55 },
+      ],
+      smart: [
+        { disk: "sda", tests: [{ status: "SUCCESS" }] },
+        { disk: "sdb", tests: [{ status: "RUNNING" }, { status: "FAILED" }] },
+      ],
+    });
+
+    const res = await request(app).get("/widgets/truenas");
+    expect(res.status).toBe(200);
+    expect(res.body.disks).toEqual([
+      { name: "sda", temperatureC: 34, smartPassed: true },
+      { name: "sdb", temperatureC: 55, smartPassed: false },
+    ]);
+  });
+
+  it("reports unknown SMART/temperature as null without dropping the disk", async () => {
+    findByService.mockReturnValue(
+      connRow({ service: "truenas", url: "https://nas.local", api_key: "key" }),
+    );
+    httpPost.mockResolvedValue({
+      data: [{ name: "cpu", legend: ["time", "idle"], data: [[1000, 90]] }],
+    });
+    // Temperatures available, SMART call failed entirely → smartPassed null.
+    mockTruenasGets({
+      pool: [],
+      disk: [{ name: "sda", temperature: 30 }, { name: "sdc" }],
+      smartError: httpError(500),
+    });
+
+    const res = await request(app).get("/widgets/truenas");
+    expect(res.status).toBe(200);
+    expect(res.body.disks).toEqual([
+      { name: "sda", temperatureC: 30, smartPassed: null },
+      { name: "sdc", temperatureC: null, smartPassed: null },
+    ]);
+  });
+
+  it("returns empty disks when the disk inventory call fails (additive, no 502)", async () => {
+    findByService.mockReturnValue(
+      connRow({ service: "truenas", url: "https://nas.local", api_key: "key" }),
+    );
+    httpPost.mockResolvedValue({
+      data: [{ name: "cpu", legend: ["time", "idle"], data: [[1000, 70]] }],
+    });
+    mockTruenasGets({
+      pool: [{ name: "tank", status: "ONLINE", topology: { data: [{ stats: { allocated: 1e12, size: 2e12 } }] } }],
+      diskError: httpError(500),
+      smart: [{ disk: "sda", tests: [{ status: "SUCCESS" }] }],
+    });
+
+    const res = await request(app).get("/widgets/truenas");
+    expect(res.status).toBe(200);
+    expect(res.body.pools).toHaveLength(1); // pool still renders
+    expect(res.body.disks).toEqual([]); // no inventory → nothing to show
   });
 });
 

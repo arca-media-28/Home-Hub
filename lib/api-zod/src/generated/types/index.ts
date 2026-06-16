@@ -59,6 +59,7 @@ export * from './tileSettings';
 export * from './tileType';
 export * from './tileUpdate';
 export * from './tileUpdateIntegration';
+export * from './truenasDisk';
 export * from './truenasMetrics';
 export * from './uploadedFile';
 export * from './uploadResult';

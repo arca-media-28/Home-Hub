@@ -469,11 +469,20 @@ export interface ZfsPool {
   totalBytes: number;
 }
 
+export interface TruenasDisk {
+  name: string;
+  /** @nullable */
+  temperatureC: number | null;
+  /** @nullable */
+  smartPassed: boolean | null;
+}
+
 export interface TruenasMetrics {
   cpuPercent: number;
   memUsedGb: number;
   memTotalGb: number;
   pools: ZfsPool[];
+  disks: TruenasDisk[];
 }
 
 export interface MediaItem {

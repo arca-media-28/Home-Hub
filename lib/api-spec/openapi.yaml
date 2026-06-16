@@ -1185,7 +1185,7 @@ components:
 
     TruenasMetrics:
       type: object
-      required: [cpuPercent, memUsedGb, memTotalGb, pools]
+      required: [cpuPercent, memUsedGb, memTotalGb, pools, disks]
       properties:
         cpuPercent:
           type: number
@@ -1197,6 +1197,10 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ZfsPool"
+        disks:
+          type: array
+          items:
+            $ref: "#/components/schemas/TruenasDisk"
 
     ZfsPool:
       type: object
@@ -1210,6 +1214,17 @@ components:
           type: number
         totalBytes:
           type: number
+
+    TruenasDisk:
+      type: object
+      required: [name, temperatureC, smartPassed]
+      properties:
+        name:
+          type: string
+        temperatureC:
+          type: ["number", "null"]
+        smartPassed:
+          type: ["boolean", "null"]
 
     MediaItem:
       type: object

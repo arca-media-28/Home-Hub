@@ -5,6 +5,7 @@
  * HomeHub API
  * OpenAPI spec version: 0.1.0
  */
+import type { TruenasDisk } from './truenasDisk';
 import type { ZfsPool } from './zfsPool';
 
 export interface TruenasMetrics {
@@ -12,4 +13,5 @@ export interface TruenasMetrics {
   memUsedGb: number;
   memTotalGb: number;
   pools: ZfsPool[];
+  disks: TruenasDisk[];
 }
