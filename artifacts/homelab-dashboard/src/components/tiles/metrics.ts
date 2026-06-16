@@ -15,6 +15,8 @@ export const METRIC_CATALOG: Record<string, MetricDef[]> = {
   [TileIntegration.truenas]: [
     { key: "cpu", label: "CPU usage" },
     { key: "ram", label: "RAM usage" },
+    { key: "network", label: "Network I/O" },
+    { key: "arc", label: "ZFS ARC" },
     { key: "pools", label: "ZFS pools" },
     { key: "disks", label: "Disk health" },
   ],

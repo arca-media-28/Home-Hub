@@ -33,3 +33,15 @@ data source (raw rows vs mean). Keep fixtures realistic (include `"time"`).
 
 **Why:** the only path that yields exactly 0 for BOTH CPU and RAM (while pools
 work) is the partial-failure fallback — i.e. reporting/get_data was rejected.
+
+## 3. Network + ARC extras ride a SEPARATE reporting/get_data POST
+- Net throughput + ZFS ARC come from reporting graphs `interface`,
+  `arcactualrate`, `arcsize` — requested in their OWN POST, settled
+  independently from the cpu/memory call.
+- **Why:** the `interface` graph can require an `identifier` on some installs and
+  may be rejected (422). Bundling it with cpu/memory would regress CPU/RAM to 0
+  on rejection. Isolating it keeps the failure additive (net/ARC → null, no 502).
+- Unit assumptions (untested against live, documented in code): interface values
+  are kilobits/s → Mbps `/1000`; `arcsize` is bytes → GB `/1e9`; `arcactualrate`
+  is hits/misses per sec → ratio `hits/(hits+misses)*100`. Parser tolerates
+  legend key aliases (received/rx, sent/tx, arc_size/size/arcsz).

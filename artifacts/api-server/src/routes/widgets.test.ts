@@ -340,6 +340,88 @@ describe("GET /widgets/truenas", () => {
     expect(res.body.pools).toHaveLength(1); // pool still renders
     expect(res.body.disks).toEqual([]); // no inventory → nothing to show
   });
+
+  // Route the two reporting POSTs by their requested graph names: the core call
+  // asks for cpu/memory, the extras call asks for interface/arcactualrate/arcsize.
+  function mockTruenasReporting(opts: { core?: unknown; coreError?: Error; extras?: unknown; extrasError?: Error }) {
+    httpPost.mockImplementation((_url: string, body: { graphs: Array<{ name?: string }> }) => {
+      const names = body.graphs.map((g) => g.name);
+      if (names.includes("interface")) {
+        return opts.extrasError ? Promise.reject(opts.extrasError) : Promise.resolve({ data: opts.extras ?? [] });
+      }
+      return opts.coreError ? Promise.reject(opts.coreError) : Promise.resolve({ data: opts.core ?? [] });
+    });
+  }
+
+  it("parses network throughput and ARC stats from the extras reporting call", async () => {
+    findByService.mockReturnValue(
+      connRow({ service: "truenas", url: "https://nas.local", api_key: "key" }),
+    );
+    mockTruenasReporting({
+      core: [{ name: "cpu", legend: ["time", "idle"], data: [[1000, 80]] }],
+      // interface throughput is kilobits/s (→ Mbps is /1000); arcactualrate is
+      // hits/misses per second (→ 9000/(9000+1000) = 90% hit); arcsize is bytes.
+      extras: [
+        { name: "interface", legend: ["time", "received", "sent"], data: [[1000, 184600, 42300]] },
+        { name: "arcactualrate", legend: ["time", "hits", "misses"], data: [[1000, 9000, 1000]] },
+        { name: "arcsize", legend: ["time", "arc_size"], data: [[1000, 31.4e9]] },
+      ],
+    });
+    httpGet.mockResolvedValue({ data: [] });
+
+    const res = await request(app).get("/widgets/truenas");
+    expect(res.status).toBe(200);
+    expect(res.body.netInMbps).toBe(184.6);
+    expect(res.body.netOutMbps).toBe(42.3);
+    expect(res.body.arcHitRatio).toBe(90);
+    expect(res.body.arcSizeGb).toBeCloseTo(31.4, 1);
+    // CPU still parsed from the core call.
+    expect(res.body.cpuPercent).toBe(20);
+
+    // The extras must ride a SEPARATE reporting POST, not be bundled with cpu/memory.
+    const extraCall = httpPost.mock.calls.find(
+      ([, body]: [string, { graphs: Array<{ name?: string }> }]) =>
+        body.graphs.some((g) => g.name === "interface"),
+    );
+    expect(extraCall).toBeDefined();
+    expect(extraCall![1].graphs).toEqual([
+      { name: "interface" },
+      { name: "arcactualrate" },
+      { name: "arcsize" },
+    ]);
+  });
+
+  it("nulls net/ARC when the extras call fails but keeps CPU/RAM (additive)", async () => {
+    findByService.mockReturnValue(
+      connRow({ service: "truenas", url: "https://nas.local", api_key: "key" }),
+    );
+    mockTruenasReporting({
+      core: [
+        { name: "cpu", legend: ["time", "idle"], data: [[1000, 70]] },
+        { name: "memory", legend: ["time", "used", "free"], data: [[1000, 8e9, 8e9]] },
+      ],
+      extrasError: httpError(422), // interface graph rejected by the backend
+    });
+    httpGet.mockResolvedValue({ data: [] });
+
+    const res = await request(app).get("/widgets/truenas");
+    expect(res.status).toBe(200); // additive failure → never a 502
+    expect(res.body.cpuPercent).toBe(30); // core reporting unaffected
+    expect(res.body.memUsedGb).toBe(8);
+    expect(res.body.netInMbps).toBeNull();
+    expect(res.body.netOutMbps).toBeNull();
+    expect(res.body.arcHitRatio).toBeNull();
+    expect(res.body.arcSizeGb).toBeNull();
+  });
+
+  it("includes network and ARC sample values when unconfigured", async () => {
+    const res = await request(app).get("/widgets/truenas");
+    expect(res.status).toBe(200);
+    expect(res.body.netInMbps).toBe(184.6);
+    expect(res.body.netOutMbps).toBe(42.3);
+    expect(res.body.arcHitRatio).toBe(98.7);
+    expect(res.body.arcSizeGb).toBe(31.4);
+  });
 });
 
 // ── Media (Plex) ──────────────────────────────────────────────────────────────

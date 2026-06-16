@@ -1254,6 +1254,18 @@ components:
           type: number
         memTotalGb:
           type: number
+        netInMbps:
+          description: Inbound network throughput in megabits/sec; null when the reporting graph is unavailable.
+          type: ["number", "null"]
+        netOutMbps:
+          description: Outbound network throughput in megabits/sec; null when the reporting graph is unavailable.
+          type: ["number", "null"]
+        arcHitRatio:
+          description: ZFS ARC hit ratio as a percentage (0-100); null when the reporting graph is unavailable.
+          type: ["number", "null"]
+        arcSizeGb:
+          description: ZFS ARC size in gigabytes; null when the reporting graph is unavailable.
+          type: ["number", "null"]
         pools:
           type: array
           items:

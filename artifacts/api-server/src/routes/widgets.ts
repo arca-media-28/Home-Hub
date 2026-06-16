@@ -136,6 +136,68 @@ function parseTruenasReporting(reportData: unknown): {
   };
 }
 
+// First matching legend key from a list of candidates, or null when none of the
+// candidates are present. Lets the network/ARC parsers tolerate small legend
+// naming differences across TrueNAS/Netdata versions.
+function pickLegendValue(map: Record<string, number>, keys: string[]): number | null {
+  for (const key of keys) {
+    if (key in map) return map[key]!;
+  }
+  return null;
+}
+
+// Reduce a TrueNAS reporting response into network throughput and ZFS ARC stats.
+// These graphs are best-effort extras: any that is missing yields null so the
+// tile can simply omit it. Requested via a SEPARATE reporting call from CPU/RAM
+// so an interface graph that needs an identifier (and may be rejected) never
+// regresses the core CPU/RAM numbers.
+//
+// Unit assumptions (the same Netdata-based backend that serves CPU/RAM):
+//  - interface throughput is in kilobits/sec → megabits/sec is value / 1000.
+//  - arcsize is in bytes → gigabytes is value / 1e9 (matching the memory graph).
+//  - arcactualrate reports hits/misses per second → ratio = hits/(hits+misses).
+function parseTruenasNetArc(reportData: unknown): {
+  netInMbps: number | null;
+  netOutMbps: number | null;
+  arcHitRatio: number | null;
+  arcSizeGb: number | null;
+} {
+  const graphs = (reportData ?? []) as Array<{ name?: string }>;
+  const ifaceGraph = graphs.find((g) => g.name === "interface");
+  const arcRateGraph = graphs.find((g) => g.name === "arcactualrate");
+  const arcSizeGraph = graphs.find((g) => g.name === "arcsize");
+
+  let netInMbps: number | null = null;
+  let netOutMbps: number | null = null;
+  if (ifaceGraph) {
+    const iface = latestByLegend(ifaceGraph);
+    const rxKbps = pickLegendValue(iface, ["received", "rx", "in", "incoming"]);
+    const txKbps = pickLegendValue(iface, ["sent", "tx", "out", "outgoing"]);
+    if (rxKbps != null) netInMbps = Number((Math.abs(rxKbps) / 1000).toFixed(2));
+    if (txKbps != null) netOutMbps = Number((Math.abs(txKbps) / 1000).toFixed(2));
+  }
+
+  let arcHitRatio: number | null = null;
+  if (arcRateGraph) {
+    const rate = latestByLegend(arcRateGraph);
+    const hits = pickLegendValue(rate, ["hits", "hit"]);
+    const misses = pickLegendValue(rate, ["misses", "miss"]);
+    if (hits != null && misses != null) {
+      const total = hits + misses;
+      arcHitRatio = total > 0 ? Number(((hits / total) * 100).toFixed(1)) : 0;
+    }
+  }
+
+  let arcSizeGb: number | null = null;
+  if (arcSizeGraph) {
+    const size = latestByLegend(arcSizeGraph);
+    const sizeBytes = pickLegendValue(size, ["arc_size", "size", "arcsz", "arc", "c"]);
+    if (sizeBytes != null) arcSizeGb = Number((sizeBytes / 1e9).toFixed(2));
+  }
+
+  return { netInMbps, netOutMbps, arcHitRatio, arcSizeGb };
+}
+
 // Reduce a TrueNAS `GET /api/v2.0/pool` response into per-pool used/total bytes.
 function parseTruenasPools(poolData: unknown) {
   return ((poolData ?? []) as TruenasPool[]).map((p) => {
@@ -200,6 +262,10 @@ router.get("/truenas", requireAuth, async (_req, res) => {
       cpuPercent: 12.4,
       memUsedGb: 14.2,
       memTotalGb: 64.0,
+      netInMbps: 184.6,
+      netOutMbps: 42.3,
+      arcHitRatio: 98.7,
+      arcSizeGb: 31.4,
       pools: [
         { name: "tank", status: "ONLINE", usedBytes: 2.1e12, totalBytes: 10e12 },
         { name: "backup", status: "ONLINE", usedBytes: 500e9, totalBytes: 4e12 },
@@ -224,22 +290,32 @@ router.get("/truenas", requireAuth, async (_req, res) => {
   // the past. Request a short trailing window ending a few seconds ago and
   // aggregate it (documented working form: now-90s … now-30s).
   const nowSec = Math.floor(Date.now() / 1000);
+  const reportingQuery = { start: nowSec - 90, end: nowSec - 30, aggregate: true };
   const reportingBody = {
     graphs: [{ name: "cpu" }, { name: "memory" }],
-    reporting_query: { start: nowSec - 90, end: nowSec - 30, aggregate: true },
+    reporting_query: reportingQuery,
+  };
+  // Network throughput + ZFS ARC stats live in the same reporting backend but are
+  // requested as a SEPARATE call. The "interface" graph can require an identifier
+  // on some installs and may be rejected; isolating it means a rejection only
+  // drops the net/ARC extras instead of regressing the core CPU/RAM numbers.
+  const extraReportingBody = {
+    graphs: [{ name: "interface" }, { name: "arcactualrate" }, { name: "arcsize" }],
+    reporting_query: reportingQuery,
   };
 
   // The reporting (CPU/RAM), pool (storage) and disk-health (temperature +
   // SMART) calls are all independent. Settle them separately so one failing
   // source no longer blanks the whole tile — whatever data is available still
-  // renders. The disk and SMART calls are purely additive: they never count
-  // toward the 502 "unavailable" decision, which is reserved for a fully
+  // renders. The disk, SMART and net/ARC calls are purely additive: they never
+  // count toward the 502 "unavailable" decision, which is reserved for a fully
   // unreachable server (both the reporting and pool calls failing).
-  const [reportResult, poolResult, diskResult, smartResult] = await Promise.allSettled([
+  const [reportResult, poolResult, diskResult, smartResult, extraResult] = await Promise.allSettled([
     httpClient.post(`${baseUrl}/api/v2.0/reporting/get_data`, reportingBody, { headers }),
     httpClient.get(`${baseUrl}/api/v2.0/pool`, { headers }),
     httpClient.get(`${baseUrl}/api/v2.0/disk`, { headers }),
     httpClient.get(`${baseUrl}/api/v2.0/smart/test/results`, { headers }),
+    httpClient.post(`${baseUrl}/api/v2.0/reporting/get_data`, extraReportingBody, { headers }),
   ]);
 
   if (reportResult.status === "rejected" && poolResult.status === "rejected") {
@@ -295,7 +371,24 @@ router.get("/truenas", requireAuth, async (_req, res) => {
   }
   const disks = parseTruenasDisks(diskData, smartData);
 
-  res.json({ ...reporting, pools, disks });
+  // Network + ARC extras: additive. A rejected (or partial) extra reporting call
+  // simply leaves these as null so the tile omits them — never a 502.
+  let netArc = {
+    netInMbps: null as number | null,
+    netOutMbps: null as number | null,
+    arcHitRatio: null as number | null,
+    arcSizeGb: null as number | null,
+  };
+  if (extraResult.status === "fulfilled") {
+    netArc = parseTruenasNetArc(extraResult.value.data);
+  } else {
+    logger.error(
+      { reason: normalizeHttpError(extraResult.reason) },
+      "TrueNAS widget: network/ARC reporting call failed (extras unavailable)",
+    );
+  }
+
+  res.json({ ...reporting, ...netArc, pools, disks });
 });
 
 // ────────────────────────────────────────────────

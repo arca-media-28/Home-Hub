@@ -1,5 +1,5 @@
 import { useGetTruenasMetrics, getGetTruenasMetricsQueryKey } from "@workspace/api-client-react";
-import { HardDrive } from "lucide-react";
+import { HardDrive, ArrowDown, ArrowUp } from "lucide-react";
 import type { WidgetProps } from "./IntegrationTile";
 import { tileBudget, BAR_PX, ROW_PX, SECTION_PX } from "./metrics";
 
@@ -51,6 +51,15 @@ export default function TruenasTile({ enabled, density }: WidgetProps) {
   const budget = tileBudget(density);
   const showCpu = enabled.has("cpu") && budget.block(BAR_PX);
   const showRam = enabled.has("ram") && budget.block(BAR_PX);
+
+  // Network throughput and ARC are best-effort extras: only revealed when the
+  // metric is enabled, the upstream actually returned a value (not null), and
+  // the body still has room. Each is one compact text row.
+  const hasNet = data.netInMbps != null || data.netOutMbps != null;
+  const showNetwork = enabled.has("network") && hasNet && budget.block(ROW_PX);
+  const hasArc = data.arcHitRatio != null || data.arcSizeGb != null;
+  const showArc = enabled.has("arc") && hasArc && budget.block(ROW_PX);
+
   const poolCount =
     enabled.has("pools") && data.pools.length > 0
       ? budget.list(SECTION_PX, ROW_PX, data.pools.length)
@@ -75,6 +84,35 @@ export default function TruenasTile({ enabled, density }: WidgetProps) {
             value={memPct}
             label={`RAM  ${data.memUsedGb.toFixed(1)}/${data.memTotalGb.toFixed(1)} GB`}
           />
+        )}
+        {showNetwork && (
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-muted-foreground">Network</span>
+            <span className="flex items-center gap-2 font-medium text-foreground">
+              <span className="flex items-center gap-0.5">
+                <ArrowDown className="w-3 h-3 text-green-500" />
+                {(data.netInMbps ?? 0).toFixed(1)}
+              </span>
+              <span className="flex items-center gap-0.5">
+                <ArrowUp className="w-3 h-3 text-blue-500" />
+                {(data.netOutMbps ?? 0).toFixed(1)}
+              </span>
+              <span className="text-muted-foreground">Mbps</span>
+            </span>
+          </div>
+        )}
+        {showArc && (
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-muted-foreground">ARC</span>
+            <span className="flex items-center gap-2 font-medium text-foreground">
+              {data.arcHitRatio != null && (
+                <span className={data.arcHitRatio >= 90 ? "text-green-500" : data.arcHitRatio >= 70 ? "text-amber-500" : "text-red-500"}>
+                  {data.arcHitRatio.toFixed(1)}% hit
+                </span>
+              )}
+              {data.arcSizeGb != null && <span>{data.arcSizeGb.toFixed(1)} GB</span>}
+            </span>
+          </div>
         )}
       </div>
       {showPools && (

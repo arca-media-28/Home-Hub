@@ -409,6 +409,10 @@ export const GetTruenasMetricsResponse = zod.object({
   "cpuPercent": zod.number(),
   "memUsedGb": zod.number(),
   "memTotalGb": zod.number(),
+  "netInMbps": zod.number().nullish().describe('Inbound network throughput in megabits\/sec; null when the reporting graph is unavailable.'),
+  "netOutMbps": zod.number().nullish().describe('Outbound network throughput in megabits\/sec; null when the reporting graph is unavailable.'),
+  "arcHitRatio": zod.number().nullish().describe('ZFS ARC hit ratio as a percentage (0-100); null when the reporting graph is unavailable.'),
+  "arcSizeGb": zod.number().nullish().describe('ZFS ARC size in gigabytes; null when the reporting graph is unavailable.'),
   "pools": zod.array(zod.object({
   "name": zod.string(),
   "status": zod.string(),

@@ -13,7 +13,7 @@ import {
 
 describe("allMetricKeys", () => {
   it("returns every catalog key for a known integration", () => {
-    expect(allMetricKeys(TileIntegration.truenas)).toEqual(["cpu", "ram", "pools", "disks"]);
+    expect(allMetricKeys(TileIntegration.truenas)).toEqual(["cpu", "ram", "network", "arc", "pools", "disks"]);
     expect(allMetricKeys(TileIntegration.sonarr)).toEqual(["queue", "upcoming"]);
     expect(allMetricKeys(TileIntegration.qbittorrent)).toEqual(["speeds", "torrents"]);
     expect(allMetricKeys(TileIntegration.media)).toEqual(["recent", "continue"]);
@@ -29,7 +29,7 @@ describe("allMetricKeys", () => {
 describe("resolveEnabledMetrics", () => {
   it("shows all metrics when the selection is null (backward-compatible default)", () => {
     const enabled = resolveEnabledMetrics(TileIntegration.truenas, null);
-    expect([...enabled].sort()).toEqual(["cpu", "disks", "pools", "ram"]);
+    expect([...enabled].sort()).toEqual(["arc", "cpu", "disks", "network", "pools", "ram"]);
   });
 
   it("shows all metrics when the selection is undefined", () => {

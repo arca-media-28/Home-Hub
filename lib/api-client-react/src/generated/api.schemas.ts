@@ -495,6 +495,26 @@ export interface TruenasMetrics {
   cpuPercent: number;
   memUsedGb: number;
   memTotalGb: number;
+  /**
+     * Inbound network throughput in megabits/sec; null when the reporting graph is unavailable.
+     * @nullable
+     */
+  netInMbps?: number | null;
+  /**
+     * Outbound network throughput in megabits/sec; null when the reporting graph is unavailable.
+     * @nullable
+     */
+  netOutMbps?: number | null;
+  /**
+     * ZFS ARC hit ratio as a percentage (0-100); null when the reporting graph is unavailable.
+     * @nullable
+     */
+  arcHitRatio?: number | null;
+  /**
+     * ZFS ARC size in gigabytes; null when the reporting graph is unavailable.
+     * @nullable
+     */
+  arcSizeGb?: number | null;
   pools: ZfsPool[];
   disks: TruenasDisk[];
 }
