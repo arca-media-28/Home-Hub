@@ -70,7 +70,7 @@ export const GetTilesResponseItem = zod.object({
   "id": zod.number(),
   "userId": zod.number(),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('clock'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('clock'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -102,7 +102,12 @@ export const GetTilesResponseItem = zod.object({
   "sportsShowNews": zod.boolean().nullish().describe('When true, the Sports tile shows the latest headlines. Absent or null defaults to false. At least one of sportsShowScores \/ sportsShowNews must be on.'),
   "newsFeedUrl": zod.string().nullish().describe('RSS or Atom feed URL the News tile pulls headlines from. Null or absent means none set, in which case the tile shows demo headlines.'),
   "newsMaxItems": zod.number().nullish().describe('Maximum number of headlines the News tile requests\/shows. Null or absent defaults to a sensible value (clamped server-side).'),
-  "newsShowTimestamp": zod.boolean().nullish().describe('When true, the News tile shows each headline\'s published time (as room allows). Absent or false hides it (the default).')
+  "newsShowTimestamp": zod.boolean().nullish().describe('When true, the News tile shows each headline\'s published time (as room allows). Absent or false hides it (the default).'),
+  "stockWatchlist": zod.array(zod.object({
+  "symbol": zod.string().describe('Ticker symbol (e.g. \"AAPL\"), stored uppercased.'),
+  "shares": zod.number().nullish().describe('Optional number of shares held. When present (and > 0) the tile shows this row\'s position value and gain\/loss.'),
+  "costBasis": zod.number().nullish().describe('Optional average cost per share. Used with shares to compute gain\/loss. Null or absent when not tracking cost.')
+})).nullish().describe('Per-tile watchlist of stock symbols for the Stocks tile. Each entry carries an uppercased ticker symbol and optional share quantity and average cost basis per share, which turn the watchlist into a lightweight portfolio. Null or absent means none set (the tile shows demo\/sample quotes).')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.'),
   "createdAt": zod.string().optional()
 })
@@ -114,7 +119,7 @@ export const GetTilesResponse = zod.array(GetTilesResponseItem)
  */
 export const CreateTileBody = zod.object({
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('clock'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('clock'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -146,7 +151,12 @@ export const CreateTileBody = zod.object({
   "sportsShowNews": zod.boolean().nullish().describe('When true, the Sports tile shows the latest headlines. Absent or null defaults to false. At least one of sportsShowScores \/ sportsShowNews must be on.'),
   "newsFeedUrl": zod.string().nullish().describe('RSS or Atom feed URL the News tile pulls headlines from. Null or absent means none set, in which case the tile shows demo headlines.'),
   "newsMaxItems": zod.number().nullish().describe('Maximum number of headlines the News tile requests\/shows. Null or absent defaults to a sensible value (clamped server-side).'),
-  "newsShowTimestamp": zod.boolean().nullish().describe('When true, the News tile shows each headline\'s published time (as room allows). Absent or false hides it (the default).')
+  "newsShowTimestamp": zod.boolean().nullish().describe('When true, the News tile shows each headline\'s published time (as room allows). Absent or false hides it (the default).'),
+  "stockWatchlist": zod.array(zod.object({
+  "symbol": zod.string().describe('Ticker symbol (e.g. \"AAPL\"), stored uppercased.'),
+  "shares": zod.number().nullish().describe('Optional number of shares held. When present (and > 0) the tile shows this row\'s position value and gain\/loss.'),
+  "costBasis": zod.number().nullish().describe('Optional average cost per share. Used with shares to compute gain\/loss. Null or absent when not tracking cost.')
+})).nullish().describe('Per-tile watchlist of stock symbols for the Stocks tile. Each entry carries an uppercased ticker symbol and optional share quantity and average cost basis per share, which turn the watchlist into a lightweight portfolio. Null or absent means none set (the tile shows demo\/sample quotes).')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.')
 })
 
@@ -162,7 +172,7 @@ export const GetTileResponse = zod.object({
   "id": zod.number(),
   "userId": zod.number(),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('clock'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('clock'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -194,7 +204,12 @@ export const GetTileResponse = zod.object({
   "sportsShowNews": zod.boolean().nullish().describe('When true, the Sports tile shows the latest headlines. Absent or null defaults to false. At least one of sportsShowScores \/ sportsShowNews must be on.'),
   "newsFeedUrl": zod.string().nullish().describe('RSS or Atom feed URL the News tile pulls headlines from. Null or absent means none set, in which case the tile shows demo headlines.'),
   "newsMaxItems": zod.number().nullish().describe('Maximum number of headlines the News tile requests\/shows. Null or absent defaults to a sensible value (clamped server-side).'),
-  "newsShowTimestamp": zod.boolean().nullish().describe('When true, the News tile shows each headline\'s published time (as room allows). Absent or false hides it (the default).')
+  "newsShowTimestamp": zod.boolean().nullish().describe('When true, the News tile shows each headline\'s published time (as room allows). Absent or false hides it (the default).'),
+  "stockWatchlist": zod.array(zod.object({
+  "symbol": zod.string().describe('Ticker symbol (e.g. \"AAPL\"), stored uppercased.'),
+  "shares": zod.number().nullish().describe('Optional number of shares held. When present (and > 0) the tile shows this row\'s position value and gain\/loss.'),
+  "costBasis": zod.number().nullish().describe('Optional average cost per share. Used with shares to compute gain\/loss. Null or absent when not tracking cost.')
+})).nullish().describe('Per-tile watchlist of stock symbols for the Stocks tile. Each entry carries an uppercased ticker symbol and optional share quantity and average cost basis per share, which turn the watchlist into a lightweight portfolio. Null or absent means none set (the tile shows demo\/sample quotes).')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.'),
   "createdAt": zod.string().optional()
 })
@@ -208,7 +223,7 @@ export const UpdateTileParams = zod.object({
 })
 
 export const UpdateTileBody = zod.object({
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('clock'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('clock'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal(null)]).nullish(),
   "gridX": zod.number().optional(),
   "gridY": zod.number().optional(),
   "gridW": zod.number().optional(),
@@ -240,7 +255,12 @@ export const UpdateTileBody = zod.object({
   "sportsShowNews": zod.boolean().nullish().describe('When true, the Sports tile shows the latest headlines. Absent or null defaults to false. At least one of sportsShowScores \/ sportsShowNews must be on.'),
   "newsFeedUrl": zod.string().nullish().describe('RSS or Atom feed URL the News tile pulls headlines from. Null or absent means none set, in which case the tile shows demo headlines.'),
   "newsMaxItems": zod.number().nullish().describe('Maximum number of headlines the News tile requests\/shows. Null or absent defaults to a sensible value (clamped server-side).'),
-  "newsShowTimestamp": zod.boolean().nullish().describe('When true, the News tile shows each headline\'s published time (as room allows). Absent or false hides it (the default).')
+  "newsShowTimestamp": zod.boolean().nullish().describe('When true, the News tile shows each headline\'s published time (as room allows). Absent or false hides it (the default).'),
+  "stockWatchlist": zod.array(zod.object({
+  "symbol": zod.string().describe('Ticker symbol (e.g. \"AAPL\"), stored uppercased.'),
+  "shares": zod.number().nullish().describe('Optional number of shares held. When present (and > 0) the tile shows this row\'s position value and gain\/loss.'),
+  "costBasis": zod.number().nullish().describe('Optional average cost per share. Used with shares to compute gain\/loss. Null or absent when not tracking cost.')
+})).nullish().describe('Per-tile watchlist of stock symbols for the Stocks tile. Each entry carries an uppercased ticker symbol and optional share quantity and average cost basis per share, which turn the watchlist into a lightweight portfolio. Null or absent means none set (the tile shows demo\/sample quotes).')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.')
 })
 
@@ -248,7 +268,7 @@ export const UpdateTileResponse = zod.object({
   "id": zod.number(),
   "userId": zod.number(),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('clock'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('clock'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -280,7 +300,12 @@ export const UpdateTileResponse = zod.object({
   "sportsShowNews": zod.boolean().nullish().describe('When true, the Sports tile shows the latest headlines. Absent or null defaults to false. At least one of sportsShowScores \/ sportsShowNews must be on.'),
   "newsFeedUrl": zod.string().nullish().describe('RSS or Atom feed URL the News tile pulls headlines from. Null or absent means none set, in which case the tile shows demo headlines.'),
   "newsMaxItems": zod.number().nullish().describe('Maximum number of headlines the News tile requests\/shows. Null or absent defaults to a sensible value (clamped server-side).'),
-  "newsShowTimestamp": zod.boolean().nullish().describe('When true, the News tile shows each headline\'s published time (as room allows). Absent or false hides it (the default).')
+  "newsShowTimestamp": zod.boolean().nullish().describe('When true, the News tile shows each headline\'s published time (as room allows). Absent or false hides it (the default).'),
+  "stockWatchlist": zod.array(zod.object({
+  "symbol": zod.string().describe('Ticker symbol (e.g. \"AAPL\"), stored uppercased.'),
+  "shares": zod.number().nullish().describe('Optional number of shares held. When present (and > 0) the tile shows this row\'s position value and gain\/loss.'),
+  "costBasis": zod.number().nullish().describe('Optional average cost per share. Used with shares to compute gain\/loss. Null or absent when not tracking cost.')
+})).nullish().describe('Per-tile watchlist of stock symbols for the Stocks tile. Each entry carries an uppercased ticker symbol and optional share quantity and average cost basis per share, which turn the watchlist into a lightweight portfolio. Null or absent means none set (the tile shows demo\/sample quotes).')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.'),
   "createdAt": zod.string().optional()
 })
@@ -311,7 +336,7 @@ export const SaveLayoutResponseItem = zod.object({
   "id": zod.number(),
   "userId": zod.number(),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('clock'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('clock'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -343,7 +368,12 @@ export const SaveLayoutResponseItem = zod.object({
   "sportsShowNews": zod.boolean().nullish().describe('When true, the Sports tile shows the latest headlines. Absent or null defaults to false. At least one of sportsShowScores \/ sportsShowNews must be on.'),
   "newsFeedUrl": zod.string().nullish().describe('RSS or Atom feed URL the News tile pulls headlines from. Null or absent means none set, in which case the tile shows demo headlines.'),
   "newsMaxItems": zod.number().nullish().describe('Maximum number of headlines the News tile requests\/shows. Null or absent defaults to a sensible value (clamped server-side).'),
-  "newsShowTimestamp": zod.boolean().nullish().describe('When true, the News tile shows each headline\'s published time (as room allows). Absent or false hides it (the default).')
+  "newsShowTimestamp": zod.boolean().nullish().describe('When true, the News tile shows each headline\'s published time (as room allows). Absent or false hides it (the default).'),
+  "stockWatchlist": zod.array(zod.object({
+  "symbol": zod.string().describe('Ticker symbol (e.g. \"AAPL\"), stored uppercased.'),
+  "shares": zod.number().nullish().describe('Optional number of shares held. When present (and > 0) the tile shows this row\'s position value and gain\/loss.'),
+  "costBasis": zod.number().nullish().describe('Optional average cost per share. Used with shares to compute gain\/loss. Null or absent when not tracking cost.')
+})).nullish().describe('Per-tile watchlist of stock symbols for the Stocks tile. Each entry carries an uppercased ticker symbol and optional share quantity and average cost basis per share, which turn the watchlist into a lightweight portfolio. Null or absent means none set (the tile shows demo\/sample quotes).')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.'),
   "createdAt": zod.string().optional()
 })
@@ -581,6 +611,41 @@ export const GetNewsWidgetResponse = zod.object({
   "source": zod.string().nullish().describe('Per-item source\/feed name when present (some aggregated feeds tag each entry). Null when not provided; the tile falls back to the feed title.'),
   "published": zod.string().nullish().describe('ISO timestamp of when the item was published, when the feed provides one. Null otherwise.')
 })).describe('Recent headlines parsed from the feed, newest first.')
+})
+
+
+/**
+ * @summary Get current price and daily change for a set of stock symbols
+ */
+export const GetStocksWidgetQueryParams = zod.object({
+  "symbols": zod.coerce.string().optional().describe('Comma-separated ticker symbols to quote (e.g. \"AAPL,MSFT,VOO\"). When omitted or empty, representative demo quotes are returned so an unconfigured tile still renders.')
+})
+
+export const GetStocksWidgetResponse = zod.object({
+  "quotes": zod.array(zod.object({
+  "symbol": zod.string().describe('The ticker symbol this quote is for (uppercased).'),
+  "name": zod.string().nullish().describe('Human-readable company\/ETF name when available. Null when the provider does not return one.'),
+  "price": zod.number().describe('Latest\/current price.'),
+  "change": zod.number().describe('Absolute price change since the previous close.'),
+  "changePercent": zod.number().describe('Percent price change since the previous close.')
+})).describe('One quote per requested symbol that resolved successfully.'),
+  "sample": zod.boolean().describe('True when the quotes are built-in sample data (no provider API key configured), so the tile can label them as not-live.')
+})
+
+
+/**
+ * @summary Search for stock symbols by ticker or company name (for the tile editor)
+ */
+export const SearchStocksQueryParams = zod.object({
+  "q": zod.coerce.string().describe('Search text (ticker fragment or company name).')
+})
+
+export const SearchStocksResponse = zod.object({
+  "results": zod.array(zod.object({
+  "symbol": zod.string().describe('Ticker symbol to add to a watchlist.'),
+  "description": zod.string().describe('Company\/ETF name or description for the symbol.')
+})),
+  "sample": zod.boolean().describe('True when the results are built-in sample matches (no provider API key configured).')
 })
 
 

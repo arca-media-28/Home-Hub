@@ -63,6 +63,7 @@ export const TileIntegration = {
   weather: 'weather',
   sports: 'sports',
   news: 'news',
+  stocks: 'stocks',
 } as const;
 
 /**
@@ -78,6 +79,21 @@ export const TileImageFit = {
   center: 'center',
   'top-left': 'top-left',
 } as const;
+
+export interface StockWatchEntry {
+  /** Ticker symbol (e.g. "AAPL"), stored uppercased. */
+  symbol: string;
+  /**
+     * Optional number of shares held. When present (and > 0) the tile shows this row's position value and gain/loss.
+     * @nullable
+     */
+  shares?: number | null;
+  /**
+     * Optional average cost per share. Used with shares to compute gain/loss. Null or absent when not tracking cost.
+     * @nullable
+     */
+  costBasis?: number | null;
+}
 
 /**
  * Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.
@@ -159,6 +175,11 @@ export type TileSettings = {
      * @nullable
      */
   newsShowTimestamp?: boolean | null;
+  /**
+     * Per-tile watchlist of stock symbols for the Stocks tile. Each entry carries an uppercased ticker symbol and optional share quantity and average cost basis per share, which turn the watchlist into a lightweight portfolio. Null or absent means none set (the tile shows demo/sample quotes).
+     * @nullable
+     */
+  stockWatchlist?: StockWatchEntry[] | null;
 } | null;
 
 export interface Tile {
@@ -250,6 +271,7 @@ export const TileInputIntegration = {
   weather: 'weather',
   sports: 'sports',
   news: 'news',
+  stocks: 'stocks',
 } as const;
 
 export interface TileInput {
@@ -300,6 +322,7 @@ export const TileUpdateIntegration = {
   weather: 'weather',
   sports: 'sports',
   news: 'news',
+  stocks: 'stocks',
 } as const;
 
 export interface TileUpdate {
@@ -329,6 +352,42 @@ export interface TileUpdate {
   /** @nullable */
   metrics?: string[] | null;
   tileSettings?: TileSettings | null;
+}
+
+export interface StockQuote {
+  /** The ticker symbol this quote is for (uppercased). */
+  symbol: string;
+  /**
+     * Human-readable company/ETF name when available. Null when the provider does not return one.
+     * @nullable
+     */
+  name?: string | null;
+  /** Latest/current price. */
+  price: number;
+  /** Absolute price change since the previous close. */
+  change: number;
+  /** Percent price change since the previous close. */
+  changePercent: number;
+}
+
+export interface StockData {
+  /** One quote per requested symbol that resolved successfully. */
+  quotes: StockQuote[];
+  /** True when the quotes are built-in sample data (no provider API key configured), so the tile can label them as not-live. */
+  sample: boolean;
+}
+
+export interface StockSearchResult {
+  /** Ticker symbol to add to a watchlist. */
+  symbol: string;
+  /** Company/ETF name or description for the symbol. */
+  description: string;
+}
+
+export interface StockSearchData {
+  results: StockSearchResult[];
+  /** True when the results are built-in sample matches (no provider API key configured). */
+  sample: boolean;
 }
 
 export interface LayoutItem {
@@ -685,5 +744,19 @@ url?: string;
  * Maximum number of headlines to return (clamped server-side).
  */
 limit?: number;
+};
+
+export type GetStocksWidgetParams = {
+/**
+ * Comma-separated ticker symbols to quote (e.g. "AAPL,MSFT,VOO"). When omitted or empty, representative demo quotes are returned so an unconfigured tile still renders.
+ */
+symbols?: string;
+};
+
+export type SearchStocksParams = {
+/**
+ * Search text (ticker fragment or company name).
+ */
+q: string;
 };
 

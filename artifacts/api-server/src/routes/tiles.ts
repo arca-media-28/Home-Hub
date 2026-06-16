@@ -44,6 +44,37 @@ interface TileSettings {
   newsFeedUrl?: string | null;
   newsMaxItems?: number | null;
   newsShowTimestamp?: boolean | null;
+  stockWatchlist?: StockWatchEntry[] | null;
+}
+
+// A single watchlist entry for the Stocks tile: a ticker symbol plus optional
+// share quantity and average cost basis (which turn the watchlist into a
+// lightweight portfolio).
+interface StockWatchEntry {
+  symbol: string;
+  shares?: number | null;
+  costBasis?: number | null;
+}
+
+// Validate/clean a single watchlist entry. Returns null when there is no usable
+// symbol so callers can drop garbage rows.
+function pickStockWatchEntry(raw: unknown): StockWatchEntry | null {
+  if (!raw || typeof raw !== "object") return null;
+  const obj = raw as Record<string, unknown>;
+  const symbol = typeof obj["symbol"] === "string" ? obj["symbol"].trim().toUpperCase() : "";
+  if (!symbol) return null;
+  const entry: StockWatchEntry = { symbol };
+  if (typeof obj["shares"] === "number" && Number.isFinite(obj["shares"])) {
+    entry.shares = obj["shares"];
+  } else if (obj["shares"] === null) {
+    entry.shares = null;
+  }
+  if (typeof obj["costBasis"] === "number" && Number.isFinite(obj["costBasis"])) {
+    entry.costBasis = obj["costBasis"];
+  } else if (obj["costBasis"] === null) {
+    entry.costBasis = null;
+  }
+  return entry;
 }
 
 // Copy the known keys of a tile-settings object into a clean TileSettings,
@@ -131,6 +162,13 @@ function pickTileSettings(obj: Record<string, unknown>): TileSettings {
     result.newsShowTimestamp = obj["newsShowTimestamp"];
   } else if (obj["newsShowTimestamp"] === null) {
     result.newsShowTimestamp = null;
+  }
+  if (Array.isArray(obj["stockWatchlist"])) {
+    result.stockWatchlist = obj["stockWatchlist"]
+      .map(pickStockWatchEntry)
+      .filter((e): e is StockWatchEntry => e !== null);
+  } else if (obj["stockWatchlist"] === null) {
+    result.stockWatchlist = null;
   }
   return result;
 }

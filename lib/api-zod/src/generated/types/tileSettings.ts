@@ -5,6 +5,7 @@
  * HomeHub API
  * OpenAPI spec version: 0.1.0
  */
+import type { StockWatchEntry } from './stockWatchEntry';
 
 /**
  * Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.
@@ -86,4 +87,9 @@ export type TileSettings = {
      * @nullable
      */
   newsShowTimestamp?: boolean | null;
+  /**
+     * Per-tile watchlist of stock symbols for the Stocks tile. Each entry carries an uppercased ticker symbol and optional share quantity and average cost basis per share, which turn the watchlist into a lightweight portfolio. Null or absent means none set (the tile shows demo/sample quotes).
+     * @nullable
+     */
+  stockWatchlist?: StockWatchEntry[] | null;
 } | null;

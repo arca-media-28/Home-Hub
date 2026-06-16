@@ -1377,4 +1377,189 @@ router.get("/news", requireAuth, async (req, res) => {
   }
 });
 
+// ────────────────────────────────────────────────
+// Stocks Widget
+// ────────────────────────────────────────────────
+// Per-tile watchlist of US equity/ETF symbols. Quotes (price + daily change)
+// come from a free stock-quote provider (Finnhub) proxied here so the API key
+// stays server-side. Following the widget-data convention: with NO key
+// configured the route returns clearly-labeled sample quotes (sample: true) so
+// the tile still renders; with a key configured but the upstream failing it
+// returns 502 so the tile shows its error state.
+
+const STOCKS_MAX_SYMBOLS = 25;
+const FINNHUB_BASE = "https://finnhub.io/api/v1";
+
+// The provider key is read from a server secret. Finnhub is the chosen free
+// provider (simple per-symbol /quote endpoint + /search on the free tier).
+function getStocksApiKey(): string | undefined {
+  return process.env["FINNHUB_API_KEY"]?.trim() || process.env["STOCKS_API_KEY"]?.trim() || undefined;
+}
+
+// A small static catalog used both for sample quotes (unconfigured) and as a
+// fallback symbol-search source. Prices are representative, not live.
+const SAMPLE_STOCKS: Record<string, { name: string; price: number; changePercent: number }> = {
+  AAPL: { name: "Apple Inc", price: 229.87, changePercent: 0.82 },
+  MSFT: { name: "Microsoft Corp", price: 432.15, changePercent: -0.45 },
+  GOOGL: { name: "Alphabet Inc Class A", price: 178.34, changePercent: 1.21 },
+  AMZN: { name: "Amazon.com Inc", price: 201.55, changePercent: -1.08 },
+  NVDA: { name: "NVIDIA Corp", price: 138.92, changePercent: 2.34 },
+  TSLA: { name: "Tesla Inc", price: 352.41, changePercent: -2.11 },
+  META: { name: "Meta Platforms Inc", price: 602.78, changePercent: 0.56 },
+  VOO: { name: "Vanguard S&P 500 ETF", price: 545.6, changePercent: 0.34 },
+  SPY: { name: "SPDR S&P 500 ETF Trust", price: 593.12, changePercent: 0.31 },
+  QQQ: { name: "Invesco QQQ Trust", price: 511.47, changePercent: 0.62 },
+};
+
+const DEFAULT_SAMPLE_SYMBOLS = ["AAPL", "MSFT", "NVDA", "VOO"];
+
+interface StockQuoteOut {
+  symbol: string;
+  name: string | null;
+  price: number;
+  change: number;
+  changePercent: number;
+}
+
+// Build a sample quote for a symbol. Falls back to a deterministic pseudo-price
+// for symbols not in the static catalog so an arbitrary watchlist still renders
+// representative (clearly non-live) data.
+function sampleQuote(symbol: string): StockQuoteOut {
+  const known = SAMPLE_STOCKS[symbol];
+  if (known) {
+    const price = known.price;
+    const change = (price * known.changePercent) / 100;
+    return { symbol, name: known.name, price, change, changePercent: known.changePercent };
+  }
+  // Deterministic fallback from the symbol's characters.
+  let seed = 0;
+  for (let i = 0; i < symbol.length; i++) seed = (seed * 31 + symbol.charCodeAt(i)) % 100000;
+  const price = 20 + (seed % 480) + (seed % 100) / 100;
+  const changePercent = ((seed % 800) - 400) / 100; // -4% .. +4%
+  const change = (price * changePercent) / 100;
+  return { symbol, name: null, price, change, changePercent };
+}
+
+function parseSymbols(raw: unknown): string[] {
+  const text = typeof raw === "string" ? raw : "";
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const part of text.split(",")) {
+    const sym = part.trim().toUpperCase();
+    if (sym && !seen.has(sym)) {
+      seen.add(sym);
+      out.push(sym);
+      if (out.length >= STOCKS_MAX_SYMBOLS) break;
+    }
+  }
+  return out;
+}
+
+router.get("/stocks", requireAuth, async (req, res) => {
+  const symbols = parseSymbols(req.query["symbols"]);
+  const apiKey = getStocksApiKey();
+
+  // Unconfigured (no provider key): return clearly-labeled sample quotes. When
+  // no symbols were requested either, seed with a representative default set so
+  // a brand-new tile still shows content.
+  if (!apiKey) {
+    const list = symbols.length > 0 ? symbols : DEFAULT_SAMPLE_SYMBOLS;
+    res.json({ quotes: list.map(sampleQuote), sample: true });
+    return;
+  }
+
+  // Configured but nothing to quote yet — return an empty (non-sample) result.
+  if (symbols.length === 0) {
+    res.json({ quotes: [], sample: false });
+    return;
+  }
+
+  try {
+    // Finnhub has a per-symbol quote endpoint; fetch them in parallel. Profile
+    // lookups (for the company name) are best-effort and must not fail the row.
+    const quotes = await Promise.all(
+      symbols.map(async (symbol): Promise<StockQuoteOut | null> => {
+        const quoteRes = await httpClient.get(`${FINNHUB_BASE}/quote`, {
+          params: { symbol, token: apiKey },
+        });
+        const q = (quoteRes.data ?? {}) as {
+          c?: number; // current price
+          d?: number; // change
+          dp?: number; // percent change
+        };
+        // Finnhub returns all-zeros for an unknown symbol; treat that as "no
+        // data" and drop the row rather than showing a $0 quote.
+        if (!q.c || q.c === 0) return null;
+
+        let name: string | null = null;
+        try {
+          const profRes = await httpClient.get(`${FINNHUB_BASE}/stock/profile2`, {
+            params: { symbol, token: apiKey },
+          });
+          const prof = (profRes.data ?? {}) as { name?: string };
+          name = prof.name?.trim() || null;
+        } catch {
+          // Name is a nicety; ignore lookup failures.
+        }
+
+        return {
+          symbol,
+          name,
+          price: q.c,
+          change: q.d ?? 0,
+          changePercent: q.dp ?? 0,
+        };
+      }),
+    );
+
+    res.json({ quotes: quotes.filter((q): q is StockQuoteOut => q !== null), sample: false });
+  } catch (err) {
+    logger.error({ reason: normalizeHttpError(err) }, "Stocks widget error");
+    res.status(502).json({ error: "Failed to fetch stock quotes" });
+  }
+});
+
+router.get("/stocks/search", requireAuth, async (req, res) => {
+  const q = typeof req.query["q"] === "string" ? req.query["q"].trim() : "";
+  const apiKey = getStocksApiKey();
+
+  if (!q) {
+    res.json({ results: [], sample: !apiKey });
+    return;
+  }
+
+  // Unconfigured: match against the built-in sample catalog so the editor can
+  // still add symbols (clearly sample data).
+  if (!apiKey) {
+    const upper = q.toUpperCase();
+    const results = Object.entries(SAMPLE_STOCKS)
+      .filter(([sym, info]) => sym.includes(upper) || info.name.toUpperCase().includes(upper))
+      .map(([sym, info]) => ({ symbol: sym, description: info.name }));
+    res.json({ results, sample: true });
+    return;
+  }
+
+  try {
+    const searchRes = await httpClient.get(`${FINNHUB_BASE}/search`, {
+      params: { q, token: apiKey },
+    });
+    const data = (searchRes.data ?? {}) as {
+      result?: Array<{ symbol?: string; description?: string; type?: string }>;
+    };
+    const results = (data.result ?? [])
+      // Common stocks/ETFs only — skip symbols with exchange suffixes (foreign
+      // listings) to keep the free-tier US-equity focus.
+      .filter((r) => r.symbol && !r.symbol.includes("."))
+      .slice(0, 20)
+      .map((r) => ({
+        symbol: (r.symbol ?? "").toUpperCase(),
+        description: r.description?.trim() || (r.symbol ?? "").toUpperCase(),
+      }));
+    res.json({ results, sample: false });
+  } catch (err) {
+    logger.error({ reason: normalizeHttpError(err) }, "Stocks search error");
+    res.status(502).json({ error: "Failed to search stock symbols" });
+  }
+});
+
 export default router;

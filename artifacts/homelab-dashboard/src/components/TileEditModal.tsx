@@ -53,9 +53,12 @@ import {
   useGetQbittorrentStatus,
   getListUploadsQueryKey,
   getGetQbittorrentStatusQueryKey,
+  useSearchStocks,
+  getSearchStocksQueryKey,
   TileType,
   TileIntegration,
   type Tile,
+  type StockWatchEntry,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Trash2, X, Pipette, RotateCcw } from "lucide-react";
@@ -92,6 +95,7 @@ const INTEGRATIONS = [
   { value: TileIntegration.weather, label: "Weather" },
   { value: TileIntegration.sports, label: "Sports" },
   { value: TileIntegration.news, label: "News" },
+  { value: TileIntegration.stocks, label: "Stocks" },
 ] as const;
 
 type ImageSource = "upload" | "library" | "url";
@@ -180,6 +184,12 @@ export default function TileEditModal({ open, onOpenChange, tile, mode }: TileEd
   const [newsShowTimestamp, setNewsShowTimestamp] = useState<boolean>(
     tile?.tileSettings?.newsShowTimestamp ?? false,
   );
+  // Stocks (watchlist) widget options. Each entry holds a symbol plus optional
+  // share quantity and cost basis (turning the watchlist into a portfolio).
+  const [stockWatchlist, setStockWatchlist] = useState<StockWatchEntry[]>(
+    tile?.tileSettings?.stockWatchlist ?? [],
+  );
+  const [stockSearch, setStockSearch] = useState<string>("");
 
   useEffect(() => {
     if (open) {
@@ -213,6 +223,8 @@ export default function TileEditModal({ open, onOpenChange, tile, mode }: TileEd
       setNewsFeedUrl(tile?.tileSettings?.newsFeedUrl ?? "");
       setNewsMaxItems(tile?.tileSettings?.newsMaxItems ?? 8);
       setNewsShowTimestamp(tile?.tileSettings?.newsShowTimestamp ?? false);
+      setStockWatchlist(tile?.tileSettings?.stockWatchlist ?? []);
+      setStockSearch("");
       setShowColorPicker(false);
       setShowTitleColorPicker(false);
     }
@@ -250,6 +262,7 @@ export default function TileEditModal({ open, onOpenChange, tile, mode }: TileEd
   const isWeather = integration === TileIntegration.weather;
   const isSports = integration === TileIntegration.sports;
   const isNews = integration === TileIntegration.news;
+  const isStocks = integration === TileIntegration.stocks;
 
   // Teams for the chosen leagues, for the dependent team multi-select. Sourced
   // from the baked-in catalog (ESPN's /teams endpoint isn't CORS-enabled), so
@@ -594,7 +607,9 @@ export default function TileEditModal({ open, onOpenChange, tile, mode }: TileEd
                     newsMaxItems,
                     newsShowTimestamp,
                   }
-                : null,
+                : isStocks
+                  ? { stockWatchlist }
+                  : null,
       gridX: tile?.gridX ?? 0,
       gridY: tile?.gridY ?? 0,
       gridW: tile?.gridW ?? 2,
@@ -1352,6 +1367,15 @@ export default function TileEditModal({ open, onOpenChange, tile, mode }: TileEd
               </label>
             </div>
           )}
+
+          {isStocks && (
+            <StocksWatchlistEditor
+              watchlist={stockWatchlist}
+              onChange={setStockWatchlist}
+              search={stockSearch}
+              onSearchChange={setStockSearch}
+            />
+          )}
         </div>
 
         <DialogFooter className="flex-col sm:flex-row gap-2">
@@ -1374,5 +1398,198 @@ export default function TileEditModal({ open, onOpenChange, tile, mode }: TileEd
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+// Editor for the Stocks tile's per-tile watchlist. Symbols are added via a live
+// symbol search (provider-backed, or built-in sample matches when unconfigured)
+// and each entry can optionally carry shares + cost basis to track a position.
+function StocksWatchlistEditor({
+  watchlist,
+  onChange,
+  search,
+  onSearchChange,
+}: {
+  watchlist: StockWatchEntry[];
+  onChange: (next: StockWatchEntry[]) => void;
+  search: string;
+  onSearchChange: (next: string) => void;
+}) {
+  const query = search.trim();
+  const { data: searchData, isFetching } = useSearchStocks(
+    { q: query },
+    {
+      query: {
+        queryKey: getSearchStocksQueryKey({ q: query }),
+        enabled: query.length >= 1,
+        staleTime: 30_000,
+      },
+    },
+  );
+
+  const existing = new Set(watchlist.map((e) => e.symbol));
+  const results = (searchData?.results ?? []).filter((r) => !existing.has(r.symbol.toUpperCase()));
+
+  function addSymbol(symbol: string) {
+    const sym = symbol.trim().toUpperCase();
+    if (!sym || existing.has(sym)) return;
+    onChange([...watchlist, { symbol: sym, shares: null, costBasis: null }]);
+    onSearchChange("");
+  }
+
+  function removeAt(index: number) {
+    onChange(watchlist.filter((_, i) => i !== index));
+  }
+
+  function move(index: number, delta: number) {
+    const target = index + delta;
+    if (target < 0 || target >= watchlist.length) return;
+    const next = [...watchlist];
+    const [item] = next.splice(index, 1);
+    next.splice(target, 0, item);
+    onChange(next);
+  }
+
+  function updateAt(index: number, patch: Partial<StockWatchEntry>) {
+    onChange(watchlist.map((e, i) => (i === index ? { ...e, ...patch } : e)));
+  }
+
+  // Parse a numeric text input into a positive number or null (empty/invalid).
+  function parseNum(value: string): number | null {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    const n = Number(trimmed);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  }
+
+  return (
+    <div className="space-y-3 border-t border-border pt-4">
+      <div className="space-y-1.5">
+        <Label>Add symbols</Label>
+        <Input
+          value={search}
+          onChange={(e) => onSearchChange(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              if (results[0]) addSymbol(results[0].symbol);
+              else if (query) addSymbol(query);
+            }
+          }}
+          placeholder="Search ticker or company (e.g. AAPL, Apple)"
+        />
+        <p className="text-xs text-muted-foreground">
+          US stocks &amp; ETFs. Without a provider API key the tile shows sample
+          quotes; set <code>FINNHUB_API_KEY</code> for live prices.
+        </p>
+
+        {query.length >= 1 && (
+          <div className="max-h-40 overflow-y-auto rounded-md border border-border divide-y divide-border">
+            {isFetching && results.length === 0 ? (
+              <div className="px-3 py-2 text-xs text-muted-foreground">Searching…</div>
+            ) : results.length === 0 ? (
+              <button
+                type="button"
+                onClick={() => addSymbol(query)}
+                className="w-full text-left px-3 py-2 text-sm hover:bg-accent"
+              >
+                Add &quot;{query.toUpperCase()}&quot;
+              </button>
+            ) : (
+              results.map((r) => (
+                <button
+                  key={r.symbol}
+                  type="button"
+                  onClick={() => addSymbol(r.symbol)}
+                  className="w-full text-left px-3 py-2 hover:bg-accent flex items-center justify-between gap-2"
+                >
+                  <span className="text-sm font-medium">{r.symbol}</span>
+                  <span className="text-xs text-muted-foreground truncate">
+                    {r.description}
+                  </span>
+                </button>
+              ))
+            )}
+          </div>
+        )}
+      </div>
+
+      {watchlist.length > 0 && (
+        <div className="space-y-2">
+          <Label>Watchlist</Label>
+          <p className="text-xs text-muted-foreground">
+            Add shares (and optional cost/share) to track a position's value and
+            gain/loss. Leave blank for a price-only watchlist.
+          </p>
+          <div className="space-y-2">
+            {watchlist.map((entry, i) => (
+              <div
+                key={entry.symbol}
+                className="rounded-md border border-border p-2 space-y-2"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm font-semibold">{entry.symbol}</span>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2"
+                      disabled={i === 0}
+                      onClick={() => move(i, -1)}
+                    >
+                      ↑
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2"
+                      disabled={i === watchlist.length - 1}
+                      onClick={() => move(i, 1)}
+                    >
+                      ↓
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2 text-destructive"
+                      onClick={() => removeAt(i)}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Shares</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="any"
+                      value={entry.shares ?? ""}
+                      onChange={(e) => updateAt(i, { shares: parseNum(e.target.value) })}
+                      placeholder="—"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Cost / share</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="any"
+                      value={entry.costBasis ?? ""}
+                      onChange={(e) => updateAt(i, { costBasis: parseNum(e.target.value) })}
+                      placeholder="—"
+                    />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

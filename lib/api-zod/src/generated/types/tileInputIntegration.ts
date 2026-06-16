@@ -27,4 +27,5 @@ export const TileInputIntegration = {
   weather: 'weather',
   sports: 'sports',
   news: 'news',
+  stocks: 'stocks',
 } as const;

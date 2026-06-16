@@ -28,6 +28,7 @@ import type {
   ErrorResponse,
   ErsatzTvData,
   GetNewsWidgetParams,
+  GetStocksWidgetParams,
   HealthStatus,
   LayoutUpdate,
   MediaItem,
@@ -37,10 +38,13 @@ import type {
   ProwlarrData,
   QbittorrentData,
   RadarrData,
+  SearchStocksParams,
   ServiceConnection,
   ServiceConnectionUpdate,
   ServiceStatus,
   SonarrData,
+  StockData,
+  StockSearchData,
   TailscaleData,
   Tile,
   TileInput,
@@ -1862,6 +1866,174 @@ export function useGetNewsWidget<TData = Awaited<ReturnType<typeof getNewsWidget
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetNewsWidgetQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetStocksWidgetUrl = (params?: GetStocksWidgetParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/widgets/stocks?${stringifiedParams}` : `/api/widgets/stocks`
+}
+
+/**
+ * @summary Get current price and daily change for a set of stock symbols
+ */
+export const getStocksWidget = async (params?: GetStocksWidgetParams, options?: RequestInit): Promise<StockData> => {
+
+  return customFetch<StockData>(getGetStocksWidgetUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetStocksWidgetQueryKey = (params?: GetStocksWidgetParams,) => {
+    return [
+    `/api/widgets/stocks`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetStocksWidgetQueryOptions = <TData = Awaited<ReturnType<typeof getStocksWidget>>, TError = ErrorType<ErrorResponse>>(params?: GetStocksWidgetParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getStocksWidget>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetStocksWidgetQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getStocksWidget>>> = ({ signal }) => getStocksWidget(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getStocksWidget>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetStocksWidgetQueryResult = NonNullable<Awaited<ReturnType<typeof getStocksWidget>>>
+export type GetStocksWidgetQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Get current price and daily change for a set of stock symbols
+ */
+
+export function useGetStocksWidget<TData = Awaited<ReturnType<typeof getStocksWidget>>, TError = ErrorType<ErrorResponse>>(
+ params?: GetStocksWidgetParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getStocksWidget>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetStocksWidgetQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getSearchStocksUrl = (params: SearchStocksParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/widgets/stocks/search?${stringifiedParams}` : `/api/widgets/stocks/search`
+}
+
+/**
+ * @summary Search for stock symbols by ticker or company name (for the tile editor)
+ */
+export const searchStocks = async (params: SearchStocksParams, options?: RequestInit): Promise<StockSearchData> => {
+
+  return customFetch<StockSearchData>(getSearchStocksUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getSearchStocksQueryKey = (params?: SearchStocksParams,) => {
+    return [
+    `/api/widgets/stocks/search`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getSearchStocksQueryOptions = <TData = Awaited<ReturnType<typeof searchStocks>>, TError = ErrorType<ErrorResponse>>(params: SearchStocksParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof searchStocks>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getSearchStocksQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof searchStocks>>> = ({ signal }) => searchStocks(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof searchStocks>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type SearchStocksQueryResult = NonNullable<Awaited<ReturnType<typeof searchStocks>>>
+export type SearchStocksQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Search for stock symbols by ticker or company name (for the tile editor)
+ */
+
+export function useSearchStocks<TData = Awaited<ReturnType<typeof searchStocks>>, TError = ErrorType<ErrorResponse>>(
+ params: SearchStocksParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof searchStocks>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getSearchStocksQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

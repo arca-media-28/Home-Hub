@@ -27,4 +27,5 @@ export const TileUpdateIntegration = {
   weather: 'weather',
   sports: 'sports',
   news: 'news',
+  stocks: 'stocks',
 } as const;

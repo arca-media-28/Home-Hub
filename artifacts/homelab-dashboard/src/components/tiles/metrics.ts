@@ -59,6 +59,10 @@ export const METRIC_CATALOG: Record<string, MetricDef[]> = {
     { key: "activeStreams", label: "Active streams" },
     { key: "nowPlaying", label: "Now playing" },
   ],
+  [TileIntegration.stocks]: [
+    { key: "dailyChange", label: "Daily change" },
+    { key: "portfolio", label: "Portfolio totals" },
+  ],
 };
 
 // All metric keys for an integration (used as the default "show all" set).

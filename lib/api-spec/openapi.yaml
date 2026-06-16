@@ -476,6 +476,65 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /widgets/stocks:
+    get:
+      operationId: getStocksWidget
+      tags: [widgets]
+      summary: Get current price and daily change for a set of stock symbols
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: symbols
+          in: query
+          required: false
+          description: >-
+            Comma-separated ticker symbols to quote (e.g. "AAPL,MSFT,VOO").
+            When omitted or empty, representative demo quotes are returned so an
+            unconfigured tile still renders.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Quotes for the requested symbols
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StockData"
+        "502":
+          description: The configured stock-quote provider could not be reached
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /widgets/stocks/search:
+    get:
+      operationId: searchStocks
+      tags: [widgets]
+      summary: Search for stock symbols by ticker or company name (for the tile editor)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: q
+          in: query
+          required: true
+          description: Search text (ticker fragment or company name).
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Matching symbols
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StockSearchData"
+        "502":
+          description: The configured stock-quote provider could not be reached
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /connections:
     get:
       operationId: getConnections
@@ -659,7 +718,7 @@ components:
           enum: [app, truenas, media, sonarr, radarr, qbittorrent]
         integration:
           type: ["string", "null"]
-          enum: [truenas, media, sonarr, radarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, clock, weather, sports, news, null]
+          enum: [truenas, media, sonarr, radarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, clock, weather, sports, news, stocks, null]
         gridX:
           type: integer
         gridY:
@@ -738,7 +797,7 @@ components:
           enum: [app, truenas, media, sonarr, radarr, qbittorrent]
         integration:
           type: ["string", "null"]
-          enum: [truenas, media, sonarr, radarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, clock, weather, sports, news, null]
+          enum: [truenas, media, sonarr, radarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, clock, weather, sports, news, stocks, null]
         gridX:
           type: integer
         gridY:
@@ -781,7 +840,7 @@ components:
       properties:
         integration:
           type: ["string", "null"]
-          enum: [truenas, media, sonarr, radarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, clock, weather, sports, news, null]
+          enum: [truenas, media, sonarr, radarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, clock, weather, sports, news, stocks, null]
         gridX:
           type: integer
         gridY:
@@ -917,6 +976,96 @@ components:
             When true, the News tile shows each headline's published time (as
             room allows). Absent or false hides it (the default).
           type: ["boolean", "null"]
+        stockWatchlist:
+          description: >-
+            Per-tile watchlist of stock symbols for the Stocks tile. Each entry
+            carries an uppercased ticker symbol and optional share quantity and
+            average cost basis per share, which turn the watchlist into a
+            lightweight portfolio. Null or absent means none set (the tile shows
+            demo/sample quotes).
+          type: ["array", "null"]
+          items:
+            $ref: "#/components/schemas/StockWatchEntry"
+
+    StockWatchEntry:
+      type: object
+      required: [symbol]
+      properties:
+        symbol:
+          description: Ticker symbol (e.g. "AAPL"), stored uppercased.
+          type: string
+        shares:
+          description: >-
+            Optional number of shares held. When present (and > 0) the tile
+            shows this row's position value and gain/loss.
+          type: ["number", "null"]
+        costBasis:
+          description: >-
+            Optional average cost per share. Used with shares to compute
+            gain/loss. Null or absent when not tracking cost.
+          type: ["number", "null"]
+
+    StockQuote:
+      type: object
+      required: [symbol, price, change, changePercent]
+      properties:
+        symbol:
+          description: The ticker symbol this quote is for (uppercased).
+          type: string
+        name:
+          description: >-
+            Human-readable company/ETF name when available. Null when the
+            provider does not return one.
+          type: ["string", "null"]
+        price:
+          description: Latest/current price.
+          type: number
+        change:
+          description: Absolute price change since the previous close.
+          type: number
+        changePercent:
+          description: Percent price change since the previous close.
+          type: number
+
+    StockData:
+      type: object
+      required: [quotes, sample]
+      properties:
+        quotes:
+          description: One quote per requested symbol that resolved successfully.
+          type: array
+          items:
+            $ref: "#/components/schemas/StockQuote"
+        sample:
+          description: >-
+            True when the quotes are built-in sample data (no provider API key
+            configured), so the tile can label them as not-live.
+          type: boolean
+
+    StockSearchResult:
+      type: object
+      required: [symbol, description]
+      properties:
+        symbol:
+          description: Ticker symbol to add to a watchlist.
+          type: string
+        description:
+          description: Company/ETF name or description for the symbol.
+          type: string
+
+    StockSearchData:
+      type: object
+      required: [results, sample]
+      properties:
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/StockSearchResult"
+        sample:
+          description: >-
+            True when the results are built-in sample matches (no provider API
+            key configured).
+          type: boolean
 
     LayoutItem:
       type: object
