@@ -74,8 +74,13 @@ interface TileEditModalProps {
 
 const NONE = "none";
 
-// Default tile background color (matches the app's card surface).
-const DEFAULT_BG_COLOR = "#1c1c20";
+// CSS value used to preview a theme-default tile background. When a tile has no
+// explicit per-tile bgColor it follows the active theme's card surface, so the
+// editor swatch/preview shows the same token instead of a baked-in hex.
+const THEME_BG_PREVIEW = "hsl(var(--card))";
+// Neutral starting point for the color picker when opening it on a theme-default
+// tile (the first drag turns the background into an explicit color).
+const PICKER_FALLBACK = "#1c1c20";
 
 // Optional integrations a tile can attach. "None" keeps the tile a plain
 // app/link shortcut.
@@ -109,7 +114,8 @@ export default function TileEditModal({ open, onOpenChange, tile, mode }: TileEd
   const [integration, setIntegration] = useState<string>(tile?.integration ?? NONE);
   const [name, setName] = useState(tile?.name ?? "");
   const [url, setUrl] = useState(tile?.url ?? "");
-  const [bgColor, setBgColor] = useState(tile?.bgColor ?? DEFAULT_BG_COLOR);
+  // null = follow the active theme's card surface; an explicit value overrides it.
+  const [bgColor, setBgColor] = useState<string | null>(tile?.bgColor ?? null);
   const [imageUrl, setImageUrl] = useState(tile?.imageUrl ?? "");
   const [imageFit, setImageFit] = useState<FitValue>(initialPlacement.fit);
   const [imagePosition, setImagePosition] = useState<string>(initialPlacement.position);
@@ -197,7 +203,7 @@ export default function TileEditModal({ open, onOpenChange, tile, mode }: TileEd
       setIntegration(tile?.integration ?? NONE);
       setName(tile?.name ?? "");
       setUrl(tile?.url ?? "");
-      setBgColor(tile?.bgColor ?? DEFAULT_BG_COLOR);
+      setBgColor(tile?.bgColor ?? null);
       setImageUrl(tile?.imageUrl ?? "");
       setImageFit(placement.fit);
       setImagePosition(placement.position);
@@ -720,14 +726,14 @@ export default function TileEditModal({ open, onOpenChange, tile, mode }: TileEd
               <button
                 type="button"
                 className="w-8 h-8 rounded-md border border-border flex-shrink-0 shadow-sm"
-                style={{ background: bgColor }}
+                style={{ background: bgColor || THEME_BG_PREVIEW }}
                 onClick={() => setShowColorPicker((v) => !v)}
                 aria-label="Pick color"
               />
               <Input
-                value={bgColor}
-                onChange={(e) => setBgColor(e.target.value)}
-                placeholder={DEFAULT_BG_COLOR}
+                value={bgColor ?? ""}
+                onChange={(e) => setBgColor(e.target.value || null)}
+                placeholder="Theme default"
                 className="font-mono text-sm"
               />
               {eyeDropperSupported && (
@@ -748,17 +754,17 @@ export default function TileEditModal({ open, onOpenChange, tile, mode }: TileEd
                 variant="outline"
                 size="icon"
                 className="flex-shrink-0"
-                onClick={() => setBgColor(DEFAULT_BG_COLOR)}
-                disabled={bgColor === DEFAULT_BG_COLOR}
-                title="Reset to default color"
-                aria-label="Reset to default color"
+                onClick={() => setBgColor(null)}
+                disabled={bgColor === null}
+                title="Reset to theme default"
+                aria-label="Reset to theme default"
               >
                 <RotateCcw className="w-4 h-4" />
               </Button>
             </div>
             {showColorPicker && (
               <div className="mt-2">
-                <HexColorPicker color={bgColor} onChange={setBgColor} />
+                <HexColorPicker color={bgColor ?? PICKER_FALLBACK} onChange={setBgColor} />
               </div>
             )}
           </div>
@@ -791,7 +797,7 @@ export default function TileEditModal({ open, onOpenChange, tile, mode }: TileEd
                     : "cursor-grab touch-none select-none"
                   : ""
               }`}
-              style={{ background: bgColor }}
+              style={{ background: bgColor || THEME_BG_PREVIEW }}
               onPointerDown={handlePreviewPointerDown}
               onPointerMove={handlePreviewPointerMove}
               onPointerUp={endDrag}

@@ -9,7 +9,8 @@ interface AppTileProps {
 
 export default function AppTile({ tile }: AppTileProps) {
   const hasImage = Boolean(tile.imageUrl);
-  const bg = tile.bgColor || "hsl(240 6% 12%)";
+  // No explicit per-tile color → follow the active theme's card surface.
+  const bg = tile.bgColor || "hsl(var(--card))";
 
   const image = resolveImageStyle(tile);
   const title = resolveTitleStyle(tile);
@@ -39,7 +40,7 @@ export default function AppTile({ tile }: AppTileProps) {
         {tile.name && !tile.hideTitle && (
           <span
             className={`font-bold leading-tight tracking-wide drop-shadow-sm max-w-full truncate ${title.sizeClass} ${title.textAlignClass}`}
-            style={{ color: tile.titleColor || (hasImage ? "#fff" : "inherit") }}
+            style={{ color: tile.titleColor || (hasImage ? "#fff" : "hsl(var(--card-foreground))") }}
           >
             {tile.name}
           </span>
@@ -47,7 +48,7 @@ export default function AppTile({ tile }: AppTileProps) {
         {tile.url && (
           <span
             className={`text-xs opacity-60 truncate max-w-full hidden group-hover:block ${title.textAlignClass}`}
-            style={{ color: hasImage ? "#fff" : "inherit" }}
+            style={{ color: hasImage ? "#fff" : "hsl(var(--card-foreground))" }}
           >
             <ExternalLink className="inline w-3 h-3 mr-0.5" />
             Open

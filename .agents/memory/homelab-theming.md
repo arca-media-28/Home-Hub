@@ -43,9 +43,12 @@ hard corners everywhere, set all four `--radius-*` to `var(--radius)` (i.e. 0), 
 those by editing the className directly (progress bars, thumbnails).
 
 **Old-theme leaks to check beyond tokens:** hardcoded colors that bypass tokens —
-`TileEditModal` default `bgColor` for new app tiles, `AppTile` fallback `bg`, and `not-found.tsx`
-(used raw `bg-gray-*`/`text-gray-*`). Status colors in tiles (green/amber/red) are intentional and
-fine to keep.
+`not-found.tsx` (used raw `bg-gray-*`/`text-gray-*`). Status colors in tiles (green/amber/red) are
+intentional and fine to keep. **Tile bgColor now follows theme:** AppTile/IntegrationTile fall back
+to `hsl(var(--card))` (not a hardcoded hex), and TileEditModal's `bgColor` is `string | null` where
+null = "Theme default" (mirrors `titleColor`'s null=automatic). New tiles no longer bake in a dark
+hex; an explicit per-tile color still overrides the theme. Don't reintroduce a literal default hex
+into the modal's bgColor state — that re-bakes off-theme colors into every new tile.
 
 **Structural variety (not just color):** themes also differ in FORM via theme-scoped CSS in
 `index.css` AFTER the token blocks (unlayered, so it beats Tailwind's `@layer utilities` by source

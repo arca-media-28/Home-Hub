@@ -94,7 +94,8 @@ interface IntegrationTileProps {
 export default function IntegrationTile({ tile, status }: IntegrationTileProps) {
   const integration = tile.integration!;
   const hasImage = Boolean(tile.imageUrl);
-  const bg = tile.bgColor || "hsl(240 6% 12%)";
+  // No explicit per-tile color → follow the active theme's card surface.
+  const bg = tile.bgColor || "hsl(var(--card))";
   const label = tile.name || INTEGRATION_LABELS[integration] || "App";
 
   const image = resolveImageStyle(tile);
