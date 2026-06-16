@@ -1,5 +1,6 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Trophy, Newspaper } from "lucide-react";
+import { Trophy, Newspaper, Shield } from "lucide-react";
 import type { WidgetProps } from "./IntegrationTile";
 import {
   fetchSports,
@@ -21,11 +22,52 @@ function Placeholder({ children }: { children: React.ReactNode }) {
   );
 }
 
+// Small team crest shown beside each team name. Falls back to a neutral shield
+// glyph when ESPN omits the logo or the image fails to load, so the row stays
+// aligned either way. Sized in pixels (not utility classes) so the caller can
+// scale it with tile density without touching the row-height budget math.
+function TeamLogo({
+  src,
+  alt,
+  size,
+}: {
+  src: string | null;
+  alt: string;
+  size: number;
+}) {
+  const [failed, setFailed] = useState(false);
+
+  if (!src || failed) {
+    return (
+      <span
+        className="flex-shrink-0 inline-flex items-center justify-center text-muted-foreground"
+        style={{ width: size, height: size }}
+        aria-hidden="true"
+      >
+        <Shield className="w-full h-full opacity-50" />
+      </span>
+    );
+  }
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      width={size}
+      height={size}
+      loading="lazy"
+      onError={() => setFailed(true)}
+      className="flex-shrink-0 object-contain"
+      style={{ width: size, height: size }}
+    />
+  );
+}
+
 // One game row: away @ home with scores, plus a status pill ("Live", "Final",
 // or the start time). Live games highlight the status in the accent color.
 // When ESPN supplies a game page, the whole row becomes a link that opens the
 // box score in a new tab; otherwise it renders inert.
-function ScoreRow({ game }: { game: SportsScore }) {
+function ScoreRow({ game, logoSize }: { game: SportsScore; logoSize: number }) {
   const live = game.state === "in";
   const statusClass = live
     ? "text-primary font-semibold"
@@ -37,13 +79,19 @@ function ScoreRow({ game }: { game: SportsScore }) {
     <>
       <div className="min-w-0 flex-1 space-y-0.5">
         <div className="flex items-center justify-between gap-2">
-          <span className="truncate">{game.away.name}</span>
+          <span className="flex items-center gap-1.5 min-w-0">
+            <TeamLogo src={game.away.logo} alt={game.away.name} size={logoSize} />
+            <span className="truncate">{game.away.name}</span>
+          </span>
           <span className="tabular-nums font-semibold flex-shrink-0">
             {game.away.score ?? ""}
           </span>
         </div>
         <div className="flex items-center justify-between gap-2">
-          <span className="truncate">{game.home.name}</span>
+          <span className="flex items-center gap-1.5 min-w-0">
+            <TeamLogo src={game.home.logo} alt={game.home.name} size={logoSize} />
+            <span className="truncate">{game.home.name}</span>
+          </span>
           <span className="tabular-nums font-semibold flex-shrink-0">
             {game.home.score ?? ""}
           </span>
@@ -146,6 +194,10 @@ export default function SportsTile({ density, tileSettings }: WidgetProps) {
   // row is two lines (two teams); headlines are two-line clamped.
   const budget = tileBudget(density);
 
+  // Logos scale with tile density but stay within a single text-xs line, so the
+  // two-line SCORE_ROW_PX budget below is unaffected.
+  const logoSize = density.level === "lg" ? 18 : density.level === "md" ? 16 : 14;
+
   const SCORE_ROW_PX = 42; // two team lines + spacing
   const HEADLINE_ROW_PX = TWO_LINE_ROW_PX;
 
@@ -193,7 +245,7 @@ export default function SportsTile({ density, tileSettings }: WidgetProps) {
           </div>
           <div className="space-y-1.5">
             {scores.slice(0, scoreRows).map((g) => (
-              <ScoreRow key={g.id} game={g} />
+              <ScoreRow key={g.id} game={g} logoSize={logoSize} />
             ))}
           </div>
         </div>
