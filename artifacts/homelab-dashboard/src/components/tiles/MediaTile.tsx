@@ -7,6 +7,7 @@ import {
   type ContinueWatchingItem,
 } from "@workspace/api-client-react";
 import { Tv, PlayCircle } from "lucide-react";
+import type { ReactNode } from "react";
 import type { WidgetProps } from "./IntegrationTile";
 import { tileBudget, SECTION_PX, MEDIA_ROW_PX } from "./metrics";
 
@@ -40,6 +41,35 @@ function Cover({ thumb, title, url }: { thumb: string | null | undefined; title:
     );
   }
   return inner;
+}
+
+// The title/secondary-text block for a media row. When the item carries a Plex
+// deep link the whole block becomes a link that opens the item in Plex in a new
+// tab; otherwise it renders as plain, non-clickable text.
+function TitleLink({
+  title,
+  url,
+  children,
+}: {
+  title: string;
+  url: string | null | undefined;
+  children: ReactNode;
+}) {
+  if (url) {
+    return (
+      <a
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        title={`Open "${title}" in Plex`}
+        onClick={(e) => e.stopPropagation()}
+        className="block min-w-0 flex-1 rounded-sm hover:text-primary transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+      >
+        {children}
+      </a>
+    );
+  }
+  return <div className="min-w-0 flex-1">{children}</div>;
 }
 
 // Primary/secondary line for a Recently Added entry. For TV (series name present)
@@ -120,7 +150,7 @@ export default function MediaTile({ enabled, density }: WidgetProps) {
           {continueItems.slice(0, continueCount).map((item) => (
             <div key={item.id} className="flex items-center gap-2 min-w-0">
               <Cover thumb={item.thumb} title={item.title} url={item.url} />
-              <div className="min-w-0 flex-1">
+              <TitleLink title={item.title} url={item.url}>
                 <p className="text-xs font-medium truncate">{item.seriesName || item.title}</p>
                 {item.seriesName && <p className="text-xs text-muted-foreground truncate">{item.title}</p>}
                 {item.progress != null && (
@@ -131,7 +161,7 @@ export default function MediaTile({ enabled, density }: WidgetProps) {
                     />
                   </div>
                 )}
-              </div>
+              </TitleLink>
             </div>
           ))}
         </div>
@@ -148,10 +178,10 @@ export default function MediaTile({ enabled, density }: WidgetProps) {
             return (
               <div key={item.id} className="flex items-center gap-2 min-w-0">
                 <Cover thumb={item.thumb} title={item.title} url={item.url} />
-                <div className="min-w-0 flex-1">
+                <TitleLink title={item.title} url={item.url}>
                   <p className="text-xs font-medium truncate">{primary}</p>
                   <p className="text-xs text-muted-foreground capitalize truncate">{secondary}</p>
-                </div>
+                </TitleLink>
               </div>
             );
           })}
