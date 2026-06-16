@@ -103,18 +103,20 @@ describe("GET /widgets/truenas", () => {
       connRow({ service: "truenas", url: "https://nas.local", api_key: "key" }),
     );
 
-    // reporting/get_data → POST. CPU legend includes idle=80 (→ 20% used).
-    // Memory legend values are in bytes; total is the sum of present buckets.
+    // reporting/get_data → POST. The real response puts "time" first in the
+    // legend and each data row is aligned to that full legend (timestamp first).
+    // CPU legend includes idle=80 (→ 20% used). Memory values are in bytes; total
+    // is the sum of present buckets.
     httpPost.mockResolvedValue({
       data: [
         {
           name: "cpu",
-          legend: ["user", "system", "idle"],
+          legend: ["time", "user", "system", "idle"],
           data: [[1000, 15, 5, 80]],
         },
         {
           name: "memory",
-          legend: ["used", "free", "cached", "buffers"],
+          legend: ["time", "used", "free", "cached", "buffers"],
           data: [[1000, 8e9, 4e9, 3e9, 1e9]],
         },
       ],
@@ -143,11 +145,14 @@ describe("GET /widgets/truenas", () => {
 
     // Reporting must be a POST with the graphs query and integer unix-timestamp
     // start/end (the modern Netdata backend rejects relative "now-30s" strings).
+    // The window must end slightly in the past, not at "now" (the latest samples
+    // aren't collected yet), so `end` is strictly before the current second.
     const [, postBody] = httpPost.mock.calls[0]!;
     expect(postBody.graphs).toEqual([{ name: "cpu" }, { name: "memory" }]);
     expect(Number.isInteger(postBody.reporting_query.start)).toBe(true);
     expect(Number.isInteger(postBody.reporting_query.end)).toBe(true);
     expect(postBody.reporting_query.end).toBeGreaterThan(postBody.reporting_query.start);
+    expect(postBody.reporting_query.end).toBeLessThan(Math.floor(Date.now() / 1000));
     expect(postBody.reporting_query.aggregate).toBe(true);
   });
 
@@ -183,8 +188,8 @@ describe("GET /widgets/truenas", () => {
     );
     httpPost.mockResolvedValue({
       data: [
-        { name: "cpu", legend: ["user", "idle"], data: [[1000, 20, 80]] },
-        { name: "memory", legend: ["used", "free"], data: [[1000, 8e9, 8e9]] },
+        { name: "cpu", legend: ["time", "user", "idle"], data: [[1000, 20, 80]] },
+        { name: "memory", legend: ["time", "used", "free"], data: [[1000, 8e9, 8e9]] },
       ],
     });
     httpGet.mockRejectedValue(httpError(500));
@@ -200,15 +205,17 @@ describe("GET /widgets/truenas", () => {
     findByService.mockReturnValue(
       connRow({ service: "truenas", url: "https://nas.local", api_key: "key" }),
     );
+    // `aggregations.mean` excludes the "time" column, so [10, 70] maps to
+    // user=10, idle=70 against the time-stripped legend.
     httpPost.mockResolvedValue({
       data: [
         {
           name: "cpu",
-          legend: ["user", "idle"],
+          legend: ["time", "user", "idle"],
           data: [[1000, 1, 1]],
           aggregations: { mean: [10, 70] },
         },
-        { name: "memory", legend: ["used", "free"], data: [[1000, 1e9, 1e9]] },
+        { name: "memory", legend: ["time", "used", "free"], data: [[1000, 1e9, 1e9]] },
       ],
     });
     httpGet.mockResolvedValue({ data: [] });

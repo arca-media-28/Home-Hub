@@ -60,29 +60,37 @@ function plexDeepLink(machineId: string | undefined, ratingKey: string | undefin
 // TrueNAS SCALE Widget
 // ────────────────────────────────────────────────
 // Build a legend→latest-value map for a single reporting graph. TrueNAS returns
-// each graph as { legend: string[], data: number[][], aggregations? }. Each data
-// row begins with a unix timestamp, so the values align with the legend after
-// dropping that first column. Prefer the aggregated mean when present.
+// each graph as { legend: string[], data: number[][], aggregations? }. The real
+// response includes "time" as the FIRST legend entry, and each data row is
+// aligned to that full legend (the unix timestamp sits in the "time" column).
+// The `aggregations.mean` array, however, holds one value per legend column
+// EXCLUDING "time". The two sources must therefore be zipped differently.
+// Prefer the aggregated mean when present.
 function latestByLegend(graph: unknown): Record<string, number> {
   const g = graph as
     | { legend?: string[]; data?: number[][]; aggregations?: { mean?: number[] } }
     | undefined;
   const legend = g?.legend ?? [];
 
-  let values: number[];
+  const map: Record<string, number> = {};
   const mean = g?.aggregations?.mean;
   if (Array.isArray(mean)) {
-    values = mean.map((n) => Number(n) || 0);
+    // mean excludes the "time" column → zip against the legend with "time" gone.
+    const valueLegend = legend.filter((name) => name !== "time");
+    const values = mean.map((n) => Number(n) || 0);
+    valueLegend.forEach((name, i) => {
+      map[name] = values[i] ?? 0;
+    });
   } else {
+    // Data rows are aligned to the FULL legend (timestamp in the "time" column),
+    // so zip the row directly against the legend without dropping a column.
     const rows = g?.data ?? [];
     const last = rows[rows.length - 1] ?? [];
-    values = last.slice(1).map((n) => Number(n) || 0);
+    const values = last.map((n) => Number(n) || 0);
+    legend.forEach((name, i) => {
+      map[name] = values[i] ?? 0;
+    });
   }
-
-  const map: Record<string, number> = {};
-  legend.forEach((name, i) => {
-    map[name] = values[i] ?? 0;
-  });
   return map;
 }
 
@@ -167,11 +175,14 @@ router.get("/truenas", requireAuth, async (_req, res) => {
   // (Issuing a GET with a body does not reliably send the payload.) The modern
   // Netdata-based backend (SCALE 24.04+, incl. 25.10 "Goldeye") rejects the old
   // relative time strings ("now-30s"/"now") — `start`/`end` must be integer unix
-  // timestamps (seconds). Request a short trailing window and aggregate it.
+  // timestamps (seconds). It also rejects a window whose `end` is "now": the
+  // most recent samples aren't collected yet, so the query must end slightly in
+  // the past. Request a short trailing window ending a few seconds ago and
+  // aggregate it (documented working form: now-90s … now-30s).
   const nowSec = Math.floor(Date.now() / 1000);
   const reportingBody = {
     graphs: [{ name: "cpu" }, { name: "memory" }],
-    reporting_query: { start: nowSec - 60, end: nowSec, aggregate: true },
+    reporting_query: { start: nowSec - 90, end: nowSec - 30, aggregate: true },
   };
 
   // The reporting (CPU/RAM) and pool (storage) calls are independent. Settle

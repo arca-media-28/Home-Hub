@@ -5,6 +5,7 @@
 - [Homelab theming](homelab-theming.md) — reskin via index.css tokens; now a 6-theme picker (data-theme attr, before-paint script, per-theme color overrides), NOT :root/.dark; set all --radius-* for sharp corners, verify authed views with runTest.
 - [service_connections is global](service-connections-global.md) — table keyed by service only (no userId); rows shared across all users; PUT clobbers real settings, beware testing on live.
 - [Widget data + HTTP convention](widget-data-convention.md) — mock only when unconfigured, configured-failure→502; shared httpClient (self-signed TLS) in lib/http.ts; TrueNAS/Sonarr/Radarr/qBittorrent API gotchas.
+- [TrueNAS reporting legend + window](truenas-reporting-legend.md) — legend has leading "time"; data rows zip full legend, mean zips legend minus "time"; reporting window must end in PAST (now-90s…now-30s), not now.
 - [Self-hosted Docker glibc base](docker-glibc-lockfile.md) — lockfile strips non-host native binaries; build with node:*-slim (glibc), NOT alpine/musl, or rollup/lightningcss/better-sqlite3 fail.
 - [Express 5 SPA wildcard crash](express5-spa-wildcard.md) — bare app.get("*") crashes prod only (path-to-regexp 8); SPA branch registers only in Docker prod, not Replit/Vite dev; use a final middleware.
 - [Local dev loop](local-dev-loop.md) — run on LAN box for real connections; Vite `/api` proxy gated on REPL_ID (off on Replit); API hot reload via build.mjs --watch; `pnpm run dev:local`.
