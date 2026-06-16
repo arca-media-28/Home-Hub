@@ -70,7 +70,7 @@ export const GetTilesResponseItem = zod.object({
   "id": zod.number(),
   "userId": zod.number(),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('clock'),zod.literal('weather'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('clock'),zod.literal('weather'),zod.literal('sports'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -95,8 +95,12 @@ export const GetTilesResponseItem = zod.object({
   "clockShowDate": zod.boolean().nullish().describe('When true, the Local Time tile shows the current date. Absent or false hides it (the default).'),
   "weatherAutoLocate": zod.boolean().nullish().describe('When true, the Weather tile auto-detects the user\'s location via the browser. Absent or true defaults to auto-detect; false uses the typed weatherLocation instead.'),
   "weatherLocation": zod.string().nullish().describe('City\/place name to geocode for the Weather tile when auto-detect is off (or as a fallback). Null or absent means none set.'),
-  "weatherUnits": zod.union([zod.literal('c'),zod.literal('f'),zod.literal(null)]).nullish().describe('Temperature units for the Weather tile: \"c\" for Celsius, \"f\" for Fahrenheit. Absent or null defaults to \"c\".')
-}).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, and the Weather tile options.'),
+  "weatherUnits": zod.union([zod.literal('c'),zod.literal('f'),zod.literal(null)]).nullish().describe('Temperature units for the Weather tile: \"c\" for Celsius, \"f\" for Fahrenheit. Absent or null defaults to \"c\".'),
+  "sportsLeagues": zod.array(zod.string()).nullish().describe('League keys the Sports tile follows (e.g. \"nfl\", \"nba\", \"eng.1\"). Null or absent means none selected yet (the tile shows an empty state until at least one league is chosen).'),
+  "sportsTeams": zod.array(zod.string()).nullish().describe('Optional team allow-list for the Sports tile, scoped per league as \"<leagueKey>:<teamId>\" (e.g. \"nfl:12\"). When a league has no entries here, all of its teams are shown. Null or absent means no team filtering (all teams in every selected league).'),
+  "sportsShowScores": zod.boolean().nullish().describe('When true, the Sports tile shows live\/recent scores. Absent or null defaults to true. At least one of sportsShowScores \/ sportsShowNews must be on.'),
+  "sportsShowNews": zod.boolean().nullish().describe('When true, the Sports tile shows the latest headlines. Absent or null defaults to false. At least one of sportsShowScores \/ sportsShowNews must be on.')
+}).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.'),
   "createdAt": zod.string().optional()
 })
 export const GetTilesResponse = zod.array(GetTilesResponseItem)
@@ -107,7 +111,7 @@ export const GetTilesResponse = zod.array(GetTilesResponseItem)
  */
 export const CreateTileBody = zod.object({
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('clock'),zod.literal('weather'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('clock'),zod.literal('weather'),zod.literal('sports'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -132,8 +136,12 @@ export const CreateTileBody = zod.object({
   "clockShowDate": zod.boolean().nullish().describe('When true, the Local Time tile shows the current date. Absent or false hides it (the default).'),
   "weatherAutoLocate": zod.boolean().nullish().describe('When true, the Weather tile auto-detects the user\'s location via the browser. Absent or true defaults to auto-detect; false uses the typed weatherLocation instead.'),
   "weatherLocation": zod.string().nullish().describe('City\/place name to geocode for the Weather tile when auto-detect is off (or as a fallback). Null or absent means none set.'),
-  "weatherUnits": zod.union([zod.literal('c'),zod.literal('f'),zod.literal(null)]).nullish().describe('Temperature units for the Weather tile: \"c\" for Celsius, \"f\" for Fahrenheit. Absent or null defaults to \"c\".')
-}).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, and the Weather tile options.')
+  "weatherUnits": zod.union([zod.literal('c'),zod.literal('f'),zod.literal(null)]).nullish().describe('Temperature units for the Weather tile: \"c\" for Celsius, \"f\" for Fahrenheit. Absent or null defaults to \"c\".'),
+  "sportsLeagues": zod.array(zod.string()).nullish().describe('League keys the Sports tile follows (e.g. \"nfl\", \"nba\", \"eng.1\"). Null or absent means none selected yet (the tile shows an empty state until at least one league is chosen).'),
+  "sportsTeams": zod.array(zod.string()).nullish().describe('Optional team allow-list for the Sports tile, scoped per league as \"<leagueKey>:<teamId>\" (e.g. \"nfl:12\"). When a league has no entries here, all of its teams are shown. Null or absent means no team filtering (all teams in every selected league).'),
+  "sportsShowScores": zod.boolean().nullish().describe('When true, the Sports tile shows live\/recent scores. Absent or null defaults to true. At least one of sportsShowScores \/ sportsShowNews must be on.'),
+  "sportsShowNews": zod.boolean().nullish().describe('When true, the Sports tile shows the latest headlines. Absent or null defaults to false. At least one of sportsShowScores \/ sportsShowNews must be on.')
+}).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.')
 })
 
 
@@ -148,7 +156,7 @@ export const GetTileResponse = zod.object({
   "id": zod.number(),
   "userId": zod.number(),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('clock'),zod.literal('weather'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('clock'),zod.literal('weather'),zod.literal('sports'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -173,8 +181,12 @@ export const GetTileResponse = zod.object({
   "clockShowDate": zod.boolean().nullish().describe('When true, the Local Time tile shows the current date. Absent or false hides it (the default).'),
   "weatherAutoLocate": zod.boolean().nullish().describe('When true, the Weather tile auto-detects the user\'s location via the browser. Absent or true defaults to auto-detect; false uses the typed weatherLocation instead.'),
   "weatherLocation": zod.string().nullish().describe('City\/place name to geocode for the Weather tile when auto-detect is off (or as a fallback). Null or absent means none set.'),
-  "weatherUnits": zod.union([zod.literal('c'),zod.literal('f'),zod.literal(null)]).nullish().describe('Temperature units for the Weather tile: \"c\" for Celsius, \"f\" for Fahrenheit. Absent or null defaults to \"c\".')
-}).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, and the Weather tile options.'),
+  "weatherUnits": zod.union([zod.literal('c'),zod.literal('f'),zod.literal(null)]).nullish().describe('Temperature units for the Weather tile: \"c\" for Celsius, \"f\" for Fahrenheit. Absent or null defaults to \"c\".'),
+  "sportsLeagues": zod.array(zod.string()).nullish().describe('League keys the Sports tile follows (e.g. \"nfl\", \"nba\", \"eng.1\"). Null or absent means none selected yet (the tile shows an empty state until at least one league is chosen).'),
+  "sportsTeams": zod.array(zod.string()).nullish().describe('Optional team allow-list for the Sports tile, scoped per league as \"<leagueKey>:<teamId>\" (e.g. \"nfl:12\"). When a league has no entries here, all of its teams are shown. Null or absent means no team filtering (all teams in every selected league).'),
+  "sportsShowScores": zod.boolean().nullish().describe('When true, the Sports tile shows live\/recent scores. Absent or null defaults to true. At least one of sportsShowScores \/ sportsShowNews must be on.'),
+  "sportsShowNews": zod.boolean().nullish().describe('When true, the Sports tile shows the latest headlines. Absent or null defaults to false. At least one of sportsShowScores \/ sportsShowNews must be on.')
+}).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.'),
   "createdAt": zod.string().optional()
 })
 
@@ -187,7 +199,7 @@ export const UpdateTileParams = zod.object({
 })
 
 export const UpdateTileBody = zod.object({
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('clock'),zod.literal('weather'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('clock'),zod.literal('weather'),zod.literal('sports'),zod.literal(null)]).nullish(),
   "gridX": zod.number().optional(),
   "gridY": zod.number().optional(),
   "gridW": zod.number().optional(),
@@ -212,15 +224,19 @@ export const UpdateTileBody = zod.object({
   "clockShowDate": zod.boolean().nullish().describe('When true, the Local Time tile shows the current date. Absent or false hides it (the default).'),
   "weatherAutoLocate": zod.boolean().nullish().describe('When true, the Weather tile auto-detects the user\'s location via the browser. Absent or true defaults to auto-detect; false uses the typed weatherLocation instead.'),
   "weatherLocation": zod.string().nullish().describe('City\/place name to geocode for the Weather tile when auto-detect is off (or as a fallback). Null or absent means none set.'),
-  "weatherUnits": zod.union([zod.literal('c'),zod.literal('f'),zod.literal(null)]).nullish().describe('Temperature units for the Weather tile: \"c\" for Celsius, \"f\" for Fahrenheit. Absent or null defaults to \"c\".')
-}).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, and the Weather tile options.')
+  "weatherUnits": zod.union([zod.literal('c'),zod.literal('f'),zod.literal(null)]).nullish().describe('Temperature units for the Weather tile: \"c\" for Celsius, \"f\" for Fahrenheit. Absent or null defaults to \"c\".'),
+  "sportsLeagues": zod.array(zod.string()).nullish().describe('League keys the Sports tile follows (e.g. \"nfl\", \"nba\", \"eng.1\"). Null or absent means none selected yet (the tile shows an empty state until at least one league is chosen).'),
+  "sportsTeams": zod.array(zod.string()).nullish().describe('Optional team allow-list for the Sports tile, scoped per league as \"<leagueKey>:<teamId>\" (e.g. \"nfl:12\"). When a league has no entries here, all of its teams are shown. Null or absent means no team filtering (all teams in every selected league).'),
+  "sportsShowScores": zod.boolean().nullish().describe('When true, the Sports tile shows live\/recent scores. Absent or null defaults to true. At least one of sportsShowScores \/ sportsShowNews must be on.'),
+  "sportsShowNews": zod.boolean().nullish().describe('When true, the Sports tile shows the latest headlines. Absent or null defaults to false. At least one of sportsShowScores \/ sportsShowNews must be on.')
+}).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.')
 })
 
 export const UpdateTileResponse = zod.object({
   "id": zod.number(),
   "userId": zod.number(),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('clock'),zod.literal('weather'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('clock'),zod.literal('weather'),zod.literal('sports'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -245,8 +261,12 @@ export const UpdateTileResponse = zod.object({
   "clockShowDate": zod.boolean().nullish().describe('When true, the Local Time tile shows the current date. Absent or false hides it (the default).'),
   "weatherAutoLocate": zod.boolean().nullish().describe('When true, the Weather tile auto-detects the user\'s location via the browser. Absent or true defaults to auto-detect; false uses the typed weatherLocation instead.'),
   "weatherLocation": zod.string().nullish().describe('City\/place name to geocode for the Weather tile when auto-detect is off (or as a fallback). Null or absent means none set.'),
-  "weatherUnits": zod.union([zod.literal('c'),zod.literal('f'),zod.literal(null)]).nullish().describe('Temperature units for the Weather tile: \"c\" for Celsius, \"f\" for Fahrenheit. Absent or null defaults to \"c\".')
-}).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, and the Weather tile options.'),
+  "weatherUnits": zod.union([zod.literal('c'),zod.literal('f'),zod.literal(null)]).nullish().describe('Temperature units for the Weather tile: \"c\" for Celsius, \"f\" for Fahrenheit. Absent or null defaults to \"c\".'),
+  "sportsLeagues": zod.array(zod.string()).nullish().describe('League keys the Sports tile follows (e.g. \"nfl\", \"nba\", \"eng.1\"). Null or absent means none selected yet (the tile shows an empty state until at least one league is chosen).'),
+  "sportsTeams": zod.array(zod.string()).nullish().describe('Optional team allow-list for the Sports tile, scoped per league as \"<leagueKey>:<teamId>\" (e.g. \"nfl:12\"). When a league has no entries here, all of its teams are shown. Null or absent means no team filtering (all teams in every selected league).'),
+  "sportsShowScores": zod.boolean().nullish().describe('When true, the Sports tile shows live\/recent scores. Absent or null defaults to true. At least one of sportsShowScores \/ sportsShowNews must be on.'),
+  "sportsShowNews": zod.boolean().nullish().describe('When true, the Sports tile shows the latest headlines. Absent or null defaults to false. At least one of sportsShowScores \/ sportsShowNews must be on.')
+}).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.'),
   "createdAt": zod.string().optional()
 })
 
@@ -276,7 +296,7 @@ export const SaveLayoutResponseItem = zod.object({
   "id": zod.number(),
   "userId": zod.number(),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('clock'),zod.literal('weather'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('clock'),zod.literal('weather'),zod.literal('sports'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -301,8 +321,12 @@ export const SaveLayoutResponseItem = zod.object({
   "clockShowDate": zod.boolean().nullish().describe('When true, the Local Time tile shows the current date. Absent or false hides it (the default).'),
   "weatherAutoLocate": zod.boolean().nullish().describe('When true, the Weather tile auto-detects the user\'s location via the browser. Absent or true defaults to auto-detect; false uses the typed weatherLocation instead.'),
   "weatherLocation": zod.string().nullish().describe('City\/place name to geocode for the Weather tile when auto-detect is off (or as a fallback). Null or absent means none set.'),
-  "weatherUnits": zod.union([zod.literal('c'),zod.literal('f'),zod.literal(null)]).nullish().describe('Temperature units for the Weather tile: \"c\" for Celsius, \"f\" for Fahrenheit. Absent or null defaults to \"c\".')
-}).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, and the Weather tile options.'),
+  "weatherUnits": zod.union([zod.literal('c'),zod.literal('f'),zod.literal(null)]).nullish().describe('Temperature units for the Weather tile: \"c\" for Celsius, \"f\" for Fahrenheit. Absent or null defaults to \"c\".'),
+  "sportsLeagues": zod.array(zod.string()).nullish().describe('League keys the Sports tile follows (e.g. \"nfl\", \"nba\", \"eng.1\"). Null or absent means none selected yet (the tile shows an empty state until at least one league is chosen).'),
+  "sportsTeams": zod.array(zod.string()).nullish().describe('Optional team allow-list for the Sports tile, scoped per league as \"<leagueKey>:<teamId>\" (e.g. \"nfl:12\"). When a league has no entries here, all of its teams are shown. Null or absent means no team filtering (all teams in every selected league).'),
+  "sportsShowScores": zod.boolean().nullish().describe('When true, the Sports tile shows live\/recent scores. Absent or null defaults to true. At least one of sportsShowScores \/ sportsShowNews must be on.'),
+  "sportsShowNews": zod.boolean().nullish().describe('When true, the Sports tile shows the latest headlines. Absent or null defaults to false. At least one of sportsShowScores \/ sportsShowNews must be on.')
+}).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.'),
   "createdAt": zod.string().optional()
 })
 export const SaveLayoutResponse = zod.array(SaveLayoutResponseItem)

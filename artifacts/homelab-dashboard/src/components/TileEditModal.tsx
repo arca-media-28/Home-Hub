@@ -42,6 +42,7 @@ import {
   type PositionKey,
   type TitleSize,
 } from "@/components/tiles/imageStyle";
+import { SPORTS_LEAGUES, getLeagueTeams } from "@/lib/sports";
 import { useToast } from "@/hooks/use-toast";
 import {
   useCreateTile,
@@ -89,6 +90,7 @@ const INTEGRATIONS = [
   { value: TileIntegration.ersatztv, label: "ErsatzTV" },
   { value: TileIntegration.clock, label: "Local Time" },
   { value: TileIntegration.weather, label: "Weather" },
+  { value: TileIntegration.sports, label: "Sports" },
 ] as const;
 
 type ImageSource = "upload" | "library" | "url";
@@ -154,6 +156,19 @@ export default function TileEditModal({ open, onOpenChange, tile, mode }: TileEd
   const [weatherUnits, setWeatherUnits] = useState<"c" | "f">(
     tile?.tileSettings?.weatherUnits ?? "c",
   );
+  // Sports widget options.
+  const [sportsLeagues, setSportsLeagues] = useState<string[]>(
+    tile?.tileSettings?.sportsLeagues ?? [],
+  );
+  const [sportsTeams, setSportsTeams] = useState<string[]>(
+    tile?.tileSettings?.sportsTeams ?? [],
+  );
+  const [sportsShowScores, setSportsShowScores] = useState<boolean>(
+    tile?.tileSettings?.sportsShowScores ?? true,
+  );
+  const [sportsShowNews, setSportsShowNews] = useState<boolean>(
+    tile?.tileSettings?.sportsShowNews ?? false,
+  );
 
   useEffect(() => {
     if (open) {
@@ -180,6 +195,10 @@ export default function TileEditModal({ open, onOpenChange, tile, mode }: TileEd
       setWeatherAutoLocate(tile?.tileSettings?.weatherAutoLocate ?? true);
       setWeatherLocation(tile?.tileSettings?.weatherLocation ?? "");
       setWeatherUnits(tile?.tileSettings?.weatherUnits ?? "c");
+      setSportsLeagues(tile?.tileSettings?.sportsLeagues ?? []);
+      setSportsTeams(tile?.tileSettings?.sportsTeams ?? []);
+      setSportsShowScores(tile?.tileSettings?.sportsShowScores ?? true);
+      setSportsShowNews(tile?.tileSettings?.sportsShowNews ?? false);
       setShowColorPicker(false);
       setShowTitleColorPicker(false);
     }
@@ -215,6 +234,38 @@ export default function TileEditModal({ open, onOpenChange, tile, mode }: TileEd
   // and no metric catalog or backing service.
   const isClock = integration === TileIntegration.clock;
   const isWeather = integration === TileIntegration.weather;
+  const isSports = integration === TileIntegration.sports;
+
+  // Teams for the chosen leagues, for the dependent team multi-select. Sourced
+  // from the baked-in catalog (ESPN's /teams endpoint isn't CORS-enabled), so
+  // this is a synchronous lookup grouped per selected league.
+  const sportsTeamGroups = sportsLeagues.map((key) => ({
+    league: key,
+    teams: getLeagueTeams(key),
+  }));
+
+  function toggleSportsLeague(key: string, checked: boolean) {
+    setSportsLeagues((prev) => {
+      const set = new Set(prev);
+      if (checked) set.add(key);
+      else set.delete(key);
+      return SPORTS_LEAGUES.filter((l) => set.has(l.key)).map((l) => l.key);
+    });
+    // Dropping a league also drops any of its selected teams.
+    if (!checked) {
+      setSportsTeams((prev) => prev.filter((t) => !t.startsWith(`${key}:`)));
+    }
+  }
+
+  function toggleSportsTeam(teamKeyValue: string, checked: boolean) {
+    setSportsTeams((prev) => {
+      const set = new Set(prev);
+      if (checked) set.add(teamKeyValue);
+      else set.delete(teamKeyValue);
+      return Array.from(set);
+    });
+  }
+
   const qbStatusQuery = useGetQbittorrentStatus({
     query: {
       queryKey: getGetQbittorrentStatusQueryKey(),
@@ -261,6 +312,12 @@ export default function TileEditModal({ open, onOpenChange, tile, mode }: TileEd
     // Switching integrations invalidates the old metric keys; reset to "show
     // all" for the newly chosen service.
     setMetrics(null);
+    // Switching away from Sports clears its selections so a stale league/team
+    // filter never rides along to a different widget.
+    if (next !== TileIntegration.sports) {
+      setSportsLeagues([]);
+      setSportsTeams([]);
+    }
   }
 
   function toggleMetric(key: string, checked: boolean) {
@@ -497,8 +554,8 @@ export default function TileEditModal({ open, onOpenChange, tile, mode }: TileEd
       // Plain app/link tiles carry no metric selection.
       metrics: integration === NONE ? null : metrics,
       // tileSettings carries per-widget config: the qBittorrent category
-      // filter, the clock format options, or the weather options. Every other
-      // tile clears it.
+      // filter, the clock format options, the weather options, or the sports
+      // options. Every other tile clears it.
       tileSettings: isQbittorrent
         ? { categoryFilter, groupByCategory }
         : isClock
@@ -509,7 +566,14 @@ export default function TileEditModal({ open, onOpenChange, tile, mode }: TileEd
                 weatherLocation: weatherLocation.trim() || null,
                 weatherUnits,
               }
-            : null,
+            : isSports
+              ? {
+                  sportsLeagues,
+                  sportsTeams,
+                  sportsShowScores,
+                  sportsShowNews,
+                }
+              : null,
       gridX: tile?.gridX ?? 0,
       gridY: tile?.gridY ?? 0,
       gridW: tile?.gridW ?? 2,
@@ -1108,6 +1172,111 @@ export default function TileEditModal({ open, onOpenChange, tile, mode }: TileEd
                     <SelectItem value="f">Fahrenheit (°F)</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+            </div>
+          )}
+
+          {isSports && (
+            <div className="space-y-4 border-t border-border pt-4">
+              <div className="space-y-2">
+                <Label>Leagues</Label>
+                <p className="text-xs text-muted-foreground">
+                  Pick the leagues to follow. Scores and headlines cover every
+                  selected league.
+                </p>
+                <div className="space-y-2 pt-1">
+                  {SPORTS_LEAGUES.map((l) => (
+                    <label
+                      key={l.key}
+                      htmlFor={`league-${l.key}`}
+                      className="flex items-center gap-2 cursor-pointer select-none"
+                    >
+                      <Checkbox
+                        id={`league-${l.key}`}
+                        checked={sportsLeagues.includes(l.key)}
+                        onCheckedChange={(c) => toggleSportsLeague(l.key, c === true)}
+                      />
+                      <span className="text-sm">{l.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {sportsLeagues.length > 0 && (
+                <div className="space-y-2">
+                  <Label>Teams</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Optional. Narrow to specific teams — leave a league's teams
+                    unchecked to show all of its teams.
+                  </p>
+                  <div className="space-y-3 pt-1">
+                    {sportsTeamGroups.map(({ league, teams }) => (
+                        <div key={league} className="space-y-1.5">
+                          <div className="text-xs font-medium text-foreground">
+                            {SPORTS_LEAGUES.find((l) => l.key === league)?.label ?? league}
+                          </div>
+                          {teams.length === 0 ? (
+                            <p className="text-xs text-muted-foreground pl-1">
+                              No teams available.
+                            </p>
+                          ) : (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-44 overflow-y-auto pr-1">
+                              {teams.map((t) => (
+                                <label
+                                  key={t.key}
+                                  htmlFor={`team-${t.key}`}
+                                  className="flex items-center gap-2 cursor-pointer select-none"
+                                >
+                                  <Checkbox
+                                    id={`team-${t.key}`}
+                                    checked={sportsTeams.includes(t.key)}
+                                    onCheckedChange={(c) => toggleSportsTeam(t.key, c === true)}
+                                  />
+                                  <span className="text-sm truncate">{t.label}</span>
+                                </label>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <Label>Show</Label>
+                <label
+                  htmlFor="sports-scores"
+                  className="flex items-center gap-2 cursor-pointer select-none"
+                >
+                  <Checkbox
+                    id="sports-scores"
+                    checked={sportsShowScores}
+                    onCheckedChange={(c) => {
+                      const next = c === true;
+                      setSportsShowScores(next);
+                      // Keep at least one of scores/news on.
+                      if (!next && !sportsShowNews) setSportsShowNews(true);
+                    }}
+                  />
+                  <span className="text-sm">Live scores</span>
+                </label>
+                <label
+                  htmlFor="sports-news"
+                  className="flex items-center gap-2 cursor-pointer select-none"
+                >
+                  <Checkbox
+                    id="sports-news"
+                    checked={sportsShowNews}
+                    onCheckedChange={(c) => {
+                      const next = c === true;
+                      setSportsShowNews(next);
+                      // Keep at least one of scores/news on.
+                      if (!next && !sportsShowScores) setSportsShowScores(true);
+                    }}
+                  />
+                  <span className="text-sm">Breaking news</span>
+                </label>
               </div>
             </div>
           )}

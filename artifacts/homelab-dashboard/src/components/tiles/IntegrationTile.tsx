@@ -14,6 +14,7 @@ import TailscaleTile from "./TailscaleTile";
 import ErsatztvTile from "./ErsatztvTile";
 import ClockTile from "./ClockTile";
 import WeatherTile from "./WeatherTile";
+import SportsTile from "./SportsTile";
 import { resolveEnabledMetrics, tileDensity, type TileDensity } from "./metrics";
 import { resolveImageStyle } from "./imageStyle";
 import { openTileUrl } from "@/lib/utils";
@@ -31,6 +32,7 @@ export const INTEGRATION_LABELS: Record<string, string> = {
   [TileIntegration.ersatztv]: "ErsatzTV",
   [TileIntegration.clock]: "Local Time",
   [TileIntegration.weather]: "Weather",
+  [TileIntegration.sports]: "Sports",
 };
 
 // Props every integration widget receives: the resolved set of enabled metric
@@ -69,6 +71,8 @@ function renderStatusView(integration: string, props: WidgetProps) {
       return <ClockTile {...props} />;
     case TileIntegration.weather:
       return <WeatherTile {...props} />;
+    case TileIntegration.sports:
+      return <SportsTile {...props} />;
     default:
       return null;
   }

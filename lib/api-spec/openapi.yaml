@@ -623,7 +623,7 @@ components:
           enum: [app, truenas, media, sonarr, radarr, qbittorrent]
         integration:
           type: ["string", "null"]
-          enum: [truenas, media, sonarr, radarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, clock, weather, null]
+          enum: [truenas, media, sonarr, radarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, clock, weather, sports, null]
         gridX:
           type: integer
         gridY:
@@ -702,7 +702,7 @@ components:
           enum: [app, truenas, media, sonarr, radarr, qbittorrent]
         integration:
           type: ["string", "null"]
-          enum: [truenas, media, sonarr, radarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, clock, weather, null]
+          enum: [truenas, media, sonarr, radarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, clock, weather, sports, null]
         gridX:
           type: integer
         gridY:
@@ -745,7 +745,7 @@ components:
       properties:
         integration:
           type: ["string", "null"]
-          enum: [truenas, media, sonarr, radarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, clock, weather, null]
+          enum: [truenas, media, sonarr, radarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, clock, weather, sports, null]
         gridX:
           type: integer
         gridY:
@@ -787,7 +787,8 @@ components:
       description: >-
         Per-tile extra configuration for integration widgets. Null means no
         extra settings (the default). Carries the qBittorrent category filter,
-        the Local Time clock options, and the Weather tile options.
+        the Local Time clock options, the Weather tile options, and the Sports
+        tile options.
       type: ["object", "null"]
       properties:
         categoryFilter:
@@ -836,6 +837,35 @@ components:
             Fahrenheit. Absent or null defaults to "c".
           type: ["string", "null"]
           enum: ["c", "f", null]
+        sportsLeagues:
+          description: >-
+            League keys the Sports tile follows (e.g. "nfl", "nba", "eng.1").
+            Null or absent means none selected yet (the tile shows an empty
+            state until at least one league is chosen).
+          type: ["array", "null"]
+          items:
+            type: string
+        sportsTeams:
+          description: >-
+            Optional team allow-list for the Sports tile, scoped per league as
+            "<leagueKey>:<teamId>" (e.g. "nfl:12"). When a league has no entries
+            here, all of its teams are shown. Null or absent means no team
+            filtering (all teams in every selected league).
+          type: ["array", "null"]
+          items:
+            type: string
+        sportsShowScores:
+          description: >-
+            When true, the Sports tile shows live/recent scores. Absent or null
+            defaults to true. At least one of sportsShowScores / sportsShowNews
+            must be on.
+          type: ["boolean", "null"]
+        sportsShowNews:
+          description: >-
+            When true, the Sports tile shows the latest headlines. Absent or
+            null defaults to false. At least one of sportsShowScores /
+            sportsShowNews must be on.
+          type: ["boolean", "null"]
 
     LayoutItem:
       type: object

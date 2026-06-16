@@ -61,6 +61,7 @@ export const TileIntegration = {
   ersatztv: 'ersatztv',
   clock: 'clock',
   weather: 'weather',
+  sports: 'sports',
 } as const;
 
 /**
@@ -78,7 +79,7 @@ export const TileImageFit = {
 } as const;
 
 /**
- * Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, and the Weather tile options.
+ * Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.
  * @nullable
  */
 export type TileSettings = {
@@ -122,6 +123,26 @@ export type TileSettings = {
      * @nullable
      */
   weatherUnits?: 'c' | 'f' | null;
+  /**
+     * League keys the Sports tile follows (e.g. "nfl", "nba", "eng.1"). Null or absent means none selected yet (the tile shows an empty state until at least one league is chosen).
+     * @nullable
+     */
+  sportsLeagues?: string[] | null;
+  /**
+     * Optional team allow-list for the Sports tile, scoped per league as "<leagueKey>:<teamId>" (e.g. "nfl:12"). When a league has no entries here, all of its teams are shown. Null or absent means no team filtering (all teams in every selected league).
+     * @nullable
+     */
+  sportsTeams?: string[] | null;
+  /**
+     * When true, the Sports tile shows live/recent scores. Absent or null defaults to true. At least one of sportsShowScores / sportsShowNews must be on.
+     * @nullable
+     */
+  sportsShowScores?: boolean | null;
+  /**
+     * When true, the Sports tile shows the latest headlines. Absent or null defaults to false. At least one of sportsShowScores / sportsShowNews must be on.
+     * @nullable
+     */
+  sportsShowNews?: boolean | null;
 } | null | null;
 
 export interface Tile {
@@ -211,6 +232,7 @@ export const TileInputIntegration = {
   ersatztv: 'ersatztv',
   clock: 'clock',
   weather: 'weather',
+  sports: 'sports',
 } as const;
 
 export interface TileInput {
@@ -259,6 +281,7 @@ export const TileUpdateIntegration = {
   ersatztv: 'ersatztv',
   clock: 'clock',
   weather: 'weather',
+  sports: 'sports',
 } as const;
 
 export interface TileUpdate {

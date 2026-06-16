@@ -25,4 +25,5 @@ export const TileIntegration = {
   ersatztv: 'ersatztv',
   clock: 'clock',
   weather: 'weather',
+  sports: 'sports',
 } as const;

@@ -37,6 +37,10 @@ interface TileSettings {
   weatherAutoLocate?: boolean | null;
   weatherLocation?: string | null;
   weatherUnits?: "c" | "f" | null;
+  sportsLeagues?: string[] | null;
+  sportsTeams?: string[] | null;
+  sportsShowScores?: boolean | null;
+  sportsShowNews?: boolean | null;
 }
 
 // Copy the known keys of a tile-settings object into a clean TileSettings,
@@ -85,6 +89,30 @@ function pickTileSettings(obj: Record<string, unknown>): TileSettings {
     result.weatherUnits = obj["weatherUnits"];
   } else if (obj["weatherUnits"] === null) {
     result.weatherUnits = null;
+  }
+  if (Array.isArray(obj["sportsLeagues"])) {
+    result.sportsLeagues = obj["sportsLeagues"].filter(
+      (x): x is string => typeof x === "string",
+    );
+  } else if (obj["sportsLeagues"] === null) {
+    result.sportsLeagues = null;
+  }
+  if (Array.isArray(obj["sportsTeams"])) {
+    result.sportsTeams = obj["sportsTeams"].filter(
+      (x): x is string => typeof x === "string",
+    );
+  } else if (obj["sportsTeams"] === null) {
+    result.sportsTeams = null;
+  }
+  if (typeof obj["sportsShowScores"] === "boolean") {
+    result.sportsShowScores = obj["sportsShowScores"];
+  } else if (obj["sportsShowScores"] === null) {
+    result.sportsShowScores = null;
+  }
+  if (typeof obj["sportsShowNews"] === "boolean") {
+    result.sportsShowNews = obj["sportsShowNews"];
+  } else if (obj["sportsShowNews"] === null) {
+    result.sportsShowNews = null;
   }
   return result;
 }
