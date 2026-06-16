@@ -65,58 +65,26 @@
   --radius-md: var(--radius);
   --radius-lg: var(--radius);
   --radius-xl: var(--radius);
+
+  /* Theme-aware elevation: each theme supplies its own --app-shadow-*
+     (flat for Rack, soft for light themes, glow for Nebula). */
+  --shadow-sm: var(--app-shadow-sm);
+  --shadow-md: var(--app-shadow-md);
+  --shadow-lg: var(--app-shadow-lg);
+  --shadow-xl: var(--app-shadow-xl);
+  --shadow-2xl: var(--app-shadow-2xl);
 }
 
-/* RACK — dark terminal command-center theme */
+/*
+ * Multi-theme token system. Shared constants and the derived opaque-border
+ * tokens live in :root; each theme overrides the raw palette / fonts / radius
+ * via [data-theme="..."] on <html>. The derived borders recompute against the
+ * active theme because every selector here targets the same documentElement.
+ * Rack is also the default palette in :root, so an unset data-theme still works.
+ */
 :root {
-  --button-outline: rgba(255,255,255, .10);
-  --badge-outline: rgba(255,255,255, .05);
   --opaque-button-border-intensity: 9;
 
-  --elevate-1: rgba(255,255,255, .04);
-  --elevate-2: rgba(255,255,255, .09);
-
-  --background: 240 11% 4%;
-  --foreground: 0 0% 90%;
-  --border: 0 0% 20%;
-  --card: 240 9% 6%;
-  --card-foreground: 0 0% 90%;
-  --card-border: 0 0% 20%;
-  --sidebar: 240 11% 4%;
-  --sidebar-foreground: 0 0% 90%;
-  --sidebar-border: 0 0% 20%;
-  --sidebar-primary: 41 100% 50%;
-  --sidebar-primary-foreground: 0 0% 5%;
-  --sidebar-accent: 240 6% 12%;
-  --sidebar-accent-foreground: 0 0% 90%;
-  --sidebar-ring: 41 100% 50%;
-  --popover: 240 9% 6%;
-  --popover-foreground: 0 0% 90%;
-  --popover-border: 0 0% 20%;
-  --primary: 41 100% 50%;
-  --primary-foreground: 0 0% 5%;
-  --secondary: 240 6% 12%;
-  --secondary-foreground: 0 0% 90%;
-  --muted: 240 6% 16%;
-  --muted-foreground: 240 5% 55%;
-  --accent: 41 100% 50%;
-  --accent-foreground: 0 0% 5%;
-  --destructive: 0 84% 60%;
-  --destructive-foreground: 0 0% 100%;
-  --input: 0 0% 20%;
-  --ring: 41 100% 50%;
-  
-  --chart-1: 41 100% 50%;
-  --chart-2: 0 0% 90%;
-  --chart-3: 200 80% 50%;
-  --chart-4: 150 80% 50%;
-  --chart-5: 300 80% 50%;
-
-  --app-font-sans: 'Space Mono', ui-monospace, 'Courier New', monospace;
-  --app-font-serif: Georgia, serif;
-  --app-font-mono: 'Space Mono', ui-monospace, 'Courier New', monospace;
-  --radius: 0rem;
-  
   --shadow-sm: 0px 2px 4px rgba(0, 0, 0, 0.05);
   --shadow: 0px 4px 12px rgba(0, 0, 0, 0.08);
   --shadow-md: 0px 8px 24px rgba(0, 0, 0, 0.12);
@@ -136,13 +104,10 @@
   --accent-border: hsl(from hsl(var(--accent)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
   --destructive-border: hsl(var(--destructive));
   --destructive-border: hsl(from hsl(var(--destructive)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
-}
 
-.dark {
+  /* RACK — dark terminal command-center (default) */
   --button-outline: rgba(255,255,255, .10);
   --badge-outline: rgba(255,255,255, .05);
-  --opaque-button-border-intensity: 9;
-
   --elevate-1: rgba(255,255,255, .04);
   --elevate-2: rgba(255,255,255, .09);
 
@@ -175,12 +140,200 @@
   --destructive-foreground: 0 0% 100%;
   --input: 0 0% 20%;
   --ring: 41 100% 50%;
-  
+
   --chart-1: 41 100% 50%;
   --chart-2: 0 0% 90%;
   --chart-3: 200 80% 50%;
   --chart-4: 150 80% 50%;
   --chart-5: 300 80% 50%;
+
+  --app-font-sans: 'Space Mono', ui-monospace, 'Courier New', monospace;
+  --app-font-serif: Georgia, serif;
+  --app-font-mono: 'Space Mono', ui-monospace, 'Courier New', monospace;
+  --radius: 0rem;
+
+  /* Rack is flat & hard-edged — elevation comes from borders, not shadows. */
+  --app-shadow-sm: 0 1px 2px rgba(0,0,0,.5);
+  --app-shadow-md: 0 2px 8px rgba(0,0,0,.55);
+  --app-shadow-lg: 0 10px 24px rgba(0,0,0,.6);
+  --app-shadow-xl: 0 16px 36px rgba(0,0,0,.65);
+  --app-shadow-2xl: 0 28px 64px rgba(0,0,0,.75);
+}
+
+/* HEARTH — warm light: cream, burnt-orange, Fraunces + DM Sans, large radius */
+[data-theme="hearth"] {
+  --button-outline: rgba(67,44,26, .10);
+  --badge-outline: rgba(67,44,26, .06);
+  --elevate-1: rgba(67,44,26, .04);
+  --elevate-2: rgba(67,44,26, .08);
+
+  --background: 38 50% 97%;
+  --foreground: 26 44% 18%;
+  --border: 32 34% 93%;
+  --card: 0 0% 100%;
+  --card-foreground: 26 44% 18%;
+  --card-border: 32 34% 93%;
+  --sidebar: 38 50% 97%;
+  --sidebar-foreground: 26 44% 18%;
+  --sidebar-border: 32 34% 93%;
+  --sidebar-primary: 24 66% 53%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 30 45% 91%;
+  --sidebar-accent-foreground: 26 44% 18%;
+  --sidebar-ring: 24 66% 53%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 26 44% 18%;
+  --popover-border: 30 30% 87%;
+  --primary: 24 66% 53%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 30 45% 91%;
+  --secondary-foreground: 26 44% 18%;
+  --muted: 33 35% 92%;
+  --muted-foreground: 26 26% 44%;
+  --accent: 30 45% 90%;
+  --accent-foreground: 26 44% 18%;
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 100%;
+  --input: 30 30% 87%;
+  --ring: 24 66% 53%;
+
+  --chart-1: 24 66% 53%;
+  --chart-2: 16 60% 45%;
+  --chart-3: 40 70% 55%;
+  --chart-4: 130 30% 45%;
+  --chart-5: 350 55% 55%;
+
+  --app-font-sans: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
+  --app-font-serif: 'Fraunces', Georgia, serif;
+  --app-font-mono: ui-monospace, 'Courier New', monospace;
+  --radius: 1.25rem;
+}
+
+/* NEBULA — dark cool: deep indigo, violet primary + cyan accent, Space Grotesk */
+[data-theme="nebula"] {
+  --button-outline: rgba(255,255,255, .10);
+  --badge-outline: rgba(255,255,255, .05);
+  --elevate-1: rgba(255,255,255, .05);
+  --elevate-2: rgba(255,255,255, .10);
+
+  --background: 245 45% 7%;
+  --foreground: 240 20% 92%;
+  --border: 252 42% 34%;
+  --card: 244 38% 11%;
+  --card-foreground: 240 20% 92%;
+  --card-border: 252 42% 34%;
+  --sidebar: 245 45% 7%;
+  --sidebar-foreground: 240 20% 92%;
+  --sidebar-border: 252 42% 34%;
+  --sidebar-primary: 255 95% 68%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 244 30% 18%;
+  --sidebar-accent-foreground: 240 20% 92%;
+  --sidebar-ring: 255 95% 68%;
+  --popover: 244 38% 11%;
+  --popover-foreground: 240 20% 92%;
+  --popover-border: 244 25% 22%;
+  --primary: 255 95% 68%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 244 30% 18%;
+  --secondary-foreground: 240 20% 92%;
+  --muted: 244 25% 20%;
+  --muted-foreground: 240 15% 65%;
+  --accent: 188 84% 53%;
+  --accent-foreground: 245 45% 7%;
+  --destructive: 0 72% 55%;
+  --destructive-foreground: 0 0% 100%;
+  --input: 244 25% 22%;
+  --ring: 255 95% 68%;
+
+  --chart-1: 255 95% 68%;
+  --chart-2: 188 84% 53%;
+  --chart-3: 280 70% 65%;
+  --chart-4: 210 80% 60%;
+  --chart-5: 320 70% 62%;
+
+  --app-font-sans: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif;
+  --app-font-serif: Georgia, serif;
+  --app-font-mono: 'Space Mono', ui-monospace, 'Courier New', monospace;
+  --radius: 0.75rem;
+}
+
+/* ============================================================
+ * Structural theme traits — variety beyond color. Each theme gets
+ * its own elevation, ambient background, and typographic voice so
+ * themes differ in FORM, not just palette. Only three themes remain and
+ * each is pushed hard so they read as different products:
+ *   RACK   — dark terminal: flat surfaces, hard grid, UPPERCASE mono labels.
+ *   HEARTH — warm editorial: borderless cards floating on soft diffuse
+ *            shadows, gradient wash, serif headings, no caps.
+ *   NEBULA — cosmic: translucent glass cards, colored glow, geometric sans,
+ *            no caps (so it never reads as a Rack recolor).
+ * ============================================================ */
+
+/* Elevation — Rack stays flat (defined in :root); Hearth gets soft diffuse
+   shadows that carry the borderless cards; Nebula gets colored glow. */
+[data-theme="hearth"] {
+  --app-shadow-sm: 0 1px 2px hsl(26 44% 18% / .05);
+  --app-shadow-md: 0 6px 20px hsl(26 44% 18% / .10);
+  --app-shadow-lg: 0 18px 40px hsl(26 44% 18% / .12);
+  --app-shadow-xl: 0 26px 52px hsl(26 44% 18% / .14);
+  --app-shadow-2xl: 0 36px 72px hsl(26 44% 18% / .17);
+}
+[data-theme="nebula"] {
+  --app-shadow-sm: 0 1px 2px rgba(0,0,0,.5);
+  --app-shadow-md: 0 4px 18px hsl(255 95% 62% / .24);
+  --app-shadow-lg: 0 12px 36px hsl(255 95% 62% / .30);
+  --app-shadow-xl: 0 16px 48px hsl(255 95% 62% / .34);
+  --app-shadow-2xl: 0 0 70px hsl(255 95% 62% / .32), 0 26px 64px rgba(0,0,0,.6);
+}
+
+/* Ambient backgrounds — Rack keeps its technical grid (the default
+   .bg-dot-pattern below); Hearth gets a soft warm gradient wash with no
+   grid; Nebula gets pure cosmic glows (no grid, so it stays distinct from
+   Rack). These override the default .bg-dot-pattern grid. */
+[data-theme="hearth"] .bg-dot-pattern {
+  background-image:
+    radial-gradient(1200px 600px at 78% -12%, hsl(24 66% 53% / .14), transparent 60%),
+    radial-gradient(1000px 520px at -8% 112%, hsl(40 72% 55% / .12), transparent 55%);
+  background-size: cover;
+  background-attachment: fixed;
+}
+[data-theme="nebula"] .bg-dot-pattern {
+  background-image:
+    radial-gradient(900px 640px at 82% -16%, hsl(255 95% 68% / .26), transparent 60%),
+    radial-gradient(760px 540px at -6% 112%, hsl(188 84% 53% / .18), transparent 55%),
+    radial-gradient(620px 460px at 50% 120%, hsl(280 80% 60% / .12), transparent 60%);
+  background-size: cover;
+  background-attachment: fixed;
+}
+
+/* Nebula reads as glass: translucent, blurred card surfaces over the glow.
+   (Dropdowns/popovers use --popover and are unaffected.) */
+[data-theme="nebula"] .bg-card {
+  background-color: hsl(244 38% 11% / .55);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* Typographic voice — only Rack keeps the techy UPPERCASE + wide tracking;
+   Hearth and Nebula drop the caps so neither reads as a Rack recolor. */
+[data-theme="hearth"] .uppercase,
+[data-theme="nebula"] .uppercase {
+  text-transform: none;
+}
+[data-theme="hearth"] .tracking-widest,
+[data-theme="nebula"] .tracking-widest,
+[data-theme="hearth"] .tracking-wider,
+[data-theme="nebula"] .tracking-wider {
+  letter-spacing: normal;
+}
+
+/* Hearth reads as warm editorial: serif headings. */
+[data-theme="hearth"] h1,
+[data-theme="hearth"] h2,
+[data-theme="hearth"] h3 {
+  font-family: var(--app-font-serif);
+  letter-spacing: -0.01em;
 }
 
 @layer base {

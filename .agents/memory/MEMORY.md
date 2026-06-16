@@ -2,7 +2,7 @@
 - [SQLite data dir](sqlite-datadir.md) — DATA_DIR defaults to ./data (not /data) in dev; /data only exists in Docker
 - [TanStack Query v5 onError](tanstack-query-v5.md) — onError removed from useQuery options in v5; use useEffect + isError instead
 - [JWT secret self-host](jwt-secret-self-host.md) — prod auto-generates + persists a random JWT secret in DATA_DIR (no fail-closed); keep compose JWT_SECRET default empty
-- [Homelab theming](homelab-theming.md) — reskin whole app via index.css tokens; mirror :root/.dark, set all --radius-* (not just --radius) for sharp corners, watch hardcoded color leaks, verify authed views with runTest.
+- [Homelab theming](homelab-theming.md) — reskin via index.css tokens; now a 6-theme picker (data-theme attr, before-paint script, per-theme color overrides), NOT :root/.dark; set all --radius-* for sharp corners, verify authed views with runTest.
 - [service_connections is global](service-connections-global.md) — table keyed by service only (no userId); rows shared across all users; PUT clobbers real settings, beware testing on live.
 - [Widget data + HTTP convention](widget-data-convention.md) — mock only when unconfigured, configured-failure→502; shared httpClient (self-signed TLS) in lib/http.ts; TrueNAS/Sonarr/Radarr/qBittorrent API gotchas.
 - [Self-hosted Docker glibc base](docker-glibc-lockfile.md) — lockfile strips non-host native binaries; build with node:*-slim (glibc), NOT alpine/musl, or rollup/lightningcss/better-sqlite3 fail.

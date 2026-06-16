@@ -3,19 +3,146 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
-    <title>Homelab Dashboard</title>
-    <meta name="description" content="Homelab Dashboard — built on Replit. Update this description to reflect the app." />
+    <title>HomeHub</title>
+    <meta name="description" content="HomeHub — one calm dashboard for every service on your home network." />
     <meta name="robots" content="index, follow" />
-    <meta property="og:title" content="Homelab Dashboard" />
-    <meta property="og:description" content="Homelab Dashboard — built on Replit. Update this description to reflect the app." />
+    <meta property="og:title" content="HomeHub" />
+    <meta property="og:description" content="HomeHub — one calm dashboard for every service on your home network." />
     <meta property="og:type" content="website" />
+    <meta property="og:image" content="/opengraph.jpg" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Homelab Dashboard" />
-    <meta name="twitter:description" content="Homelab Dashboard — built on Replit. Update this description to reflect the app." />
+    <meta name="twitter:title" content="HomeHub" />
+    <meta name="twitter:description" content="HomeHub — one calm dashboard for every service on your home network." />
+    <meta name="twitter:image" content="/opengraph.jpg" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Space+Grotesk:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=DM+Sans:wght@400;500;600;700&family=Outfit:wght@300;400;500;600;700&family=Nunito+Sans:wght@400;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+      /*
+       * Applies the saved HomeHub theme + per-theme custom color overrides
+       * synchronously, before first paint, to avoid a flash of the wrong theme.
+       * Exposed as window.__homehubApplyTheme so the React layer reuses the exact
+       * same color-derivation math for live updates (single source of truth).
+       */
+      (function () {
+        var THEME_KEY = "homehub:theme";
+        var COLORS_KEY = "homehub:colors";
+        var DEFAULT_THEME = "rack";
+        var KNOWN = ["rack", "hearth", "nebula"];
+
+        // Inline overrides we set / clear so re-applying never leaves stale vars.
+        var OVERRIDE_VARS = [
+          "--background", "--foreground", "--card", "--card-foreground",
+          "--card-border", "--popover", "--popover-foreground", "--popover-border",
+          "--sidebar", "--sidebar-foreground", "--sidebar-border",
+          "--sidebar-accent", "--sidebar-accent-foreground",
+          "--secondary", "--secondary-foreground", "--muted", "--muted-foreground",
+          "--accent", "--accent-foreground", "--border", "--input",
+          "--primary", "--primary-foreground", "--sidebar-primary",
+          "--sidebar-primary-foreground", "--ring", "--sidebar-ring", "--chart-1"
+        ];
+
+        function clamp(n, lo, hi) { return Math.min(hi, Math.max(lo, n)); }
+
+        function hexToHsl(hex) {
+          if (typeof hex !== "string") return null;
+          var m = hex.trim().replace(/^#/, "");
+          if (m.length === 3) m = m[0] + m[0] + m[1] + m[1] + m[2] + m[2];
+          if (m.length !== 6 || /[^0-9a-fA-F]/.test(m)) return null;
+          var r = parseInt(m.slice(0, 2), 16) / 255;
+          var g = parseInt(m.slice(2, 4), 16) / 255;
+          var b = parseInt(m.slice(4, 6), 16) / 255;
+          var max = Math.max(r, g, b), min = Math.min(r, g, b);
+          var h = 0, s = 0, l = (max + min) / 2;
+          var d = max - min;
+          if (d !== 0) {
+            s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+            if (max === r) h = (g - b) / d + (g < b ? 6 : 0);
+            else if (max === g) h = (b - r) / d + 2;
+            else h = (r - g) / d + 4;
+            h *= 60;
+          }
+          return { h: Math.round(h), s: Math.round(s * 100), l: Math.round(l * 100) };
+        }
+
+        function triplet(h, s, l) {
+          return Math.round(h) + " " + clamp(Math.round(s), 0, 100) + "% " + clamp(Math.round(l), 0, 100) + "%";
+        }
+
+        function applyBackground(root, hsl) {
+          var isLight = hsl.l > 50;
+          var h = hsl.h, s = Math.min(hsl.s, 40);
+          // contrasting foreground
+          var fg = triplet(h, Math.min(s, 14), isLight ? 16 : 92);
+          var cardL = isLight ? clamp(hsl.l + 2, 0, 100) : clamp(hsl.l + 4, 0, 100);
+          var subtleL = isLight ? clamp(hsl.l - 5, 0, 100) : clamp(hsl.l + 8, 0, 100);
+          var borderL = isLight ? clamp(hsl.l - 12, 0, 100) : clamp(hsl.l + 14, 0, 100);
+          var mutedFgL = isLight ? 42 : 62;
+
+          root.style.setProperty("--background", triplet(h, hsl.s, hsl.l));
+          root.style.setProperty("--foreground", fg);
+          root.style.setProperty("--card", triplet(h, s, cardL));
+          root.style.setProperty("--card-foreground", fg);
+          root.style.setProperty("--card-border", triplet(h, s, borderL));
+          root.style.setProperty("--popover", triplet(h, s, cardL));
+          root.style.setProperty("--popover-foreground", fg);
+          root.style.setProperty("--popover-border", triplet(h, s, borderL));
+          root.style.setProperty("--sidebar", triplet(h, hsl.s, hsl.l));
+          root.style.setProperty("--sidebar-foreground", fg);
+          root.style.setProperty("--sidebar-border", triplet(h, s, borderL));
+          root.style.setProperty("--sidebar-accent", triplet(h, s, subtleL));
+          root.style.setProperty("--sidebar-accent-foreground", fg);
+          root.style.setProperty("--secondary", triplet(h, s, subtleL));
+          root.style.setProperty("--secondary-foreground", fg);
+          root.style.setProperty("--muted", triplet(h, s, subtleL));
+          root.style.setProperty("--muted-foreground", triplet(h, Math.min(s, 18), mutedFgL));
+          root.style.setProperty("--accent", triplet(h, s, subtleL));
+          root.style.setProperty("--accent-foreground", fg);
+          root.style.setProperty("--border", triplet(h, s, borderL));
+          root.style.setProperty("--input", triplet(h, s, borderL));
+        }
+
+        function applyPrimary(root, hsl) {
+          var t = triplet(hsl.h, hsl.s, hsl.l);
+          var fg = hsl.l > 55 ? "0 0% 8%" : "0 0% 100%";
+          root.style.setProperty("--primary", t);
+          root.style.setProperty("--primary-foreground", fg);
+          root.style.setProperty("--sidebar-primary", t);
+          root.style.setProperty("--sidebar-primary-foreground", fg);
+          root.style.setProperty("--ring", t);
+          root.style.setProperty("--sidebar-ring", t);
+          root.style.setProperty("--chart-1", t);
+        }
+
+        window.__homehubApplyTheme = function (theme, colors) {
+          var root = document.documentElement;
+          if (KNOWN.indexOf(theme) === -1) theme = DEFAULT_THEME;
+          root.setAttribute("data-theme", theme);
+          for (var i = 0; i < OVERRIDE_VARS.length; i++) {
+            root.style.removeProperty(OVERRIDE_VARS[i]);
+          }
+          colors = colors || {};
+          if (colors.background) {
+            var bg = hexToHsl(colors.background);
+            if (bg) applyBackground(root, bg);
+          }
+          if (colors.primary) {
+            var pr = hexToHsl(colors.primary);
+            if (pr) applyPrimary(root, pr);
+          }
+        };
+
+        try {
+          var theme = localStorage.getItem(THEME_KEY) || DEFAULT_THEME;
+          var all = {};
+          try { all = JSON.parse(localStorage.getItem(COLORS_KEY) || "{}") || {}; } catch (e) { all = {}; }
+          window.__homehubApplyTheme(theme, all[theme]);
+        } catch (e) {
+          document.documentElement.setAttribute("data-theme", DEFAULT_THEME);
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

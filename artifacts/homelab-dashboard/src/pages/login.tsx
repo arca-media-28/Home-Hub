@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useLocation, Link } from "wouter";
 import { useLogin } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
-import { Terminal, User, Lock, ChevronRight } from "lucide-react";
+import { Boxes, User, Lock, ChevronRight } from "lucide-react";
 
 export default function Login() {
   const [, setLocation] = useLocation();
@@ -39,13 +39,13 @@ export default function Login() {
 
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-2">
-            <Terminal className="w-5 h-5 text-primary" />
+            <Boxes className="w-5 h-5 text-primary" />
             <h1 className="text-xl font-bold text-foreground uppercase tracking-widest">
               Welcome back
             </h1>
           </div>
           <p className="text-sm text-muted-foreground">
-            Sign in to your homelab dashboard
+            Sign in to HomeHub
           </p>
         </div>
 

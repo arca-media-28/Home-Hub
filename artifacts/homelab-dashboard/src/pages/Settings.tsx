@@ -16,8 +16,9 @@ import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import AppearanceSettings from "@/components/AppearanceSettings";
 import {
-  Terminal,
+  Boxes,
   ArrowLeft,
   Loader2,
   Check,
@@ -358,7 +359,7 @@ export default function Settings() {
       <header className="sticky top-0 z-30 border-b border-border bg-background/80 backdrop-blur-sm">
         <div className="max-w-screen-md mx-auto px-4 h-14 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
-            <Terminal className="w-5 h-5 text-primary" />
+            <Boxes className="w-5 h-5 text-primary" />
             <span className="font-bold text-sm uppercase tracking-widest text-foreground">
               Settings
             </span>
@@ -376,6 +377,8 @@ export default function Settings() {
       </header>
 
       <main className="max-w-screen-md mx-auto px-4 py-6">
+        <AppearanceSettings />
+
         <div className="mb-6">
           <h1 className="font-bold uppercase tracking-widest text-foreground">
             Service connections
