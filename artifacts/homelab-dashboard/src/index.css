@@ -346,6 +346,37 @@
   }
 }
 
+/* Theme-aware scrollbars. References the same per-[data-theme] HSL tokens, so
+   they recolor automatically on theme switch — no JS needed. Slim track uses
+   muted/border; thumb uses primary and brightens to foreground on hover. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--primary)) hsl(var(--muted));
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background-color: hsl(var(--muted));
+  border: 1px solid hsl(var(--border));
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: hsl(var(--primary));
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: hsl(var(--foreground));
+}
+
+::-webkit-scrollbar-corner {
+  background-color: hsl(var(--muted));
+}
+
 .bg-dot-pattern {
   background-image:
     linear-gradient(hsl(var(--primary) / 0.05) 1px, transparent 1px),
