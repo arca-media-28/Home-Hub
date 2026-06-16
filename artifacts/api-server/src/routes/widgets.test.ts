@@ -23,11 +23,16 @@ vi.mock("../lib/db.js", () => ({
 const httpGet = vi.fn();
 const httpPost = vi.fn();
 const httpDelete = vi.fn();
+// Tailscale (and other cloud-only services) use the TLS-verifying cloud client.
+const cloudGet = vi.fn();
 vi.mock("../lib/http.js", () => ({
   httpClient: {
     get: (...args: unknown[]) => httpGet(...args),
     post: (...args: unknown[]) => httpPost(...args),
     delete: (...args: unknown[]) => httpDelete(...args),
+  },
+  cloudHttpClient: {
+    get: (...args: unknown[]) => cloudGet(...args),
   },
   normalizeBaseUrl: (url: string | undefined | null) => {
     const trimmed = url?.trim();
@@ -81,6 +86,7 @@ beforeEach(() => {
   httpGet.mockReset();
   httpPost.mockReset();
   httpDelete.mockReset();
+  cloudGet.mockReset();
   httpDelete.mockResolvedValue({ data: {} });
   // Default: every service is unconfigured unless a test says otherwise.
   findByService.mockReturnValue(undefined);
@@ -1018,5 +1024,113 @@ describe("GET /widgets/news", () => {
     const res = await request(app).get("/widgets/news?url=https://example.com/notafeed");
     expect(res.status).toBe(502);
     expect(res.body.error).toMatch(/feed/i);
+  });
+});
+
+// ── Tailscale ───────────────────────────────────────────────────────────────
+describe("GET /widgets/tailscale", () => {
+  it("returns sample data when unconfigured", async () => {
+    const res = await request(app).get("/widgets/tailscale");
+    expect(res.status).toBe(200);
+    expect(res.body.tailnet).toBe("example.ts.net");
+    expect(res.body.deviceCount).toBe(4);
+    expect(res.body.devices).toHaveLength(4);
+    // Sample devices carry addresses so the tile preview renders without a
+    // live connection.
+    expect(res.body.devices[0].addresses).toEqual(["100.64.0.1", "fd7a:115c:a1e0::1"]);
+    // Sample data must not hit the cloud API.
+    expect(cloudGet).not.toHaveBeenCalled();
+  });
+
+  it("maps live devices: addresses, online and exit-node derivation", async () => {
+    findByService.mockReturnValue(
+      connRow({ service: "tailscale", url: "example.ts.net", api_key: "tskey-abc" }),
+    );
+
+    const now = Date.now();
+    cloudGet.mockResolvedValue({
+      data: {
+        devices: [
+          {
+            // Online (seen 1 min ago) and an approved IPv4 exit node.
+            id: "node-1",
+            hostname: "homelab-nas",
+            name: "homelab-nas.example.ts.net",
+            os: "linux",
+            lastSeen: new Date(now - 60_000).toISOString(),
+            enabledRoutes: ["0.0.0.0/0", "192.168.1.0/24"],
+            addresses: ["100.64.0.10", "fd7a:115c:a1e0::a"],
+            keyExpiryDisabled: true,
+          },
+          {
+            // Offline (seen 2 days ago); merely advertises (not enabled) the
+            // default route, so it is NOT an exit node.
+            nodeId: "node-2",
+            name: "old-laptop.example.ts.net",
+            os: "windows",
+            lastSeen: new Date(now - 2 * 86400_000).toISOString(),
+            enabledRoutes: [],
+            advertisedRoutes: ["0.0.0.0/0"],
+            addresses: ["100.64.0.20"],
+          },
+        ],
+      },
+    });
+
+    const res = await request(app).get("/widgets/tailscale");
+    expect(res.status).toBe(200);
+    expect(res.body.tailnet).toBe("example.ts.net");
+    expect(res.body.deviceCount).toBe(2);
+    expect(res.body.onlineCount).toBe(1);
+    expect(res.body.offlineCount).toBe(1);
+    // Only online exit nodes are counted.
+    expect(res.body.exitNodeCount).toBe(1);
+
+    const [nas, laptop] = res.body.devices;
+    expect(nas.id).toBe("node-1");
+    // Prefers the short hostname over the full DNS name.
+    expect(nas.name).toBe("homelab-nas");
+    expect(nas.online).toBe(true);
+    expect(nas.exitNode).toBe(true);
+    expect(nas.addresses).toEqual(["100.64.0.10", "fd7a:115c:a1e0::a"]);
+
+    expect(laptop.id).toBe("node-2");
+    // Falls back to the first DNS label when there is no hostname.
+    expect(laptop.name).toBe("old-laptop");
+    expect(laptop.online).toBe(false);
+    expect(laptop.exitNode).toBe(false);
+    expect(laptop.addresses).toEqual(["100.64.0.20"]);
+
+    // Cloud API is queried with the saved token and fields=all.
+    const [url, opts] = cloudGet.mock.calls[0]!;
+    expect(url).toContain("/tailnet/example.ts.net/devices");
+    expect(opts.headers.Authorization).toBe("Bearer tskey-abc");
+    expect(opts.params.fields).toBe("all");
+    // Live data must not produce a missing-address field.
+    expect(httpGet).not.toHaveBeenCalled();
+  });
+
+  it("defaults addresses to an empty array when absent", async () => {
+    findByService.mockReturnValue(
+      connRow({ service: "tailscale", url: "example.ts.net", api_key: "tskey-abc" }),
+    );
+    cloudGet.mockResolvedValue({
+      data: { devices: [{ id: "n", hostname: "h", os: "linux", lastSeen: new Date().toISOString() }] },
+    });
+
+    const res = await request(app).get("/widgets/tailscale");
+    expect(res.status).toBe(200);
+    expect(res.body.devices[0].addresses).toEqual([]);
+  });
+
+  it("returns 502 on upstream failure (no sample fallback)", async () => {
+    findByService.mockReturnValue(
+      connRow({ service: "tailscale", url: "example.ts.net", api_key: "tskey-abc" }),
+    );
+    cloudGet.mockRejectedValue(httpError(500));
+
+    const res = await request(app).get("/widgets/tailscale");
+    expect(res.status).toBe(502);
+    expect(res.body.error).toMatch(/tailscale/i);
   });
 });
