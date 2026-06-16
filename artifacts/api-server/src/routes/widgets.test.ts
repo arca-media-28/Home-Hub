@@ -361,9 +361,25 @@ describe("GET /widgets/truenas", () => {
       core: [{ name: "cpu", legend: ["time", "idle"], data: [[1000, 80]] }],
       // interface throughput is kilobits/s (→ Mbps is /1000); arcactualrate is
       // hits/misses per second (→ 9000/(9000+1000) = 90% hit); arcsize is bytes.
+      // Two data rows per graph so the route can build a per-sample series. The
+      // current value is taken from the LAST row.
       extras: [
-        { name: "interface", legend: ["time", "received", "sent"], data: [[1000, 184600, 42300]] },
-        { name: "arcactualrate", legend: ["time", "hits", "misses"], data: [[1000, 9000, 1000]] },
+        {
+          name: "interface",
+          legend: ["time", "received", "sent"],
+          data: [
+            [1000, 120000, 30000],
+            [1060, 184600, 42300],
+          ],
+        },
+        {
+          name: "arcactualrate",
+          legend: ["time", "hits", "misses"],
+          data: [
+            [1000, 8000, 2000],
+            [1060, 9000, 1000],
+          ],
+        },
         { name: "arcsize", legend: ["time", "arc_size"], data: [[1000, 31.4e9]] },
       ],
     });
@@ -375,6 +391,17 @@ describe("GET /widgets/truenas", () => {
     expect(res.body.netOutMbps).toBe(42.3);
     expect(res.body.arcHitRatio).toBe(90);
     expect(res.body.arcSizeGb).toBeCloseTo(31.4, 1);
+    // Per-sample series (kilobits/s → Mbps; ARC hit ratio per row).
+    expect(res.body.netInSeries).toEqual([120, 184.6]);
+    expect(res.body.netOutSeries).toEqual([30, 42.3]);
+    expect(res.body.arcHitSeries).toEqual([80, 90]);
+    // The extras call must request a longer, NON-aggregated window so the data
+    // rows form a series (aggregate:true collapses them to a single mean).
+    const extraReportingCall = httpPost.mock.calls.find(
+      ([, body]: [string, { graphs: Array<{ name?: string }>; reporting_query?: { aggregate?: boolean } }]) =>
+        body.graphs.some((g) => g.name === "interface"),
+    );
+    expect(extraReportingCall![1].reporting_query?.aggregate).toBe(false);
     // CPU still parsed from the core call.
     expect(res.body.cpuPercent).toBe(20);
 
@@ -412,6 +439,10 @@ describe("GET /widgets/truenas", () => {
     expect(res.body.netOutMbps).toBeNull();
     expect(res.body.arcHitRatio).toBeNull();
     expect(res.body.arcSizeGb).toBeNull();
+    // Series fall back to empty (not null) so the tile simply omits the sparkline.
+    expect(res.body.netInSeries).toEqual([]);
+    expect(res.body.netOutSeries).toEqual([]);
+    expect(res.body.arcHitSeries).toEqual([]);
   });
 
   it("includes network and ARC sample values when unconfigured", async () => {
@@ -421,6 +452,11 @@ describe("GET /widgets/truenas", () => {
     expect(res.body.netOutMbps).toBe(42.3);
     expect(res.body.arcHitRatio).toBe(98.7);
     expect(res.body.arcSizeGb).toBe(31.4);
+    // Sample series are non-empty so the sparkline renders on dev/Replit.
+    expect(res.body.netInSeries.length).toBeGreaterThan(2);
+    expect(res.body.arcHitSeries.length).toBeGreaterThan(2);
+    // ARC hit ratio is a percentage, so the sample stays within 0-100.
+    expect(Math.max(...res.body.arcHitSeries)).toBeLessThanOrEqual(100);
   });
 });
 

@@ -146,6 +146,57 @@ function pickLegendValue(map: Record<string, number>, keys: string[]): number | 
   return null;
 }
 
+// Extract the chronological per-sample series for a single legend column from a
+// graph's raw `data` rows (one value per time step, oldest→newest). The first
+// matching candidate key wins. Returns [] when the column is absent or there are
+// no rows. Unlike latestByLegend this never collapses to the aggregated mean — a
+// sparkline needs the individual samples, so the extras call must request the
+// window WITHOUT aggregation for these to be populated.
+function seriesByLegend(graph: unknown, keys: string[]): number[] {
+  const g = graph as { legend?: string[]; data?: number[][] } | undefined;
+  const legend = g?.legend ?? [];
+  const rows = g?.data ?? [];
+  if (legend.length === 0 || rows.length === 0) return [];
+  let idx = -1;
+  for (const key of keys) {
+    const i = legend.indexOf(key);
+    if (i >= 0) {
+      idx = i;
+      break;
+    }
+  }
+  if (idx < 0) return [];
+  const out: number[] = [];
+  for (const row of rows) {
+    const v = row?.[idx];
+    if (typeof v === "number" && Number.isFinite(v)) out.push(v);
+  }
+  return out;
+}
+
+// Build a deterministic, gently-wiggling demo series ending near `base`, clamped
+// to [min, max]. Used only for the unconfigured sample payload so the sparkline
+// renders something representative on Replit/dev where no NAS is reachable.
+function sampleSeries(base: number, amp: number, min: number, max: number, n = 30): number[] {
+  return Array.from({ length: n }, (_, i) => {
+    const v = base + Math.sin(i / 2.3) * amp + Math.cos(i / 3.7) * amp * 0.4;
+    return Number(Math.min(max, Math.max(min, v)).toFixed(2));
+  });
+}
+
+// Reduce a long series to at most `max` evenly-spaced points (always keeping the
+// first and last) so the sparkline payload stays small regardless of how many
+// samples the reporting window returned.
+function downsample(series: number[], max = 30): number[] {
+  if (series.length <= max) return series;
+  const out: number[] = [];
+  const step = (series.length - 1) / (max - 1);
+  for (let i = 0; i < max; i++) {
+    out.push(series[Math.round(i * step)]!);
+  }
+  return out;
+}
+
 // Reduce a TrueNAS reporting response into network throughput and ZFS ARC stats.
 // These graphs are best-effort extras: any that is missing yields null so the
 // tile can simply omit it. Requested via a SEPARATE reporting call from CPU/RAM
@@ -161,23 +212,36 @@ function parseTruenasNetArc(reportData: unknown): {
   netOutMbps: number | null;
   arcHitRatio: number | null;
   arcSizeGb: number | null;
+  netInSeries: number[];
+  netOutSeries: number[];
+  arcHitSeries: number[];
 } {
   const graphs = (reportData ?? []) as Array<{ name?: string }>;
   const ifaceGraph = graphs.find((g) => g.name === "interface");
   const arcRateGraph = graphs.find((g) => g.name === "arcactualrate");
   const arcSizeGraph = graphs.find((g) => g.name === "arcsize");
 
+  const rxKeys = ["received", "rx", "in", "incoming"];
+  const txKeys = ["sent", "tx", "out", "outgoing"];
+
   let netInMbps: number | null = null;
   let netOutMbps: number | null = null;
+  let netInSeries: number[] = [];
+  let netOutSeries: number[] = [];
   if (ifaceGraph) {
     const iface = latestByLegend(ifaceGraph);
-    const rxKbps = pickLegendValue(iface, ["received", "rx", "in", "incoming"]);
-    const txKbps = pickLegendValue(iface, ["sent", "tx", "out", "outgoing"]);
+    const rxKbps = pickLegendValue(iface, rxKeys);
+    const txKbps = pickLegendValue(iface, txKeys);
     if (rxKbps != null) netInMbps = Number((Math.abs(rxKbps) / 1000).toFixed(2));
     if (txKbps != null) netOutMbps = Number((Math.abs(txKbps) / 1000).toFixed(2));
+    // Per-sample throughput trend (kilobits/sec → Mbps), oldest→newest.
+    const toMbps = (v: number) => Number((Math.abs(v) / 1000).toFixed(2));
+    netInSeries = downsample(seriesByLegend(ifaceGraph, rxKeys).map(toMbps));
+    netOutSeries = downsample(seriesByLegend(ifaceGraph, txKeys).map(toMbps));
   }
 
   let arcHitRatio: number | null = null;
+  let arcHitSeries: number[] = [];
   if (arcRateGraph) {
     const rate = latestByLegend(arcRateGraph);
     const hits = pickLegendValue(rate, ["hits", "hit"]);
@@ -186,6 +250,16 @@ function parseTruenasNetArc(reportData: unknown): {
       const total = hits + misses;
       arcHitRatio = total > 0 ? Number(((hits / total) * 100).toFixed(1)) : 0;
     }
+    // Per-sample hit ratio: combine the hits and misses series step by step.
+    const hitsSeries = seriesByLegend(arcRateGraph, ["hits", "hit"]);
+    const missSeries = seriesByLegend(arcRateGraph, ["misses", "miss"]);
+    const n = Math.min(hitsSeries.length, missSeries.length);
+    const ratios: number[] = [];
+    for (let i = 0; i < n; i++) {
+      const total = hitsSeries[i]! + missSeries[i]!;
+      ratios.push(total > 0 ? Number(((hitsSeries[i]! / total) * 100).toFixed(1)) : 0);
+    }
+    arcHitSeries = downsample(ratios);
   }
 
   let arcSizeGb: number | null = null;
@@ -195,7 +269,7 @@ function parseTruenasNetArc(reportData: unknown): {
     if (sizeBytes != null) arcSizeGb = Number((sizeBytes / 1e9).toFixed(2));
   }
 
-  return { netInMbps, netOutMbps, arcHitRatio, arcSizeGb };
+  return { netInMbps, netOutMbps, arcHitRatio, arcSizeGb, netInSeries, netOutSeries, arcHitSeries };
 }
 
 // Reduce a TrueNAS `GET /api/v2.0/pool` response into per-pool used/total bytes.
@@ -266,6 +340,9 @@ router.get("/truenas", requireAuth, async (_req, res) => {
       netOutMbps: 42.3,
       arcHitRatio: 98.7,
       arcSizeGb: 31.4,
+      netInSeries: sampleSeries(184.6, 45, 90, 300),
+      netOutSeries: sampleSeries(42.3, 18, 5, 200),
+      arcHitSeries: sampleSeries(98.7, 1.2, 80, 100),
       pools: [
         { name: "tank", status: "ONLINE", usedBytes: 2.1e12, totalBytes: 10e12 },
         { name: "backup", status: "ONLINE", usedBytes: 500e9, totalBytes: 4e12 },
@@ -299,9 +376,15 @@ router.get("/truenas", requireAuth, async (_req, res) => {
   // requested as a SEPARATE call. The "interface" graph can require an identifier
   // on some installs and may be rejected; isolating it means a rejection only
   // drops the net/ARC extras instead of regressing the core CPU/RAM numbers.
+  // The net/ARC extras want a short *series* over time (to draw sparklines), not
+  // just a single aggregate, so they ride a longer trailing window with
+  // aggregation OFF — each returned data row is then one time step. The same
+  // "end in the past" rule applies (the most recent samples aren't collected
+  // yet). The current value is taken from the last sample of the series.
+  const extraReportingQuery = { start: nowSec - 1800, end: nowSec - 30, aggregate: false };
   const extraReportingBody = {
     graphs: [{ name: "interface" }, { name: "arcactualrate" }, { name: "arcsize" }],
-    reporting_query: reportingQuery,
+    reporting_query: extraReportingQuery,
   };
 
   // The reporting (CPU/RAM), pool (storage) and disk-health (temperature +
@@ -378,6 +461,9 @@ router.get("/truenas", requireAuth, async (_req, res) => {
     netOutMbps: null as number | null,
     arcHitRatio: null as number | null,
     arcSizeGb: null as number | null,
+    netInSeries: [] as number[],
+    netOutSeries: [] as number[],
+    arcHitSeries: [] as number[],
   };
   if (extraResult.status === "fulfilled") {
     netArc = parseTruenasNetArc(extraResult.value.data);

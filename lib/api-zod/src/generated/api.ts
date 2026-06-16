@@ -413,6 +413,9 @@ export const GetTruenasMetricsResponse = zod.object({
   "netOutMbps": zod.number().nullish().describe('Outbound network throughput in megabits\/sec; null when the reporting graph is unavailable.'),
   "arcHitRatio": zod.number().nullish().describe('ZFS ARC hit ratio as a percentage (0-100); null when the reporting graph is unavailable.'),
   "arcSizeGb": zod.number().nullish().describe('ZFS ARC size in gigabytes; null when the reporting graph is unavailable.'),
+  "netInSeries": zod.array(zod.number()).optional().describe('Recent inbound throughput samples (Mbps), oldest first, for an inline sparkline. Empty when the reporting graph is unavailable.'),
+  "netOutSeries": zod.array(zod.number()).optional().describe('Recent outbound throughput samples (Mbps), oldest first, for an inline sparkline. Empty when the reporting graph is unavailable.'),
+  "arcHitSeries": zod.array(zod.number()).optional().describe('Recent ZFS ARC hit-ratio samples (percent, 0-100), oldest first, for an inline sparkline. Empty when the reporting graph is unavailable.'),
   "pools": zod.array(zod.object({
   "name": zod.string(),
   "status": zod.string(),

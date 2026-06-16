@@ -1266,6 +1266,27 @@ components:
         arcSizeGb:
           description: ZFS ARC size in gigabytes; null when the reporting graph is unavailable.
           type: ["number", "null"]
+        netInSeries:
+          description: >-
+            Recent inbound throughput samples (Mbps), oldest first, for an inline
+            sparkline. Empty when the reporting graph is unavailable.
+          type: array
+          items:
+            type: number
+        netOutSeries:
+          description: >-
+            Recent outbound throughput samples (Mbps), oldest first, for an inline
+            sparkline. Empty when the reporting graph is unavailable.
+          type: array
+          items:
+            type: number
+        arcHitSeries:
+          description: >-
+            Recent ZFS ARC hit-ratio samples (percent, 0-100), oldest first, for
+            an inline sparkline. Empty when the reporting graph is unavailable.
+          type: array
+          items:
+            type: number
         pools:
           type: array
           items:

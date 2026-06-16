@@ -32,6 +32,12 @@ export interface TruenasMetrics {
      * @nullable
      */
   arcSizeGb?: number | null;
+  /** Recent inbound throughput samples (Mbps), oldest first, for an inline sparkline. Empty when the reporting graph is unavailable. */
+  netInSeries?: number[];
+  /** Recent outbound throughput samples (Mbps), oldest first, for an inline sparkline. Empty when the reporting graph is unavailable. */
+  netOutSeries?: number[];
+  /** Recent ZFS ARC hit-ratio samples (percent, 0-100), oldest first, for an inline sparkline. Empty when the reporting graph is unavailable. */
+  arcHitSeries?: number[];
   pools: ZfsPool[];
   disks: TruenasDisk[];
 }

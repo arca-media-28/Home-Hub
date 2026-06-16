@@ -3,6 +3,60 @@ import { HardDrive, ArrowDown, ArrowUp } from "lucide-react";
 import type { WidgetProps } from "./IntegrationTile";
 import { tileBudget, BAR_PX, ROW_PX, SECTION_PX } from "./metrics";
 
+// Compact inline sparkline. Draws one polyline per series sharing a single
+// min/max scale so multiple lines (e.g. network in/out) are comparable. Purely
+// decorative, so it is hidden from assistive tech.
+function Sparkline({
+  lines,
+  width = 52,
+  height = 16,
+}: {
+  lines: { values: number[]; color: string }[];
+  width?: number;
+  height?: number;
+}) {
+  const all = lines.flatMap((l) => l.values);
+  if (all.length < 2) return null;
+  const min = Math.min(...all);
+  const max = Math.max(...all);
+  const span = max - min || 1;
+  const pad = 1;
+  const usableH = height - pad * 2;
+  return (
+    <svg
+      width={width}
+      height={height}
+      viewBox={`0 0 ${width} ${height}`}
+      className="flex-shrink-0"
+      aria-hidden="true"
+      preserveAspectRatio="none"
+    >
+      {lines.map((line, li) => {
+        if (line.values.length < 2) return null;
+        const stepX = width / (line.values.length - 1);
+        const points = line.values
+          .map((v, i) => {
+            const x = i * stepX;
+            const y = pad + (1 - (v - min) / span) * usableH;
+            return `${x.toFixed(1)},${y.toFixed(1)}`;
+          })
+          .join(" ");
+        return (
+          <polyline
+            key={li}
+            points={points}
+            fill="none"
+            stroke={line.color}
+            strokeWidth={1.5}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        );
+      })}
+    </svg>
+  );
+}
+
 function Bar({ value, label }: { value: number; label: string }) {
   const pct = Math.min(100, Math.max(0, value));
   const color = pct > 85 ? "#ef4444" : pct > 65 ? "#f59e0b" : "#22c55e";
@@ -60,6 +114,16 @@ export default function TruenasTile({ enabled, density }: WidgetProps) {
   const hasArc = data.arcHitRatio != null || data.arcSizeGb != null;
   const showArc = enabled.has("arc") && hasArc && budget.block(ROW_PX);
 
+  // Inline sparklines only when the body is wide enough to fit one without
+  // crowding the values. They live inside the existing net/ARC rows, so they
+  // cost no extra vertical budget.
+  const wide = density.bodyWidth >= 240;
+  const netInSeries = data.netInSeries ?? [];
+  const netOutSeries = data.netOutSeries ?? [];
+  const showNetSpark = wide && (netInSeries.length >= 2 || netOutSeries.length >= 2);
+  const arcHitSeries = data.arcHitSeries ?? [];
+  const showArcSpark = wide && arcHitSeries.length >= 2;
+
   const poolCount =
     enabled.has("pools") && data.pools.length > 0
       ? budget.list(SECTION_PX, ROW_PX, data.pools.length)
@@ -86,9 +150,17 @@ export default function TruenasTile({ enabled, density }: WidgetProps) {
           />
         )}
         {showNetwork && (
-          <div className="flex items-center justify-between text-xs">
+          <div className="flex items-center justify-between text-xs gap-2">
             <span className="text-muted-foreground">Network</span>
             <span className="flex items-center gap-2 font-medium text-foreground">
+              {showNetSpark && (
+                <Sparkline
+                  lines={[
+                    { values: netInSeries, color: "rgb(34 197 94)" },
+                    { values: netOutSeries, color: "rgb(59 130 246)" },
+                  ]}
+                />
+              )}
               <span className="flex items-center gap-0.5">
                 <ArrowDown className="w-3 h-3 text-green-500" />
                 {(data.netInMbps ?? 0).toFixed(1)}
@@ -102,9 +174,12 @@ export default function TruenasTile({ enabled, density }: WidgetProps) {
           </div>
         )}
         {showArc && (
-          <div className="flex items-center justify-between text-xs">
+          <div className="flex items-center justify-between text-xs gap-2">
             <span className="text-muted-foreground">ARC</span>
             <span className="flex items-center gap-2 font-medium text-foreground">
+              {showArcSpark && (
+                <Sparkline lines={[{ values: arcHitSeries, color: "rgb(34 197 94)" }]} />
+              )}
               {data.arcHitRatio != null && (
                 <span className={data.arcHitRatio >= 90 ? "text-green-500" : data.arcHitRatio >= 70 ? "text-amber-500" : "text-red-500"}>
                   {data.arcHitRatio.toFixed(1)}% hit

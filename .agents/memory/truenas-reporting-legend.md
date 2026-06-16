@@ -45,3 +45,16 @@ work) is the partial-failure fallback — i.e. reporting/get_data was rejected.
   are kilobits/s → Mbps `/1000`; `arcsize` is bytes → GB `/1e9`; `arcactualrate`
   is hits/misses per sec → ratio `hits/(hits+misses)*100`. Parser tolerates
   legend key aliases (received/rx, sent/tx, arc_size/size/arcsz).
+
+## 4. Sparkline series need a longer, NON-aggregated extras window
+- The core CPU/RAM call stays aggregated (short now-90s…now-30s, `aggregate:true`
+  → single mean). The net/ARC extras call uses a LONGER trailing window
+  (`now-1800s…now-30s`) with `aggregate:false` so each `data` row is one time
+  step → a real per-sample series for sparklines.
+- **Why:** `aggregate:true` collapses the rows to one mean value; you cannot draw
+  a trend from a single point. Zip each legend column across ALL rows
+  (`seriesByLegend`), then downsample to ≤30 evenly-spaced points to bound payload.
+- Current value still works: with no mean present, `latestByLegend` falls back to
+  the LAST data row, so the headline number is just the most recent sample.
+- ARC hit-ratio series is computed per-row from the hits & misses series
+  (`hits/(hits+misses)*100`), not from an aggregate.
