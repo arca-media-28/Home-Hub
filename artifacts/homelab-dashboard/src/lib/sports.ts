@@ -65,6 +65,8 @@ export interface SportsScore {
   home: SportsTeamSide;
   away: SportsTeamSide;
   startDate: string | null;
+  // ESPN game/box-score page for this event, when available.
+  link: string | null;
 }
 
 export interface SportsHeadline {
@@ -104,14 +106,41 @@ interface EspnCompetitor {
   };
 }
 
+interface EspnLink {
+  rel?: string[];
+  href?: string;
+}
+
 interface EspnEvent {
   id?: string;
   date?: string;
   status?: { type?: { state?: string; shortDetail?: string; detail?: string } };
+  links?: EspnLink[];
   competitions?: Array<{
     competitors?: EspnCompetitor[];
     status?: { type?: { state?: string; shortDetail?: string; detail?: string } };
+    links?: EspnLink[];
   }>;
+}
+
+// Pick the best web page link for a game from ESPN's `links` array. Prefer the
+// box-score/summary "desktop" page, then any "desktop" page, then the first
+// http(s) link. ESPN occasionally emits app-only deep links, which we skip.
+function pickEventLink(links: EspnLink[] | undefined): string | null {
+  if (!links || links.length === 0) return null;
+  const web = links.filter(
+    (l) => typeof l.href === "string" && /^https?:\/\//.test(l.href),
+  );
+  if (web.length === 0) return null;
+  const byRel = (rel: string) =>
+    web.find((l) => (l.rel ?? []).includes(rel))?.href;
+  return (
+    byRel("boxscore") ||
+    byRel("summary") ||
+    byRel("desktop") ||
+    web[0].href ||
+    null
+  );
 }
 
 interface EspnArticle {
@@ -183,6 +212,7 @@ async function fetchLeagueScores(
       home: side(home),
       away: side(away),
       startDate: ev.date ?? null,
+      link: pickEventLink(comp?.links) ?? pickEventLink(ev.links),
     });
   }
 

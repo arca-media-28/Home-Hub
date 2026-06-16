@@ -23,6 +23,8 @@ function Placeholder({ children }: { children: React.ReactNode }) {
 
 // One game row: away @ home with scores, plus a status pill ("Live", "Final",
 // or the start time). Live games highlight the status in the accent color.
+// When ESPN supplies a game page, the whole row becomes a link that opens the
+// box score in a new tab; otherwise it renders inert.
 function ScoreRow({ game }: { game: SportsScore }) {
   const live = game.state === "in";
   const statusClass = live
@@ -31,8 +33,8 @@ function ScoreRow({ game }: { game: SportsScore }) {
   const status =
     game.state === "in" ? game.detail || "Live" : game.detail || "—";
 
-  return (
-    <div className="flex items-center justify-between gap-2 text-xs">
+  const body = (
+    <>
       <div className="min-w-0 flex-1 space-y-0.5">
         <div className="flex items-center justify-between gap-2">
           <span className="truncate">{game.away.name}</span>
@@ -50,7 +52,26 @@ function ScoreRow({ game }: { game: SportsScore }) {
       <span className={`flex-shrink-0 w-16 text-right text-[11px] leading-tight ${statusClass}`}>
         {status}
       </span>
-    </div>
+    </>
+  );
+
+  if (game.link) {
+    return (
+      <a
+        href={game.link}
+        target="_blank"
+        rel="noreferrer"
+        title={`${game.away.name} @ ${game.home.name} — open on ESPN`}
+        onClick={(e) => e.stopPropagation()}
+        className="flex items-center justify-between gap-2 text-xs rounded-sm hover:text-primary transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+      >
+        {body}
+      </a>
+    );
+  }
+
+  return (
+    <div className="flex items-center justify-between gap-2 text-xs">{body}</div>
   );
 }
 
@@ -67,7 +88,9 @@ function HeadlineRow({ item }: { item: SportsHeadline }) {
         href={item.link}
         target="_blank"
         rel="noreferrer"
-        className="block space-y-0.5 hover:text-primary transition-colors"
+        title={`${item.headline} — open on ESPN`}
+        onClick={(e) => e.stopPropagation()}
+        className="block space-y-0.5 rounded-sm hover:text-primary transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
       >
         {body}
       </a>
