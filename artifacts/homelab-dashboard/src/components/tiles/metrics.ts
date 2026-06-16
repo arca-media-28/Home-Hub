@@ -98,9 +98,9 @@ export function resolveEnabledMetrics(
 // a scroll bar. Grid units only seed the first paint before measurement settles.
 
 // Grid → pixel seed constants, matching the dashboard's GridLayout config.
-const SEED_ROW_HEIGHT = 80;
+const SEED_ROW_HEIGHT = 40;
 const SEED_MARGIN = 12;
-const SEED_COLS = 12;
+const SEED_COLS = 24;
 const SEED_GRID_WIDTH = 1200;
 // Header is h-11 (44px) plus a 1px top border on the body when shown.
 const SEED_HEADER_PX = 45;

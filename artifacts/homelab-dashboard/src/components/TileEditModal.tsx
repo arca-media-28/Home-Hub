@@ -665,8 +665,8 @@ export default function TileEditModal({ open, onOpenChange, tile, mode }: TileEd
                   : null,
       gridX: tile?.gridX ?? 0,
       gridY: tile?.gridY ?? 0,
-      gridW: tile?.gridW ?? 2,
-      gridH: tile?.gridH ?? 2,
+      gridW: tile?.gridW ?? 4,
+      gridH: tile?.gridH ?? 4,
     };
 
     if (mode === "create") {

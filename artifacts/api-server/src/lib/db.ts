@@ -31,8 +31,8 @@ db.exec(`
     type TEXT NOT NULL DEFAULT 'app',
     grid_x INTEGER NOT NULL DEFAULT 0,
     grid_y INTEGER NOT NULL DEFAULT 0,
-    grid_w INTEGER NOT NULL DEFAULT 2,
-    grid_h INTEGER NOT NULL DEFAULT 2,
+    grid_w INTEGER NOT NULL DEFAULT 4,
+    grid_h INTEGER NOT NULL DEFAULT 4,
     name TEXT,
     url TEXT,
     bg_color TEXT,
@@ -125,6 +125,18 @@ if (!tileColumns.some((c) => c.name === "hide_title")) {
 //     the qBittorrent category filter ({ categoryFilter: string[] | null }).
 if (!tileColumns.some((c) => c.name === "tile_settings")) {
   db.exec("ALTER TABLE tiles ADD COLUMN tile_settings TEXT");
+}
+
+// 1g. Grid resolution doubling. The dashboard grid went from 12 cols × 80px
+//     rows to 24 cols × 40px rows, halving the smallest tile step. To keep every
+//     existing tile at its current visual size and position, scale all four grid
+//     coordinates ×2. Guarded by PRAGMA user_version so it runs exactly once.
+const gridSchemaVersion = db.pragma("user_version", { simple: true }) as number;
+if (gridSchemaVersion < 1) {
+  db.exec(
+    "UPDATE tiles SET grid_x = grid_x * 2, grid_y = grid_y * 2, grid_w = grid_w * 2, grid_h = grid_h * 2"
+  );
+  db.pragma("user_version = 1");
 }
 
 // 2. One-time data migration: existing integration-typed tiles become app/link

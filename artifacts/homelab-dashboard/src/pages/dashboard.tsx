@@ -44,8 +44,8 @@ import {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const Grid = GridLayout as React.ComponentType<any>;
 
-const COLS = 12;
-const ROW_HEIGHT = 80;
+const COLS = 24;
+const ROW_HEIGHT = 40;
 
 function tileToLayout(tile: Tile) {
   return {
