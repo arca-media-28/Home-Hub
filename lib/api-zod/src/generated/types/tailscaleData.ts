@@ -18,5 +18,7 @@ export interface TailscaleData {
   offlineCount: number;
   /** Number of online devices offering an approved exit node. */
   exitNodeCount: number;
+  /** Number of devices whose node key is expiring soon (within the warning window) or has already lapsed. */
+  expiringSoonCount: number;
   devices: TailscaleDevice[];
 }

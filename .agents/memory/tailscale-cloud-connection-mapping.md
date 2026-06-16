@@ -27,3 +27,8 @@ Tailscale specifics worth remembering:
 - Exit node = device's `enabledRoutes` includes `0.0.0.0/0` or `::/0`
   (advertisedRoutes are merely offered; enabled = admin-approved).
 - Use `fields=all` to get enabledRoutes + lastSeen on each device.
+- Node-key expiry: device carries `expires` (ISO) + `keyExpiryDisabled`. The
+  no-expiry sentinel is `"0001-01-01T00:00:00Z"` which parses to a non-positive
+  epoch — treat any non-positive `expires` as "no expiry". "Expiring soon" =
+  within 7 days OR already lapsed (lapsed still needs attention). Tile exposes a
+  `keyWarnings` metric; the warning row only renders when count > 0.

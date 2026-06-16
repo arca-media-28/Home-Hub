@@ -570,6 +570,7 @@ export const GetTailscaleStatusResponse = zod.object({
   "onlineCount": zod.number().describe('Number of devices currently online.'),
   "offlineCount": zod.number().describe('Number of devices currently offline.'),
   "exitNodeCount": zod.number().describe('Number of online devices offering an approved exit node.'),
+  "expiringSoonCount": zod.number().describe('Number of devices whose node key is expiring soon (within the warning window) or has already lapsed.'),
   "devices": zod.array(zod.object({
   "id": zod.string(),
   "name": zod.string().describe('The device\'s machine\/host name.'),
@@ -577,7 +578,10 @@ export const GetTailscaleStatusResponse = zod.object({
   "online": zod.boolean().describe('Whether the device is currently online, derived from how recently it was last seen.'),
   "lastSeen": zod.string().nullish().describe('ISO timestamp of when the device was last seen, when known.'),
   "exitNode": zod.boolean().describe('Whether the device offers an approved exit node (advertises and is allowed to route the default 0.0.0.0\/0 route).'),
-  "addresses": zod.array(zod.string()).optional().describe('The device\'s tailnet IP addresses (e.g. the 100.x.y.z CGNAT address and an IPv6 address), in the order Tailscale reports them.')
+  "addresses": zod.array(zod.string()).optional().describe('The device\'s tailnet IP addresses (e.g. the 100.x.y.z CGNAT address and an IPv6 address), in the order Tailscale reports them.'),
+  "expires": zod.string().nullish().describe('ISO timestamp of when the device\'s node key expires, or null when key expiry is disabled or no expiry is set.'),
+  "keyExpiryDisabled": zod.boolean().describe('Whether key expiry has been disabled for this device (its node key never expires).'),
+  "keyExpiringSoon": zod.boolean().describe('Whether the device\'s node key is expiring within the warning window (or has already lapsed). Always false when key expiry is disabled.')
 }))
 })
 

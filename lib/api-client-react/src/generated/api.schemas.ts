@@ -667,6 +667,15 @@ export interface TailscaleDevice {
   exitNode: boolean;
   /** The device's tailnet IP addresses (e.g. the 100.x.y.z CGNAT address and an IPv6 address), in the order Tailscale reports them. */
   addresses?: string[];
+  /**
+     * ISO timestamp of when the device's node key expires, or null when key expiry is disabled or no expiry is set.
+     * @nullable
+     */
+  expires?: string | null;
+  /** Whether key expiry has been disabled for this device (its node key never expires). */
+  keyExpiryDisabled: boolean;
+  /** Whether the device's node key is expiring within the warning window (or has already lapsed). Always false when key expiry is disabled. */
+  keyExpiringSoon: boolean;
 }
 
 export interface TailscaleData {
@@ -680,6 +689,8 @@ export interface TailscaleData {
   offlineCount: number;
   /** Number of online devices offering an approved exit node. */
   exitNodeCount: number;
+  /** Number of devices whose node key is expiring soon (within the warning window) or has already lapsed. */
+  expiringSoonCount: number;
   devices: TailscaleDevice[];
 }
 

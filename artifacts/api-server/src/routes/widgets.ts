@@ -1043,12 +1043,38 @@ router.get("/prowlarr", requireAuth, async (_req, res) => {
 // devices endpoint has no direct online flag, so this is the standard heuristic.
 const TAILSCALE_ONLINE_WINDOW_MS = 5 * 60 * 1000;
 
+// A device's node key is flagged as "expiring soon" when it will lapse within
+// this window (or has already lapsed). Tailscale node keys expire unless key
+// expiry is disabled; a lapsed key silently drops the device off the tailnet.
+const TAILSCALE_KEY_EXPIRY_WARN_MS = 7 * 24 * 60 * 60 * 1000;
+
 // A device is an approved exit node when its enabled routes include the default
 // route in either address family. (advertisedRoutes are merely offered; the
 // enabled ones are what the tailnet admin has actually approved.)
 function isExitNode(routes: string[] | undefined): boolean {
   if (!Array.isArray(routes)) return false;
   return routes.includes("0.0.0.0/0") || routes.includes("::/0");
+}
+
+// Resolve a device's key-expiry state from the raw `expires`/`keyExpiryDisabled`
+// fields. Tailscale uses the sentinel "0001-01-01T00:00:00Z" (which parses to a
+// non-positive epoch) when a device has no expiry, so we treat any non-positive
+// timestamp as "no expiry". `expiringSoon` is true when a real expiry falls
+// inside the warning window — including keys that have already lapsed, since
+// those still need the user's attention.
+function keyExpiryStatus(
+  expires: string | undefined,
+  keyExpiryDisabled: boolean | undefined,
+  nowMs: number,
+): { expires: string | null; keyExpiryDisabled: boolean; keyExpiringSoon: boolean } {
+  const disabled = keyExpiryDisabled === true;
+  const expiresMs = expires ? new Date(expires).getTime() : NaN;
+  const hasExpiry = !disabled && Number.isFinite(expiresMs) && expiresMs > 0;
+  return {
+    expires: hasExpiry ? new Date(expiresMs).toISOString() : null,
+    keyExpiryDisabled: disabled,
+    keyExpiringSoon: hasExpiry && expiresMs - nowMs <= TAILSCALE_KEY_EXPIRY_WARN_MS,
+  };
 }
 
 router.get("/tailscale", requireAuth, async (_req, res) => {
@@ -1065,11 +1091,12 @@ router.get("/tailscale", requireAuth, async (_req, res) => {
       onlineCount: 3,
       offlineCount: 1,
       exitNodeCount: 1,
+      expiringSoonCount: 1,
       devices: [
-        { id: "1", name: "homelab-nas", os: "linux", online: true, lastSeen: new Date(now).toISOString(), exitNode: true, addresses: ["100.64.0.1", "fd7a:115c:a1e0::1"] },
-        { id: "2", name: "macbook-pro", os: "macOS", online: true, lastSeen: new Date(now - 60_000).toISOString(), exitNode: false, addresses: ["100.64.0.2", "fd7a:115c:a1e0::2"] },
-        { id: "3", name: "pixel-phone", os: "android", online: true, lastSeen: new Date(now - 120_000).toISOString(), exitNode: false, addresses: ["100.64.0.3", "fd7a:115c:a1e0::3"] },
-        { id: "4", name: "old-laptop", os: "windows", online: false, lastSeen: new Date(now - 3 * 86400_000).toISOString(), exitNode: false, addresses: ["100.64.0.4", "fd7a:115c:a1e0::4"] },
+        { id: "1", name: "homelab-nas", os: "linux", online: true, lastSeen: new Date(now).toISOString(), exitNode: true, addresses: ["100.64.0.1", "fd7a:115c:a1e0::1"], expires: null, keyExpiryDisabled: true, keyExpiringSoon: false },
+        { id: "2", name: "macbook-pro", os: "macOS", online: true, lastSeen: new Date(now - 60_000).toISOString(), exitNode: false, addresses: ["100.64.0.2", "fd7a:115c:a1e0::2"], expires: new Date(now + 3 * 86400_000).toISOString(), keyExpiryDisabled: false, keyExpiringSoon: true },
+        { id: "3", name: "pixel-phone", os: "android", online: true, lastSeen: new Date(now - 120_000).toISOString(), exitNode: false, addresses: ["100.64.0.3", "fd7a:115c:a1e0::3"], expires: new Date(now + 90 * 86400_000).toISOString(), keyExpiryDisabled: false, keyExpiringSoon: false },
+        { id: "4", name: "old-laptop", os: "windows", online: false, lastSeen: new Date(now - 3 * 86400_000).toISOString(), exitNode: false, addresses: ["100.64.0.4", "fd7a:115c:a1e0::4"], expires: new Date(now + 45 * 86400_000).toISOString(), keyExpiryDisabled: false, keyExpiringSoon: false },
       ],
     });
     return;
@@ -1095,6 +1122,8 @@ router.get("/tailscale", requireAuth, async (_req, res) => {
       enabledRoutes?: string[];
       advertisedRoutes?: string[];
       addresses?: string[];
+      expires?: string;
+      keyExpiryDisabled?: boolean;
     }>;
 
     const devices = rawDevices.map((d, i) => {
@@ -1105,6 +1134,7 @@ router.get("/tailscale", requireAuth, async (_req, res) => {
       const fullName = d.name ?? "";
       const name = d.hostname?.trim() || fullName.split(".")[0] || fullName || `device-${i + 1}`;
       const exitNode = isExitNode(d.enabledRoutes);
+      const keyExpiry = keyExpiryStatus(d.expires, d.keyExpiryDisabled, now);
       return {
         id: d.id ?? d.nodeId ?? String(i + 1),
         name,
@@ -1113,11 +1143,13 @@ router.get("/tailscale", requireAuth, async (_req, res) => {
         lastSeen: !Number.isNaN(lastSeenMs) ? new Date(lastSeenMs).toISOString() : null,
         exitNode,
         addresses: Array.isArray(d.addresses) ? d.addresses : [],
+        ...keyExpiry,
       };
     });
 
     const onlineCount = devices.filter((d) => d.online).length;
     const exitNodeCount = devices.filter((d) => d.exitNode && d.online).length;
+    const expiringSoonCount = devices.filter((d) => d.keyExpiringSoon).length;
 
     res.json({
       tailnet,
@@ -1125,6 +1157,7 @@ router.get("/tailscale", requireAuth, async (_req, res) => {
       onlineCount,
       offlineCount: devices.length - onlineCount,
       exitNodeCount,
+      expiringSoonCount,
       devices,
     });
   } catch (err) {

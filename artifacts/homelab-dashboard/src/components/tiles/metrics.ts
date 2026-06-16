@@ -52,6 +52,7 @@ export const METRIC_CATALOG: Record<string, MetricDef[]> = {
   [TileIntegration.tailscale]: [
     { key: "summary", label: "Device summary" },
     { key: "exitNodes", label: "Exit nodes" },
+    { key: "keyWarnings", label: "Key warnings" },
     { key: "devices", label: "Device list" },
   ],
   [TileIntegration.ersatztv]: [

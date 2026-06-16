@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useGetTailscaleStatus, getGetTailscaleStatusQueryKey } from "@workspace/api-client-react";
-import { Network, ArrowUpRight, Copy, Check } from "lucide-react";
+import { Network, ArrowUpRight, Copy, Check, KeyRound, AlertTriangle } from "lucide-react";
 import type { WidgetProps } from "./IntegrationTile";
 import { tileBudget, STAT_ROW_PX, ROW_PX, SECTION_PX, TWO_LINE_ROW_PX } from "./metrics";
 
@@ -25,6 +25,20 @@ function relativeLastSeen(iso: string | null | undefined): string {
   if (hours < 24) return `${hours}h ago`;
   const days = Math.floor(hours / 24);
   return `${days}d ago`;
+}
+
+// Compact key-expiry label, e.g. "expires in 3d", "expires in 5h", or
+// "expired" once the key has already lapsed.
+function relativeExpiry(iso: string | null | undefined): string {
+  if (!iso) return "expiring soon";
+  const when = new Date(iso).getTime();
+  if (Number.isNaN(when)) return "expiring soon";
+  const diff = when - Date.now();
+  if (diff <= 0) return "expired";
+  const hours = Math.floor(diff / 3_600_000);
+  if (hours < 24) return `expires in ${Math.max(1, hours)}h`;
+  const days = Math.floor(hours / 24);
+  return `expires in ${days}d`;
 }
 
 export default function TailscaleTile({ enabled, density }: WidgetProps) {
@@ -64,17 +78,27 @@ export default function TailscaleTile({ enabled, density }: WidgetProps) {
   }
 
   // Reveal in catalog priority — device summary, then exit-node availability,
-  // then the per-device list (which greedily fills whatever space remains).
+  // then the key-expiry warnings, then the per-device list (which greedily fills
+  // whatever space remains).
+  const expiringSoonCount =
+    data.expiringSoonCount ?? data.devices.filter((d) => d.keyExpiringSoon).length;
   const budget = tileBudget(density);
   const showSummary = enabled.has("summary") && budget.block(STAT_ROW_PX);
   const showExitNodes = enabled.has("exitNodes") && budget.block(ROW_PX);
+  // Only claim a row for key warnings when the metric is on AND something is
+  // actually expiring — an all-clear line would just be noise.
+  const showKeyWarnings =
+    enabled.has("keyWarnings") && expiringSoonCount > 0 && budget.block(ROW_PX);
   const deviceRows = enabled.has("devices")
     ? budget.list(SECTION_PX, TWO_LINE_ROW_PX, data.devices.length)
     : 0;
 
-  // Show online devices first so the most relevant rows survive truncation.
+  // Surface devices with expiring keys first (they need attention most), then
+  // online devices, so the most relevant rows survive truncation.
   const sortedDevices = [...data.devices].sort(
-    (a, b) => Number(b.online) - Number(a.online),
+    (a, b) =>
+      Number(b.keyExpiringSoon) - Number(a.keyExpiringSoon) ||
+      Number(b.online) - Number(a.online),
   );
   const visibleDevices = sortedDevices.slice(0, deviceRows);
 
@@ -121,6 +145,18 @@ export default function TailscaleTile({ enabled, density }: WidgetProps) {
         </div>
       )}
 
+      {showKeyWarnings && (
+        <div className="flex items-center justify-between text-xs rounded border border-amber-500/40 bg-amber-500/10 px-2 py-1">
+          <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400">
+            <KeyRound className="w-3.5 h-3.5" />
+            Keys expiring
+          </span>
+          <span className="font-semibold tabular-nums text-amber-600 dark:text-amber-400">
+            {expiringSoonCount}
+          </span>
+        </div>
+      )}
+
       {deviceRows > 0 && (
         <div className="flex-1 min-h-0 flex flex-col gap-1.5 overflow-hidden">
           {visibleDevices.map((d) => {
@@ -144,9 +180,21 @@ export default function TailscaleTile({ enabled, density }: WidgetProps) {
                         Exit
                       </span>
                     )}
+                    {d.keyExpiringSoon && (
+                      <AlertTriangle
+                        className="flex-shrink-0 w-3 h-3 text-amber-500"
+                        aria-label={`Key ${relativeExpiry(d.expires)}`}
+                      />
+                    )}
                   </div>
-                  <div className="text-[10px] text-muted-foreground truncate">
-                    {d.os} · {d.online ? "online" : relativeLastSeen(d.lastSeen)}
+                  <div
+                    className={`text-[10px] truncate ${
+                      d.keyExpiringSoon ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground"
+                    }`}
+                  >
+                    {d.keyExpiringSoon
+                      ? `${d.os} · ${relativeExpiry(d.expires)}`
+                      : `${d.os} · ${d.online ? "online" : relativeLastSeen(d.lastSeen)}`}
                   </div>
                 </div>
                 {ip && (

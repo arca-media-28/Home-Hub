@@ -1490,7 +1490,7 @@ components:
 
     TailscaleData:
       type: object
-      required: [tailnet, deviceCount, onlineCount, offlineCount, exitNodeCount, devices]
+      required: [tailnet, deviceCount, onlineCount, offlineCount, exitNodeCount, expiringSoonCount, devices]
       properties:
         tailnet:
           description: The tailnet name the devices belong to.
@@ -1507,6 +1507,11 @@ components:
         exitNodeCount:
           description: Number of online devices offering an approved exit node.
           type: integer
+        expiringSoonCount:
+          description: >-
+            Number of devices whose node key is expiring soon (within the warning
+            window) or has already lapsed.
+          type: integer
         devices:
           type: array
           items:
@@ -1514,7 +1519,7 @@ components:
 
     TailscaleDevice:
       type: object
-      required: [id, name, os, online, exitNode]
+      required: [id, name, os, online, exitNode, keyExpiryDisabled, keyExpiringSoon]
       properties:
         id:
           type: string
@@ -1544,6 +1549,21 @@ components:
           type: array
           items:
             type: string
+        expires:
+          description: >-
+            ISO timestamp of when the device's node key expires, or null when key
+            expiry is disabled or no expiry is set.
+          type: ["string", "null"]
+        keyExpiryDisabled:
+          description: >-
+            Whether key expiry has been disabled for this device (its node key
+            never expires).
+          type: boolean
+        keyExpiringSoon:
+          description: >-
+            Whether the device's node key is expiring within the warning window
+            (or has already lapsed). Always false when key expiry is disabled.
+          type: boolean
 
     ErsatzTvData:
       type: object
