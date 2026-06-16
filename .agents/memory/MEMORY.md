@@ -11,3 +11,4 @@
 - [Tile metrics + density](tile-metrics-density.md) — null=show-all, []=show-none; verbose section shows when large OR lighter metric off; layout-save route must return SAME full Tile shape or resize drops fields from cache.
 - [imagePosition dual-use](imageposition-focal-point.md) — imagePosition holds EITHER a named anchor key OR a custom focal point "X% Y%"; resolveObjectPosition/positionToPercent branch on isFocalPoint, no schema/enum change needed.
 - [tsc refs serve stale .d.ts](tsc-project-references-stale-dts.md) — workspace typecheck "missing export/field" that exists in src? rebuild lib refs (tsc --build lib/*/tsconfig.json) first; dist/*.d.ts is stale.
+- [Prowlarr widget API mapping](prowlarr-api-mapping.md) — indexer uses `enable` (singular); per-indexer failing derived from health-message name match; grabs from history eventType=1 within 24h.

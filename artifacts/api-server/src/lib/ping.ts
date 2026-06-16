@@ -78,6 +78,13 @@ export async function pingService(service: string, v: TestValues): Promise<TestR
       if (!token) return { ok: false, message: "Invalid email or password." };
       return { ok: true, message: "Connected" };
     }
+    case "prowlarr": {
+      if (!v.apiKey) return { ok: false, message: "Enter an API Key first." };
+      await httpClient.get(`${base}/api/v1/system/status`, {
+        headers: { "X-Api-Key": v.apiKey },
+      });
+      return { ok: true, message: "Connected" };
+    }
     case "pihole": {
       if (!v.apiKey) return { ok: false, message: "Enter an API Key first." };
       // Auto-detect v6 (REST API) vs v5 (admin/api.php). A successful fetch

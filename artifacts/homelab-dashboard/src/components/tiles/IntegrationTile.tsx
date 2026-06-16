@@ -9,6 +9,7 @@ import RadarrTile from "./RadarrTile";
 import QbittorrentTile from "./QbittorrentTile";
 import PiholeTile from "./PiholeTile";
 import NginxProxyManagerTile from "./NginxProxyManagerTile";
+import ProwlarrTile from "./ProwlarrTile";
 import ClockTile from "./ClockTile";
 import WeatherTile from "./WeatherTile";
 import { resolveEnabledMetrics, tileDensity, type TileDensity } from "./metrics";
@@ -23,6 +24,7 @@ export const INTEGRATION_LABELS: Record<string, string> = {
   [TileIntegration.qbittorrent]: "qBittorrent",
   [TileIntegration.pihole]: "Pi-hole",
   [TileIntegration["nginx-proxy-manager"]]: "Nginx Proxy Manager",
+  [TileIntegration.prowlarr]: "Prowlarr",
   [TileIntegration.clock]: "Local Time",
   [TileIntegration.weather]: "Weather",
 };
@@ -53,6 +55,8 @@ function renderStatusView(integration: string, props: WidgetProps) {
       return <PiholeTile {...props} />;
     case TileIntegration["nginx-proxy-manager"]:
       return <NginxProxyManagerTile {...props} />;
+    case TileIntegration.prowlarr:
+      return <ProwlarrTile {...props} />;
     case TileIntegration.clock:
       return <ClockTile {...props} />;
     case TileIntegration.weather:

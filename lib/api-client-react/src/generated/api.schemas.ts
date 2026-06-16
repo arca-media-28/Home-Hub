@@ -56,6 +56,7 @@ export const TileIntegration = {
   qbittorrent: 'qbittorrent',
   pihole: 'pihole',
   'nginx-proxy-manager': 'nginx-proxy-manager',
+  prowlarr: 'prowlarr',
   clock: 'clock',
   weather: 'weather',
 } as const;
@@ -203,6 +204,7 @@ export const TileInputIntegration = {
   qbittorrent: 'qbittorrent',
   pihole: 'pihole',
   'nginx-proxy-manager': 'nginx-proxy-manager',
+  prowlarr: 'prowlarr',
   clock: 'clock',
   weather: 'weather',
 } as const;
@@ -248,6 +250,7 @@ export const TileUpdateIntegration = {
   qbittorrent: 'qbittorrent',
   pihole: 'pihole',
   'nginx-proxy-manager': 'nginx-proxy-manager',
+  prowlarr: 'prowlarr',
   clock: 'clock',
   weather: 'weather',
 } as const;
@@ -506,5 +509,38 @@ export interface NginxProxyManagerData {
   /** Number of proxy hosts whose SSL certificate is expired or expiring soon. */
   expiringCertsCount: number;
   proxyHosts: NginxProxyHost[];
+}
+
+/**
+ * Reachability of an enabled indexer. "ok" when reachable; "failing" when Prowlarr reports it as unavailable due to recent failures. Disabled indexers report "ok" but render grey via the enabled flag.
+ */
+export type ProwlarrIndexerStatus = typeof ProwlarrIndexerStatus[keyof typeof ProwlarrIndexerStatus];
+
+
+export const ProwlarrIndexerStatus = {
+  ok: 'ok',
+  failing: 'failing',
+} as const;
+
+export interface ProwlarrIndexer {
+  id: number;
+  name: string;
+  /** Whether the indexer is enabled in Prowlarr. */
+  enabled: boolean;
+  /** Reachability of an enabled indexer. "ok" when reachable; "failing" when Prowlarr reports it as unavailable due to recent failures. Disabled indexers report "ok" but render grey via the enabled flag. */
+  status: ProwlarrIndexerStatus;
+}
+
+export interface ProwlarrHealthIssue {
+  source: string;
+  type: string;
+  message: string;
+}
+
+export interface ProwlarrData {
+  indexers: ProwlarrIndexer[];
+  /** Number of releases grabbed across all indexers in the last 24 hours. */
+  grabCount24h: number;
+  healthIssues: ProwlarrHealthIssue[];
 }
 

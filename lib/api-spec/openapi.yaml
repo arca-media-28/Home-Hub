@@ -395,6 +395,21 @@ paths:
               schema:
                 $ref: "#/components/schemas/NginxProxyManagerData"
 
+  /widgets/prowlarr:
+    get:
+      operationId: getProwlarrWidget
+      tags: [widgets]
+      summary: Get indexer status, recent grab count, and health warnings from Prowlarr
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Prowlarr indexer status summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProwlarrData"
+
   /connections:
     get:
       operationId: getConnections
@@ -459,7 +474,7 @@ paths:
           required: true
           schema:
             type: string
-            enum: [truenas, plex, sonarr, radarr, qbittorrent, pihole, nginx-proxy-manager]
+            enum: [truenas, plex, sonarr, radarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr]
       requestBody:
         required: true
         content:
@@ -493,7 +508,7 @@ paths:
           required: true
           schema:
             type: string
-            enum: [truenas, plex, sonarr, radarr, qbittorrent, pihole, nginx-proxy-manager]
+            enum: [truenas, plex, sonarr, radarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr]
       requestBody:
         required: true
         content:
@@ -578,7 +593,7 @@ components:
           enum: [app, truenas, media, sonarr, radarr, qbittorrent]
         integration:
           type: ["string", "null"]
-          enum: [truenas, media, sonarr, radarr, qbittorrent, pihole, nginx-proxy-manager, clock, weather, null]
+          enum: [truenas, media, sonarr, radarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, clock, weather, null]
         gridX:
           type: integer
         gridY:
@@ -657,7 +672,7 @@ components:
           enum: [app, truenas, media, sonarr, radarr, qbittorrent]
         integration:
           type: ["string", "null"]
-          enum: [truenas, media, sonarr, radarr, qbittorrent, pihole, nginx-proxy-manager, clock, weather, null]
+          enum: [truenas, media, sonarr, radarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, clock, weather, null]
         gridX:
           type: integer
         gridY:
@@ -700,7 +715,7 @@ components:
       properties:
         integration:
           type: ["string", "null"]
-          enum: [truenas, media, sonarr, radarr, qbittorrent, pihole, nginx-proxy-manager, clock, weather, null]
+          enum: [truenas, media, sonarr, radarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, clock, weather, null]
         gridX:
           type: integer
         gridY:
@@ -1166,3 +1181,49 @@ components:
         sslExpiring:
           description: Whether the attached SSL certificate is expired or expiring soon.
           type: boolean
+
+    ProwlarrData:
+      type: object
+      required: [indexers, grabCount24h, healthIssues]
+      properties:
+        indexers:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProwlarrIndexer"
+        grabCount24h:
+          description: Number of releases grabbed across all indexers in the last 24 hours.
+          type: integer
+        healthIssues:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProwlarrHealthIssue"
+
+    ProwlarrIndexer:
+      type: object
+      required: [id, name, enabled, status]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        enabled:
+          description: Whether the indexer is enabled in Prowlarr.
+          type: boolean
+        status:
+          description: >-
+            Reachability of an enabled indexer. "ok" when reachable; "failing"
+            when Prowlarr reports it as unavailable due to recent failures.
+            Disabled indexers report "ok" but render grey via the enabled flag.
+          type: string
+          enum: [ok, failing]
+
+    ProwlarrHealthIssue:
+      type: object
+      required: [source, type, message]
+      properties:
+        source:
+          type: string
+        type:
+          type: string
+        message:
+          type: string

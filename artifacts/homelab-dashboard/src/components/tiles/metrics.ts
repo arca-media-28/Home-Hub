@@ -43,6 +43,12 @@ export const METRIC_CATALOG: Record<string, MetricDef[]> = {
     { key: "dead", label: "Dead hosts" },
     { key: "ssl", label: "SSL warnings" },
   ],
+  [TileIntegration.prowlarr]: [
+    { key: "indexerSummary", label: "Indexer summary" },
+    { key: "indexerList", label: "Per-indexer status" },
+    { key: "grabCount", label: "Grabs (24h)" },
+    { key: "healthWarnings", label: "Health warnings" },
+  ],
 };
 
 // All metric keys for an integration (used as the default "show all" set).

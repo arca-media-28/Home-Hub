@@ -885,4 +885,104 @@ router.get("/nginx-proxy-manager", requireAuth, async (_req, res) => {
   }
 });
 
+// ────────────────────────────────────────────────
+// Prowlarr Widget
+// ────────────────────────────────────────────────
+// Prowlarr exposes its v1 API behind an X-Api-Key header. The tile wants three
+// things: a per-indexer status list, a recent grab count, and the health
+// warnings Prowlarr is currently reporting. We derive per-indexer "failing"
+// state from the health feed: Prowlarr surfaces unreachable indexers as a
+// health issue whose message names the affected indexers, so an enabled indexer
+// counts as failing when its name appears in any health message.
+router.get("/prowlarr", requireAuth, async (_req, res) => {
+  const saved = getSavedConnection("prowlarr");
+  const baseUrl = saved.url || process.env["PROWLARR_URL"];
+  const apiKey = saved.apiKey || process.env["PROWLARR_API_KEY"];
+
+  if (!baseUrl || !apiKey) {
+    // Sample data only when the service is genuinely unconfigured.
+    res.json({
+      indexers: [
+        { id: 1, name: "1337x", enabled: true, status: "ok" },
+        { id: 2, name: "The Pirate Bay", enabled: true, status: "ok" },
+        { id: 3, name: "Nyaa", enabled: true, status: "failing" },
+        { id: 4, name: "RARBG", enabled: false, status: "ok" },
+        { id: 5, name: "TorrentGalaxy", enabled: true, status: "ok" },
+      ],
+      grabCount24h: 7,
+      healthIssues: [
+        {
+          source: "IndexerStatusCheck",
+          type: "warning",
+          message: "Indexers unavailable due to failures: Nyaa",
+        },
+      ],
+    });
+    return;
+  }
+
+  try {
+    const headers = { "X-Api-Key": apiKey };
+
+    const [indexerRes, historyRes, healthRes] = await Promise.all([
+      httpClient.get(`${baseUrl}/api/v1/indexer`, { headers }),
+      // eventType=1 is "releaseGrabbed"; the paged response carries rows under
+      // `records` sorted newest-first, so a single page of 100 covers the most
+      // recent grabs we need to count for the last 24h.
+      httpClient.get(`${baseUrl}/api/v1/history`, {
+        headers,
+        params: { pageSize: 100, eventType: 1 },
+      }),
+      httpClient.get(`${baseUrl}/api/v1/health`, { headers }),
+    ]);
+
+    const healthIssues = ((healthRes.data ?? []) as Array<{
+      source?: string;
+      type?: string;
+      message?: string;
+    }>).map((h) => ({
+      source: h.source ?? "",
+      type: h.type ?? "",
+      message: h.message ?? "",
+    }));
+
+    // Concatenate every health message once so we can cheaply test whether an
+    // indexer's name is referenced as failing.
+    const healthText = healthIssues.map((h) => h.message).join(" \u0000 ");
+
+    const indexers = ((indexerRes.data ?? []) as Array<{
+      id: number;
+      name: string;
+      enable?: boolean;
+    }>).map((ix) => {
+      const enabled = Boolean(ix.enable);
+      // Only enabled indexers can be "failing"; a disabled one is intentionally
+      // off and renders grey via the enabled flag.
+      const failing = enabled && ix.name.length > 0 && healthText.includes(ix.name);
+      return {
+        id: ix.id,
+        name: ix.name,
+        enabled,
+        status: failing ? "failing" : "ok",
+      };
+    });
+
+    // Count grabs within the last 24h. Each history record carries a `date`
+    // (ISO) timestamp; rows beyond the window (or without a parseable date) are
+    // ignored.
+    const cutoff = Date.now() - 24 * 3600_000;
+    const records = (historyRes.data?.records ?? []) as Array<{ date?: string }>;
+    const grabCount24h = records.filter((r) => {
+      if (!r.date) return false;
+      const t = new Date(r.date).getTime();
+      return !Number.isNaN(t) && t >= cutoff;
+    }).length;
+
+    res.json({ indexers, grabCount24h, healthIssues });
+  } catch (err) {
+    logger.error({ reason: normalizeHttpError(err) }, "Prowlarr widget error");
+    res.status(502).json({ error: "Failed to fetch Prowlarr data" });
+  }
+});
+
 export default router;

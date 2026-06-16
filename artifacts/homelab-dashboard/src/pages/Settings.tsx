@@ -30,6 +30,7 @@ import {
   Download,
   Shield,
   Network,
+  Radar,
   Plug,
   X,
 } from "lucide-react";
@@ -41,7 +42,8 @@ type ServiceKey =
   | "radarr"
   | "qbittorrent"
   | "pihole"
-  | "nginx-proxy-manager";
+  | "nginx-proxy-manager"
+  | "prowlarr";
 
 type FieldKey = "url" | "apiKey" | "username" | "password" | "token";
 
@@ -125,6 +127,12 @@ const SERVICES: ServiceDef[] = [
       { key: "username", label: "Email", placeholder: "admin@example.com" },
       { key: "password", label: "Password", type: "password", placeholder: "••••••••" },
     ],
+  },
+  {
+    key: "prowlarr",
+    name: "Prowlarr",
+    icon: Radar,
+    fields: [URL_FIELD, API_KEY_FIELD],
   },
 ];
 

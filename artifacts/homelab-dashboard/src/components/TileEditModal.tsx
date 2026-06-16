@@ -84,6 +84,7 @@ const INTEGRATIONS = [
   { value: TileIntegration.truenas, label: "TrueNAS" },
   { value: TileIntegration.pihole, label: "Pi-hole" },
   { value: TileIntegration["nginx-proxy-manager"], label: "Nginx Proxy Manager" },
+  { value: TileIntegration.prowlarr, label: "Prowlarr" },
   { value: TileIntegration.clock, label: "Local Time" },
   { value: TileIntegration.weather, label: "Weather" },
 ] as const;

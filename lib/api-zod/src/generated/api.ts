@@ -70,7 +70,7 @@ export const GetTilesResponseItem = zod.object({
   "id": zod.number(),
   "userId": zod.number(),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('clock'),zod.literal('weather'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('clock'),zod.literal('weather'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -107,7 +107,7 @@ export const GetTilesResponse = zod.array(GetTilesResponseItem)
  */
 export const CreateTileBody = zod.object({
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('clock'),zod.literal('weather'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('clock'),zod.literal('weather'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -148,7 +148,7 @@ export const GetTileResponse = zod.object({
   "id": zod.number(),
   "userId": zod.number(),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('clock'),zod.literal('weather'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('clock'),zod.literal('weather'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -187,7 +187,7 @@ export const UpdateTileParams = zod.object({
 })
 
 export const UpdateTileBody = zod.object({
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('clock'),zod.literal('weather'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('clock'),zod.literal('weather'),zod.literal(null)]).nullish(),
   "gridX": zod.number().optional(),
   "gridY": zod.number().optional(),
   "gridW": zod.number().optional(),
@@ -220,7 +220,7 @@ export const UpdateTileResponse = zod.object({
   "id": zod.number(),
   "userId": zod.number(),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('clock'),zod.literal('weather'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('clock'),zod.literal('weather'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -276,7 +276,7 @@ export const SaveLayoutResponseItem = zod.object({
   "id": zod.number(),
   "userId": zod.number(),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('clock'),zod.literal('weather'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('clock'),zod.literal('weather'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -471,6 +471,25 @@ export const GetNginxProxyManagerDataResponse = zod.object({
 
 
 /**
+ * @summary Get indexer status, recent grab count, and health warnings from Prowlarr
+ */
+export const GetProwlarrWidgetResponse = zod.object({
+  "indexers": zod.array(zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "enabled": zod.boolean().describe('Whether the indexer is enabled in Prowlarr.'),
+  "status": zod.enum(['ok', 'failing']).describe('Reachability of an enabled indexer. \"ok\" when reachable; \"failing\" when Prowlarr reports it as unavailable due to recent failures. Disabled indexers report \"ok\" but render grey via the enabled flag.')
+})),
+  "grabCount24h": zod.number().describe('Number of releases grabbed across all indexers in the last 24 hours.'),
+  "healthIssues": zod.array(zod.object({
+  "source": zod.string(),
+  "type": zod.string(),
+  "message": zod.string()
+}))
+})
+
+
+/**
  * @summary List saved service connection settings
  */
 export const GetConnectionsResponseItem = zod.object({
@@ -513,7 +532,7 @@ export const GetConnectionHealthResponse = zod.array(GetConnectionHealthResponse
  * @summary Test a service connection using the supplied values without saving
  */
 export const TestConnectionParams = zod.object({
-  "service": zod.enum(['truenas', 'plex', 'sonarr', 'radarr', 'qbittorrent', 'pihole', 'nginx-proxy-manager'])
+  "service": zod.enum(['truenas', 'plex', 'sonarr', 'radarr', 'qbittorrent', 'pihole', 'nginx-proxy-manager', 'prowlarr'])
 })
 
 export const TestConnectionBody = zod.object({
@@ -534,7 +553,7 @@ export const TestConnectionResponse = zod.object({
  * @summary Save connection settings for a single service
  */
 export const UpdateConnectionParams = zod.object({
-  "service": zod.enum(['truenas', 'plex', 'sonarr', 'radarr', 'qbittorrent', 'pihole', 'nginx-proxy-manager'])
+  "service": zod.enum(['truenas', 'plex', 'sonarr', 'radarr', 'qbittorrent', 'pihole', 'nginx-proxy-manager', 'prowlarr'])
 })
 
 export const UpdateConnectionBody = zod.object({
