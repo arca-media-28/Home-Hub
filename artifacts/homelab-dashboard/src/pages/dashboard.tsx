@@ -44,8 +44,24 @@ import {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const Grid = GridLayout as React.ComponentType<any>;
 
-const COLS = 24;
 const ROW_HEIGHT = 40;
+const GRID_MARGIN = 12;
+// Fixed per-column footprint (column width + one margin) that matches the
+// established grid resolution (24 cols at ~1536px). Holding this constant keeps
+// every tile the same visual size while the number of columns scales with the
+// available width — a wider screen exposes more placeable columns instead of
+// stretching the existing ones. With react-grid-layout's containerPadding=[0,0]
+// the rendered column width is (width - margin*(cols-1))/cols, so solving for a
+// target column width gives cols = (width + margin) / (colWidth + margin).
+const COL_WIDTH = 51;
+const MIN_COLS = 12;
+
+function colsForWidth(width: number): number {
+  return Math.max(
+    MIN_COLS,
+    Math.round((width + GRID_MARGIN) / (COL_WIDTH + GRID_MARGIN)),
+  );
+}
 
 function tileToLayout(tile: Tile) {
   return {
@@ -155,6 +171,7 @@ export default function Dashboard() {
   });
 
   const layout = tiles.map(tileToLayout);
+  const cols = colsForWidth(gridWidth);
 
   const handleLayoutChange = useCallback(
     (currentLayout: { i: string; x: number; y: number; w: number; h: number }[]) => {
@@ -318,7 +335,7 @@ export default function Dashboard() {
       </header>
 
       {/* Grid */}
-      <main className="max-w-screen-2xl mx-auto px-4 py-6">
+      <main className="px-4 py-6">
         {isLoading ? (
           <div className="flex items-center justify-center h-48 text-muted-foreground text-sm">
             <span className="text-primary">{"> "}</span>
@@ -349,13 +366,13 @@ export default function Dashboard() {
             <Grid
               className="layout"
               layout={layout}
-              cols={COLS}
+              cols={cols}
               rowHeight={ROW_HEIGHT}
               width={gridWidth}
               isDraggable={editMode}
               isResizable={editMode}
               onLayoutChange={handleLayoutChange}
-              margin={[12, 12]}
+              margin={[GRID_MARGIN, GRID_MARGIN]}
               containerPadding={[0, 0]}
               draggableHandle=".drag-handle"
             >
