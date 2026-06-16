@@ -27,9 +27,11 @@ import type {
   ContinueWatchingItem,
   ErrorResponse,
   ErsatzTvData,
+  GetNewsWidgetParams,
   HealthStatus,
   LayoutUpdate,
   MediaItem,
+  NewsData,
   NginxProxyManagerData,
   PiholeData,
   ProwlarrData,
@@ -1776,6 +1778,90 @@ export function useGetErsatzTvWidget<TData = Awaited<ReturnType<typeof getErsatz
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetErsatzTvWidgetQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetNewsWidgetUrl = (params?: GetNewsWidgetParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/widgets/news?${stringifiedParams}` : `/api/widgets/news`
+}
+
+/**
+ * @summary Fetch and parse recent headlines from an RSS/Atom feed URL
+ */
+export const getNewsWidget = async (params?: GetNewsWidgetParams, options?: RequestInit): Promise<NewsData> => {
+
+  return customFetch<NewsData>(getGetNewsWidgetUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetNewsWidgetQueryKey = (params?: GetNewsWidgetParams,) => {
+    return [
+    `/api/widgets/news`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetNewsWidgetQueryOptions = <TData = Awaited<ReturnType<typeof getNewsWidget>>, TError = ErrorType<ErrorResponse>>(params?: GetNewsWidgetParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getNewsWidget>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetNewsWidgetQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getNewsWidget>>> = ({ signal }) => getNewsWidget(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getNewsWidget>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetNewsWidgetQueryResult = NonNullable<Awaited<ReturnType<typeof getNewsWidget>>>
+export type GetNewsWidgetQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Fetch and parse recent headlines from an RSS/Atom feed URL
+ */
+
+export function useGetNewsWidget<TData = Awaited<ReturnType<typeof getNewsWidget>>, TError = ErrorType<ErrorResponse>>(
+ params?: GetNewsWidgetParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getNewsWidget>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetNewsWidgetQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

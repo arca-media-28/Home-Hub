@@ -91,6 +91,7 @@ const INTEGRATIONS = [
   { value: TileIntegration.clock, label: "Local Time" },
   { value: TileIntegration.weather, label: "Weather" },
   { value: TileIntegration.sports, label: "Sports" },
+  { value: TileIntegration.news, label: "News" },
 ] as const;
 
 type ImageSource = "upload" | "library" | "url";
@@ -169,6 +170,16 @@ export default function TileEditModal({ open, onOpenChange, tile, mode }: TileEd
   const [sportsShowNews, setSportsShowNews] = useState<boolean>(
     tile?.tileSettings?.sportsShowNews ?? false,
   );
+  // News (RSS/Atom) widget options.
+  const [newsFeedUrl, setNewsFeedUrl] = useState<string>(
+    tile?.tileSettings?.newsFeedUrl ?? "",
+  );
+  const [newsMaxItems, setNewsMaxItems] = useState<number>(
+    tile?.tileSettings?.newsMaxItems ?? 8,
+  );
+  const [newsShowTimestamp, setNewsShowTimestamp] = useState<boolean>(
+    tile?.tileSettings?.newsShowTimestamp ?? false,
+  );
 
   useEffect(() => {
     if (open) {
@@ -199,6 +210,9 @@ export default function TileEditModal({ open, onOpenChange, tile, mode }: TileEd
       setSportsTeams(tile?.tileSettings?.sportsTeams ?? []);
       setSportsShowScores(tile?.tileSettings?.sportsShowScores ?? true);
       setSportsShowNews(tile?.tileSettings?.sportsShowNews ?? false);
+      setNewsFeedUrl(tile?.tileSettings?.newsFeedUrl ?? "");
+      setNewsMaxItems(tile?.tileSettings?.newsMaxItems ?? 8);
+      setNewsShowTimestamp(tile?.tileSettings?.newsShowTimestamp ?? false);
       setShowColorPicker(false);
       setShowTitleColorPicker(false);
     }
@@ -235,6 +249,7 @@ export default function TileEditModal({ open, onOpenChange, tile, mode }: TileEd
   const isClock = integration === TileIntegration.clock;
   const isWeather = integration === TileIntegration.weather;
   const isSports = integration === TileIntegration.sports;
+  const isNews = integration === TileIntegration.news;
 
   // Teams for the chosen leagues, for the dependent team multi-select. Sourced
   // from the baked-in catalog (ESPN's /teams endpoint isn't CORS-enabled), so
@@ -573,7 +588,13 @@ export default function TileEditModal({ open, onOpenChange, tile, mode }: TileEd
                   sportsShowScores,
                   sportsShowNews,
                 }
-              : null,
+              : isNews
+                ? {
+                    newsFeedUrl: newsFeedUrl.trim() || null,
+                    newsMaxItems,
+                    newsShowTimestamp,
+                  }
+                : null,
       gridX: tile?.gridX ?? 0,
       gridY: tile?.gridY ?? 0,
       gridW: tile?.gridW ?? 2,
@@ -1278,6 +1299,57 @@ export default function TileEditModal({ open, onOpenChange, tile, mode }: TileEd
                   <span className="text-sm">Breaking news</span>
                 </label>
               </div>
+            </div>
+          )}
+
+          {isNews && (
+            <div className="space-y-3 border-t border-border pt-4">
+              <div className="space-y-1.5">
+                <Label>Feed URL</Label>
+                <Input
+                  value={newsFeedUrl}
+                  onChange={(e) => setNewsFeedUrl(e.target.value)}
+                  placeholder="https://feeds.bbci.co.uk/news/rss.xml"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Paste any RSS or Atom feed URL (e.g. BBC, Hacker News, a
+                  subreddit, a blog). Leave blank to preview demo headlines.
+                </p>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>Maximum headlines</Label>
+                <Select
+                  value={String(newsMaxItems)}
+                  onValueChange={(v) => setNewsMaxItems(Number(v))}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[5, 8, 10, 15, 20, 30].map((n) => (
+                      <SelectItem key={n} value={String(n)}>
+                        {n} headlines
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Upper limit — the tile shows as many as fit its size.
+                </p>
+              </div>
+
+              <label
+                htmlFor="news-timestamp"
+                className="flex items-center gap-2 cursor-pointer select-none"
+              >
+                <Checkbox
+                  id="news-timestamp"
+                  checked={newsShowTimestamp}
+                  onCheckedChange={(c) => setNewsShowTimestamp(c === true)}
+                />
+                <span className="text-sm">Show published time</span>
+              </label>
             </div>
           )}
         </div>

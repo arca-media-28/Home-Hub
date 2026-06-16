@@ -71,4 +71,19 @@ export type TileSettings = {
      * @nullable
      */
   sportsShowNews?: boolean | null;
-} | null | null;
+  /**
+     * RSS or Atom feed URL the News tile pulls headlines from. Null or absent means none set, in which case the tile shows demo headlines.
+     * @nullable
+     */
+  newsFeedUrl?: string | null;
+  /**
+     * Maximum number of headlines the News tile requests/shows. Null or absent defaults to a sensible value (clamped server-side).
+     * @nullable
+     */
+  newsMaxItems?: number | null;
+  /**
+     * When true, the News tile shows each headline's published time (as room allows). Absent or false hides it (the default).
+     * @nullable
+     */
+  newsShowTimestamp?: boolean | null;
+} | null;

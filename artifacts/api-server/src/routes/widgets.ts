@@ -1,4 +1,5 @@
 import { Router } from "express";
+import Parser from "rss-parser";
 import { requireAuth } from "../lib/auth.js";
 import { connectionStmts } from "../lib/db.js";
 import { httpClient, cloudHttpClient, normalizeBaseUrl, normalizeHttpError } from "../lib/http.js";
@@ -1265,6 +1266,114 @@ router.get("/ersatztv", requireAuth, async (_req, res) => {
   } catch (err) {
     logger.error({ reason: normalizeHttpError(err) }, "ErsatzTV widget error");
     res.status(502).json({ error: "Failed to fetch ErsatzTV data" });
+  }
+});
+
+// ────────────────────────────────────────────────
+// News (RSS / Atom) Widget
+// ────────────────────────────────────────────────
+// Unlike the homelab service tiles, this widget is configured entirely per-tile
+// (no saved Settings connection): the tile passes the feed URL + item limit as
+// query params. With no URL we return demo headlines (the "mock when
+// unconfigured" convention); a configured-but-unfetchable/unparsable feed 502s
+// so the tile renders its error state.
+
+const NEWS_DEFAULT_LIMIT = 8;
+const NEWS_MAX_LIMIT = 30;
+
+// Single shared parser. We fetch the feed ourselves via the shared httpClient so
+// the request honors our timeout and self-signed-TLS handling, then hand the raw
+// XML to rss-parser's parseString (it handles both RSS 2.0 and Atom).
+const rssParser = new Parser();
+
+interface NewsItemOut {
+  title: string;
+  link: string | null;
+  source: string | null;
+  published: string | null;
+}
+
+const DEMO_NEWS: { feedTitle: string; items: NewsItemOut[] } = {
+  feedTitle: "Demo Feed",
+  items: [
+    {
+      title: "Add a feed URL in this tile's settings to see real headlines",
+      link: null,
+      source: "Demo Feed",
+      published: new Date().toISOString(),
+    },
+    {
+      title: "Self-hosted homelab dashboards keep gaining momentum",
+      link: null,
+      source: "Demo Feed",
+      published: new Date(Date.now() - 3600_000).toISOString(),
+    },
+    {
+      title: "RSS is still the simplest way to follow any site",
+      link: null,
+      source: "Demo Feed",
+      published: new Date(Date.now() - 2 * 3600_000).toISOString(),
+    },
+    {
+      title: "Works with BBC, Hacker News, subreddits, and most blogs",
+      link: null,
+      source: "Demo Feed",
+      published: new Date(Date.now() - 5 * 3600_000).toISOString(),
+    },
+    {
+      title: "No API key or signup required — just paste a feed link",
+      link: null,
+      source: "Demo Feed",
+      published: new Date(Date.now() - 8 * 3600_000).toISOString(),
+    },
+  ],
+};
+
+function clampNewsLimit(raw: unknown): number {
+  const n = typeof raw === "string" ? parseInt(raw, 10) : Number(raw);
+  if (!Number.isFinite(n) || n <= 0) return NEWS_DEFAULT_LIMIT;
+  return Math.min(NEWS_MAX_LIMIT, Math.max(1, Math.floor(n)));
+}
+
+router.get("/news", requireAuth, async (req, res) => {
+  const rawUrl = typeof req.query["url"] === "string" ? req.query["url"].trim() : "";
+  const limit = clampNewsLimit(req.query["limit"]);
+  const feedUrl = normalizeBaseUrl(rawUrl);
+
+  // Unconfigured (no feed URL): show representative demo headlines.
+  if (!feedUrl) {
+    res.json({ feedTitle: DEMO_NEWS.feedTitle, items: DEMO_NEWS.items.slice(0, limit) });
+    return;
+  }
+
+  try {
+    const r = await httpClient.get(feedUrl, {
+      responseType: "text",
+      // Some feeds gate on a browser-y UA and reject the default axios one.
+      headers: { Accept: "application/rss+xml, application/atom+xml, application/xml, text/xml, */*" },
+    });
+    const feed = await rssParser.parseString(String(r.data ?? ""));
+    const feedTitle = feed.title?.trim() || null;
+
+    const items: NewsItemOut[] = (feed.items ?? []).slice(0, limit).map((it) => {
+      const title = (it.title ?? "").trim() || "(untitled)";
+      const link = it.link?.trim() || null;
+      // rss-parser exposes the per-item <source> as `it.source` when present.
+      const source =
+        (typeof it.source === "string" ? it.source.trim() : "") || null;
+      const isoRaw = it.isoDate || it.pubDate || null;
+      let published: string | null = null;
+      if (isoRaw) {
+        const d = new Date(isoRaw);
+        published = Number.isNaN(d.getTime()) ? null : d.toISOString();
+      }
+      return { title, link, source, published };
+    });
+
+    res.json({ feedTitle, items });
+  } catch (err) {
+    logger.warn({ feedUrl, reason: normalizeHttpError(err) }, "News widget error");
+    res.status(502).json({ error: "Could not fetch or parse that feed." });
   }
 });
 

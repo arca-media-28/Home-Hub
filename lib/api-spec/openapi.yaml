@@ -440,6 +440,42 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErsatzTvData"
 
+  /widgets/news:
+    get:
+      operationId: getNewsWidget
+      tags: [widgets]
+      summary: Fetch and parse recent headlines from an RSS/Atom feed URL
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: url
+          in: query
+          required: false
+          description: >-
+            The RSS or Atom feed URL to fetch. When omitted, representative demo
+            headlines are returned so an unconfigured tile still renders.
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          description: Maximum number of headlines to return (clamped server-side).
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Parsed feed headlines
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NewsData"
+        "502":
+          description: The configured feed could not be fetched or parsed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /connections:
     get:
       operationId: getConnections
@@ -623,7 +659,7 @@ components:
           enum: [app, truenas, media, sonarr, radarr, qbittorrent]
         integration:
           type: ["string", "null"]
-          enum: [truenas, media, sonarr, radarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, clock, weather, sports, null]
+          enum: [truenas, media, sonarr, radarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, clock, weather, sports, news, null]
         gridX:
           type: integer
         gridY:
@@ -702,7 +738,7 @@ components:
           enum: [app, truenas, media, sonarr, radarr, qbittorrent]
         integration:
           type: ["string", "null"]
-          enum: [truenas, media, sonarr, radarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, clock, weather, sports, null]
+          enum: [truenas, media, sonarr, radarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, clock, weather, sports, news, null]
         gridX:
           type: integer
         gridY:
@@ -745,7 +781,7 @@ components:
       properties:
         integration:
           type: ["string", "null"]
-          enum: [truenas, media, sonarr, radarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, clock, weather, sports, null]
+          enum: [truenas, media, sonarr, radarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, clock, weather, sports, news, null]
         gridX:
           type: integer
         gridY:
@@ -865,6 +901,21 @@ components:
             When true, the Sports tile shows the latest headlines. Absent or
             null defaults to false. At least one of sportsShowScores /
             sportsShowNews must be on.
+          type: ["boolean", "null"]
+        newsFeedUrl:
+          description: >-
+            RSS or Atom feed URL the News tile pulls headlines from. Null or
+            absent means none set, in which case the tile shows demo headlines.
+          type: ["string", "null"]
+        newsMaxItems:
+          description: >-
+            Maximum number of headlines the News tile requests/shows. Null or
+            absent defaults to a sensible value (clamped server-side).
+          type: ["integer", "null"]
+        newsShowTimestamp:
+          description: >-
+            When true, the News tile shows each headline's published time (as
+            room allows). Absent or false hides it (the default).
           type: ["boolean", "null"]
 
     LayoutItem:
@@ -1374,4 +1425,43 @@ components:
           description: >-
             Title of the programme currently airing on the channel (start ≤ now
             < stop in the EPG). Null when nothing is currently scheduled.
+          type: ["string", "null"]
+
+    NewsData:
+      type: object
+      required: [feedTitle, items]
+      properties:
+        feedTitle:
+          description: >-
+            The feed's own title (e.g. "BBC News"), used as a source label on
+            the tile. Null when the feed does not provide one.
+          type: ["string", "null"]
+        items:
+          description: Recent headlines parsed from the feed, newest first.
+          type: array
+          items:
+            $ref: "#/components/schemas/NewsItem"
+
+    NewsItem:
+      type: object
+      required: [title, link]
+      properties:
+        title:
+          description: The headline text.
+          type: string
+        link:
+          description: >-
+            URL of the full article. Null when the feed entry has no link, in
+            which case the tile renders the headline as plain text.
+          type: ["string", "null"]
+        source:
+          description: >-
+            Per-item source/feed name when present (some aggregated feeds tag
+            each entry). Null when not provided; the tile falls back to the
+            feed title.
+          type: ["string", "null"]
+        published:
+          description: >-
+            ISO timestamp of when the item was published, when the feed provides
+            one. Null otherwise.
           type: ["string", "null"]

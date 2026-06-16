@@ -829,3 +829,88 @@ describe("GET /widgets/pihole", () => {
     expect(res.body.error).toMatch(/invalid pi-hole response/i);
   });
 });
+
+// ── News (RSS / Atom) ─────────────────────────────────────────────────────────
+describe("GET /widgets/news", () => {
+  const RSS_SAMPLE = `<?xml version="1.0"?>
+<rss version="2.0">
+  <channel>
+    <title>Example Feed</title>
+    <item>
+      <title>First headline</title>
+      <link>https://example.com/a</link>
+      <pubDate>Tue, 16 Jun 2026 05:00:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>Second headline</title>
+      <link>https://example.com/b</link>
+      <pubDate>Tue, 16 Jun 2026 04:00:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>Third headline</title>
+      <link>https://example.com/c</link>
+    </item>
+  </channel>
+</rss>`;
+
+  it("returns demo headlines when no feed URL is supplied", async () => {
+    const res = await request(app).get("/widgets/news");
+    expect(res.status).toBe(200);
+    expect(res.body.feedTitle).toBe("Demo Feed");
+    expect(res.body.items.length).toBeGreaterThan(0);
+    // Demo content must not hit the network.
+    expect(httpGet).not.toHaveBeenCalled();
+  });
+
+  it("honors the limit param for demo headlines", async () => {
+    const res = await request(app).get("/widgets/news?limit=2");
+    expect(res.status).toBe(200);
+    expect(res.body.items).toHaveLength(2);
+    expect(httpGet).not.toHaveBeenCalled();
+  });
+
+  it("fetches and parses a configured RSS feed", async () => {
+    httpGet.mockResolvedValue({ data: RSS_SAMPLE });
+
+    const res = await request(app).get("/widgets/news?url=https://example.com/feed.xml");
+    expect(res.status).toBe(200);
+    expect(res.body.feedTitle).toBe("Example Feed");
+    expect(res.body.items).toHaveLength(3);
+    expect(res.body.items[0]).toMatchObject({
+      title: "First headline",
+      link: "https://example.com/a",
+    });
+    expect(res.body.items[0].published).toBe("2026-06-16T05:00:00.000Z");
+    // An item without a date yields a null published rather than an invalid one.
+    expect(res.body.items[2].published).toBeNull();
+
+    // Feed must be fetched as text so rss-parser receives raw XML.
+    const [, opts] = httpGet.mock.calls[0]!;
+    expect(opts.responseType).toBe("text");
+  });
+
+  it("caps the number of items at the requested limit", async () => {
+    httpGet.mockResolvedValue({ data: RSS_SAMPLE });
+
+    const res = await request(app).get("/widgets/news?url=https://example.com/feed.xml&limit=1");
+    expect(res.status).toBe(200);
+    expect(res.body.items).toHaveLength(1);
+    expect(res.body.items[0].title).toBe("First headline");
+  });
+
+  it("returns 502 when the feed cannot be fetched", async () => {
+    httpGet.mockRejectedValue(httpError(500));
+
+    const res = await request(app).get("/widgets/news?url=https://down.example.com/feed.xml");
+    expect(res.status).toBe(502);
+    expect(res.body.error).toMatch(/feed/i);
+  });
+
+  it("returns 502 when the response is not a parseable feed", async () => {
+    httpGet.mockResolvedValue({ data: "<html><body>not a feed</body></html>" });
+
+    const res = await request(app).get("/widgets/news?url=https://example.com/notafeed");
+    expect(res.status).toBe(502);
+    expect(res.body.error).toMatch(/feed/i);
+  });
+});

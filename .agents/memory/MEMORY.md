@@ -15,3 +15,4 @@
 - [Tailscale cloud connection mapping](tailscale-cloud-connection-mapping.md) — cloud-only service reuses url=tailnet/apiKey=token; cloud APIs must use TLS-verifying cloudHttpClient, NOT the insecure shared httpClient.
 - [ErsatzTV widget API mapping](ersatztv-api-mapping.md) — no-auth (base URL only); now-playing from /iptv/channels.m3u + /iptv/xmltv.xml (start≤now<stop); activeStreams=null (no endpoint), omit metric not 502.
 - [ESPN sports API CORS](espn-sports-cors.md) — keyless client-side tile: /scoreboard + /news have CORS (browser-fetchable), /teams does NOT; bake team rosters into a static catalog instead.
+- [tileSettings persistence whitelist](tile-settings-whitelist.md) — new per-tile setting saves 200 but stays demo? add it to pickTileSettings() allow-list in api-server routes/tiles.ts, not just OpenAPI/modal.

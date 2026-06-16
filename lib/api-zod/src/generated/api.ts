@@ -70,7 +70,7 @@ export const GetTilesResponseItem = zod.object({
   "id": zod.number(),
   "userId": zod.number(),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('clock'),zod.literal('weather'),zod.literal('sports'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('clock'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -99,7 +99,10 @@ export const GetTilesResponseItem = zod.object({
   "sportsLeagues": zod.array(zod.string()).nullish().describe('League keys the Sports tile follows (e.g. \"nfl\", \"nba\", \"eng.1\"). Null or absent means none selected yet (the tile shows an empty state until at least one league is chosen).'),
   "sportsTeams": zod.array(zod.string()).nullish().describe('Optional team allow-list for the Sports tile, scoped per league as \"<leagueKey>:<teamId>\" (e.g. \"nfl:12\"). When a league has no entries here, all of its teams are shown. Null or absent means no team filtering (all teams in every selected league).'),
   "sportsShowScores": zod.boolean().nullish().describe('When true, the Sports tile shows live\/recent scores. Absent or null defaults to true. At least one of sportsShowScores \/ sportsShowNews must be on.'),
-  "sportsShowNews": zod.boolean().nullish().describe('When true, the Sports tile shows the latest headlines. Absent or null defaults to false. At least one of sportsShowScores \/ sportsShowNews must be on.')
+  "sportsShowNews": zod.boolean().nullish().describe('When true, the Sports tile shows the latest headlines. Absent or null defaults to false. At least one of sportsShowScores \/ sportsShowNews must be on.'),
+  "newsFeedUrl": zod.string().nullish().describe('RSS or Atom feed URL the News tile pulls headlines from. Null or absent means none set, in which case the tile shows demo headlines.'),
+  "newsMaxItems": zod.number().nullish().describe('Maximum number of headlines the News tile requests\/shows. Null or absent defaults to a sensible value (clamped server-side).'),
+  "newsShowTimestamp": zod.boolean().nullish().describe('When true, the News tile shows each headline\'s published time (as room allows). Absent or false hides it (the default).')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.'),
   "createdAt": zod.string().optional()
 })
@@ -111,7 +114,7 @@ export const GetTilesResponse = zod.array(GetTilesResponseItem)
  */
 export const CreateTileBody = zod.object({
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('clock'),zod.literal('weather'),zod.literal('sports'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('clock'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -140,7 +143,10 @@ export const CreateTileBody = zod.object({
   "sportsLeagues": zod.array(zod.string()).nullish().describe('League keys the Sports tile follows (e.g. \"nfl\", \"nba\", \"eng.1\"). Null or absent means none selected yet (the tile shows an empty state until at least one league is chosen).'),
   "sportsTeams": zod.array(zod.string()).nullish().describe('Optional team allow-list for the Sports tile, scoped per league as \"<leagueKey>:<teamId>\" (e.g. \"nfl:12\"). When a league has no entries here, all of its teams are shown. Null or absent means no team filtering (all teams in every selected league).'),
   "sportsShowScores": zod.boolean().nullish().describe('When true, the Sports tile shows live\/recent scores. Absent or null defaults to true. At least one of sportsShowScores \/ sportsShowNews must be on.'),
-  "sportsShowNews": zod.boolean().nullish().describe('When true, the Sports tile shows the latest headlines. Absent or null defaults to false. At least one of sportsShowScores \/ sportsShowNews must be on.')
+  "sportsShowNews": zod.boolean().nullish().describe('When true, the Sports tile shows the latest headlines. Absent or null defaults to false. At least one of sportsShowScores \/ sportsShowNews must be on.'),
+  "newsFeedUrl": zod.string().nullish().describe('RSS or Atom feed URL the News tile pulls headlines from. Null or absent means none set, in which case the tile shows demo headlines.'),
+  "newsMaxItems": zod.number().nullish().describe('Maximum number of headlines the News tile requests\/shows. Null or absent defaults to a sensible value (clamped server-side).'),
+  "newsShowTimestamp": zod.boolean().nullish().describe('When true, the News tile shows each headline\'s published time (as room allows). Absent or false hides it (the default).')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.')
 })
 
@@ -156,7 +162,7 @@ export const GetTileResponse = zod.object({
   "id": zod.number(),
   "userId": zod.number(),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('clock'),zod.literal('weather'),zod.literal('sports'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('clock'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -185,7 +191,10 @@ export const GetTileResponse = zod.object({
   "sportsLeagues": zod.array(zod.string()).nullish().describe('League keys the Sports tile follows (e.g. \"nfl\", \"nba\", \"eng.1\"). Null or absent means none selected yet (the tile shows an empty state until at least one league is chosen).'),
   "sportsTeams": zod.array(zod.string()).nullish().describe('Optional team allow-list for the Sports tile, scoped per league as \"<leagueKey>:<teamId>\" (e.g. \"nfl:12\"). When a league has no entries here, all of its teams are shown. Null or absent means no team filtering (all teams in every selected league).'),
   "sportsShowScores": zod.boolean().nullish().describe('When true, the Sports tile shows live\/recent scores. Absent or null defaults to true. At least one of sportsShowScores \/ sportsShowNews must be on.'),
-  "sportsShowNews": zod.boolean().nullish().describe('When true, the Sports tile shows the latest headlines. Absent or null defaults to false. At least one of sportsShowScores \/ sportsShowNews must be on.')
+  "sportsShowNews": zod.boolean().nullish().describe('When true, the Sports tile shows the latest headlines. Absent or null defaults to false. At least one of sportsShowScores \/ sportsShowNews must be on.'),
+  "newsFeedUrl": zod.string().nullish().describe('RSS or Atom feed URL the News tile pulls headlines from. Null or absent means none set, in which case the tile shows demo headlines.'),
+  "newsMaxItems": zod.number().nullish().describe('Maximum number of headlines the News tile requests\/shows. Null or absent defaults to a sensible value (clamped server-side).'),
+  "newsShowTimestamp": zod.boolean().nullish().describe('When true, the News tile shows each headline\'s published time (as room allows). Absent or false hides it (the default).')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.'),
   "createdAt": zod.string().optional()
 })
@@ -199,7 +208,7 @@ export const UpdateTileParams = zod.object({
 })
 
 export const UpdateTileBody = zod.object({
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('clock'),zod.literal('weather'),zod.literal('sports'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('clock'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal(null)]).nullish(),
   "gridX": zod.number().optional(),
   "gridY": zod.number().optional(),
   "gridW": zod.number().optional(),
@@ -228,7 +237,10 @@ export const UpdateTileBody = zod.object({
   "sportsLeagues": zod.array(zod.string()).nullish().describe('League keys the Sports tile follows (e.g. \"nfl\", \"nba\", \"eng.1\"). Null or absent means none selected yet (the tile shows an empty state until at least one league is chosen).'),
   "sportsTeams": zod.array(zod.string()).nullish().describe('Optional team allow-list for the Sports tile, scoped per league as \"<leagueKey>:<teamId>\" (e.g. \"nfl:12\"). When a league has no entries here, all of its teams are shown. Null or absent means no team filtering (all teams in every selected league).'),
   "sportsShowScores": zod.boolean().nullish().describe('When true, the Sports tile shows live\/recent scores. Absent or null defaults to true. At least one of sportsShowScores \/ sportsShowNews must be on.'),
-  "sportsShowNews": zod.boolean().nullish().describe('When true, the Sports tile shows the latest headlines. Absent or null defaults to false. At least one of sportsShowScores \/ sportsShowNews must be on.')
+  "sportsShowNews": zod.boolean().nullish().describe('When true, the Sports tile shows the latest headlines. Absent or null defaults to false. At least one of sportsShowScores \/ sportsShowNews must be on.'),
+  "newsFeedUrl": zod.string().nullish().describe('RSS or Atom feed URL the News tile pulls headlines from. Null or absent means none set, in which case the tile shows demo headlines.'),
+  "newsMaxItems": zod.number().nullish().describe('Maximum number of headlines the News tile requests\/shows. Null or absent defaults to a sensible value (clamped server-side).'),
+  "newsShowTimestamp": zod.boolean().nullish().describe('When true, the News tile shows each headline\'s published time (as room allows). Absent or false hides it (the default).')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.')
 })
 
@@ -236,7 +248,7 @@ export const UpdateTileResponse = zod.object({
   "id": zod.number(),
   "userId": zod.number(),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('clock'),zod.literal('weather'),zod.literal('sports'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('clock'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -265,7 +277,10 @@ export const UpdateTileResponse = zod.object({
   "sportsLeagues": zod.array(zod.string()).nullish().describe('League keys the Sports tile follows (e.g. \"nfl\", \"nba\", \"eng.1\"). Null or absent means none selected yet (the tile shows an empty state until at least one league is chosen).'),
   "sportsTeams": zod.array(zod.string()).nullish().describe('Optional team allow-list for the Sports tile, scoped per league as \"<leagueKey>:<teamId>\" (e.g. \"nfl:12\"). When a league has no entries here, all of its teams are shown. Null or absent means no team filtering (all teams in every selected league).'),
   "sportsShowScores": zod.boolean().nullish().describe('When true, the Sports tile shows live\/recent scores. Absent or null defaults to true. At least one of sportsShowScores \/ sportsShowNews must be on.'),
-  "sportsShowNews": zod.boolean().nullish().describe('When true, the Sports tile shows the latest headlines. Absent or null defaults to false. At least one of sportsShowScores \/ sportsShowNews must be on.')
+  "sportsShowNews": zod.boolean().nullish().describe('When true, the Sports tile shows the latest headlines. Absent or null defaults to false. At least one of sportsShowScores \/ sportsShowNews must be on.'),
+  "newsFeedUrl": zod.string().nullish().describe('RSS or Atom feed URL the News tile pulls headlines from. Null or absent means none set, in which case the tile shows demo headlines.'),
+  "newsMaxItems": zod.number().nullish().describe('Maximum number of headlines the News tile requests\/shows. Null or absent defaults to a sensible value (clamped server-side).'),
+  "newsShowTimestamp": zod.boolean().nullish().describe('When true, the News tile shows each headline\'s published time (as room allows). Absent or false hides it (the default).')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.'),
   "createdAt": zod.string().optional()
 })
@@ -296,7 +311,7 @@ export const SaveLayoutResponseItem = zod.object({
   "id": zod.number(),
   "userId": zod.number(),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('clock'),zod.literal('weather'),zod.literal('sports'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('clock'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -325,7 +340,10 @@ export const SaveLayoutResponseItem = zod.object({
   "sportsLeagues": zod.array(zod.string()).nullish().describe('League keys the Sports tile follows (e.g. \"nfl\", \"nba\", \"eng.1\"). Null or absent means none selected yet (the tile shows an empty state until at least one league is chosen).'),
   "sportsTeams": zod.array(zod.string()).nullish().describe('Optional team allow-list for the Sports tile, scoped per league as \"<leagueKey>:<teamId>\" (e.g. \"nfl:12\"). When a league has no entries here, all of its teams are shown. Null or absent means no team filtering (all teams in every selected league).'),
   "sportsShowScores": zod.boolean().nullish().describe('When true, the Sports tile shows live\/recent scores. Absent or null defaults to true. At least one of sportsShowScores \/ sportsShowNews must be on.'),
-  "sportsShowNews": zod.boolean().nullish().describe('When true, the Sports tile shows the latest headlines. Absent or null defaults to false. At least one of sportsShowScores \/ sportsShowNews must be on.')
+  "sportsShowNews": zod.boolean().nullish().describe('When true, the Sports tile shows the latest headlines. Absent or null defaults to false. At least one of sportsShowScores \/ sportsShowNews must be on.'),
+  "newsFeedUrl": zod.string().nullish().describe('RSS or Atom feed URL the News tile pulls headlines from. Null or absent means none set, in which case the tile shows demo headlines.'),
+  "newsMaxItems": zod.number().nullish().describe('Maximum number of headlines the News tile requests\/shows. Null or absent defaults to a sensible value (clamped server-side).'),
+  "newsShowTimestamp": zod.boolean().nullish().describe('When true, the News tile shows each headline\'s published time (as room allows). Absent or false hides it (the default).')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.'),
   "createdAt": zod.string().optional()
 })
@@ -544,6 +562,25 @@ export const GetErsatzTvWidgetResponse = zod.object({
   "name": zod.string().describe('The channel\'s display name.'),
   "nowPlaying": zod.string().nullable().describe('Title of the programme currently airing on the channel (start ≤ now < stop in the EPG). Null when nothing is currently scheduled.')
 })).describe('Channels and what each is currently airing (from the EPG).')
+})
+
+
+/**
+ * @summary Fetch and parse recent headlines from an RSS/Atom feed URL
+ */
+export const GetNewsWidgetQueryParams = zod.object({
+  "url": zod.coerce.string().optional().describe('The RSS or Atom feed URL to fetch. When omitted, representative demo headlines are returned so an unconfigured tile still renders.'),
+  "limit": zod.coerce.number().optional().describe('Maximum number of headlines to return (clamped server-side).')
+})
+
+export const GetNewsWidgetResponse = zod.object({
+  "feedTitle": zod.string().nullable().describe('The feed\'s own title (e.g. \"BBC News\"), used as a source label on the tile. Null when the feed does not provide one.'),
+  "items": zod.array(zod.object({
+  "title": zod.string().describe('The headline text.'),
+  "link": zod.string().nullable().describe('URL of the full article. Null when the feed entry has no link, in which case the tile renders the headline as plain text.'),
+  "source": zod.string().nullish().describe('Per-item source\/feed name when present (some aggregated feeds tag each entry). Null when not provided; the tile falls back to the feed title.'),
+  "published": zod.string().nullish().describe('ISO timestamp of when the item was published, when the feed provides one. Null otherwise.')
+})).describe('Recent headlines parsed from the feed, newest first.')
 })
 
 

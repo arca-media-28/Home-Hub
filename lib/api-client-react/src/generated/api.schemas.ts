@@ -62,6 +62,7 @@ export const TileIntegration = {
   clock: 'clock',
   weather: 'weather',
   sports: 'sports',
+  news: 'news',
 } as const;
 
 /**
@@ -143,7 +144,22 @@ export type TileSettings = {
      * @nullable
      */
   sportsShowNews?: boolean | null;
-} | null | null;
+  /**
+     * RSS or Atom feed URL the News tile pulls headlines from. Null or absent means none set, in which case the tile shows demo headlines.
+     * @nullable
+     */
+  newsFeedUrl?: string | null;
+  /**
+     * Maximum number of headlines the News tile requests/shows. Null or absent defaults to a sensible value (clamped server-side).
+     * @nullable
+     */
+  newsMaxItems?: number | null;
+  /**
+     * When true, the News tile shows each headline's published time (as room allows). Absent or false hides it (the default).
+     * @nullable
+     */
+  newsShowTimestamp?: boolean | null;
+} | null;
 
 export interface Tile {
   id: number;
@@ -233,6 +249,7 @@ export const TileInputIntegration = {
   clock: 'clock',
   weather: 'weather',
   sports: 'sports',
+  news: 'news',
 } as const;
 
 export interface TileInput {
@@ -282,6 +299,7 @@ export const TileUpdateIntegration = {
   clock: 'clock',
   weather: 'weather',
   sports: 'sports',
+  news: 'news',
 } as const;
 
 export interface TileUpdate {
@@ -627,4 +645,45 @@ export interface ErsatzTvData {
   /** Channels and what each is currently airing (from the EPG). */
   channels: ErsatzTvChannel[];
 }
+
+export interface NewsItem {
+  /** The headline text. */
+  title: string;
+  /**
+     * URL of the full article. Null when the feed entry has no link, in which case the tile renders the headline as plain text.
+     * @nullable
+     */
+  link: string | null;
+  /**
+     * Per-item source/feed name when present (some aggregated feeds tag each entry). Null when not provided; the tile falls back to the feed title.
+     * @nullable
+     */
+  source?: string | null;
+  /**
+     * ISO timestamp of when the item was published, when the feed provides one. Null otherwise.
+     * @nullable
+     */
+  published?: string | null;
+}
+
+export interface NewsData {
+  /**
+     * The feed's own title (e.g. "BBC News"), used as a source label on the tile. Null when the feed does not provide one.
+     * @nullable
+     */
+  feedTitle: string | null;
+  /** Recent headlines parsed from the feed, newest first. */
+  items: NewsItem[];
+}
+
+export type GetNewsWidgetParams = {
+/**
+ * The RSS or Atom feed URL to fetch. When omitted, representative demo headlines are returned so an unconfigured tile still renders.
+ */
+url?: string;
+/**
+ * Maximum number of headlines to return (clamped server-side).
+ */
+limit?: number;
+};
 

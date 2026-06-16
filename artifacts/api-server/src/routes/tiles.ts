@@ -41,6 +41,9 @@ interface TileSettings {
   sportsTeams?: string[] | null;
   sportsShowScores?: boolean | null;
   sportsShowNews?: boolean | null;
+  newsFeedUrl?: string | null;
+  newsMaxItems?: number | null;
+  newsShowTimestamp?: boolean | null;
 }
 
 // Copy the known keys of a tile-settings object into a clean TileSettings,
@@ -113,6 +116,21 @@ function pickTileSettings(obj: Record<string, unknown>): TileSettings {
     result.sportsShowNews = obj["sportsShowNews"];
   } else if (obj["sportsShowNews"] === null) {
     result.sportsShowNews = null;
+  }
+  if (typeof obj["newsFeedUrl"] === "string") {
+    result.newsFeedUrl = obj["newsFeedUrl"];
+  } else if (obj["newsFeedUrl"] === null) {
+    result.newsFeedUrl = null;
+  }
+  if (typeof obj["newsMaxItems"] === "number") {
+    result.newsMaxItems = obj["newsMaxItems"];
+  } else if (obj["newsMaxItems"] === null) {
+    result.newsMaxItems = null;
+  }
+  if (typeof obj["newsShowTimestamp"] === "boolean") {
+    result.newsShowTimestamp = obj["newsShowTimestamp"];
+  } else if (obj["newsShowTimestamp"] === null) {
+    result.newsShowTimestamp = null;
   }
   return result;
 }
