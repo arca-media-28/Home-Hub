@@ -1653,6 +1653,87 @@ router.get("/stocks", requireAuth, async (req, res) => {
   }
 });
 
+// Number of recent daily closes a sparkline shows (~30 trading days).
+const STOCKS_CANDLE_DAYS = 30;
+
+interface StockCandleSeriesOut {
+  symbol: string;
+  closes: number[];
+}
+
+// Build a deterministic sample closing-price series for a symbol. The walk ends
+// near the symbol's sample price and drifts in the direction of its sample
+// daily change, so the sparkline visibly matches the row's up/down tone.
+function sampleCandleSeries(symbol: string): StockCandleSeriesOut {
+  const quote = sampleQuote(symbol);
+  const end = quote.price;
+  // Slope across the window scaled loosely off the daily-change direction.
+  const drift = (quote.changePercent / 100) * end * 6;
+  const start = Math.max(1, end - drift);
+  // Seed a small pseudo-random wiggle from the symbol so it is stable per render.
+  let seed = 0;
+  for (let i = 0; i < symbol.length; i++) seed = (seed * 31 + symbol.charCodeAt(i)) % 100000;
+  const closes: number[] = [];
+  for (let i = 0; i < STOCKS_CANDLE_DAYS; i++) {
+    const t = i / (STOCKS_CANDLE_DAYS - 1);
+    const base = start + (end - start) * t;
+    seed = (seed * 1103515245 + 12345) % 2147483648;
+    const wiggle = ((seed / 2147483648) * 2 - 1) * end * 0.012;
+    closes.push(Math.max(0.01, Number((base + wiggle).toFixed(2))));
+  }
+  // Pin the last point exactly to the sample price for visual consistency.
+  closes[closes.length - 1] = Number(end.toFixed(2));
+  return { symbol, closes };
+}
+
+router.get("/stocks/candles", requireAuth, async (req, res) => {
+  const symbols = parseSymbols(req.query["symbols"]);
+  const apiKey = getStocksApiKey();
+
+  // Unconfigured: return clearly-labeled sample series so the tile still renders.
+  if (!apiKey) {
+    const list = symbols.length > 0 ? symbols : DEFAULT_SAMPLE_SYMBOLS;
+    res.json({ series: list.map(sampleCandleSeries), sample: true });
+    return;
+  }
+
+  if (symbols.length === 0) {
+    res.json({ series: [], sample: false });
+    return;
+  }
+
+  try {
+    // Finnhub's daily-candle endpoint takes a UNIX-second window. Fetch ~6 weeks
+    // back to comfortably cover STOCKS_CANDLE_DAYS trading days, then keep the
+    // most recent closes. Per-symbol fetches run in parallel; a symbol with no
+    // usable data is dropped rather than failing the whole request.
+    const to = Math.floor(Date.now() / 1000);
+    const from = to - 60 * 60 * 24 * 45;
+    const series = await Promise.all(
+      symbols.map(async (symbol): Promise<StockCandleSeriesOut | null> => {
+        const candleRes = await httpClient.get(`${FINNHUB_BASE}/stock/candle`, {
+          params: { symbol, resolution: "D", from, to, token: apiKey },
+        });
+        const data = (candleRes.data ?? {}) as { c?: number[]; s?: string };
+        // Finnhub signals "no data" with s:"no_data" and/or an empty close array.
+        if (data.s !== "ok" || !Array.isArray(data.c) || data.c.length === 0) {
+          return null;
+        }
+        const closes = data.c
+          .filter((n): n is number => typeof n === "number" && Number.isFinite(n))
+          .slice(-STOCKS_CANDLE_DAYS);
+        if (closes.length === 0) return null;
+        return { symbol, closes };
+      }),
+    );
+
+    res.json({ series: series.filter((s): s is StockCandleSeriesOut => s !== null), sample: false });
+  } catch (err) {
+    logger.error({ reason: normalizeHttpError(err) }, "Stock candles widget error");
+    res.status(502).json({ error: "Failed to fetch stock candles" });
+  }
+});
+
 router.get("/stocks/search", requireAuth, async (req, res) => {
   const q = typeof req.query["q"] === "string" ? req.query["q"].trim() : "";
   const apiKey = getStocksApiKey();

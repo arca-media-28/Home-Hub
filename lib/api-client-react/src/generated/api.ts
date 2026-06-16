@@ -28,6 +28,7 @@ import type {
   ErrorResponse,
   ErsatzTvData,
   GetNewsWidgetParams,
+  GetStockCandlesParams,
   GetStocksWidgetParams,
   HealthStatus,
   LayoutUpdate,
@@ -43,6 +44,7 @@ import type {
   ServiceConnectionUpdate,
   ServiceStatus,
   SonarrData,
+  StockCandlesData,
   StockData,
   StockSearchData,
   TailscaleData,
@@ -1950,6 +1952,90 @@ export function useGetStocksWidget<TData = Awaited<ReturnType<typeof getStocksWi
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetStocksWidgetQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetStockCandlesUrl = (params?: GetStockCandlesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/widgets/stocks/candles?${stringifiedParams}` : `/api/widgets/stocks/candles`
+}
+
+/**
+ * @summary Get recent daily closing prices (for inline sparklines) for symbols
+ */
+export const getStockCandles = async (params?: GetStockCandlesParams, options?: RequestInit): Promise<StockCandlesData> => {
+
+  return customFetch<StockCandlesData>(getGetStockCandlesUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetStockCandlesQueryKey = (params?: GetStockCandlesParams,) => {
+    return [
+    `/api/widgets/stocks/candles`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetStockCandlesQueryOptions = <TData = Awaited<ReturnType<typeof getStockCandles>>, TError = ErrorType<ErrorResponse>>(params?: GetStockCandlesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getStockCandles>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetStockCandlesQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getStockCandles>>> = ({ signal }) => getStockCandles(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getStockCandles>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetStockCandlesQueryResult = NonNullable<Awaited<ReturnType<typeof getStockCandles>>>
+export type GetStockCandlesQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Get recent daily closing prices (for inline sparklines) for symbols
+ */
+
+export function useGetStockCandles<TData = Awaited<ReturnType<typeof getStockCandles>>, TError = ErrorType<ErrorResponse>>(
+ params?: GetStockCandlesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getStockCandles>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetStockCandlesQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

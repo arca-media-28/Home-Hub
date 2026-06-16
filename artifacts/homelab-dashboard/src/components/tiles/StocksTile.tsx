@@ -1,8 +1,55 @@
-import { useGetStocksWidget, getGetStocksWidgetQueryKey } from "@workspace/api-client-react";
+import {
+  useGetStocksWidget,
+  getGetStocksWidgetQueryKey,
+  useGetStockCandles,
+  getGetStockCandlesQueryKey,
+} from "@workspace/api-client-react";
 import type { StockQuote } from "@workspace/api-client-react";
 import { TrendingUp, TrendingDown } from "lucide-react";
 import type { WidgetProps } from "./IntegrationTile";
 import { tileBudget, ROW_PX, TWO_LINE_ROW_PX, STAT_ROW_PX } from "./metrics";
+
+// Compact inline sparkline of recent closing prices. Renders a single polyline
+// scaled to fit the given box, colored by overall direction (first → last). The
+// path is purely decorative, so it is hidden from assistive tech.
+function Sparkline({ closes, width = 56, height = 18 }: { closes: number[]; width?: number; height?: number }) {
+  if (closes.length < 2) return null;
+  const min = Math.min(...closes);
+  const max = Math.max(...closes);
+  const span = max - min || 1;
+  const stepX = width / (closes.length - 1);
+  // Leave 1px padding top/bottom so the stroke never clips at the edges.
+  const pad = 1;
+  const usableH = height - pad * 2;
+  const points = closes
+    .map((c, i) => {
+      const x = i * stepX;
+      const y = pad + (1 - (c - min) / span) * usableH;
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .join(" ");
+  const up = closes[closes.length - 1] >= closes[0];
+  const stroke = up ? "rgb(34 197 94)" : "rgb(239 68 68)"; // green-500 / red-500
+  return (
+    <svg
+      width={width}
+      height={height}
+      viewBox={`0 0 ${width} ${height}`}
+      className="flex-shrink-0"
+      aria-hidden="true"
+      preserveAspectRatio="none"
+    >
+      <polyline
+        points={points}
+        fill="none"
+        stroke={stroke}
+        strokeWidth={1.5}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
 
 // Format a currency-ish number compactly. Large totals get thousands grouping;
 // per-share prices keep two decimals.
@@ -49,6 +96,20 @@ export default function StocksTile({ enabled, density, tileSettings }: WidgetPro
       retry: 1,
     },
   });
+
+  // Recent closing-price series for the sparkline metric. Only fetched when the
+  // "sparkline" metric is enabled; closes change slowly, so refresh sparingly.
+  const showSparkline = enabled.has("sparkline");
+  const { data: candleData } = useGetStockCandles(params, {
+    query: {
+      queryKey: getGetStockCandlesQueryKey(params),
+      enabled: showSparkline,
+      refetchInterval: 15 * 60_000,
+      staleTime: 10 * 60_000,
+      retry: 1,
+    },
+  });
+  const closesBySymbol = new Map((candleData?.series ?? []).map((s) => [s.symbol, s.closes]));
 
   if (isLoading) {
     return (
@@ -138,6 +199,8 @@ export default function StocksTile({ enabled, density, tileSettings }: WidgetPro
           const positionValue = shares != null ? quote.price * shares : null;
           const gainLoss =
             shares != null && costBasis != null ? (quote.price - costBasis) * shares : null;
+          const closes = closesBySymbol.get(quote.symbol);
+          const sparkVisible = showSparkline && wide && closes != null && closes.length >= 2;
           return (
             <div key={quote.symbol} className="min-w-0">
               <div className="flex items-center justify-between gap-2">
@@ -149,7 +212,8 @@ export default function StocksTile({ enabled, density, tileSettings }: WidgetPro
                     </span>
                   )}
                 </div>
-                <div className="flex items-baseline gap-2 flex-shrink-0">
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {sparkVisible && <Sparkline closes={closes} />}
                   <span className="text-xs font-medium tabular-nums">
                     ${fmtMoney(quote.price)}
                   </span>

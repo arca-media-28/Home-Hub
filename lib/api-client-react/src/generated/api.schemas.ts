@@ -390,6 +390,20 @@ export interface StockSearchData {
   sample: boolean;
 }
 
+export interface StockCandleSeries {
+  /** The ticker symbol this series is for (uppercased). */
+  symbol: string;
+  /** Recent daily closing prices in chronological order (oldest first), suitable for rendering an inline sparkline. */
+  closes: number[];
+}
+
+export interface StockCandlesData {
+  /** One closing-price series per requested symbol that resolved. */
+  series: StockCandleSeries[];
+  /** True when the series are built-in sample data (no provider API key configured), so the tile can label them as not-live. */
+  sample: boolean;
+}
+
 export interface LayoutItem {
   id: number;
   gridX: number;
@@ -771,6 +785,13 @@ limit?: number;
 export type GetStocksWidgetParams = {
 /**
  * Comma-separated ticker symbols to quote (e.g. "AAPL,MSFT,VOO"). When omitted or empty, representative demo quotes are returned so an unconfigured tile still renders.
+ */
+symbols?: string;
+};
+
+export type GetStockCandlesParams = {
+/**
+ * Comma-separated ticker symbols to fetch recent daily closes for (e.g. "AAPL,MSFT,VOO"). When omitted or empty, representative demo series are returned so an unconfigured tile still renders.
  */
 symbols?: string;
 };

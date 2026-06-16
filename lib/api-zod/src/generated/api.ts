@@ -644,6 +644,22 @@ export const GetStocksWidgetResponse = zod.object({
 
 
 /**
+ * @summary Get recent daily closing prices (for inline sparklines) for symbols
+ */
+export const GetStockCandlesQueryParams = zod.object({
+  "symbols": zod.coerce.string().optional().describe('Comma-separated ticker symbols to fetch recent daily closes for (e.g. \"AAPL,MSFT,VOO\"). When omitted or empty, representative demo series are returned so an unconfigured tile still renders.')
+})
+
+export const GetStockCandlesResponse = zod.object({
+  "series": zod.array(zod.object({
+  "symbol": zod.string().describe('The ticker symbol this series is for (uppercased).'),
+  "closes": zod.array(zod.number()).describe('Recent daily closing prices in chronological order (oldest first), suitable for rendering an inline sparkline.')
+})).describe('One closing-price series per requested symbol that resolved.'),
+  "sample": zod.boolean().describe('True when the series are built-in sample data (no provider API key configured), so the tile can label them as not-live.')
+})
+
+
+/**
  * @summary Search for stock symbols by ticker or company name (for the tile editor)
  */
 export const SearchStocksQueryParams = zod.object({

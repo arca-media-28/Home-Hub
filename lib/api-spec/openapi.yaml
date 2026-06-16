@@ -507,6 +507,37 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /widgets/stocks/candles:
+    get:
+      operationId: getStockCandles
+      tags: [widgets]
+      summary: Get recent daily closing prices (for inline sparklines) for symbols
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: symbols
+          in: query
+          required: false
+          description: >-
+            Comma-separated ticker symbols to fetch recent daily closes for
+            (e.g. "AAPL,MSFT,VOO"). When omitted or empty, representative demo
+            series are returned so an unconfigured tile still renders.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Recent closing-price series, one per resolved symbol
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StockCandlesData"
+        "502":
+          description: The configured stock-quote provider could not be reached
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /widgets/stocks/search:
     get:
       operationId: searchStocks
@@ -1065,6 +1096,36 @@ components:
           description: >-
             True when the results are built-in sample matches (no provider API
             key configured).
+          type: boolean
+
+    StockCandleSeries:
+      type: object
+      required: [symbol, closes]
+      properties:
+        symbol:
+          description: The ticker symbol this series is for (uppercased).
+          type: string
+        closes:
+          description: >-
+            Recent daily closing prices in chronological order (oldest first),
+            suitable for rendering an inline sparkline.
+          type: array
+          items:
+            type: number
+
+    StockCandlesData:
+      type: object
+      required: [series, sample]
+      properties:
+        series:
+          description: One closing-price series per requested symbol that resolved.
+          type: array
+          items:
+            $ref: "#/components/schemas/StockCandleSeries"
+        sample:
+          description: >-
+            True when the series are built-in sample data (no provider API key
+            configured), so the tile can label them as not-live.
           type: boolean
 
     LayoutItem:

@@ -63,6 +63,7 @@ export const METRIC_CATALOG: Record<string, MetricDef[]> = {
   ],
   [TileIntegration.stocks]: [
     { key: "dailyChange", label: "Daily change" },
+    { key: "sparkline", label: "Trend sparkline" },
     { key: "portfolio", label: "Portfolio totals" },
   ],
 };
