@@ -101,6 +101,12 @@ export async function pingService(service: string, v: TestValues): Promise<TestR
       });
       return { ok: true, message: "Connected" };
     }
+    case "ersatztv": {
+      // ErsatzTV runs without auth here: a successful GET against the channels
+      // playlist confirms reachability using only the base URL.
+      await httpClient.get(`${base}/iptv/channels.m3u`);
+      return { ok: true, message: "Connected" };
+    }
     case "pihole": {
       if (!v.apiKey) return { ok: false, message: "Enter an API Key first." };
       // Auto-detect v6 (REST API) vs v5 (admin/api.php). A successful fetch

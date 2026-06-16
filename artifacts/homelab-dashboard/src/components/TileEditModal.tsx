@@ -86,6 +86,7 @@ const INTEGRATIONS = [
   { value: TileIntegration["nginx-proxy-manager"], label: "Nginx Proxy Manager" },
   { value: TileIntegration.prowlarr, label: "Prowlarr" },
   { value: TileIntegration.tailscale, label: "Tailscale" },
+  { value: TileIntegration.ersatztv, label: "ErsatzTV" },
   { value: TileIntegration.clock, label: "Local Time" },
   { value: TileIntegration.weather, label: "Weather" },
 ] as const;

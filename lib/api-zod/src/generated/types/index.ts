@@ -12,6 +12,8 @@ export * from './connectionHealth';
 export * from './connectionTestResult';
 export * from './continueWatchingItem';
 export * from './errorResponse';
+export * from './ersatzTvChannel';
+export * from './ersatzTvData';
 export * from './healthStatus';
 export * from './layoutItem';
 export * from './layoutUpdate';

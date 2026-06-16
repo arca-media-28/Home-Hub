@@ -1130,4 +1130,142 @@ router.get("/tailscale", requireAuth, async (_req, res) => {
   }
 });
 
+// ────────────────────────────────────────────────
+// ErsatzTV Widget
+// ────────────────────────────────────────────────
+// ErsatzTV is a homelab live/linear TV server that runs without auth here, so
+// every call needs only the base URL. It publishes its channel list as an M3U
+// playlist (/iptv/channels.m3u) and its guide as XMLTV (/iptv/xmltv.xml). We
+// derive the channel list (number + name) from the M3U and each channel's
+// "now playing" by matching the currently-airing programme (start ≤ now < stop)
+// from the XMLTV guide, keyed by the M3U tvg-id ↔ XMLTV channel id.
+
+interface ErsatzChannel {
+  number: string;
+  name: string;
+  tvgId: string;
+}
+
+// Parse the channel rows out of an ErsatzTV M3U playlist. Each channel is a
+// `#EXTINF:` line carrying tvg-* attributes followed by the stream URL; we only
+// need the attributes (number, name, id) for the tile.
+function parseM3uChannels(m3u: string): ErsatzChannel[] {
+  const channels: ErsatzChannel[] = [];
+  const lines = m3u.split(/\r?\n/);
+  for (const line of lines) {
+    if (!line.startsWith("#EXTINF")) continue;
+    const attr = (name: string): string => {
+      const m = line.match(new RegExp(`${name}="([^"]*)"`));
+      return m?.[1]?.trim() ?? "";
+    };
+    const tvgId = attr("tvg-id");
+    const number = attr("tvg-chno") || tvgId;
+    // The display name is the text after the trailing comma; fall back to
+    // tvg-name when the comma form is absent.
+    const commaName = line.slice(line.indexOf(",") + 1).trim();
+    const name = commaName || attr("tvg-name") || number;
+    if (!number && !name) continue;
+    channels.push({ number, name, tvgId });
+  }
+  return channels;
+}
+
+// Parse an XMLTV timestamp like "20260616120000 +0000" (offset optional) into
+// epoch ms. Returns NaN when unparseable so callers can skip the programme.
+function parseXmltvTime(value: string): number {
+  const m = value
+    .trim()
+    .match(/^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})(?:\s*([+-]\d{4}))?/);
+  if (!m) return NaN;
+  const [, y, mo, d, h, mi, s, off] = m;
+  const iso = `${y}-${mo}-${d}T${h}:${mi}:${s}${
+    off ? `${off.slice(0, 3)}:${off.slice(3)}` : "Z"
+  }`;
+  return new Date(iso).getTime();
+}
+
+// Build a map of channelId → currently-airing programme title from an XMLTV
+// document. A programme is "now playing" when start ≤ now < stop. Earlier
+// matches win, but normally only one programme covers a given instant.
+function parseXmltvNowPlaying(xml: string, nowMs: number): Map<string, string> {
+  const nowPlaying = new Map<string, string>();
+  const programmeRe = /<programme\b([^>]*)>([\s\S]*?)<\/programme>/g;
+  let match: RegExpExecArray | null;
+  while ((match = programmeRe.exec(xml)) !== null) {
+    const attrs = match[1] ?? "";
+    const body = match[2] ?? "";
+    const channel = attrs.match(/channel="([^"]*)"/)?.[1]?.trim();
+    const startRaw = attrs.match(/start="([^"]*)"/)?.[1];
+    const stopRaw = attrs.match(/stop="([^"]*)"/)?.[1];
+    if (!channel || !startRaw || !stopRaw) continue;
+    if (nowPlaying.has(channel)) continue;
+    const start = parseXmltvTime(startRaw);
+    const stop = parseXmltvTime(stopRaw);
+    if (Number.isNaN(start) || Number.isNaN(stop)) continue;
+    if (nowMs < start || nowMs >= stop) continue;
+    const title = body
+      .match(/<title\b[^>]*>([\s\S]*?)<\/title>/)?.[1]
+      ?.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/, "$1")
+      .replace(/&amp;/g, "&")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&quot;/g, '"')
+      .replace(/&apos;/g, "'")
+      .trim();
+    if (title) nowPlaying.set(channel, title);
+  }
+  return nowPlaying;
+}
+
+router.get("/ersatztv", requireAuth, async (_req, res) => {
+  const saved = getSavedConnection("ersatztv");
+  const baseUrl = saved.url || process.env["ERSATZTV_URL"];
+
+  if (!baseUrl) {
+    // Sample data only when the service is genuinely unconfigured.
+    res.json({
+      reachable: true,
+      activeStreams: 2,
+      channels: [
+        { number: "1", name: "Movies 24/7", nowPlaying: "The Maltese Falcon" },
+        { number: "2", name: "Retro Cartoons", nowPlaying: "Looney Tunes" },
+        { number: "3", name: "Nature Documentaries", nowPlaying: "Planet Earth: Jungles" },
+        { number: "4", name: "Sci-Fi Marathon", nowPlaying: "Blade Runner" },
+        { number: "5", name: "News Loop", nowPlaying: null },
+      ],
+    });
+    return;
+  }
+
+  try {
+    const base = trimSlash(baseUrl);
+
+    const [channelsRes, guideRes] = await Promise.all([
+      httpClient.get(`${base}/iptv/channels.m3u`, { responseType: "text" }),
+      httpClient.get(`${base}/iptv/xmltv.xml`, { responseType: "text" }),
+    ]);
+
+    const channelList = parseM3uChannels(String(channelsRes.data ?? ""));
+    const nowPlaying = parseXmltvNowPlaying(String(guideRes.data ?? ""), Date.now());
+
+    const channels = channelList.map((c) => ({
+      number: c.number,
+      name: c.name,
+      // Match the guide by tvg-id, falling back to channel number (ErsatzTV
+      // keys XMLTV channels by their number when no explicit id is set).
+      nowPlaying: nowPlaying.get(c.tvgId) ?? nowPlaying.get(c.number) ?? null,
+    }));
+
+    // Active streams: ErsatzTV exposes no stable no-auth endpoint for the live
+    // session count on this instance, so we degrade gracefully and omit the
+    // metric (null) rather than failing the whole tile.
+    const activeStreams: number | null = null;
+
+    res.json({ reachable: true, activeStreams, channels });
+  } catch (err) {
+    logger.error({ reason: normalizeHttpError(err) }, "ErsatzTV widget error");
+    res.status(502).json({ error: "Failed to fetch ErsatzTV data" });
+  }
+});
+
 export default router;

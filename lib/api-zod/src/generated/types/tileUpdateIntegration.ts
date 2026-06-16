@@ -22,6 +22,7 @@ export const TileUpdateIntegration = {
   'nginx-proxy-manager': 'nginx-proxy-manager',
   prowlarr: 'prowlarr',
   tailscale: 'tailscale',
+  ersatztv: 'ersatztv',
   clock: 'clock',
   weather: 'weather',
 } as const;

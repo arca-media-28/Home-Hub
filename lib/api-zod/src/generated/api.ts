@@ -70,7 +70,7 @@ export const GetTilesResponseItem = zod.object({
   "id": zod.number(),
   "userId": zod.number(),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('clock'),zod.literal('weather'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('clock'),zod.literal('weather'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -107,7 +107,7 @@ export const GetTilesResponse = zod.array(GetTilesResponseItem)
  */
 export const CreateTileBody = zod.object({
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('clock'),zod.literal('weather'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('clock'),zod.literal('weather'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -148,7 +148,7 @@ export const GetTileResponse = zod.object({
   "id": zod.number(),
   "userId": zod.number(),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('clock'),zod.literal('weather'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('clock'),zod.literal('weather'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -187,7 +187,7 @@ export const UpdateTileParams = zod.object({
 })
 
 export const UpdateTileBody = zod.object({
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('clock'),zod.literal('weather'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('clock'),zod.literal('weather'),zod.literal(null)]).nullish(),
   "gridX": zod.number().optional(),
   "gridY": zod.number().optional(),
   "gridW": zod.number().optional(),
@@ -220,7 +220,7 @@ export const UpdateTileResponse = zod.object({
   "id": zod.number(),
   "userId": zod.number(),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('clock'),zod.literal('weather'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('clock'),zod.literal('weather'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -276,7 +276,7 @@ export const SaveLayoutResponseItem = zod.object({
   "id": zod.number(),
   "userId": zod.number(),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('clock'),zod.literal('weather'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('clock'),zod.literal('weather'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -510,6 +510,20 @@ export const GetTailscaleStatusResponse = zod.object({
 
 
 /**
+ * @summary Get live status (reachability, active streams, and per-channel now playing) from ErsatzTV
+ */
+export const GetErsatzTvWidgetResponse = zod.object({
+  "reachable": zod.boolean().describe('Whether the ErsatzTV server is up and reachable. Always true in a 200 response (a configured-but-unreachable server returns 502); the field lets the tile render the health metric uniformly.'),
+  "activeStreams": zod.number().nullish().describe('Number of currently active playout\/streaming sessions. Null when ErsatzTV does not expose session information on this instance, in which case the tile omits the metric rather than failing.'),
+  "channels": zod.array(zod.object({
+  "number": zod.string().describe('The channel number (e.g. \"1\", \"2.1\").'),
+  "name": zod.string().describe('The channel\'s display name.'),
+  "nowPlaying": zod.string().nullable().describe('Title of the programme currently airing on the channel (start ≤ now < stop in the EPG). Null when nothing is currently scheduled.')
+})).describe('Channels and what each is currently airing (from the EPG).')
+})
+
+
+/**
  * @summary List saved service connection settings
  */
 export const GetConnectionsResponseItem = zod.object({
@@ -552,7 +566,7 @@ export const GetConnectionHealthResponse = zod.array(GetConnectionHealthResponse
  * @summary Test a service connection using the supplied values without saving
  */
 export const TestConnectionParams = zod.object({
-  "service": zod.enum(['truenas', 'plex', 'sonarr', 'radarr', 'qbittorrent', 'pihole', 'nginx-proxy-manager', 'prowlarr', 'tailscale'])
+  "service": zod.enum(['truenas', 'plex', 'sonarr', 'radarr', 'qbittorrent', 'pihole', 'nginx-proxy-manager', 'prowlarr', 'tailscale', 'ersatztv'])
 })
 
 export const TestConnectionBody = zod.object({
@@ -573,7 +587,7 @@ export const TestConnectionResponse = zod.object({
  * @summary Save connection settings for a single service
  */
 export const UpdateConnectionParams = zod.object({
-  "service": zod.enum(['truenas', 'plex', 'sonarr', 'radarr', 'qbittorrent', 'pihole', 'nginx-proxy-manager', 'prowlarr', 'tailscale'])
+  "service": zod.enum(['truenas', 'plex', 'sonarr', 'radarr', 'qbittorrent', 'pihole', 'nginx-proxy-manager', 'prowlarr', 'tailscale', 'ersatztv'])
 })
 
 export const UpdateConnectionBody = zod.object({

@@ -32,6 +32,7 @@ import {
   Network,
   Radar,
   Globe,
+  Tv2,
   Plug,
   X,
 } from "lucide-react";
@@ -45,7 +46,8 @@ type ServiceKey =
   | "pihole"
   | "nginx-proxy-manager"
   | "prowlarr"
-  | "tailscale";
+  | "tailscale"
+  | "ersatztv";
 
 type FieldKey = "url" | "apiKey" | "username" | "password" | "token";
 
@@ -152,6 +154,13 @@ const SERVICES: ServiceDef[] = [
         placeholder: "tskey-api-••••••••",
       },
     ],
+  },
+  {
+    key: "ersatztv",
+    name: "ErsatzTV",
+    icon: Tv2,
+    // ErsatzTV runs without auth here, so only a base URL is needed.
+    fields: [URL_FIELD],
   },
 ];
 

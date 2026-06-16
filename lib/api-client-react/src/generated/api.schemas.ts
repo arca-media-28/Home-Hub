@@ -58,6 +58,7 @@ export const TileIntegration = {
   'nginx-proxy-manager': 'nginx-proxy-manager',
   prowlarr: 'prowlarr',
   tailscale: 'tailscale',
+  ersatztv: 'ersatztv',
   clock: 'clock',
   weather: 'weather',
 } as const;
@@ -207,6 +208,7 @@ export const TileInputIntegration = {
   'nginx-proxy-manager': 'nginx-proxy-manager',
   prowlarr: 'prowlarr',
   tailscale: 'tailscale',
+  ersatztv: 'ersatztv',
   clock: 'clock',
   weather: 'weather',
 } as const;
@@ -254,6 +256,7 @@ export const TileUpdateIntegration = {
   'nginx-proxy-manager': 'nginx-proxy-manager',
   prowlarr: 'prowlarr',
   tailscale: 'tailscale',
+  ersatztv: 'ersatztv',
   clock: 'clock',
   weather: 'weather',
 } as const;
@@ -576,5 +579,29 @@ export interface TailscaleData {
   /** Number of online devices offering an approved exit node. */
   exitNodeCount: number;
   devices: TailscaleDevice[];
+}
+
+export interface ErsatzTvChannel {
+  /** The channel number (e.g. "1", "2.1"). */
+  number: string;
+  /** The channel's display name. */
+  name: string;
+  /**
+     * Title of the programme currently airing on the channel (start ≤ now < stop in the EPG). Null when nothing is currently scheduled.
+     * @nullable
+     */
+  nowPlaying: string | null;
+}
+
+export interface ErsatzTvData {
+  /** Whether the ErsatzTV server is up and reachable. Always true in a 200 response (a configured-but-unreachable server returns 502); the field lets the tile render the health metric uniformly. */
+  reachable: boolean;
+  /**
+     * Number of currently active playout/streaming sessions. Null when ErsatzTV does not expose session information on this instance, in which case the tile omits the metric rather than failing.
+     * @nullable
+     */
+  activeStreams?: number | null;
+  /** Channels and what each is currently airing (from the EPG). */
+  channels: ErsatzTvChannel[];
 }
 

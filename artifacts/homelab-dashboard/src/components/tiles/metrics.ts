@@ -54,6 +54,11 @@ export const METRIC_CATALOG: Record<string, MetricDef[]> = {
     { key: "exitNodes", label: "Exit nodes" },
     { key: "devices", label: "Device list" },
   ],
+  [TileIntegration.ersatztv]: [
+    { key: "health", label: "Health status" },
+    { key: "activeStreams", label: "Active streams" },
+    { key: "nowPlaying", label: "Now playing" },
+  ],
 };
 
 // All metric keys for an integration (used as the default "show all" set).
