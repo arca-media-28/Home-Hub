@@ -67,6 +67,13 @@ function weatherInfo(code: number, isDay: boolean): { label: string; Icon: Lucid
   }
 }
 
+interface DailyForecast {
+  date: string;
+  code: number;
+  high: number | null;
+  low: number | null;
+}
+
 interface WeatherData {
   name: string;
   temp: number;
@@ -75,6 +82,7 @@ interface WeatherData {
   isDay: boolean;
   high: number | null;
   low: number | null;
+  forecast: DailyForecast[];
 }
 
 type Target =
@@ -138,7 +146,8 @@ async function fetchWeather(target: Target, units: "c" | "f"): Promise<WeatherDa
   const res = await fetch(
     `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
       `&current=temperature_2m,apparent_temperature,weather_code,is_day` +
-      `&daily=temperature_2m_max,temperature_2m_min&temperature_unit=${tempUnit}&timezone=auto`,
+      `&daily=weather_code,temperature_2m_max,temperature_2m_min` +
+      `&forecast_days=6&temperature_unit=${tempUnit}&timezone=auto`,
   );
   if (!res.ok) throw new Error("Could not load weather");
   const j = (await res.json()) as {
@@ -148,9 +157,22 @@ async function fetchWeather(target: Target, units: "c" | "f"): Promise<WeatherDa
       weather_code: number;
       is_day: number;
     };
-    daily?: { temperature_2m_max?: number[]; temperature_2m_min?: number[] };
+    daily?: {
+      time?: string[];
+      weather_code?: number[];
+      temperature_2m_max?: number[];
+      temperature_2m_min?: number[];
+    };
   };
   if (!j.current) throw new Error("Could not load weather");
+
+  const days = j.daily?.time ?? [];
+  const forecast: DailyForecast[] = days.map((date, i) => ({
+    date,
+    code: j.daily?.weather_code?.[i] ?? 0,
+    high: j.daily?.temperature_2m_max?.[i] ?? null,
+    low: j.daily?.temperature_2m_min?.[i] ?? null,
+  }));
 
   return {
     name,
@@ -160,7 +182,15 @@ async function fetchWeather(target: Target, units: "c" | "f"): Promise<WeatherDa
     isDay: j.current.is_day === 1,
     high: j.daily?.temperature_2m_max?.[0] ?? null,
     low: j.daily?.temperature_2m_min?.[0] ?? null,
+    forecast,
   };
+}
+
+// Short weekday label for a YYYY-MM-DD date string (parsed as local time).
+function weekdayLabel(dateStr: string): string {
+  const d = new Date(`${dateStr}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleDateString(undefined, { weekday: "short" });
 }
 
 function Prompt({ children }: { children: React.ReactNode }) {
@@ -266,6 +296,16 @@ export default function WeatherTile({ density, tileSettings }: WidgetProps) {
   // tile fills its space without ever overflowing.
   const showDetail = density.bodyHeight >= 122;
 
+  // On larger tiles, show a multi-day outlook below the current conditions. The
+  // number of days shown adapts to the tile's width (3–5 days), and the strip is
+  // only revealed when there's enough height to fit it without overflowing.
+  const upcoming = data.forecast.slice(1);
+  const fitDays = Math.floor((density.bodyWidth - 8) / 54);
+  const numDays = Math.max(3, Math.min(5, fitDays));
+  const days = upcoming.slice(0, numDays);
+  const showForecast =
+    density.bodyHeight >= 210 && density.bodyWidth >= 200 && days.length >= 3;
+
   return (
     <div className="w-full h-full flex flex-col justify-center p-3 gap-1 text-foreground">
       <div className="flex items-center gap-3">
@@ -289,6 +329,32 @@ export default function WeatherTile({ density, tileSettings }: WidgetProps) {
               H {round(data.high)}° · L {round(data.low)}°
             </span>
           )}
+        </div>
+      )}
+
+      {showForecast && (
+        <div className="flex gap-1 pt-2 mt-1 border-t border-border/50">
+          {days.map((day) => {
+            const { Icon: DayIcon, label: dayLabel } = weatherInfo(day.code, true);
+            return (
+              <div
+                key={day.date}
+                className="flex-1 min-w-0 flex flex-col items-center gap-1 text-center"
+              >
+                <span className="text-[11px] font-medium text-muted-foreground">
+                  {weekdayLabel(day.date)}
+                </span>
+                <DayIcon className="w-5 h-5 text-primary" aria-label={dayLabel} />
+                <span className="text-[11px] tabular-nums leading-tight">
+                  {day.high != null ? round(day.high) : "—"}°
+                  <span className="text-muted-foreground">
+                    {" "}
+                    {day.low != null ? round(day.low) : "—"}°
+                  </span>
+                </span>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
