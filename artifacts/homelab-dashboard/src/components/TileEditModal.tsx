@@ -684,7 +684,7 @@ export default function TileEditModal({ open, onOpenChange, tile, mode }: TileEd
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{mode === "create" ? "Add Tile" : "Edit Tile"}</DialogTitle>
         </DialogHeader>
@@ -694,374 +694,6 @@ export default function TileEditModal({ open, onOpenChange, tile, mode }: TileEd
             <Label>Name</Label>
             <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="My App" />
           </div>
-
-          <div className="space-y-1.5">
-            <Label>URL</Label>
-            <Input
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              placeholder="https://example.com"
-            />
-          </div>
-
-          <label
-            htmlFor="hide-title"
-            className="flex items-center gap-2 cursor-pointer select-none"
-          >
-            <Checkbox
-              id="hide-title"
-              checked={hideTitle}
-              onCheckedChange={(c) => setHideTitle(c === true)}
-            />
-            <span className="text-sm">Hide title text</span>
-          </label>
-
-          {integration === NONE && (
-            <div className="space-y-1.5">
-              <Label>Title Color</Label>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  className="w-8 h-8 rounded-md border border-border flex-shrink-0 shadow-sm"
-                  style={{ background: titleColor || "transparent" }}
-                  onClick={() => setShowTitleColorPicker((v) => !v)}
-                  aria-label="Pick title color"
-                />
-                <Input
-                  value={titleColor ?? ""}
-                  onChange={(e) => setTitleColor(e.target.value || null)}
-                  placeholder="Automatic"
-                  className="font-mono text-sm"
-                />
-                {eyeDropperSupported && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    className="flex-shrink-0"
-                    onClick={pickTitleColorFromScreen}
-                    title="Pick a color from your screen"
-                    aria-label="Pick a color from your screen"
-                  >
-                    <Pipette className="w-4 h-4" />
-                  </Button>
-                )}
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  className="flex-shrink-0"
-                  onClick={() => setTitleColor(null)}
-                  disabled={titleColor === null}
-                  title="Reset to automatic color"
-                  aria-label="Reset to automatic color"
-                >
-                  <RotateCcw className="w-4 h-4" />
-                </Button>
-              </div>
-              {showTitleColorPicker && (
-                <div className="mt-2">
-                  <HexColorPicker color={titleColor ?? "#ffffff"} onChange={setTitleColor} />
-                </div>
-              )}
-            </div>
-          )}
-
-          <div className="space-y-1.5">
-            <Label>Background Color</Label>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                className="w-8 h-8 rounded-md border border-border flex-shrink-0 shadow-sm"
-                style={{ background: bgColor || THEME_BG_PREVIEW }}
-                onClick={() => setShowColorPicker((v) => !v)}
-                aria-label="Pick color"
-              />
-              <Input
-                value={bgColor ?? ""}
-                onChange={(e) => setBgColor(e.target.value || null)}
-                placeholder="Theme default"
-                className="font-mono text-sm"
-              />
-              {eyeDropperSupported && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  className="flex-shrink-0"
-                  onClick={pickColorFromScreen}
-                  title="Pick a color from your screen"
-                  aria-label="Pick a color from your screen"
-                >
-                  <Pipette className="w-4 h-4" />
-                </Button>
-              )}
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                className="flex-shrink-0"
-                onClick={() => setBgColor(null)}
-                disabled={bgColor === null}
-                title="Reset to theme default"
-                aria-label="Reset to theme default"
-              >
-                <RotateCcw className="w-4 h-4" />
-              </Button>
-            </div>
-            {showColorPicker && (
-              <div className="mt-2">
-                <HexColorPicker color={bgColor ?? PICKER_FALLBACK} onChange={setBgColor} />
-              </div>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label>Image</Label>
-              {imageUrl && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive"
-                  onClick={clearImage}
-                >
-                  <X className="w-3.5 h-3.5 mr-1" />
-                  Remove
-                </Button>
-              )}
-            </div>
-
-            {/* Live preview of how the tile image will look. Drag it to set a
-                custom focal point when the image overflows the box. */}
-            <div
-              ref={previewRef}
-              className={`relative w-full h-28 rounded-md overflow-hidden border border-border ${
-                imageUrl
-                  ? isDragging
-                    ? "cursor-grabbing touch-none select-none"
-                    : "cursor-grab touch-none select-none"
-                  : ""
-              }`}
-              style={{ background: bgColor || THEME_BG_PREVIEW }}
-              onPointerDown={handlePreviewPointerDown}
-              onPointerMove={handlePreviewPointerMove}
-              onPointerUp={endDrag}
-              onPointerCancel={endDrag}
-            >
-              {imageUrl ? (
-                <div className={preview.wrapperClassName} style={preview.wrapperStyle}>
-                  <img
-                    src={imageUrl}
-                    alt="preview"
-                    className={preview.className}
-                    style={preview.style}
-                    draggable={false}
-                  />
-                </div>
-              ) : null}
-              {imageUrl && <div className="absolute inset-0 bg-black/20" />}
-              {/* Title overlay mirrors AppTile placement for plain tiles; widget
-                  tiles keep their fixed header so just show a simple label. */}
-              {hideTitle ? null : integration === NONE ? (
-                <div className={`absolute inset-0 flex flex-col gap-1 p-2 ${titlePreview.containerClass}`}>
-                  <span
-                    className={`font-bold leading-tight tracking-wide drop-shadow-sm truncate max-w-full ${titlePreview.sizeClass} ${titlePreview.textAlignClass}`}
-                    style={{ color: titleColor || (imageUrl ? "#fff" : "inherit") }}
-                  >
-                    {name || "Preview"}
-                  </span>
-                </div>
-              ) : (
-                imageUrl && (
-                  <span className="absolute bottom-1.5 left-2 text-xs font-bold text-white drop-shadow-sm truncate max-w-[90%]">
-                    {name || "Preview"}
-                  </span>
-                )
-              )}
-              {!imageUrl && integration !== NONE && (
-                <div className="flex items-center justify-center h-full text-xs text-muted-foreground">
-                  No image selected
-                </div>
-              )}
-            </div>
-
-            {/* Image source: upload a new one, pick from the library, or paste a URL. */}
-            <Tabs value={imageSource} onValueChange={(v) => setImageSource(v as ImageSource)}>
-              <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="upload">Upload</TabsTrigger>
-                <TabsTrigger value="library">Library</TabsTrigger>
-                <TabsTrigger value="url">URL</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="upload" className="pt-2">
-                <Label
-                  htmlFor="file-upload"
-                  className="cursor-pointer inline-flex text-xs px-3 py-1.5 rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors"
-                >
-                  {uploading ? "Uploading…" : imageUrl ? "Upload replacement" : "Upload image"}
-                </Label>
-                <input
-                  id="file-upload"
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handleUpload}
-                  disabled={uploading}
-                />
-                <p className="text-xs text-muted-foreground mt-1.5">
-                  Large photos are automatically resized and compressed.
-                </p>
-              </TabsContent>
-
-              <TabsContent value="library" className="pt-2">
-                {uploadsQuery.isLoading ? (
-                  <p className="text-xs text-muted-foreground">Loading…</p>
-                ) : (uploadsQuery.data?.length ?? 0) === 0 ? (
-                  <p className="text-xs text-muted-foreground">
-                    No uploads yet. Upload an image to start your library.
-                  </p>
-                ) : (
-                  <div className="grid grid-cols-4 gap-2 max-h-40 overflow-y-auto pr-1">
-                    {uploadsQuery.data!.map((file) => (
-                      <div key={file.id} className="relative group/lib aspect-square">
-                        <button
-                          type="button"
-                          onClick={() => pickImage(file.url)}
-                          className={`w-full h-full rounded-md overflow-hidden border ${
-                            imageUrl === file.url
-                              ? "border-primary ring-2 ring-primary"
-                              : "border-border hover:border-primary/60"
-                          }`}
-                          title={file.originalName ?? undefined}
-                        >
-                          <img
-                            src={file.url}
-                            alt={file.originalName ?? "uploaded image"}
-                            className="w-full h-full object-cover"
-                            draggable={false}
-                          />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteUpload(file.id, file.url)}
-                          className="absolute -top-1.5 -right-1.5 bg-destructive text-destructive-foreground rounded-full p-0.5 opacity-0 group-hover/lib:opacity-100 transition-opacity shadow"
-                          title="Delete from library"
-                          aria-label="Delete image"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </TabsContent>
-
-              <TabsContent value="url" className="pt-2">
-                <Input
-                  value={imageUrl}
-                  onChange={(e) => setImageUrl(e.target.value)}
-                  placeholder="https://…/icon.png"
-                />
-              </TabsContent>
-            </Tabs>
-          </div>
-
-          {imageUrl && (
-            <div className="space-y-3">
-              <div className="space-y-1.5">
-                <Label>Fit</Label>
-                <Select value={imageFit} onValueChange={(v) => setImageFit(v as FitValue)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {FIT_OPTIONS.map((f) => (
-                      <SelectItem key={f.value} value={f.value}>
-                        {f.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <Label>Position</Label>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 px-2 text-xs"
-                    onClick={() => setImagePosition(DEFAULT_PAN)}
-                    disabled={isCentered}
-                  >
-                    <RotateCcw className="w-3.5 h-3.5 mr-1" />
-                    Recenter
-                  </Button>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Drag the image in the preview above to position it, and use Scale
-                  to zoom in or out.
-                </p>
-              </div>
-
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <Label>Scale</Label>
-                  <span className="text-xs text-muted-foreground tabular-nums">{imageScale}%</span>
-                </div>
-                <Slider
-                  min={MIN_SCALE}
-                  max={MAX_SCALE}
-                  step={5}
-                  value={[imageScale]}
-                  onValueChange={([v]) => setImageScale(v)}
-                />
-              </div>
-            </div>
-          )}
-
-          {integration === NONE && name && (
-            <div className="space-y-3 border-t border-border pt-4">
-              <div className="space-y-1.5">
-                <Label>Title size</Label>
-                <Select value={titleSize} onValueChange={(v) => setTitleSize(v as TitleSize)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {TITLE_SIZE_OPTIONS.map((s) => (
-                      <SelectItem key={s.value} value={s.value}>
-                        {s.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-1.5">
-                <Label>Title placement</Label>
-                <div className="grid grid-cols-3 gap-1 w-[88px]">
-                  {POSITION_OPTIONS.map((p) => (
-                    <button
-                      key={p.key}
-                      type="button"
-                      onClick={() => setTitlePosition(p.key)}
-                      title={p.label}
-                      aria-label={p.label}
-                      className={`h-7 rounded border transition-colors ${
-                        titlePosition === p.key
-                          ? "bg-primary border-primary"
-                          : "bg-secondary border-border hover:bg-secondary/70"
-                      }`}
-                    />
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
 
           <div className="space-y-1.5 border-t border-border pt-4">
             <Label>App integration</Label>
@@ -1476,6 +1108,374 @@ export default function TileEditModal({ open, onOpenChange, tile, mode }: TileEd
               search={stockSearch}
               onSearchChange={setStockSearch}
             />
+          )}
+
+          <div className="space-y-1.5">
+            <Label>URL</Label>
+            <Input
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              placeholder="https://example.com"
+            />
+          </div>
+
+          <label
+            htmlFor="hide-title"
+            className="flex items-center gap-2 cursor-pointer select-none"
+          >
+            <Checkbox
+              id="hide-title"
+              checked={hideTitle}
+              onCheckedChange={(c) => setHideTitle(c === true)}
+            />
+            <span className="text-sm">Hide title text</span>
+          </label>
+
+          {integration === NONE && (
+            <div className="space-y-1.5">
+              <Label>Title Color</Label>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  className="w-8 h-8 rounded-md border border-border flex-shrink-0 shadow-sm"
+                  style={{ background: titleColor || "transparent" }}
+                  onClick={() => setShowTitleColorPicker((v) => !v)}
+                  aria-label="Pick title color"
+                />
+                <Input
+                  value={titleColor ?? ""}
+                  onChange={(e) => setTitleColor(e.target.value || null)}
+                  placeholder="Automatic"
+                  className="font-mono text-sm"
+                />
+                {eyeDropperSupported && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="flex-shrink-0"
+                    onClick={pickTitleColorFromScreen}
+                    title="Pick a color from your screen"
+                    aria-label="Pick a color from your screen"
+                  >
+                    <Pipette className="w-4 h-4" />
+                  </Button>
+                )}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="flex-shrink-0"
+                  onClick={() => setTitleColor(null)}
+                  disabled={titleColor === null}
+                  title="Reset to automatic color"
+                  aria-label="Reset to automatic color"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                </Button>
+              </div>
+              {showTitleColorPicker && (
+                <div className="mt-2">
+                  <HexColorPicker color={titleColor ?? "#ffffff"} onChange={setTitleColor} />
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="space-y-1.5">
+            <Label>Background Color</Label>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                className="w-8 h-8 rounded-md border border-border flex-shrink-0 shadow-sm"
+                style={{ background: bgColor || THEME_BG_PREVIEW }}
+                onClick={() => setShowColorPicker((v) => !v)}
+                aria-label="Pick color"
+              />
+              <Input
+                value={bgColor ?? ""}
+                onChange={(e) => setBgColor(e.target.value || null)}
+                placeholder="Theme default"
+                className="font-mono text-sm"
+              />
+              {eyeDropperSupported && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="flex-shrink-0"
+                  onClick={pickColorFromScreen}
+                  title="Pick a color from your screen"
+                  aria-label="Pick a color from your screen"
+                >
+                  <Pipette className="w-4 h-4" />
+                </Button>
+              )}
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="flex-shrink-0"
+                onClick={() => setBgColor(null)}
+                disabled={bgColor === null}
+                title="Reset to theme default"
+                aria-label="Reset to theme default"
+              >
+                <RotateCcw className="w-4 h-4" />
+              </Button>
+            </div>
+            {showColorPicker && (
+              <div className="mt-2">
+                <HexColorPicker color={bgColor ?? PICKER_FALLBACK} onChange={setBgColor} />
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label>Image</Label>
+              {imageUrl && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive"
+                  onClick={clearImage}
+                >
+                  <X className="w-3.5 h-3.5 mr-1" />
+                  Remove
+                </Button>
+              )}
+            </div>
+
+            {/* Live preview of how the tile image will look. Drag it to set a
+                custom focal point when the image overflows the box. */}
+            <div
+              ref={previewRef}
+              className={`relative w-full h-28 rounded-md overflow-hidden border border-border ${
+                imageUrl
+                  ? isDragging
+                    ? "cursor-grabbing touch-none select-none"
+                    : "cursor-grab touch-none select-none"
+                  : ""
+              }`}
+              style={{ background: bgColor || THEME_BG_PREVIEW }}
+              onPointerDown={handlePreviewPointerDown}
+              onPointerMove={handlePreviewPointerMove}
+              onPointerUp={endDrag}
+              onPointerCancel={endDrag}
+            >
+              {imageUrl ? (
+                <div className={preview.wrapperClassName} style={preview.wrapperStyle}>
+                  <img
+                    src={imageUrl}
+                    alt="preview"
+                    className={preview.className}
+                    style={preview.style}
+                    draggable={false}
+                  />
+                </div>
+              ) : null}
+              {imageUrl && <div className="absolute inset-0 bg-black/20" />}
+              {/* Title overlay mirrors AppTile placement for plain tiles; widget
+                  tiles keep their fixed header so just show a simple label. */}
+              {hideTitle ? null : integration === NONE ? (
+                <div className={`absolute inset-0 flex flex-col gap-1 p-2 ${titlePreview.containerClass}`}>
+                  <span
+                    className={`font-bold leading-tight tracking-wide drop-shadow-sm truncate max-w-full ${titlePreview.sizeClass} ${titlePreview.textAlignClass}`}
+                    style={{ color: titleColor || (imageUrl ? "#fff" : "inherit") }}
+                  >
+                    {name || "Preview"}
+                  </span>
+                </div>
+              ) : (
+                imageUrl && (
+                  <span className="absolute bottom-1.5 left-2 text-xs font-bold text-white drop-shadow-sm truncate max-w-[90%]">
+                    {name || "Preview"}
+                  </span>
+                )
+              )}
+              {!imageUrl && integration !== NONE && (
+                <div className="flex items-center justify-center h-full text-xs text-muted-foreground">
+                  No image selected
+                </div>
+              )}
+            </div>
+
+            {/* Image source: upload a new one, pick from the library, or paste a URL. */}
+            <Tabs value={imageSource} onValueChange={(v) => setImageSource(v as ImageSource)}>
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="upload">Upload</TabsTrigger>
+                <TabsTrigger value="library">Library</TabsTrigger>
+                <TabsTrigger value="url">URL</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="upload" className="pt-2">
+                <Label
+                  htmlFor="file-upload"
+                  className="cursor-pointer inline-flex text-xs px-3 py-1.5 rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors"
+                >
+                  {uploading ? "Uploading…" : imageUrl ? "Upload replacement" : "Upload image"}
+                </Label>
+                <input
+                  id="file-upload"
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleUpload}
+                  disabled={uploading}
+                />
+                <p className="text-xs text-muted-foreground mt-1.5">
+                  Large photos are automatically resized and compressed.
+                </p>
+              </TabsContent>
+
+              <TabsContent value="library" className="pt-2">
+                {uploadsQuery.isLoading ? (
+                  <p className="text-xs text-muted-foreground">Loading…</p>
+                ) : (uploadsQuery.data?.length ?? 0) === 0 ? (
+                  <p className="text-xs text-muted-foreground">
+                    No uploads yet. Upload an image to start your library.
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-4 gap-2 max-h-40 overflow-y-auto pr-1">
+                    {uploadsQuery.data!.map((file) => (
+                      <div key={file.id} className="relative group/lib aspect-square">
+                        <button
+                          type="button"
+                          onClick={() => pickImage(file.url)}
+                          className={`w-full h-full rounded-md overflow-hidden border ${
+                            imageUrl === file.url
+                              ? "border-primary ring-2 ring-primary"
+                              : "border-border hover:border-primary/60"
+                          }`}
+                          title={file.originalName ?? undefined}
+                        >
+                          <img
+                            src={file.url}
+                            alt={file.originalName ?? "uploaded image"}
+                            className="w-full h-full object-cover"
+                            draggable={false}
+                          />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteUpload(file.id, file.url)}
+                          className="absolute -top-1.5 -right-1.5 bg-destructive text-destructive-foreground rounded-full p-0.5 opacity-0 group-hover/lib:opacity-100 transition-opacity shadow"
+                          title="Delete from library"
+                          aria-label="Delete image"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="url" className="pt-2">
+                <Input
+                  value={imageUrl}
+                  onChange={(e) => setImageUrl(e.target.value)}
+                  placeholder="https://…/icon.png"
+                />
+              </TabsContent>
+            </Tabs>
+          </div>
+
+          {imageUrl && (
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <Label>Fit</Label>
+                <Select value={imageFit} onValueChange={(v) => setImageFit(v as FitValue)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {FIT_OPTIONS.map((f) => (
+                      <SelectItem key={f.value} value={f.value}>
+                        {f.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <Label>Position</Label>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-xs"
+                    onClick={() => setImagePosition(DEFAULT_PAN)}
+                    disabled={isCentered}
+                  >
+                    <RotateCcw className="w-3.5 h-3.5 mr-1" />
+                    Recenter
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Drag the image in the preview above to position it, and use Scale
+                  to zoom in or out.
+                </p>
+              </div>
+
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <Label>Scale</Label>
+                  <span className="text-xs text-muted-foreground tabular-nums">{imageScale}%</span>
+                </div>
+                <Slider
+                  min={MIN_SCALE}
+                  max={MAX_SCALE}
+                  step={5}
+                  value={[imageScale]}
+                  onValueChange={([v]) => setImageScale(v)}
+                />
+              </div>
+            </div>
+          )}
+
+          {integration === NONE && name && (
+            <div className="space-y-3 border-t border-border pt-4">
+              <div className="space-y-1.5">
+                <Label>Title size</Label>
+                <Select value={titleSize} onValueChange={(v) => setTitleSize(v as TitleSize)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TITLE_SIZE_OPTIONS.map((s) => (
+                      <SelectItem key={s.value} value={s.value}>
+                        {s.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>Title placement</Label>
+                <div className="grid grid-cols-3 gap-1 w-[88px]">
+                  {POSITION_OPTIONS.map((p) => (
+                    <button
+                      key={p.key}
+                      type="button"
+                      onClick={() => setTitlePosition(p.key)}
+                      title={p.label}
+                      aria-label={p.label}
+                      className={`h-7 rounded border transition-colors ${
+                        titlePosition === p.key
+                          ? "bg-primary border-primary"
+                          : "bg-secondary border-border hover:bg-secondary/70"
+                      }`}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
           )}
         </div>
 
