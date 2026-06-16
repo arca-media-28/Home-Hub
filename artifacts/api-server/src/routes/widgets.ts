@@ -1066,10 +1066,10 @@ router.get("/tailscale", requireAuth, async (_req, res) => {
       offlineCount: 1,
       exitNodeCount: 1,
       devices: [
-        { id: "1", name: "homelab-nas", os: "linux", online: true, lastSeen: new Date(now).toISOString(), exitNode: true },
-        { id: "2", name: "macbook-pro", os: "macOS", online: true, lastSeen: new Date(now - 60_000).toISOString(), exitNode: false },
-        { id: "3", name: "pixel-phone", os: "android", online: true, lastSeen: new Date(now - 120_000).toISOString(), exitNode: false },
-        { id: "4", name: "old-laptop", os: "windows", online: false, lastSeen: new Date(now - 3 * 86400_000).toISOString(), exitNode: false },
+        { id: "1", name: "homelab-nas", os: "linux", online: true, lastSeen: new Date(now).toISOString(), exitNode: true, addresses: ["100.64.0.1", "fd7a:115c:a1e0::1"] },
+        { id: "2", name: "macbook-pro", os: "macOS", online: true, lastSeen: new Date(now - 60_000).toISOString(), exitNode: false, addresses: ["100.64.0.2", "fd7a:115c:a1e0::2"] },
+        { id: "3", name: "pixel-phone", os: "android", online: true, lastSeen: new Date(now - 120_000).toISOString(), exitNode: false, addresses: ["100.64.0.3", "fd7a:115c:a1e0::3"] },
+        { id: "4", name: "old-laptop", os: "windows", online: false, lastSeen: new Date(now - 3 * 86400_000).toISOString(), exitNode: false, addresses: ["100.64.0.4", "fd7a:115c:a1e0::4"] },
       ],
     });
     return;
@@ -1094,6 +1094,7 @@ router.get("/tailscale", requireAuth, async (_req, res) => {
       lastSeen?: string;
       enabledRoutes?: string[];
       advertisedRoutes?: string[];
+      addresses?: string[];
     }>;
 
     const devices = rawDevices.map((d, i) => {
@@ -1111,6 +1112,7 @@ router.get("/tailscale", requireAuth, async (_req, res) => {
         online,
         lastSeen: !Number.isNaN(lastSeenMs) ? new Date(lastSeenMs).toISOString() : null,
         exitNode,
+        addresses: Array.isArray(d.addresses) ? d.addresses : [],
       };
     });
 

@@ -21,4 +21,6 @@ export interface TailscaleDevice {
   lastSeen?: string | null;
   /** Whether the device offers an approved exit node (advertises and is allowed to route the default 0.0.0.0/0 route). */
   exitNode: boolean;
+  /** The device's tailnet IP addresses (e.g. the 100.x.y.z CGNAT address and an IPv6 address), in the order Tailscale reports them. */
+  addresses?: string[];
 }

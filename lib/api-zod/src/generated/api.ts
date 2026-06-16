@@ -576,7 +576,8 @@ export const GetTailscaleStatusResponse = zod.object({
   "os": zod.string().describe('The device\'s operating system (e.g. linux, macOS, iOS).'),
   "online": zod.boolean().describe('Whether the device is currently online, derived from how recently it was last seen.'),
   "lastSeen": zod.string().nullish().describe('ISO timestamp of when the device was last seen, when known.'),
-  "exitNode": zod.boolean().describe('Whether the device offers an approved exit node (advertises and is allowed to route the default 0.0.0.0\/0 route).')
+  "exitNode": zod.boolean().describe('Whether the device offers an approved exit node (advertises and is allowed to route the default 0.0.0.0\/0 route).'),
+  "addresses": zod.array(zod.string()).optional().describe('The device\'s tailnet IP addresses (e.g. the 100.x.y.z CGNAT address and an IPv6 address), in the order Tailscale reports them.')
 }))
 })
 

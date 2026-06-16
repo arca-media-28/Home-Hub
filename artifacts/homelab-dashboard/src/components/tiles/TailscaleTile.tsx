@@ -1,7 +1,16 @@
+import { useState } from "react";
 import { useGetTailscaleStatus, getGetTailscaleStatusQueryKey } from "@workspace/api-client-react";
-import { Network, ArrowUpRight } from "lucide-react";
+import { Network, ArrowUpRight, Copy, Check } from "lucide-react";
 import type { WidgetProps } from "./IntegrationTile";
 import { tileBudget, STAT_ROW_PX, ROW_PX, SECTION_PX, TWO_LINE_ROW_PX } from "./metrics";
+
+// The first tailnet IPv4 (100.x) address is what users almost always want to
+// grab; fall back to the first address of any kind when no IPv4 is present.
+function primaryAddress(addresses: string[] | undefined): string | null {
+  if (!addresses || addresses.length === 0) return null;
+  const v4 = addresses.find((a) => /^\d{1,3}(\.\d{1,3}){3}$/.test(a));
+  return v4 ?? addresses[0] ?? null;
+}
 
 // Compact "last seen" relative label, e.g. "3m", "2h", "5d".
 function relativeLastSeen(iso: string | null | undefined): string {
@@ -22,6 +31,21 @@ export default function TailscaleTile({ enabled, density }: WidgetProps) {
   const { data, isLoading, isError } = useGetTailscaleStatus({
     query: { queryKey: getGetTailscaleStatusQueryKey(), refetchInterval: 30_000 },
   });
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  async function copyAddress(id: string, address: string) {
+    try {
+      await navigator.clipboard.writeText(address);
+    } catch {
+      // Clipboard API can be unavailable (e.g. non-secure context); ignore so
+      // the tile never throws on a copy attempt.
+      return;
+    }
+    setCopiedId(id);
+    window.setTimeout(() => {
+      setCopiedId((cur) => (cur === id ? null : cur));
+    }, 1500);
+  }
 
   if (isLoading) {
     return (
@@ -99,31 +123,51 @@ export default function TailscaleTile({ enabled, density }: WidgetProps) {
 
       {deviceRows > 0 && (
         <div className="flex-1 min-h-0 flex flex-col gap-1.5 overflow-hidden">
-          {visibleDevices.map((d) => (
-            <div key={d.id} className="flex items-center gap-2">
-              <span
-                className={`flex-shrink-0 h-2 w-2 rounded-full ${
-                  d.online ? "bg-green-500" : "bg-muted-foreground/40"
-                }`}
-                title={d.online ? "Online" : "Offline"}
-              />
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-xs font-medium text-foreground truncate">
-                    {d.name}
-                  </span>
-                  {d.exitNode && (
-                    <span className="flex-shrink-0 text-[9px] uppercase tracking-wide font-semibold text-primary border border-primary/40 rounded px-1 leading-tight">
-                      Exit
+          {visibleDevices.map((d) => {
+            const ip = primaryAddress(d.addresses);
+            const copied = copiedId === d.id;
+            return (
+              <div key={d.id} className="flex items-center gap-2">
+                <span
+                  className={`flex-shrink-0 h-2 w-2 rounded-full ${
+                    d.online ? "bg-green-500" : "bg-muted-foreground/40"
+                  }`}
+                  title={d.online ? "Online" : "Offline"}
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-medium text-foreground truncate">
+                      {d.name}
                     </span>
-                  )}
+                    {d.exitNode && (
+                      <span className="flex-shrink-0 text-[9px] uppercase tracking-wide font-semibold text-primary border border-primary/40 rounded px-1 leading-tight">
+                        Exit
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-[10px] text-muted-foreground truncate">
+                    {d.os} · {d.online ? "online" : relativeLastSeen(d.lastSeen)}
+                  </div>
                 </div>
-                <div className="text-[10px] text-muted-foreground truncate">
-                  {d.os} · {d.online ? "online" : relativeLastSeen(d.lastSeen)}
-                </div>
+                {ip && (
+                  <button
+                    type="button"
+                    onClick={() => copyAddress(d.id, ip)}
+                    title={copied ? "Copied!" : `Copy ${ip}`}
+                    aria-label={copied ? `Copied ${ip}` : `Copy ${d.name} IP ${ip}`}
+                    className="group flex-shrink-0 flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-mono tabular-nums text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                  >
+                    <span className="hidden sm:inline truncate max-w-[88px]">{ip}</span>
+                    {copied ? (
+                      <Check className="w-3 h-3 text-green-500" />
+                    ) : (
+                      <Copy className="w-3 h-3 opacity-60 group-hover:opacity-100" />
+                    )}
+                  </button>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
