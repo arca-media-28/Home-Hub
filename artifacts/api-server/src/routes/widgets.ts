@@ -85,6 +85,62 @@ function latestByLegend(graph: unknown): Record<string, number> {
   return map;
 }
 
+// Shape of a single pool row from `GET /api/v2.0/pool`, narrowed to the vdev
+// stats we sum for capacity.
+interface TruenasPool {
+  name: string;
+  status: string;
+  topology?: { data?: Array<{ stats?: { allocated?: number; alloc?: number; size?: number; space?: number } }> };
+}
+
+// Reduce a TrueNAS reporting response (array of graphs) into CPU% and memory
+// bytes. Kept separate so the route can call it only when the reporting request
+// actually succeeded.
+function parseTruenasReporting(reportData: unknown): {
+  cpuPercent: number;
+  memUsedGb: number;
+  memTotalGb: number;
+} {
+  const graphs = (reportData ?? []) as Array<{ name?: string }>;
+  const cpuGraph = graphs.find((g) => g.name === "cpu") ?? graphs[0];
+  const memGraph = graphs.find((g) => g.name === "memory") ?? graphs[1];
+
+  // CPU is reported per-state in percent; usage is everything that isn't idle.
+  const cpu = latestByLegend(cpuGraph);
+  const idle = cpu["idle"] ?? 0;
+  const cpuPercent = Math.min(100, Math.max(0, 100 - idle));
+
+  // Memory legend values are in bytes. "used" is real usage; total is the sum
+  // of the physical-memory buckets that are present.
+  const mem = latestByLegend(memGraph);
+  const memUsedBytes = mem["used"] ?? 0;
+  const memTotalBytes =
+    (mem["used"] ?? 0) +
+    (mem["free"] ?? 0) +
+    (mem["cached"] ?? 0) +
+    (mem["buffers"] ?? 0);
+
+  return {
+    cpuPercent: Number(cpuPercent.toFixed(1)),
+    memUsedGb: memUsedBytes / 1e9,
+    memTotalGb: memTotalBytes / 1e9,
+  };
+}
+
+// Reduce a TrueNAS `GET /api/v2.0/pool` response into per-pool used/total bytes.
+function parseTruenasPools(poolData: unknown) {
+  return ((poolData ?? []) as TruenasPool[]).map((p) => {
+    let usedBytes = 0;
+    let totalBytes = 0;
+    for (const vdev of p.topology?.data ?? []) {
+      const stats = vdev.stats ?? {};
+      usedBytes += stats.allocated ?? stats.alloc ?? 0;
+      totalBytes += stats.size ?? stats.space ?? 0;
+    }
+    return { name: p.name, status: p.status, usedBytes, totalBytes };
+  });
+}
+
 router.get("/truenas", requireAuth, async (_req, res) => {
   const saved = getSavedConnection("truenas");
   const baseUrl = saved.url || process.env["TRUENAS_URL"];
@@ -104,72 +160,63 @@ router.get("/truenas", requireAuth, async (_req, res) => {
     return;
   }
 
-  try {
-    const headers = { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" };
+  const headers = { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" };
 
-    // The reporting endpoint must be a POST with the query as the JSON body.
-    // (Issuing a GET with a body does not reliably send the payload.) Both
-    // graphs can be requested in a single call.
-    const [reportRes, poolRes] = await Promise.all([
-      httpClient.post(
-        `${baseUrl}/api/v2.0/reporting/get_data`,
-        {
-          graphs: [{ name: "cpu" }, { name: "memory" }],
-          reporting_query: { start: "now-30s", end: "now", aggregate: true },
-        },
-        { headers },
-      ),
-      httpClient.get(`${baseUrl}/api/v2.0/pool`, { headers }),
-    ]);
+  // The reporting endpoint must be a POST with the query as the JSON body.
+  // (Issuing a GET with a body does not reliably send the payload.) The modern
+  // Netdata-based backend (SCALE 24.04+, incl. 25.10 "Goldeye") rejects the old
+  // relative time strings ("now-30s"/"now") — `start`/`end` must be integer unix
+  // timestamps (seconds). Request a short trailing window and aggregate it.
+  const nowSec = Math.floor(Date.now() / 1000);
+  const reportingBody = {
+    graphs: [{ name: "cpu" }, { name: "memory" }],
+    reporting_query: { start: nowSec - 60, end: nowSec, aggregate: true },
+  };
 
-    const graphs = (reportRes.data ?? []) as Array<{ name?: string }>;
-    const cpuGraph = graphs.find((g) => g.name === "cpu") ?? graphs[0];
-    const memGraph = graphs.find((g) => g.name === "memory") ?? graphs[1];
+  // The reporting (CPU/RAM) and pool (storage) calls are independent. Settle
+  // them separately so one failing source no longer blanks the whole tile —
+  // whatever data is available still renders. Only a fully-unreachable server
+  // (both calls fail) returns the 502 "unavailable" state.
+  const [reportResult, poolResult] = await Promise.allSettled([
+    httpClient.post(`${baseUrl}/api/v2.0/reporting/get_data`, reportingBody, { headers }),
+    httpClient.get(`${baseUrl}/api/v2.0/pool`, { headers }),
+  ]);
 
-    // CPU is reported per-state in percent; usage is everything that isn't idle.
-    const cpu = latestByLegend(cpuGraph);
-    const idle = cpu["idle"] ?? 0;
-    const cpuPercent = Math.min(100, Math.max(0, 100 - idle));
-
-    // Memory legend values are in bytes. "used" is real usage; total is the sum
-    // of the physical-memory buckets that are present.
-    const mem = latestByLegend(memGraph);
-    const memUsedBytes = mem["used"] ?? 0;
-    const memTotalBytes =
-      (mem["used"] ?? 0) +
-      (mem["free"] ?? 0) +
-      (mem["cached"] ?? 0) +
-      (mem["buffers"] ?? 0);
-    const memUsedGb = memUsedBytes / 1e9;
-    const memTotalGb = memTotalBytes / 1e9;
-
-    // Pool capacity comes from the ZFS vdev stats in the topology. Sum the data
-    // vdevs: `allocated`/`alloc` is used space, `size`/`space` is total.
-    const pools = ((poolRes.data ?? []) as Array<{
-      name: string;
-      status: string;
-      topology?: { data?: Array<{ stats?: { allocated?: number; alloc?: number; size?: number; space?: number } }> };
-    }>).map((p) => {
-      let usedBytes = 0;
-      let totalBytes = 0;
-      for (const vdev of p.topology?.data ?? []) {
-        const stats = vdev.stats ?? {};
-        usedBytes += stats.allocated ?? stats.alloc ?? 0;
-        totalBytes += stats.size ?? stats.space ?? 0;
-      }
-      return { name: p.name, status: p.status, usedBytes, totalBytes };
-    });
-
-    res.json({
-      cpuPercent: Number(cpuPercent.toFixed(1)),
-      memUsedGb,
-      memTotalGb,
-      pools,
-    });
-  } catch (err) {
-    logger.error({ reason: normalizeHttpError(err) }, "TrueNAS widget error");
+  if (reportResult.status === "rejected" && poolResult.status === "rejected") {
+    logger.error(
+      {
+        reporting: normalizeHttpError(reportResult.reason),
+        pool: normalizeHttpError(poolResult.reason),
+      },
+      "TrueNAS widget error (both reporting and pool failed)",
+    );
     res.status(502).json({ error: "Failed to fetch TrueNAS data" });
+    return;
   }
+
+  // Partial data is fine: fall back to empty/zero values for whichever source
+  // failed, and log a one-line reason naming the failed call.
+  let reporting = { cpuPercent: 0, memUsedGb: 0, memTotalGb: 0 };
+  if (reportResult.status === "fulfilled") {
+    reporting = parseTruenasReporting(reportResult.value.data);
+  } else {
+    logger.error(
+      { reason: normalizeHttpError(reportResult.reason) },
+      "TrueNAS widget: reporting call failed (CPU/RAM unavailable)",
+    );
+  }
+
+  let pools: ReturnType<typeof parseTruenasPools> = [];
+  if (poolResult.status === "fulfilled") {
+    pools = parseTruenasPools(poolResult.value.data);
+  } else {
+    logger.error(
+      { reason: normalizeHttpError(poolResult.reason) },
+      "TrueNAS widget: pool call failed (storage unavailable)",
+    );
+  }
+
+  res.json({ ...reporting, pools });
 });
 
 // ────────────────────────────────────────────────

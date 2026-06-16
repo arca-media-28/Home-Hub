@@ -141,9 +141,59 @@ describe("GET /widgets/truenas", () => {
       { name: "tank", status: "ONLINE", usedBytes: 2e12, totalBytes: 10e12 },
     ]);
 
-    // Reporting must be a POST with the graphs query.
+    // Reporting must be a POST with the graphs query and integer unix-timestamp
+    // start/end (the modern Netdata backend rejects relative "now-30s" strings).
     const [, postBody] = httpPost.mock.calls[0]!;
     expect(postBody.graphs).toEqual([{ name: "cpu" }, { name: "memory" }]);
+    expect(Number.isInteger(postBody.reporting_query.start)).toBe(true);
+    expect(Number.isInteger(postBody.reporting_query.end)).toBe(true);
+    expect(postBody.reporting_query.end).toBeGreaterThan(postBody.reporting_query.start);
+    expect(postBody.reporting_query.aggregate).toBe(true);
+  });
+
+  it("renders pool data when only reporting fails (partial)", async () => {
+    findByService.mockReturnValue(
+      connRow({ service: "truenas", url: "https://nas.local", api_key: "key" }),
+    );
+    httpPost.mockRejectedValue(httpError(422)); // modern backend rejected the query
+    httpGet.mockResolvedValue({
+      data: [
+        {
+          name: "tank",
+          status: "ONLINE",
+          topology: { data: [{ stats: { allocated: 2e12, size: 10e12 } }] },
+        },
+      ],
+    });
+
+    const res = await request(app).get("/widgets/truenas");
+    expect(res.status).toBe(200);
+    // Reporting missing → zeroed CPU/RAM, but pools still render.
+    expect(res.body.cpuPercent).toBe(0);
+    expect(res.body.memUsedGb).toBe(0);
+    expect(res.body.memTotalGb).toBe(0);
+    expect(res.body.pools).toEqual([
+      { name: "tank", status: "ONLINE", usedBytes: 2e12, totalBytes: 10e12 },
+    ]);
+  });
+
+  it("renders CPU/RAM when only the pool call fails (partial)", async () => {
+    findByService.mockReturnValue(
+      connRow({ service: "truenas", url: "https://nas.local", api_key: "key" }),
+    );
+    httpPost.mockResolvedValue({
+      data: [
+        { name: "cpu", legend: ["user", "idle"], data: [[1000, 20, 80]] },
+        { name: "memory", legend: ["used", "free"], data: [[1000, 8e9, 8e9]] },
+      ],
+    });
+    httpGet.mockRejectedValue(httpError(500));
+
+    const res = await request(app).get("/widgets/truenas");
+    expect(res.status).toBe(200);
+    expect(res.body.cpuPercent).toBe(20);
+    expect(res.body.memUsedGb).toBe(8);
+    expect(res.body.pools).toEqual([]);
   });
 
   it("prefers aggregated mean over the last data row", async () => {

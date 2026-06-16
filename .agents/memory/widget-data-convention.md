@@ -39,7 +39,13 @@ failed before this. The same client backs both the test/ping and the widgets so
   entry per requested graph; each data row starts with a timestamp, so values
   align to `legend` after dropping column 0. CPU% = 100 − idle. Pool capacity
   comes from ZFS vdev stats (`allocated`/`alloc` used, `size`/`space` total),
-  NOT `stats.bytes` (those are I/O counters).
+  NOT `stats.bytes` (those are I/O counters). **`reporting_query.start`/`end`
+  must be integer unix-timestamps (seconds), NOT relative strings.** The modern
+  Netdata backend (SCALE 24.04+, incl. 25.10 "Goldeye") rejects `now-30s`/`now`,
+  which 502'd the tile while the Settings test (system/info only) still passed —
+  classic test-passes-widget-fails. Also: reporting (CPU/RAM) and pool (storage)
+  are **independent** — settle them separately (Promise.allSettled), render
+  partial data, and only 502 when BOTH fail. Log the failing call by name.
 - Sonarr/Radarr: queue needs `includeSeries`/`includeMovie` (+ `includeEpisode`
   for Sonarr) and returns rows under `records`; calendar needs the same include
   flags or titles render blank.

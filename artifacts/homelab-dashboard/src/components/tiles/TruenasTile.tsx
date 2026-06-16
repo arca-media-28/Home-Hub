@@ -43,7 +43,7 @@ export default function TruenasTile({ enabled, density }: WidgetProps) {
     );
   }
 
-  const memPct = (data.memUsedGb / data.memTotalGb) * 100;
+  const memPct = data.memTotalGb > 0 ? (data.memUsedGb / data.memTotalGb) * 100 : 0;
 
   // Reveal CPU, then RAM, then the ZFS pool list in priority order, showing as
   // many as fit the measured body height. Each section is hidden entirely once
