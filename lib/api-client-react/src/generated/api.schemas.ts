@@ -710,7 +710,7 @@ export interface ErsatzTvData {
   /** Whether the ErsatzTV server is up and reachable. Always true in a 200 response (a configured-but-unreachable server returns 502); the field lets the tile render the health metric uniformly. */
   reachable: boolean;
   /**
-     * Number of currently active playout/streaming sessions. Null when ErsatzTV does not expose session information on this instance, in which case the tile omits the metric rather than failing.
+     * Number of currently active streaming sessions, taken from ErsatzTV's /api/sessions endpoint (one entry per active transcode session). Null when that endpoint is unavailable (e.g. an older instance or a network error), in which case the tile omits the metric rather than failing.
      * @nullable
      */
   activeStreams?: number | null;

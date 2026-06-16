@@ -1253,6 +1253,26 @@ function parseXmltvNowPlaying(xml: string, nowMs: number): Map<string, string> {
   return nowPlaying;
 }
 
+// Fetch the live active-stream count from ErsatzTV's /api/sessions endpoint,
+// which returns a JSON array with one entry per active transcode session
+// (MPEG-TS and HLS Segmenter). Returns the array length, or null when the
+// endpoint is unavailable (older instance, network error, or unexpected shape)
+// so the tile omits the metric instead of failing.
+async function fetchErsatzActiveStreams(base: string): Promise<number | null> {
+  try {
+    const res = await httpClient.get(`${base}/api/sessions`, { responseType: "json" });
+    const data = res.data;
+    if (Array.isArray(data)) return data.length;
+    return null;
+  } catch (err) {
+    logger.warn(
+      { reason: normalizeHttpError(err) },
+      "ErsatzTV active-stream count unavailable",
+    );
+    return null;
+  }
+}
+
 router.get("/ersatztv", requireAuth, async (_req, res) => {
   const saved = getSavedConnection("ersatztv");
   const baseUrl = saved.url || process.env["ERSATZTV_URL"];
@@ -1276,9 +1296,15 @@ router.get("/ersatztv", requireAuth, async (_req, res) => {
   try {
     const base = trimSlash(baseUrl);
 
-    const [channelsRes, guideRes] = await Promise.all([
+    // Active streams come from ErsatzTV's /api/sessions endpoint, which returns
+    // a JSON array (one entry per active MPEG-TS / HLS transcode session). It is
+    // fetched alongside the M3U/XMLTV but with its own catch so a failure or an
+    // older instance without the endpoint degrades to null (omit the metric)
+    // rather than failing the whole tile.
+    const [channelsRes, guideRes, activeStreams] = await Promise.all([
       httpClient.get(`${base}/iptv/channels.m3u`, { responseType: "text" }),
       httpClient.get(`${base}/iptv/xmltv.xml`, { responseType: "text" }),
+      fetchErsatzActiveStreams(base),
     ]);
 
     const channelList = parseM3uChannels(String(channelsRes.data ?? ""));
@@ -1291,11 +1317,6 @@ router.get("/ersatztv", requireAuth, async (_req, res) => {
       // keys XMLTV channels by their number when no explicit id is set).
       nowPlaying: nowPlaying.get(c.tvgId) ?? nowPlaying.get(c.number) ?? null,
     }));
-
-    // Active streams: ErsatzTV exposes no stable no-auth endpoint for the live
-    // session count on this instance, so we degrade gracefully and omit the
-    // metric (null) rather than failing the whole tile.
-    const activeStreams: number | null = null;
 
     res.json({ reachable: true, activeStreams, channels });
   } catch (err) {

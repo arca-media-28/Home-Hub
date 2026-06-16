@@ -11,7 +11,7 @@ Endpoints (both unauthenticated, fetched as text via `responseType: "text"`):
 
 **Now playing rule:** a programme is current when `start ≤ now < stop` (stop is exclusive, so a show ending exactly now yields the next one). XMLTV time has an optional `±HHMM` offset; absent offset → treat as UTC. Titles may be CDATA or carry XML entities — decode both.
 
-**Active streams metric:** ErsatzTV exposes **no stable no-auth endpoint** for the live session/playout count on the instances here, so the widget returns `activeStreams: null` on configured instances and the tile **omits** the metric (degrade gracefully, never 502 the whole tile for this). Sample data still shows a number so the metric is demonstrable when unconfigured.
+**Active streams metric:** comes from `GET /api/sessions` (no-auth) — a JSON array, one entry per active transcode session (MPEG-TS + HLS Segmenter); `activeStreams = array.length`. Fetched with its **own** try/catch so an older instance / missing endpoint / network error returns `null` (tile omits the metric) and **never 502s the whole tile**. Older note that "no endpoint exists" is wrong — `/api/sessions` is the source.
 
 **Widget convention:** unconfigured (no base URL) → sample data; configured-but-fetch-fails → 502. `reachable` is always `true` in a 200 (an unreachable configured server 502s instead); the field exists so the tile can render the "health" metric uniformly.
 

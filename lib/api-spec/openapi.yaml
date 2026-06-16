@@ -1577,9 +1577,11 @@ components:
           type: boolean
         activeStreams:
           description: >-
-            Number of currently active playout/streaming sessions. Null when
-            ErsatzTV does not expose session information on this instance, in
-            which case the tile omits the metric rather than failing.
+            Number of currently active streaming sessions, taken from ErsatzTV's
+            /api/sessions endpoint (one entry per active transcode session).
+            Null when that endpoint is unavailable (e.g. an older instance or a
+            network error), in which case the tile omits the metric rather than
+            failing.
           type: ["integer", "null"]
         channels:
           description: Channels and what each is currently airing (from the EPG).
