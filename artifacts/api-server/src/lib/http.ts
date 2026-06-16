@@ -13,11 +13,23 @@ const insecureHttpsAgent = new https.Agent({ rejectUnauthorized: false });
 // Shared axios instance used by every widget route and the test/ping logic, so a
 // connection test that passes also means the widget will work. Standardizes the
 // timeout and the self-signed-TLS handling in one place.
+//
+// NOTE: this client disables TLS verification, which is appropriate for LAN
+// homelab services that serve self-signed certs — but NOT for calls to public
+// cloud APIs over the internet, where a bearer token would be exposed to MITM.
+// Use `cloudHttpClient` for any internet-hosted, token-bearing API.
 export const httpClient: AxiosInstance = axios.create({
   timeout: HTTP_TIMEOUT,
   httpsAgent: insecureHttpsAgent,
   // Don't auto-throw on >=300 here; callers decide. Keep axios default (throws
   // on non-2xx) so individual routes can surface a clear error state.
+});
+
+// Secure axios instance for public cloud APIs (e.g. api.tailscale.com). Uses
+// Node's default TLS validation so bearer tokens are never sent over a
+// connection whose certificate hasn't been verified.
+export const cloudHttpClient: AxiosInstance = axios.create({
+  timeout: HTTP_TIMEOUT,
 });
 
 // Normalize a user-entered base URL so axios always gets an absolute URL:

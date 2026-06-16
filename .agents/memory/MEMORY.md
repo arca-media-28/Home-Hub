@@ -12,3 +12,4 @@
 - [imagePosition dual-use](imageposition-focal-point.md) — imagePosition holds EITHER a named anchor key OR a custom focal point "X% Y%"; resolveObjectPosition/positionToPercent branch on isFocalPoint, no schema/enum change needed.
 - [tsc refs serve stale .d.ts](tsc-project-references-stale-dts.md) — workspace typecheck "missing export/field" that exists in src? rebuild lib refs (tsc --build lib/*/tsconfig.json) first; dist/*.d.ts is stale.
 - [Prowlarr widget API mapping](prowlarr-api-mapping.md) — indexer uses `enable` (singular); per-indexer failing derived from health-message name match; grabs from history eventType=1 within 24h.
+- [Tailscale cloud connection mapping](tailscale-cloud-connection-mapping.md) — cloud-only service reuses url=tailnet/apiKey=token; cloud APIs must use TLS-verifying cloudHttpClient, NOT the insecure shared httpClient.

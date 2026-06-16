@@ -49,6 +49,11 @@ export const METRIC_CATALOG: Record<string, MetricDef[]> = {
     { key: "grabCount", label: "Grabs (24h)" },
     { key: "healthWarnings", label: "Health warnings" },
   ],
+  [TileIntegration.tailscale]: [
+    { key: "summary", label: "Device summary" },
+    { key: "exitNodes", label: "Exit nodes" },
+    { key: "devices", label: "Device list" },
+  ],
 };
 
 // All metric keys for an integration (used as the default "show all" set).

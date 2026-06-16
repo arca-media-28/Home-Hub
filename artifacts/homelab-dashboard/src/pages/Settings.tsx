@@ -31,6 +31,7 @@ import {
   Shield,
   Network,
   Radar,
+  Globe,
   Plug,
   X,
 } from "lucide-react";
@@ -43,7 +44,8 @@ type ServiceKey =
   | "qbittorrent"
   | "pihole"
   | "nginx-proxy-manager"
-  | "prowlarr";
+  | "prowlarr"
+  | "tailscale";
 
 type FieldKey = "url" | "apiKey" | "username" | "password" | "token";
 
@@ -133,6 +135,23 @@ const SERVICES: ServiceDef[] = [
     name: "Prowlarr",
     icon: Radar,
     fields: [URL_FIELD, API_KEY_FIELD],
+  },
+  {
+    key: "tailscale",
+    name: "Tailscale",
+    icon: Globe,
+    // Tailscale is a cloud service, so there's no LAN base URL. We reuse the
+    // `url` field to carry the tailnet name and `apiKey` for the API access
+    // token — both are relabelled here to match.
+    fields: [
+      { key: "url", label: "Tailnet name", placeholder: "example.ts.net or -" },
+      {
+        key: "apiKey",
+        label: "API access token",
+        type: "password",
+        placeholder: "tskey-api-••••••••",
+      },
+    ],
   },
 ];
 

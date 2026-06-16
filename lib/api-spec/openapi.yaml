@@ -410,6 +410,21 @@ paths:
               schema:
                 $ref: "#/components/schemas/ProwlarrData"
 
+  /widgets/tailscale:
+    get:
+      operationId: getTailscaleStatus
+      tags: [widgets]
+      summary: Get tailnet device status (online/offline counts and per-device list) from Tailscale
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Tailscale tailnet status summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TailscaleData"
+
   /connections:
     get:
       operationId: getConnections
@@ -474,7 +489,7 @@ paths:
           required: true
           schema:
             type: string
-            enum: [truenas, plex, sonarr, radarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr]
+            enum: [truenas, plex, sonarr, radarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale]
       requestBody:
         required: true
         content:
@@ -508,7 +523,7 @@ paths:
           required: true
           schema:
             type: string
-            enum: [truenas, plex, sonarr, radarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr]
+            enum: [truenas, plex, sonarr, radarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale]
       requestBody:
         required: true
         content:
@@ -593,7 +608,7 @@ components:
           enum: [app, truenas, media, sonarr, radarr, qbittorrent]
         integration:
           type: ["string", "null"]
-          enum: [truenas, media, sonarr, radarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, clock, weather, null]
+          enum: [truenas, media, sonarr, radarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, clock, weather, null]
         gridX:
           type: integer
         gridY:
@@ -672,7 +687,7 @@ components:
           enum: [app, truenas, media, sonarr, radarr, qbittorrent]
         integration:
           type: ["string", "null"]
-          enum: [truenas, media, sonarr, radarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, clock, weather, null]
+          enum: [truenas, media, sonarr, radarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, clock, weather, null]
         gridX:
           type: integer
         gridY:
@@ -715,7 +730,7 @@ components:
       properties:
         integration:
           type: ["string", "null"]
-          enum: [truenas, media, sonarr, radarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, clock, weather, null]
+          enum: [truenas, media, sonarr, radarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, clock, weather, null]
         gridX:
           type: integer
         gridY:
@@ -1227,3 +1242,53 @@ components:
           type: string
         message:
           type: string
+
+    TailscaleData:
+      type: object
+      required: [tailnet, deviceCount, onlineCount, offlineCount, exitNodeCount, devices]
+      properties:
+        tailnet:
+          description: The tailnet name the devices belong to.
+          type: string
+        deviceCount:
+          description: Total number of devices in the tailnet.
+          type: integer
+        onlineCount:
+          description: Number of devices currently online.
+          type: integer
+        offlineCount:
+          description: Number of devices currently offline.
+          type: integer
+        exitNodeCount:
+          description: Number of online devices offering an approved exit node.
+          type: integer
+        devices:
+          type: array
+          items:
+            $ref: "#/components/schemas/TailscaleDevice"
+
+    TailscaleDevice:
+      type: object
+      required: [id, name, os, online, exitNode]
+      properties:
+        id:
+          type: string
+        name:
+          description: The device's machine/host name.
+          type: string
+        os:
+          description: The device's operating system (e.g. linux, macOS, iOS).
+          type: string
+        online:
+          description: >-
+            Whether the device is currently online, derived from how recently it
+            was last seen.
+          type: boolean
+        lastSeen:
+          description: ISO timestamp of when the device was last seen, when known.
+          type: ["string", "null"]
+        exitNode:
+          description: >-
+            Whether the device offers an approved exit node (advertises and is
+            allowed to route the default 0.0.0.0/0 route).
+          type: boolean

@@ -38,6 +38,7 @@ import type {
   ServiceConnectionUpdate,
   ServiceStatus,
   SonarrData,
+  TailscaleData,
   Tile,
   TileInput,
   TileUpdate,
@@ -1632,6 +1633,83 @@ export function useGetProwlarrWidget<TData = Awaited<ReturnType<typeof getProwla
 
 
 
+export const getGetTailscaleStatusUrl = () => {
+
+
+
+
+  return `/api/widgets/tailscale`
+}
+
+/**
+ * @summary Get tailnet device status (online/offline counts and per-device list) from Tailscale
+ */
+export const getTailscaleStatus = async ( options?: RequestInit): Promise<TailscaleData> => {
+
+  return customFetch<TailscaleData>(getGetTailscaleStatusUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetTailscaleStatusQueryKey = () => {
+    return [
+    `/api/widgets/tailscale`
+    ] as const;
+    }
+
+
+export const getGetTailscaleStatusQueryOptions = <TData = Awaited<ReturnType<typeof getTailscaleStatus>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTailscaleStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetTailscaleStatusQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTailscaleStatus>>> = ({ signal }) => getTailscaleStatus({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTailscaleStatus>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetTailscaleStatusQueryResult = NonNullable<Awaited<ReturnType<typeof getTailscaleStatus>>>
+export type GetTailscaleStatusQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get tailnet device status (online/offline counts and per-device list) from Tailscale
+ */
+
+export function useGetTailscaleStatus<TData = Awaited<ReturnType<typeof getTailscaleStatus>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTailscaleStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetTailscaleStatusQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
 export const getGetConnectionsUrl = () => {
 
 
@@ -1863,7 +1941,7 @@ export function useGetConnectionHealth<TData = Awaited<ReturnType<typeof getConn
 
 
 
-export const getTestConnectionUrl = (service: 'truenas' | 'plex' | 'sonarr' | 'radarr' | 'qbittorrent' | 'pihole' | 'nginx-proxy-manager' | 'prowlarr',) => {
+export const getTestConnectionUrl = (service: 'truenas' | 'plex' | 'sonarr' | 'radarr' | 'qbittorrent' | 'pihole' | 'nginx-proxy-manager' | 'prowlarr' | 'tailscale',) => {
 
 
 
@@ -1874,7 +1952,7 @@ export const getTestConnectionUrl = (service: 'truenas' | 'plex' | 'sonarr' | 'r
 /**
  * @summary Test a service connection using the supplied values without saving
  */
-export const testConnection = async (service: 'truenas' | 'plex' | 'sonarr' | 'radarr' | 'qbittorrent' | 'pihole' | 'nginx-proxy-manager' | 'prowlarr',
+export const testConnection = async (service: 'truenas' | 'plex' | 'sonarr' | 'radarr' | 'qbittorrent' | 'pihole' | 'nginx-proxy-manager' | 'prowlarr' | 'tailscale',
     serviceConnectionUpdate: ServiceConnectionUpdate, options?: RequestInit): Promise<ConnectionTestResult> => {
 
   return customFetch<ConnectionTestResult>(getTestConnectionUrl(service),
@@ -1891,8 +1969,8 @@ export const testConnection = async (service: 'truenas' | 'plex' | 'sonarr' | 'r
 
 
 export const getTestConnectionMutationOptions = <TError = ErrorType<ErrorResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof testConnection>>, TError,{service: 'truenas' | 'plex' | 'sonarr' | 'radarr' | 'qbittorrent' | 'pihole' | 'nginx-proxy-manager' | 'prowlarr';data: BodyType<ServiceConnectionUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof testConnection>>, TError,{service: 'truenas' | 'plex' | 'sonarr' | 'radarr' | 'qbittorrent' | 'pihole' | 'nginx-proxy-manager' | 'prowlarr';data: BodyType<ServiceConnectionUpdate>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof testConnection>>, TError,{service: 'truenas' | 'plex' | 'sonarr' | 'radarr' | 'qbittorrent' | 'pihole' | 'nginx-proxy-manager' | 'prowlarr' | 'tailscale';data: BodyType<ServiceConnectionUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof testConnection>>, TError,{service: 'truenas' | 'plex' | 'sonarr' | 'radarr' | 'qbittorrent' | 'pihole' | 'nginx-proxy-manager' | 'prowlarr' | 'tailscale';data: BodyType<ServiceConnectionUpdate>}, TContext> => {
 
 const mutationKey = ['testConnection'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -1904,7 +1982,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof testConnection>>, {service: 'truenas' | 'plex' | 'sonarr' | 'radarr' | 'qbittorrent' | 'pihole' | 'nginx-proxy-manager' | 'prowlarr';data: BodyType<ServiceConnectionUpdate>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof testConnection>>, {service: 'truenas' | 'plex' | 'sonarr' | 'radarr' | 'qbittorrent' | 'pihole' | 'nginx-proxy-manager' | 'prowlarr' | 'tailscale';data: BodyType<ServiceConnectionUpdate>}> = (props) => {
           const {service,data} = props ?? {};
 
           return  testConnection(service,data,requestOptions)
@@ -1925,17 +2003,17 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
  * @summary Test a service connection using the supplied values without saving
  */
 export const useTestConnection = <TError = ErrorType<ErrorResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof testConnection>>, TError,{service: 'truenas' | 'plex' | 'sonarr' | 'radarr' | 'qbittorrent' | 'pihole' | 'nginx-proxy-manager' | 'prowlarr';data: BodyType<ServiceConnectionUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof testConnection>>, TError,{service: 'truenas' | 'plex' | 'sonarr' | 'radarr' | 'qbittorrent' | 'pihole' | 'nginx-proxy-manager' | 'prowlarr' | 'tailscale';data: BodyType<ServiceConnectionUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof testConnection>>,
         TError,
-        {service: 'truenas' | 'plex' | 'sonarr' | 'radarr' | 'qbittorrent' | 'pihole' | 'nginx-proxy-manager' | 'prowlarr';data: BodyType<ServiceConnectionUpdate>},
+        {service: 'truenas' | 'plex' | 'sonarr' | 'radarr' | 'qbittorrent' | 'pihole' | 'nginx-proxy-manager' | 'prowlarr' | 'tailscale';data: BodyType<ServiceConnectionUpdate>},
         TContext
       > => {
       return useMutation(getTestConnectionMutationOptions(options));
     }
 
-export const getUpdateConnectionUrl = (service: 'truenas' | 'plex' | 'sonarr' | 'radarr' | 'qbittorrent' | 'pihole' | 'nginx-proxy-manager' | 'prowlarr',) => {
+export const getUpdateConnectionUrl = (service: 'truenas' | 'plex' | 'sonarr' | 'radarr' | 'qbittorrent' | 'pihole' | 'nginx-proxy-manager' | 'prowlarr' | 'tailscale',) => {
 
 
 
@@ -1946,7 +2024,7 @@ export const getUpdateConnectionUrl = (service: 'truenas' | 'plex' | 'sonarr' | 
 /**
  * @summary Save connection settings for a single service
  */
-export const updateConnection = async (service: 'truenas' | 'plex' | 'sonarr' | 'radarr' | 'qbittorrent' | 'pihole' | 'nginx-proxy-manager' | 'prowlarr',
+export const updateConnection = async (service: 'truenas' | 'plex' | 'sonarr' | 'radarr' | 'qbittorrent' | 'pihole' | 'nginx-proxy-manager' | 'prowlarr' | 'tailscale',
     serviceConnectionUpdate: ServiceConnectionUpdate, options?: RequestInit): Promise<ServiceConnection> => {
 
   return customFetch<ServiceConnection>(getUpdateConnectionUrl(service),
@@ -1963,8 +2041,8 @@ export const updateConnection = async (service: 'truenas' | 'plex' | 'sonarr' | 
 
 
 export const getUpdateConnectionMutationOptions = <TError = ErrorType<ErrorResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateConnection>>, TError,{service: 'truenas' | 'plex' | 'sonarr' | 'radarr' | 'qbittorrent' | 'pihole' | 'nginx-proxy-manager' | 'prowlarr';data: BodyType<ServiceConnectionUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof updateConnection>>, TError,{service: 'truenas' | 'plex' | 'sonarr' | 'radarr' | 'qbittorrent' | 'pihole' | 'nginx-proxy-manager' | 'prowlarr';data: BodyType<ServiceConnectionUpdate>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateConnection>>, TError,{service: 'truenas' | 'plex' | 'sonarr' | 'radarr' | 'qbittorrent' | 'pihole' | 'nginx-proxy-manager' | 'prowlarr' | 'tailscale';data: BodyType<ServiceConnectionUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateConnection>>, TError,{service: 'truenas' | 'plex' | 'sonarr' | 'radarr' | 'qbittorrent' | 'pihole' | 'nginx-proxy-manager' | 'prowlarr' | 'tailscale';data: BodyType<ServiceConnectionUpdate>}, TContext> => {
 
 const mutationKey = ['updateConnection'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -1976,7 +2054,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateConnection>>, {service: 'truenas' | 'plex' | 'sonarr' | 'radarr' | 'qbittorrent' | 'pihole' | 'nginx-proxy-manager' | 'prowlarr';data: BodyType<ServiceConnectionUpdate>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateConnection>>, {service: 'truenas' | 'plex' | 'sonarr' | 'radarr' | 'qbittorrent' | 'pihole' | 'nginx-proxy-manager' | 'prowlarr' | 'tailscale';data: BodyType<ServiceConnectionUpdate>}> = (props) => {
           const {service,data} = props ?? {};
 
           return  updateConnection(service,data,requestOptions)
@@ -1997,11 +2075,11 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
  * @summary Save connection settings for a single service
  */
 export const useUpdateConnection = <TError = ErrorType<ErrorResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateConnection>>, TError,{service: 'truenas' | 'plex' | 'sonarr' | 'radarr' | 'qbittorrent' | 'pihole' | 'nginx-proxy-manager' | 'prowlarr';data: BodyType<ServiceConnectionUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateConnection>>, TError,{service: 'truenas' | 'plex' | 'sonarr' | 'radarr' | 'qbittorrent' | 'pihole' | 'nginx-proxy-manager' | 'prowlarr' | 'tailscale';data: BodyType<ServiceConnectionUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof updateConnection>>,
         TError,
-        {service: 'truenas' | 'plex' | 'sonarr' | 'radarr' | 'qbittorrent' | 'pihole' | 'nginx-proxy-manager' | 'prowlarr';data: BodyType<ServiceConnectionUpdate>},
+        {service: 'truenas' | 'plex' | 'sonarr' | 'radarr' | 'qbittorrent' | 'pihole' | 'nginx-proxy-manager' | 'prowlarr' | 'tailscale';data: BodyType<ServiceConnectionUpdate>},
         TContext
       > => {
       return useMutation(getUpdateConnectionMutationOptions(options));

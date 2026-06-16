@@ -35,6 +35,8 @@ export * from './serviceStatus';
 export * from './sonarrData';
 export * from './sonarrQueueItem';
 export * from './sonarrUpcomingItem';
+export * from './tailscaleData';
+export * from './tailscaleDevice';
 export * from './tile';
 export * from './tileImageFit';
 export * from './tileInput';

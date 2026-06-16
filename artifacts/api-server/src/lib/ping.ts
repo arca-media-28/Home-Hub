@@ -1,4 +1,4 @@
-import { httpClient, normalizeHttpError, normalizeBaseUrl, HTTP_TIMEOUT } from "./http.js";
+import { httpClient, cloudHttpClient, normalizeHttpError, normalizeBaseUrl, HTTP_TIMEOUT } from "./http.js";
 import { fetchPiholeData } from "./pihole.js";
 import type { DbServiceConnection } from "./db.js";
 
@@ -21,6 +21,22 @@ const TIMEOUT = HTTP_TIMEOUT;
 // auth-protected endpoint so a 2xx response confirms both reachability and
 // valid credentials.
 export async function pingService(service: string, v: TestValues): Promise<TestResult> {
+  // Tailscale is a cloud service: it has no per-user base URL. We reuse the
+  // `url` field to carry the tailnet name and `apiKey` for the API access token,
+  // hitting the fixed api.tailscale.com host instead of a LAN URL.
+  if (service === "tailscale") {
+    const tailnet = v.url?.trim();
+    const token = v.apiKey?.trim();
+    if (!tailnet) return { ok: false, message: "Enter a tailnet name first." };
+    if (!token) return { ok: false, message: "Enter an API access token first." };
+    // Secure (TLS-verifying) client: this is a public cloud API carrying a token.
+    await cloudHttpClient.get(
+      `https://api.tailscale.com/api/v2/tailnet/${encodeURIComponent(tailnet)}/devices`,
+      { headers: { Authorization: `Bearer ${token}` } },
+    );
+    return { ok: true, message: "Connected" };
+  }
+
   const base = normalizeBaseUrl(v.url);
   if (!base) {
     return { ok: false, message: "Enter a Base URL first." };

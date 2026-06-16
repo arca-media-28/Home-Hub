@@ -57,6 +57,7 @@ export const TileIntegration = {
   pihole: 'pihole',
   'nginx-proxy-manager': 'nginx-proxy-manager',
   prowlarr: 'prowlarr',
+  tailscale: 'tailscale',
   clock: 'clock',
   weather: 'weather',
 } as const;
@@ -205,6 +206,7 @@ export const TileInputIntegration = {
   pihole: 'pihole',
   'nginx-proxy-manager': 'nginx-proxy-manager',
   prowlarr: 'prowlarr',
+  tailscale: 'tailscale',
   clock: 'clock',
   weather: 'weather',
 } as const;
@@ -251,6 +253,7 @@ export const TileUpdateIntegration = {
   pihole: 'pihole',
   'nginx-proxy-manager': 'nginx-proxy-manager',
   prowlarr: 'prowlarr',
+  tailscale: 'tailscale',
   clock: 'clock',
   weather: 'weather',
 } as const;
@@ -542,5 +545,36 @@ export interface ProwlarrData {
   /** Number of releases grabbed across all indexers in the last 24 hours. */
   grabCount24h: number;
   healthIssues: ProwlarrHealthIssue[];
+}
+
+export interface TailscaleDevice {
+  id: string;
+  /** The device's machine/host name. */
+  name: string;
+  /** The device's operating system (e.g. linux, macOS, iOS). */
+  os: string;
+  /** Whether the device is currently online, derived from how recently it was last seen. */
+  online: boolean;
+  /**
+     * ISO timestamp of when the device was last seen, when known.
+     * @nullable
+     */
+  lastSeen?: string | null;
+  /** Whether the device offers an approved exit node (advertises and is allowed to route the default 0.0.0.0/0 route). */
+  exitNode: boolean;
+}
+
+export interface TailscaleData {
+  /** The tailnet name the devices belong to. */
+  tailnet: string;
+  /** Total number of devices in the tailnet. */
+  deviceCount: number;
+  /** Number of devices currently online. */
+  onlineCount: number;
+  /** Number of devices currently offline. */
+  offlineCount: number;
+  /** Number of online devices offering an approved exit node. */
+  exitNodeCount: number;
+  devices: TailscaleDevice[];
 }
 

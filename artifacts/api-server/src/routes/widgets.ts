@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { requireAuth } from "../lib/auth.js";
 import { connectionStmts } from "../lib/db.js";
-import { httpClient, normalizeBaseUrl, normalizeHttpError } from "../lib/http.js";
+import { httpClient, cloudHttpClient, normalizeBaseUrl, normalizeHttpError } from "../lib/http.js";
 import { fetchPiholeData } from "../lib/pihole.js";
 import { logger } from "../lib/logger.js";
 
@@ -1029,6 +1029,104 @@ router.get("/prowlarr", requireAuth, async (_req, res) => {
   } catch (err) {
     logger.error({ reason: normalizeHttpError(err) }, "Prowlarr widget error");
     res.status(502).json({ error: "Failed to fetch Prowlarr data" });
+  }
+});
+
+// ────────────────────────────────────────────────
+// Tailscale Widget
+// ────────────────────────────────────────────────
+// Unlike the LAN services, Tailscale data comes from its cloud API
+// (api.tailscale.com), authed with an API access token. We reuse the saved
+// connection's `url` field for the tailnet name and `apiKey` for the token.
+// A device counts as "online" when it was last seen within this window — the
+// devices endpoint has no direct online flag, so this is the standard heuristic.
+const TAILSCALE_ONLINE_WINDOW_MS = 5 * 60 * 1000;
+
+// A device is an approved exit node when its enabled routes include the default
+// route in either address family. (advertisedRoutes are merely offered; the
+// enabled ones are what the tailnet admin has actually approved.)
+function isExitNode(routes: string[] | undefined): boolean {
+  if (!Array.isArray(routes)) return false;
+  return routes.includes("0.0.0.0/0") || routes.includes("::/0");
+}
+
+router.get("/tailscale", requireAuth, async (_req, res) => {
+  const saved = getSavedConnection("tailscale");
+  const tailnet = saved.url || process.env["TAILSCALE_TAILNET"];
+  const apiKey = saved.apiKey || process.env["TAILSCALE_API_KEY"];
+
+  if (!tailnet || !apiKey) {
+    // Sample data only when the service is genuinely unconfigured.
+    const now = Date.now();
+    res.json({
+      tailnet: "example.ts.net",
+      deviceCount: 4,
+      onlineCount: 3,
+      offlineCount: 1,
+      exitNodeCount: 1,
+      devices: [
+        { id: "1", name: "homelab-nas", os: "linux", online: true, lastSeen: new Date(now).toISOString(), exitNode: true },
+        { id: "2", name: "macbook-pro", os: "macOS", online: true, lastSeen: new Date(now - 60_000).toISOString(), exitNode: false },
+        { id: "3", name: "pixel-phone", os: "android", online: true, lastSeen: new Date(now - 120_000).toISOString(), exitNode: false },
+        { id: "4", name: "old-laptop", os: "windows", online: false, lastSeen: new Date(now - 3 * 86400_000).toISOString(), exitNode: false },
+      ],
+    });
+    return;
+  }
+
+  try {
+    // `fields=all` so each device carries enabledRoutes (for exit-node detection)
+    // and lastSeen (for the online heuristic). Uses the secure (TLS-verifying)
+    // client since this is a public cloud API carrying a bearer token.
+    const r = await cloudHttpClient.get(
+      `https://api.tailscale.com/api/v2/tailnet/${encodeURIComponent(tailnet)}/devices`,
+      { headers: { Authorization: `Bearer ${apiKey}` }, params: { fields: "all" } },
+    );
+
+    const now = Date.now();
+    const rawDevices = (r.data?.devices ?? []) as Array<{
+      id?: string;
+      nodeId?: string;
+      name?: string;
+      hostname?: string;
+      os?: string;
+      lastSeen?: string;
+      enabledRoutes?: string[];
+      advertisedRoutes?: string[];
+    }>;
+
+    const devices = rawDevices.map((d, i) => {
+      const lastSeenMs = d.lastSeen ? new Date(d.lastSeen).getTime() : NaN;
+      const online = !Number.isNaN(lastSeenMs) && now - lastSeenMs <= TAILSCALE_ONLINE_WINDOW_MS;
+      // Prefer the short hostname; fall back to the first label of the full DNS
+      // name, then the raw name.
+      const fullName = d.name ?? "";
+      const name = d.hostname?.trim() || fullName.split(".")[0] || fullName || `device-${i + 1}`;
+      const exitNode = isExitNode(d.enabledRoutes);
+      return {
+        id: d.id ?? d.nodeId ?? String(i + 1),
+        name,
+        os: d.os ?? "unknown",
+        online,
+        lastSeen: !Number.isNaN(lastSeenMs) ? new Date(lastSeenMs).toISOString() : null,
+        exitNode,
+      };
+    });
+
+    const onlineCount = devices.filter((d) => d.online).length;
+    const exitNodeCount = devices.filter((d) => d.exitNode && d.online).length;
+
+    res.json({
+      tailnet,
+      deviceCount: devices.length,
+      onlineCount,
+      offlineCount: devices.length - onlineCount,
+      exitNodeCount,
+      devices,
+    });
+  } catch (err) {
+    logger.error({ reason: normalizeHttpError(err) }, "Tailscale widget error");
+    res.status(502).json({ error: "Failed to fetch Tailscale data" });
   }
 });
 

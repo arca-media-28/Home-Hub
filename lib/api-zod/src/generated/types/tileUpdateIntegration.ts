@@ -21,6 +21,7 @@ export const TileUpdateIntegration = {
   pihole: 'pihole',
   'nginx-proxy-manager': 'nginx-proxy-manager',
   prowlarr: 'prowlarr',
+  tailscale: 'tailscale',
   clock: 'clock',
   weather: 'weather',
 } as const;
