@@ -37,6 +37,25 @@ export async function pingService(service: string, v: TestValues): Promise<TestR
     return { ok: true, message: "Connected" };
   }
 
+  // Stocks (Finnhub) is a cloud service with a fixed base URL, so it has no
+  // per-user URL — only an API key. Verify the key by fetching a single quote.
+  if (service === "stocks") {
+    const apiKey = v.apiKey?.trim();
+    if (!apiKey) return { ok: false, message: "Enter an API Key first." };
+    // Secure (TLS-verifying) client: this is a public cloud API carrying a key.
+    const r = await cloudHttpClient.get("https://finnhub.io/api/v1/quote", {
+      params: { symbol: "AAPL", token: apiKey },
+    });
+    // Finnhub answers an invalid key with HTTP 401, but a blank/placeholder key
+    // can also yield 200 with an empty body; treat a missing current price as a
+    // rejected key so users get a clear signal.
+    const price = (r.data as { c?: number } | null)?.c;
+    if (typeof price !== "number" || price === 0) {
+      return { ok: false, message: "Finnhub rejected the API key." };
+    }
+    return { ok: true, message: "Connected" };
+  }
+
   const base = normalizeBaseUrl(v.url);
   if (!base) {
     return { ok: false, message: "Enter a Base URL first." };
@@ -163,9 +182,10 @@ export function connectionToValues(c: DbServiceConnection): TestValues {
   };
 }
 
-// A connection is "configured" — worth health-checking — once it has a base URL.
-// Services missing credentials simply report as not-ok and never trigger a
-// false "went down" alert because the dashboard only alerts on healthy→down.
+// A connection is "configured" — worth health-checking — once it has a base URL
+// or, for URL-less cloud services like Stocks (Finnhub), an API key. Services
+// missing credentials simply report as not-ok and never trigger a false "went
+// down" alert because the dashboard only alerts on healthy→down.
 export function isConfigured(values: TestValues): boolean {
-  return Boolean(values.url?.trim());
+  return Boolean(values.url?.trim() || values.apiKey?.trim());
 }

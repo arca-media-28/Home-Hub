@@ -33,6 +33,7 @@ import {
   Radar,
   Globe,
   Tv2,
+  TrendingUp,
   MonitorPlay,
   ChevronDown,
   Plug,
@@ -56,7 +57,8 @@ type ServiceKey =
   | "nginx-proxy-manager"
   | "prowlarr"
   | "tailscale"
-  | "ersatztv";
+  | "ersatztv"
+  | "stocks";
 
 type FieldKey = "url" | "apiKey" | "username" | "password" | "token";
 
@@ -176,6 +178,14 @@ const SERVICES: ServiceDef[] = [
     icon: Tv2,
     // ErsatzTV runs without auth here, so only a base URL is needed.
     fields: [URL_FIELD],
+  },
+  {
+    key: "stocks",
+    name: "Stocks (Finnhub)",
+    icon: TrendingUp,
+    // Finnhub's base URL is fixed, so only an API key is needed. Without one the
+    // Stocks tile falls back to sample quotes.
+    fields: [API_KEY_FIELD],
   },
 ];
 

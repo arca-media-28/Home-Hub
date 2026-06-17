@@ -652,7 +652,7 @@ paths:
           required: true
           schema:
             type: string
-            enum: [truenas, plex, jellyfin, sonarr, radarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv]
+            enum: [truenas, plex, jellyfin, sonarr, radarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, stocks]
       requestBody:
         required: true
         content:
@@ -686,7 +686,7 @@ paths:
           required: true
           schema:
             type: string
-            enum: [truenas, plex, jellyfin, sonarr, radarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv]
+            enum: [truenas, plex, jellyfin, sonarr, radarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, stocks]
       requestBody:
         required: true
         content:

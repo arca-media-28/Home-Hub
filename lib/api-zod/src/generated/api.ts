@@ -733,7 +733,7 @@ export const GetConnectionHealthResponse = zod.array(GetConnectionHealthResponse
  * @summary Test a service connection using the supplied values without saving
  */
 export const TestConnectionParams = zod.object({
-  "service": zod.enum(['truenas', 'plex', 'jellyfin', 'sonarr', 'radarr', 'qbittorrent', 'pihole', 'nginx-proxy-manager', 'prowlarr', 'tailscale', 'ersatztv'])
+  "service": zod.enum(['truenas', 'plex', 'jellyfin', 'sonarr', 'radarr', 'qbittorrent', 'pihole', 'nginx-proxy-manager', 'prowlarr', 'tailscale', 'ersatztv', 'stocks'])
 })
 
 export const TestConnectionBody = zod.object({
@@ -754,7 +754,7 @@ export const TestConnectionResponse = zod.object({
  * @summary Save connection settings for a single service
  */
 export const UpdateConnectionParams = zod.object({
-  "service": zod.enum(['truenas', 'plex', 'jellyfin', 'sonarr', 'radarr', 'qbittorrent', 'pihole', 'nginx-proxy-manager', 'prowlarr', 'tailscale', 'ersatztv'])
+  "service": zod.enum(['truenas', 'plex', 'jellyfin', 'sonarr', 'radarr', 'qbittorrent', 'pihole', 'nginx-proxy-manager', 'prowlarr', 'tailscale', 'ersatztv', 'stocks'])
 })
 
 export const UpdateConnectionBody = zod.object({

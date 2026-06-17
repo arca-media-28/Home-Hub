@@ -1909,10 +1909,18 @@ router.get("/news", requireAuth, async (req, res) => {
 const STOCKS_MAX_SYMBOLS = 25;
 const FINNHUB_BASE = "https://finnhub.io/api/v1";
 
-// The provider key is read from a server secret. Finnhub is the chosen free
-// provider (simple per-symbol /quote endpoint + /search on the free tier).
+// The provider key comes from the saved "stocks" connection first (set via the
+// Settings page), falling back to the server secrets so existing deployments
+// keep working. Finnhub is the chosen free provider (simple per-symbol /quote
+// endpoint + /search on the free tier).
 function getStocksApiKey(): string | undefined {
-  return process.env["FINNHUB_API_KEY"]?.trim() || process.env["STOCKS_API_KEY"]?.trim() || undefined;
+  const saved = getSavedConnection("stocks");
+  return (
+    saved.apiKey ||
+    process.env["FINNHUB_API_KEY"]?.trim() ||
+    process.env["STOCKS_API_KEY"]?.trim() ||
+    undefined
+  );
 }
 
 // A small static catalog used both for sample quotes (unconfigured) and as a
