@@ -17,6 +17,7 @@ import WeatherTile from "./WeatherTile";
 import SportsTile from "./SportsTile";
 import NewsTile from "./NewsTile";
 import StocksTile from "./StocksTile";
+import SleeperTile from "./SleeperTile";
 import { resolveEnabledMetrics, tileDensity, type TileDensity } from "./metrics";
 import { resolveImageStyle } from "./imageStyle";
 import { openTileUrl } from "@/lib/utils";
@@ -38,6 +39,7 @@ export const INTEGRATION_LABELS: Record<string, string> = {
   [TileIntegration.sports]: "Sports",
   [TileIntegration.news]: "News",
   [TileIntegration.stocks]: "Stocks",
+  [TileIntegration.sleeper]: "Fantasy",
 };
 
 // Props every integration widget receives: the resolved set of enabled metric
@@ -86,6 +88,8 @@ function renderStatusView(integration: string, props: WidgetProps) {
       return <NewsTile {...props} />;
     case TileIntegration.stocks:
       return <StocksTile {...props} />;
+    case TileIntegration.sleeper:
+      return <SleeperTile {...props} />;
     default:
       return null;
   }

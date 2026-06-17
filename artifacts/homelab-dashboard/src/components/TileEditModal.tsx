@@ -46,6 +46,12 @@ import {
   type TitleSize,
 } from "@/components/tiles/imageStyle";
 import { SPORTS_LEAGUES, getLeagueTeams } from "@/lib/sports";
+import {
+  fetchSleeperUser,
+  fetchUserLeagues,
+  SLEEPER_SPORTS,
+  type SleeperLeague,
+} from "@/lib/sleeper";
 import { useToast } from "@/hooks/use-toast";
 import {
   useCreateTile,
@@ -111,6 +117,7 @@ const INTEGRATIONS = [
   { value: TileIntegration.clock, label: "Local Time" },
   { value: TileIntegration.weather, label: "Weather" },
   { value: TileIntegration.sports, label: "Sports" },
+  { value: TileIntegration.sleeper, label: "Fantasy" },
   { value: TileIntegration.news, label: "News" },
   { value: TileIntegration.stocks, label: "Stocks" },
   { value: TileIntegration.spacer, label: "Spacer" },
@@ -223,6 +230,36 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
   );
   const [stockSearch, setStockSearch] = useState<string>("");
 
+  // Sleeper (fantasy) widget options.
+  const [sleeperUsername, setSleeperUsername] = useState<string>(
+    tile?.tileSettings?.sleeperUsername ?? "",
+  );
+  const [sleeperLeagueId, setSleeperLeagueId] = useState<string>(
+    tile?.tileSettings?.sleeperLeagueId ?? "",
+  );
+  const [sleeperSport, setSleeperSport] = useState<string>(
+    tile?.tileSettings?.sleeperSport ?? "nfl",
+  );
+  const [sleeperSeason, setSleeperSeason] = useState<string>(
+    tile?.tileSettings?.sleeperSeason ?? String(new Date().getFullYear()),
+  );
+  const [sleeperShowMatchup, setSleeperShowMatchup] = useState<boolean>(
+    tile?.tileSettings?.sleeperShowMatchup ?? true,
+  );
+  const [sleeperShowStandings, setSleeperShowStandings] = useState<boolean>(
+    tile?.tileSettings?.sleeperShowStandings ?? true,
+  );
+  const [sleeperShowTransactions, setSleeperShowTransactions] = useState<boolean>(
+    tile?.tileSettings?.sleeperShowTransactions ?? true,
+  );
+  // Lazy-loaded league picker state: leagues fetched once a username + sport +
+  // season are known, plus the resolved Sleeper user and any lookup error.
+  const [sleeperLeagues, setSleeperLeagues] = useState<SleeperLeague[]>([]);
+  const [sleeperLoadState, setSleeperLoadState] = useState<
+    "idle" | "loading" | "success" | "error"
+  >("idle");
+  const [sleeperLoadError, setSleeperLoadError] = useState<string | null>(null);
+
   // Generic per-tile option (applies to every tile): when on, the tile body
   // scrolls instead of clipping content that overflows its grid bounds.
   const [scrollable, setScrollable] = useState<boolean>(
@@ -267,6 +304,20 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
       setNewsTestError(null);
       setStockWatchlist(tile?.tileSettings?.stockWatchlist ?? []);
       setStockSearch("");
+      setSleeperUsername(tile?.tileSettings?.sleeperUsername ?? "");
+      setSleeperLeagueId(tile?.tileSettings?.sleeperLeagueId ?? "");
+      setSleeperSport(tile?.tileSettings?.sleeperSport ?? "nfl");
+      setSleeperSeason(
+        tile?.tileSettings?.sleeperSeason ?? String(new Date().getFullYear()),
+      );
+      setSleeperShowMatchup(tile?.tileSettings?.sleeperShowMatchup ?? true);
+      setSleeperShowStandings(tile?.tileSettings?.sleeperShowStandings ?? true);
+      setSleeperShowTransactions(
+        tile?.tileSettings?.sleeperShowTransactions ?? true,
+      );
+      setSleeperLeagues([]);
+      setSleeperLoadState("idle");
+      setSleeperLoadError(null);
       setScrollable(tile?.tileSettings?.scrollable ?? false);
       setShowColorPicker(false);
       setShowTitleColorPicker(false);
@@ -306,6 +357,7 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
   const isSports = integration === TileIntegration.sports;
   const isNews = integration === TileIntegration.news;
   const isStocks = integration === TileIntegration.stocks;
+  const isSleeper = integration === TileIntegration.sleeper;
   // The spacer is a layout-only tile: an invisible gap with no name, URL,
   // image, background, or live data. Only its size/position matter, so the
   // editor strips every content field and shows a short description instead.
@@ -378,6 +430,44 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
       );
       setNewsTestItems([]);
       setNewsTestTitle(null);
+    }
+  }
+
+  // Lazily resolve the Sleeper username and load its leagues for the picker.
+  // Sleeper's endpoints are public and keyless, so this is a direct browser
+  // fetch (like the News "Test feed" button). A bad username or network error
+  // surfaces inline so the user can correct it before saving.
+  async function handleLoadSleeperLeagues() {
+    const user = sleeperUsername.trim();
+    if (!user) return;
+    setSleeperLoadState("loading");
+    setSleeperLoadError(null);
+    try {
+      const resolved = await fetchSleeperUser(user);
+      if (!resolved) {
+        setSleeperLoadState("error");
+        setSleeperLoadError(`No Sleeper user named "${user}".`);
+        setSleeperLeagues([]);
+        return;
+      }
+      const leagues = await fetchUserLeagues(
+        resolved.userId,
+        sleeperSport,
+        sleeperSeason.trim(),
+      );
+      setSleeperLeagues(leagues);
+      setSleeperLoadState("success");
+      if (leagues.length === 0) {
+        setSleeperLoadError(
+          `No ${sleeperSport.toUpperCase()} leagues found for ${user} in ${sleeperSeason}.`,
+        );
+      }
+    } catch {
+      setSleeperLoadState("error");
+      setSleeperLoadError(
+        "Couldn't reach Sleeper. Check the username, sport, and season.",
+      );
+      setSleeperLeagues([]);
     }
   }
 
@@ -704,7 +794,17 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
                     }
                   : isStocks
                     ? { stockWatchlist }
-                    : null;
+                    : isSleeper
+                      ? {
+                          sleeperUsername: sleeperUsername.trim() || null,
+                          sleeperLeagueId: sleeperLeagueId.trim() || null,
+                          sleeperSport,
+                          sleeperSeason: sleeperSeason.trim() || null,
+                          sleeperShowMatchup,
+                          sleeperShowStandings,
+                          sleeperShowTransactions,
+                        }
+                      : null;
         // Only emit a settings object when there is something to store; an
         // un-scrolled plain tile keeps tileSettings null as before.
         if (!widget && !scrollable) return null;
@@ -1186,6 +1286,170 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
               search={stockSearch}
               onSearchChange={setStockSearch}
             />
+          )}
+
+          {isSleeper && (
+            <div className="space-y-4 border-t border-border pt-4">
+              <div className="space-y-1.5">
+                <Label>Sleeper username</Label>
+                <Input
+                  value={sleeperUsername}
+                  onChange={(e) => {
+                    setSleeperUsername(e.target.value);
+                    // The previously loaded leagues no longer match the edited
+                    // username — clear them so the picker re-loads.
+                    if (sleeperLoadState !== "idle") {
+                      setSleeperLoadState("idle");
+                      setSleeperLeagues([]);
+                      setSleeperLoadError(null);
+                    }
+                  }}
+                  placeholder="your-sleeper-username"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Your public Sleeper account name. No password needed — Sleeper's
+                  data is read-only and public.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Sport</Label>
+                  <Select
+                    value={sleeperSport}
+                    onValueChange={(v) => {
+                      setSleeperSport(v);
+                      setSleeperLoadState("idle");
+                      setSleeperLeagues([]);
+                      setSleeperLoadError(null);
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {SLEEPER_SPORTS.map((s) => (
+                        <SelectItem key={s.key} value={s.key}>
+                          {s.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Season</Label>
+                  <Input
+                    value={sleeperSeason}
+                    onChange={(e) => {
+                      setSleeperSeason(e.target.value);
+                      setSleeperLoadState("idle");
+                      setSleeperLeagues([]);
+                      setSleeperLoadError(null);
+                    }}
+                    placeholder="2025"
+                    inputMode="numeric"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>League</Label>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleLoadSleeperLeagues}
+                    disabled={
+                      sleeperUsername.trim().length === 0 ||
+                      sleeperSeason.trim().length === 0 ||
+                      sleeperLoadState === "loading"
+                    }
+                    className="shrink-0"
+                  >
+                    {sleeperLoadState === "loading" ? "Loading…" : "Load leagues"}
+                  </Button>
+                  <Select
+                    value={sleeperLeagueId || NONE}
+                    onValueChange={(v) =>
+                      setSleeperLeagueId(v === NONE ? "" : v)
+                    }
+                    disabled={sleeperLeagues.length === 0}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Pick a league" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {sleeperLeagues.length === 0 ? (
+                        <SelectItem value={NONE} disabled>
+                          Load leagues first
+                        </SelectItem>
+                      ) : (
+                        sleeperLeagues.map((l) => (
+                          <SelectItem key={l.leagueId} value={l.leagueId}>
+                            {l.name}
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {sleeperLoadError && (
+                  <div className="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                    {sleeperLoadError}
+                  </div>
+                )}
+                {sleeperLeagueId &&
+                  sleeperLeagues.length === 0 &&
+                  sleeperLoadState === "idle" && (
+                    <p className="text-xs text-muted-foreground">
+                      A league is saved. Load leagues to change it.
+                    </p>
+                  )}
+                <p className="text-xs text-muted-foreground">
+                  Enter your username, then load and pick the league this tile
+                  follows.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Show</Label>
+                <label
+                  htmlFor="sleeper-matchup"
+                  className="flex items-center gap-2 cursor-pointer select-none"
+                >
+                  <Checkbox
+                    id="sleeper-matchup"
+                    checked={sleeperShowMatchup}
+                    onCheckedChange={(c) => setSleeperShowMatchup(c === true)}
+                  />
+                  <span className="text-sm">Current matchup</span>
+                </label>
+                <label
+                  htmlFor="sleeper-standings"
+                  className="flex items-center gap-2 cursor-pointer select-none"
+                >
+                  <Checkbox
+                    id="sleeper-standings"
+                    checked={sleeperShowStandings}
+                    onCheckedChange={(c) => setSleeperShowStandings(c === true)}
+                  />
+                  <span className="text-sm">Standings</span>
+                </label>
+                <label
+                  htmlFor="sleeper-transactions"
+                  className="flex items-center gap-2 cursor-pointer select-none"
+                >
+                  <Checkbox
+                    id="sleeper-transactions"
+                    checked={sleeperShowTransactions}
+                    onCheckedChange={(c) =>
+                      setSleeperShowTransactions(c === true)
+                    }
+                  />
+                  <span className="text-sm">Recent moves</span>
+                </label>
+              </div>
+            </div>
           )}
 
           {!isLayoutTile && (

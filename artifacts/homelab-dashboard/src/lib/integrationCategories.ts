@@ -22,6 +22,7 @@ const CATEGORY_BY_KEY: Record<string, Category> = {
   weather: "News",
   news: "News",
   sports: "News",
+  sleeper: "News",
   stocks: "News",
   // Media
   media: "Media",

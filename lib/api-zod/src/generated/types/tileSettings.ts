@@ -93,8 +93,43 @@ export type TileSettings = {
      */
   stockWatchlist?: StockWatchEntry[] | null;
   /**
+     * Sleeper account username the Fantasy tile follows. Used to resolve the user's id and locate their roster in the league. Null or absent means none set (the tile shows an empty state until configured).
+     * @nullable
+     */
+  sleeperUsername?: string | null;
+  /**
+     * Sleeper league id the Fantasy tile shows. Sleeper's read endpoints are public for any league id. Null or absent means none chosen yet.
+     * @nullable
+     */
+  sleeperLeagueId?: string | null;
+  /**
+     * Sport the Fantasy tile's league belongs to (e.g. "nfl", "nba"). Absent or null defaults to "nfl".
+     * @nullable
+     */
+  sleeperSport?: string | null;
+  /**
+     * Season year the Fantasy tile's league belongs to (e.g. "2025"). Absent or null defaults to the current NFL season.
+     * @nullable
+     */
+  sleeperSeason?: string | null;
+  /**
+     * When true, the Fantasy tile shows the user's current-week matchup. Absent or null defaults to true.
+     * @nullable
+     */
+  sleeperShowMatchup?: boolean | null;
+  /**
+     * When true, the Fantasy tile shows the league standings. Absent or null defaults to true.
+     * @nullable
+     */
+  sleeperShowStandings?: boolean | null;
+  /**
+     * When true, the Fantasy tile shows recent waiver/trade transactions. Absent or null defaults to true.
+     * @nullable
+     */
+  sleeperShowTransactions?: boolean | null;
+  /**
      * When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).
      * @nullable
      */
   scrollable?: boolean | null;
-} | null;
+} | null | null;

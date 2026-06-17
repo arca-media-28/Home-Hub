@@ -45,6 +45,13 @@ interface TileSettings {
   newsMaxItems?: number | null;
   newsShowTimestamp?: boolean | null;
   stockWatchlist?: StockWatchEntry[] | null;
+  sleeperUsername?: string | null;
+  sleeperLeagueId?: string | null;
+  sleeperSport?: string | null;
+  sleeperSeason?: string | null;
+  sleeperShowMatchup?: boolean | null;
+  sleeperShowStandings?: boolean | null;
+  sleeperShowTransactions?: boolean | null;
   scrollable?: boolean | null;
 }
 
@@ -170,6 +177,41 @@ function pickTileSettings(obj: Record<string, unknown>): TileSettings {
       .filter((e): e is StockWatchEntry => e !== null);
   } else if (obj["stockWatchlist"] === null) {
     result.stockWatchlist = null;
+  }
+  if (typeof obj["sleeperUsername"] === "string") {
+    result.sleeperUsername = obj["sleeperUsername"];
+  } else if (obj["sleeperUsername"] === null) {
+    result.sleeperUsername = null;
+  }
+  if (typeof obj["sleeperLeagueId"] === "string") {
+    result.sleeperLeagueId = obj["sleeperLeagueId"];
+  } else if (obj["sleeperLeagueId"] === null) {
+    result.sleeperLeagueId = null;
+  }
+  if (typeof obj["sleeperSport"] === "string") {
+    result.sleeperSport = obj["sleeperSport"];
+  } else if (obj["sleeperSport"] === null) {
+    result.sleeperSport = null;
+  }
+  if (typeof obj["sleeperSeason"] === "string") {
+    result.sleeperSeason = obj["sleeperSeason"];
+  } else if (obj["sleeperSeason"] === null) {
+    result.sleeperSeason = null;
+  }
+  if (typeof obj["sleeperShowMatchup"] === "boolean") {
+    result.sleeperShowMatchup = obj["sleeperShowMatchup"];
+  } else if (obj["sleeperShowMatchup"] === null) {
+    result.sleeperShowMatchup = null;
+  }
+  if (typeof obj["sleeperShowStandings"] === "boolean") {
+    result.sleeperShowStandings = obj["sleeperShowStandings"];
+  } else if (obj["sleeperShowStandings"] === null) {
+    result.sleeperShowStandings = null;
+  }
+  if (typeof obj["sleeperShowTransactions"] === "boolean") {
+    result.sleeperShowTransactions = obj["sleeperShowTransactions"];
+  } else if (obj["sleeperShowTransactions"] === null) {
+    result.sleeperShowTransactions = null;
   }
   if (typeof obj["scrollable"] === "boolean") {
     result.scrollable = obj["scrollable"];

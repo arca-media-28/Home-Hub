@@ -70,7 +70,7 @@ export const GetTilesResponseItem = zod.object({
   "id": zod.number(),
   "userId": zod.number(),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('clock'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('spacer'),zod.literal('divider'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('clock'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('spacer'),zod.literal('divider'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -108,6 +108,13 @@ export const GetTilesResponseItem = zod.object({
   "shares": zod.number().nullish().describe('Optional number of shares held. When present (and > 0) the tile shows this row\'s position value and gain\/loss.'),
   "costBasis": zod.number().nullish().describe('Optional average cost per share. Used with shares to compute gain\/loss. Null or absent when not tracking cost.')
 })).nullish().describe('Per-tile watchlist of stock symbols for the Stocks tile. Each entry carries an uppercased ticker symbol and optional share quantity and average cost basis per share, which turn the watchlist into a lightweight portfolio. Null or absent means none set (the tile shows demo\/sample quotes).'),
+  "sleeperUsername": zod.string().nullish().describe('Sleeper account username the Fantasy tile follows. Used to resolve the user\'s id and locate their roster in the league. Null or absent means none set (the tile shows an empty state until configured).'),
+  "sleeperLeagueId": zod.string().nullish().describe('Sleeper league id the Fantasy tile shows. Sleeper\'s read endpoints are public for any league id. Null or absent means none chosen yet.'),
+  "sleeperSport": zod.string().nullish().describe('Sport the Fantasy tile\'s league belongs to (e.g. \"nfl\", \"nba\"). Absent or null defaults to \"nfl\".'),
+  "sleeperSeason": zod.string().nullish().describe('Season year the Fantasy tile\'s league belongs to (e.g. \"2025\"). Absent or null defaults to the current NFL season.'),
+  "sleeperShowMatchup": zod.boolean().nullish().describe('When true, the Fantasy tile shows the user\'s current-week matchup. Absent or null defaults to true.'),
+  "sleeperShowStandings": zod.boolean().nullish().describe('When true, the Fantasy tile shows the league standings. Absent or null defaults to true.'),
+  "sleeperShowTransactions": zod.boolean().nullish().describe('When true, the Fantasy tile shows recent waiver\/trade transactions. Absent or null defaults to true.'),
   "scrollable": zod.boolean().nullish().describe('When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.'),
   "createdAt": zod.string().optional()
@@ -120,7 +127,7 @@ export const GetTilesResponse = zod.array(GetTilesResponseItem)
  */
 export const CreateTileBody = zod.object({
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('clock'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('spacer'),zod.literal('divider'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('clock'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('spacer'),zod.literal('divider'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -158,6 +165,13 @@ export const CreateTileBody = zod.object({
   "shares": zod.number().nullish().describe('Optional number of shares held. When present (and > 0) the tile shows this row\'s position value and gain\/loss.'),
   "costBasis": zod.number().nullish().describe('Optional average cost per share. Used with shares to compute gain\/loss. Null or absent when not tracking cost.')
 })).nullish().describe('Per-tile watchlist of stock symbols for the Stocks tile. Each entry carries an uppercased ticker symbol and optional share quantity and average cost basis per share, which turn the watchlist into a lightweight portfolio. Null or absent means none set (the tile shows demo\/sample quotes).'),
+  "sleeperUsername": zod.string().nullish().describe('Sleeper account username the Fantasy tile follows. Used to resolve the user\'s id and locate their roster in the league. Null or absent means none set (the tile shows an empty state until configured).'),
+  "sleeperLeagueId": zod.string().nullish().describe('Sleeper league id the Fantasy tile shows. Sleeper\'s read endpoints are public for any league id. Null or absent means none chosen yet.'),
+  "sleeperSport": zod.string().nullish().describe('Sport the Fantasy tile\'s league belongs to (e.g. \"nfl\", \"nba\"). Absent or null defaults to \"nfl\".'),
+  "sleeperSeason": zod.string().nullish().describe('Season year the Fantasy tile\'s league belongs to (e.g. \"2025\"). Absent or null defaults to the current NFL season.'),
+  "sleeperShowMatchup": zod.boolean().nullish().describe('When true, the Fantasy tile shows the user\'s current-week matchup. Absent or null defaults to true.'),
+  "sleeperShowStandings": zod.boolean().nullish().describe('When true, the Fantasy tile shows the league standings. Absent or null defaults to true.'),
+  "sleeperShowTransactions": zod.boolean().nullish().describe('When true, the Fantasy tile shows recent waiver\/trade transactions. Absent or null defaults to true.'),
   "scrollable": zod.boolean().nullish().describe('When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.')
 })
@@ -174,7 +188,7 @@ export const GetTileResponse = zod.object({
   "id": zod.number(),
   "userId": zod.number(),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('clock'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('spacer'),zod.literal('divider'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('clock'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('spacer'),zod.literal('divider'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -212,6 +226,13 @@ export const GetTileResponse = zod.object({
   "shares": zod.number().nullish().describe('Optional number of shares held. When present (and > 0) the tile shows this row\'s position value and gain\/loss.'),
   "costBasis": zod.number().nullish().describe('Optional average cost per share. Used with shares to compute gain\/loss. Null or absent when not tracking cost.')
 })).nullish().describe('Per-tile watchlist of stock symbols for the Stocks tile. Each entry carries an uppercased ticker symbol and optional share quantity and average cost basis per share, which turn the watchlist into a lightweight portfolio. Null or absent means none set (the tile shows demo\/sample quotes).'),
+  "sleeperUsername": zod.string().nullish().describe('Sleeper account username the Fantasy tile follows. Used to resolve the user\'s id and locate their roster in the league. Null or absent means none set (the tile shows an empty state until configured).'),
+  "sleeperLeagueId": zod.string().nullish().describe('Sleeper league id the Fantasy tile shows. Sleeper\'s read endpoints are public for any league id. Null or absent means none chosen yet.'),
+  "sleeperSport": zod.string().nullish().describe('Sport the Fantasy tile\'s league belongs to (e.g. \"nfl\", \"nba\"). Absent or null defaults to \"nfl\".'),
+  "sleeperSeason": zod.string().nullish().describe('Season year the Fantasy tile\'s league belongs to (e.g. \"2025\"). Absent or null defaults to the current NFL season.'),
+  "sleeperShowMatchup": zod.boolean().nullish().describe('When true, the Fantasy tile shows the user\'s current-week matchup. Absent or null defaults to true.'),
+  "sleeperShowStandings": zod.boolean().nullish().describe('When true, the Fantasy tile shows the league standings. Absent or null defaults to true.'),
+  "sleeperShowTransactions": zod.boolean().nullish().describe('When true, the Fantasy tile shows recent waiver\/trade transactions. Absent or null defaults to true.'),
   "scrollable": zod.boolean().nullish().describe('When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.'),
   "createdAt": zod.string().optional()
@@ -226,7 +247,7 @@ export const UpdateTileParams = zod.object({
 })
 
 export const UpdateTileBody = zod.object({
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('clock'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('spacer'),zod.literal('divider'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('clock'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('spacer'),zod.literal('divider'),zod.literal(null)]).nullish(),
   "gridX": zod.number().optional(),
   "gridY": zod.number().optional(),
   "gridW": zod.number().optional(),
@@ -264,6 +285,13 @@ export const UpdateTileBody = zod.object({
   "shares": zod.number().nullish().describe('Optional number of shares held. When present (and > 0) the tile shows this row\'s position value and gain\/loss.'),
   "costBasis": zod.number().nullish().describe('Optional average cost per share. Used with shares to compute gain\/loss. Null or absent when not tracking cost.')
 })).nullish().describe('Per-tile watchlist of stock symbols for the Stocks tile. Each entry carries an uppercased ticker symbol and optional share quantity and average cost basis per share, which turn the watchlist into a lightweight portfolio. Null or absent means none set (the tile shows demo\/sample quotes).'),
+  "sleeperUsername": zod.string().nullish().describe('Sleeper account username the Fantasy tile follows. Used to resolve the user\'s id and locate their roster in the league. Null or absent means none set (the tile shows an empty state until configured).'),
+  "sleeperLeagueId": zod.string().nullish().describe('Sleeper league id the Fantasy tile shows. Sleeper\'s read endpoints are public for any league id. Null or absent means none chosen yet.'),
+  "sleeperSport": zod.string().nullish().describe('Sport the Fantasy tile\'s league belongs to (e.g. \"nfl\", \"nba\"). Absent or null defaults to \"nfl\".'),
+  "sleeperSeason": zod.string().nullish().describe('Season year the Fantasy tile\'s league belongs to (e.g. \"2025\"). Absent or null defaults to the current NFL season.'),
+  "sleeperShowMatchup": zod.boolean().nullish().describe('When true, the Fantasy tile shows the user\'s current-week matchup. Absent or null defaults to true.'),
+  "sleeperShowStandings": zod.boolean().nullish().describe('When true, the Fantasy tile shows the league standings. Absent or null defaults to true.'),
+  "sleeperShowTransactions": zod.boolean().nullish().describe('When true, the Fantasy tile shows recent waiver\/trade transactions. Absent or null defaults to true.'),
   "scrollable": zod.boolean().nullish().describe('When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.')
 })
@@ -272,7 +300,7 @@ export const UpdateTileResponse = zod.object({
   "id": zod.number(),
   "userId": zod.number(),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('clock'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('spacer'),zod.literal('divider'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('clock'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('spacer'),zod.literal('divider'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -310,6 +338,13 @@ export const UpdateTileResponse = zod.object({
   "shares": zod.number().nullish().describe('Optional number of shares held. When present (and > 0) the tile shows this row\'s position value and gain\/loss.'),
   "costBasis": zod.number().nullish().describe('Optional average cost per share. Used with shares to compute gain\/loss. Null or absent when not tracking cost.')
 })).nullish().describe('Per-tile watchlist of stock symbols for the Stocks tile. Each entry carries an uppercased ticker symbol and optional share quantity and average cost basis per share, which turn the watchlist into a lightweight portfolio. Null or absent means none set (the tile shows demo\/sample quotes).'),
+  "sleeperUsername": zod.string().nullish().describe('Sleeper account username the Fantasy tile follows. Used to resolve the user\'s id and locate their roster in the league. Null or absent means none set (the tile shows an empty state until configured).'),
+  "sleeperLeagueId": zod.string().nullish().describe('Sleeper league id the Fantasy tile shows. Sleeper\'s read endpoints are public for any league id. Null or absent means none chosen yet.'),
+  "sleeperSport": zod.string().nullish().describe('Sport the Fantasy tile\'s league belongs to (e.g. \"nfl\", \"nba\"). Absent or null defaults to \"nfl\".'),
+  "sleeperSeason": zod.string().nullish().describe('Season year the Fantasy tile\'s league belongs to (e.g. \"2025\"). Absent or null defaults to the current NFL season.'),
+  "sleeperShowMatchup": zod.boolean().nullish().describe('When true, the Fantasy tile shows the user\'s current-week matchup. Absent or null defaults to true.'),
+  "sleeperShowStandings": zod.boolean().nullish().describe('When true, the Fantasy tile shows the league standings. Absent or null defaults to true.'),
+  "sleeperShowTransactions": zod.boolean().nullish().describe('When true, the Fantasy tile shows recent waiver\/trade transactions. Absent or null defaults to true.'),
   "scrollable": zod.boolean().nullish().describe('When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.'),
   "createdAt": zod.string().optional()
@@ -341,7 +376,7 @@ export const SaveLayoutResponseItem = zod.object({
   "id": zod.number(),
   "userId": zod.number(),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('clock'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('spacer'),zod.literal('divider'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('clock'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('spacer'),zod.literal('divider'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -379,6 +414,13 @@ export const SaveLayoutResponseItem = zod.object({
   "shares": zod.number().nullish().describe('Optional number of shares held. When present (and > 0) the tile shows this row\'s position value and gain\/loss.'),
   "costBasis": zod.number().nullish().describe('Optional average cost per share. Used with shares to compute gain\/loss. Null or absent when not tracking cost.')
 })).nullish().describe('Per-tile watchlist of stock symbols for the Stocks tile. Each entry carries an uppercased ticker symbol and optional share quantity and average cost basis per share, which turn the watchlist into a lightweight portfolio. Null or absent means none set (the tile shows demo\/sample quotes).'),
+  "sleeperUsername": zod.string().nullish().describe('Sleeper account username the Fantasy tile follows. Used to resolve the user\'s id and locate their roster in the league. Null or absent means none set (the tile shows an empty state until configured).'),
+  "sleeperLeagueId": zod.string().nullish().describe('Sleeper league id the Fantasy tile shows. Sleeper\'s read endpoints are public for any league id. Null or absent means none chosen yet.'),
+  "sleeperSport": zod.string().nullish().describe('Sport the Fantasy tile\'s league belongs to (e.g. \"nfl\", \"nba\"). Absent or null defaults to \"nfl\".'),
+  "sleeperSeason": zod.string().nullish().describe('Season year the Fantasy tile\'s league belongs to (e.g. \"2025\"). Absent or null defaults to the current NFL season.'),
+  "sleeperShowMatchup": zod.boolean().nullish().describe('When true, the Fantasy tile shows the user\'s current-week matchup. Absent or null defaults to true.'),
+  "sleeperShowStandings": zod.boolean().nullish().describe('When true, the Fantasy tile shows the league standings. Absent or null defaults to true.'),
+  "sleeperShowTransactions": zod.boolean().nullish().describe('When true, the Fantasy tile shows recent waiver\/trade transactions. Absent or null defaults to true.'),
   "scrollable": zod.boolean().nullish().describe('When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.'),
   "createdAt": zod.string().optional()

@@ -212,6 +212,12 @@ export const MEDIA_ROW_PX = 44; // list row with a 32px cover thumbnail
 export const STAT_ROW_PX = 50; // big-number stat block
 export const SECTION_PX = 26; // a section label/header incl. top spacing
 
+// Sleeper (fantasy) tile element heights, used by SleeperTile's budget math so
+// its section reveal is consistent with the rest of the system.
+export const SLEEPER_MATCHUP_PX = 112; // matchup block: two team rows + actual/projected scores + vs
+export const SLEEPER_STANDING_ROW_PX = 22; // one ranked standings row (text-xs)
+export const SLEEPER_TRANSACTION_ROW_PX = 36; // two-line transaction row
+
 export interface TileBudget {
   // Measured body width, for any width-dependent layout choices.
   readonly width: number;

@@ -29,6 +29,7 @@ export const TileIntegration = {
   sports: 'sports',
   news: 'news',
   stocks: 'stocks',
+  sleeper: 'sleeper',
   spacer: 'spacer',
   divider: 'divider',
 } as const;
