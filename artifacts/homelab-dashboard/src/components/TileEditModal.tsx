@@ -113,6 +113,7 @@ const INTEGRATIONS = [
   { value: TileIntegration.sports, label: "Sports" },
   { value: TileIntegration.news, label: "News" },
   { value: TileIntegration.stocks, label: "Stocks" },
+  { value: TileIntegration.spacer, label: "Spacer" },
 ] as const;
 
 // Pre-group the integrations by category (News, Media, Downloads, Server,
@@ -297,6 +298,10 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
   const isSports = integration === TileIntegration.sports;
   const isNews = integration === TileIntegration.news;
   const isStocks = integration === TileIntegration.stocks;
+  // The spacer is a layout-only tile: an invisible gap with no name, URL,
+  // image, background, or live data. Only its size/position matter, so the
+  // editor strips every content field and shows a short description instead.
+  const isSpacer = integration === TileIntegration.spacer;
 
   // Teams for the chosen leagues, for the dependent team multi-select. Sourced
   // from the baked-in catalog (ESPN's /teams endpoint isn't CORS-enabled), so
@@ -630,18 +635,20 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
         integration === NONE
           ? null
           : (integration as typeof TileIntegration[keyof typeof TileIntegration]),
-      name: name || undefined,
-      url: url || undefined,
+      // A spacer carries no content: clear name/url/background/image so that
+      // converting an existing tile into a spacer leaves nothing behind.
+      name: isSpacer ? "" : name || undefined,
+      url: isSpacer ? "" : url || undefined,
       // Send the raw value so clearing (null) reaches the body and the server
       // writes NULL; otherwise an undefined field is dropped and the old color
       // sticks. A non-empty string sets an explicit per-tile color as before.
-      bgColor: bgColor,
+      bgColor: isSpacer ? null : bgColor,
       // Send "" to explicitly clear the image when removed; placement fields are
       // only sent when an image is present.
-      imageUrl: imageUrl || "",
-      imageFit: imageUrl ? imageFit : undefined,
-      imagePosition: imageUrl ? imagePosition : undefined,
-      imageScale: imageUrl ? imageScale : undefined,
+      imageUrl: isSpacer ? "" : imageUrl || "",
+      imageFit: !isSpacer && imageUrl ? imageFit : undefined,
+      imagePosition: !isSpacer && imageUrl ? imagePosition : undefined,
+      imageScale: !isSpacer && imageUrl ? imageScale : undefined,
       // Title size/placement only applies to plain app/link tiles; integration
       // (widget) tiles keep their fixed header layout, so clear those fields.
       titleSize: integration === NONE ? titleSize : null,
@@ -707,12 +714,14 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
         </DialogHeader>
 
         <div className="space-y-4 py-2">
-          <div className="space-y-1.5">
-            <Label>Name</Label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="My App" />
-          </div>
+          {!isSpacer && (
+            <div className="space-y-1.5">
+              <Label>Name</Label>
+              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="My App" />
+            </div>
+          )}
 
-          <div className="space-y-1.5 border-t border-border pt-4">
+          <div className={`space-y-1.5 ${isSpacer ? "" : "border-t border-border pt-4"}`}>
             <Label>App integration</Label>
             <Select value={integration} onValueChange={handleIntegrationChange}>
               <SelectTrigger>
@@ -738,6 +747,15 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
               Optional. Attach a service to show its live status on this tile.
             </p>
           </div>
+
+          {isSpacer && (
+            <p className="text-sm text-muted-foreground border-t border-border pt-4">
+              An invisible gap tile for managing layout spacing. It stays
+              completely transparent on the dashboard and only shows a dashed
+              outline while editing. Just drag and resize it to shape your
+              layout.
+            </p>
+          )}
 
           {catalog.length > 0 && (
             <div className="space-y-2 border-t border-border pt-4">
@@ -1135,26 +1153,30 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
             />
           )}
 
-          <div className="space-y-1.5">
-            <Label>URL</Label>
-            <Input
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              placeholder="https://example.com"
-            />
-          </div>
+          {!isSpacer && (
+            <div className="space-y-1.5">
+              <Label>URL</Label>
+              <Input
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                placeholder="https://example.com"
+              />
+            </div>
+          )}
 
-          <label
-            htmlFor="hide-title"
-            className="flex items-center gap-2 cursor-pointer select-none"
-          >
-            <Checkbox
-              id="hide-title"
-              checked={hideTitle}
-              onCheckedChange={(c) => setHideTitle(c === true)}
-            />
-            <span className="text-sm">Hide title text</span>
-          </label>
+          {!isSpacer && (
+            <label
+              htmlFor="hide-title"
+              className="flex items-center gap-2 cursor-pointer select-none"
+            >
+              <Checkbox
+                id="hide-title"
+                checked={hideTitle}
+                onCheckedChange={(c) => setHideTitle(c === true)}
+              />
+              <span className="text-sm">Hide title text</span>
+            </label>
+          )}
 
           {integration === NONE && (
             <div className="space-y-1.5">
@@ -1207,6 +1229,7 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
             </div>
           )}
 
+          {!isSpacer && (
           <div className="space-y-1.5">
             <Label>Background Color</Label>
             <div className="flex items-center gap-2">
@@ -1255,7 +1278,9 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
               </div>
             )}
           </div>
+          )}
 
+          {!isSpacer && (
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label>Image</Label>
@@ -1407,8 +1432,9 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
               </TabsContent>
             </Tabs>
           </div>
+          )}
 
-          {imageUrl && (
+          {!isSpacer && imageUrl && (
             <div className="space-y-3">
               <div className="space-y-1.5">
                 <Label>Fit</Label>

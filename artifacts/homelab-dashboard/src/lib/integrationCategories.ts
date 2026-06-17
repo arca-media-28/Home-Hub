@@ -37,6 +37,8 @@ const CATEGORY_BY_KEY: Record<string, Category> = {
   "nginx-proxy-manager": "Server",
   tailscale: "Server",
   pihole: "Server",
+  // Layout helpers
+  spacer: "Other",
 };
 
 // The category for a given integration / service key. Unmapped keys land in

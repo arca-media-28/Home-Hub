@@ -65,6 +65,7 @@ export const TileIntegration = {
   sports: 'sports',
   news: 'news',
   stocks: 'stocks',
+  spacer: 'spacer',
 } as const;
 
 /**
@@ -274,6 +275,7 @@ export const TileInputIntegration = {
   sports: 'sports',
   news: 'news',
   stocks: 'stocks',
+  spacer: 'spacer',
 } as const;
 
 export interface TileInput {
@@ -327,6 +329,7 @@ export const TileUpdateIntegration = {
   sports: 'sports',
   news: 'news',
   stocks: 'stocks',
+  spacer: 'spacer',
 } as const;
 
 export interface TileUpdate {

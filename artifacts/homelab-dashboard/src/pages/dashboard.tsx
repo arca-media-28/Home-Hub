@@ -119,7 +119,18 @@ const INTEGRATION_SERVICE: Record<string, string> = {
   "nginx-proxy-manager": "nginx-proxy-manager",
 };
 
-function renderTileContent(tile: Tile, status?: ServiceStatus) {
+function renderTileContent(tile: Tile, status: ServiceStatus | undefined, editMode: boolean) {
+  // The spacer is a layout-only tile: an invisible gap. In locked mode it
+  // renders nothing at all; in edit mode it shows a dashed ghost so users can
+  // find, move, resize, or delete it.
+  if (tile.integration === "spacer") {
+    if (!editMode) return null;
+    return (
+      <div className="absolute inset-0 flex items-center justify-center border-2 border-dashed border-primary/40 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+        Spacer
+      </div>
+    );
+  }
   // Every tile renders as a styled app/link card. When an integration is
   // attached it also shows a compact live-status section from that service.
   if (tile.integration) {
@@ -431,9 +442,19 @@ export default function Dashboard() {
               {tiles.map((tile) => (
                 <div
                   key={String(tile.id)}
-                  className={`relative overflow-hidden border border-border shadow-sm bg-card transition-all ${
-                    editMode ? "ring-1 ring-primary/40 hover:ring-primary cursor-default" : "hover:border-primary/40"
-                  }`}
+                  className={
+                    tile.integration === "spacer"
+                      ? // Spacer: invisible in locked mode (no surface, no
+                        // click target), a dashed ghost in edit mode.
+                        `relative overflow-hidden transition-all ${
+                          editMode
+                            ? "ring-1 ring-primary/40 hover:ring-primary cursor-default"
+                            : "pointer-events-none"
+                        }`
+                      : `relative overflow-hidden border border-border shadow-sm bg-card transition-all ${
+                          editMode ? "ring-1 ring-primary/40 hover:ring-primary cursor-default" : "hover:border-primary/40"
+                        }`
+                  }
                 >
                   {editMode && (
                     <div className="drag-handle absolute inset-0 z-20 flex items-start justify-end p-1.5 cursor-grab active:cursor-grabbing">
@@ -456,6 +477,7 @@ export default function Dashboard() {
                     tile.integration
                       ? statusByService.get(INTEGRATION_SERVICE[tile.integration])
                       : undefined,
+                    editMode,
                   )}
                 </div>
               ))}

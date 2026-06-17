@@ -29,4 +29,5 @@ export const TileUpdateIntegration = {
   sports: 'sports',
   news: 'news',
   stocks: 'stocks',
+  spacer: 'spacer',
 } as const;
