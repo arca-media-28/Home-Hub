@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect } from "react";
+import React, { useState, useCallback, useRef, useEffect, useLayoutEffect } from "react";
 import { useLocation } from "wouter";
 import GridLayout from "react-grid-layout";
 import "react-grid-layout/css/styles.css";
@@ -105,20 +105,28 @@ export default function Dashboard() {
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedTile, setSelectedTile] = useState<Tile | undefined>(undefined);
   const [modalMode, setModalMode] = useState<EditMode>("create");
-  const [gridWidth, setGridWidth] = useState(1200);
+  // null until the real container width is measured. Gating the grid render on
+  // a measured width (instead of starting from a hard-coded guess) keeps the
+  // column count correct on the very first paint, so saved tile positions are
+  // never compacted out of bounds on a hard refresh.
+  const [gridWidth, setGridWidth] = useState<number | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const savedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showSaved, setShowSaved] = useState(false);
 
-  // Measure container width for the non-responsive GridLayout
-  useEffect(() => {
+  // Measure container width for the non-responsive GridLayout. useLayoutEffect
+  // measures synchronously before the browser paints, so the grid's first paint
+  // already uses the true width (and therefore the correct column count).
+  useLayoutEffect(() => {
     const el = containerRef.current;
     if (!el) return;
-    const ro = new ResizeObserver((entries) => {
-      const w = entries[0]?.contentRect.width;
+    const measure = () => {
+      const w = el.clientWidth;
       if (w) setGridWidth(w);
-    });
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
@@ -171,7 +179,7 @@ export default function Dashboard() {
   });
 
   const layout = tiles.map(tileToLayout);
-  const cols = colsForWidth(gridWidth);
+  const cols = gridWidth !== null ? colsForWidth(gridWidth) : MIN_COLS;
 
   const handleLayoutChange = useCallback(
     (currentLayout: { i: string; x: number; y: number; w: number; h: number }[]) => {
@@ -336,6 +344,7 @@ export default function Dashboard() {
 
       {/* Grid */}
       <main className="px-4 py-6">
+        <div ref={containerRef}>
         {isLoading ? (
           <div className="flex items-center justify-center h-48 text-muted-foreground text-sm">
             <span className="text-primary">{"> "}</span>
@@ -362,7 +371,8 @@ export default function Dashboard() {
             </Button>
           </div>
         ) : (
-          <div ref={containerRef}>
+          <div>
+            {gridWidth !== null && (
             <Grid
               className="layout"
               layout={layout}
@@ -408,8 +418,10 @@ export default function Dashboard() {
                 </div>
               ))}
             </Grid>
+            )}
           </div>
         )}
+        </div>
       </main>
 
       <TileEditModal
