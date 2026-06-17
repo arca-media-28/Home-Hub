@@ -733,10 +733,10 @@
 }
 .react-resizable-handle-se:hover { opacity: 1; }
 
-/* DOM-level hard-lock: when edit mode is off, react-grid-layout's
-   isDraggable/isResizable props are not always honoured through the CJS shim,
-   so force the grid inert regardless of prop state. Removes resize handles
-   entirely and disables drag/select on the items themselves. */
+/* Visual fallback: drag/resize is disabled at the prop level via
+   dragConfig/resizeConfig when edit mode is off. These rules remain as a
+   belt-and-suspenders guard — they hide resize handles entirely and keep the
+   items showing a default cursor. */
 .grid-locked .react-resizable-handle {
   display: none !important;
   pointer-events: none !important;
