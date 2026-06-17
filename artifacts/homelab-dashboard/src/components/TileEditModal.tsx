@@ -16,10 +16,13 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { groupByCategory } from "@/lib/integrationCategories";
 import { METRIC_CATALOG, allMetricKeys } from "@/components/tiles/metrics";
 import {
   resolveImageStyle,
@@ -86,9 +89,12 @@ const PICKER_FALLBACK = "#1c1c20";
 
 // Optional integrations a tile can attach. "None" keeps the tile a plain
 // app/link shortcut.
+// Selectable integrations (excluding "None"), grouped into categories at render
+// time. Order within this list is the within-category order shown in the
+// dropdown.
 const INTEGRATIONS = [
-  { value: NONE, label: "None" },
-  { value: TileIntegration.media, label: "Plex / Media Server" },
+  { value: TileIntegration.media, label: "Plex" },
+  { value: TileIntegration.jellyfin, label: "Jellyfin" },
   { value: TileIntegration.sonarr, label: "Sonarr" },
   { value: TileIntegration.radarr, label: "Radarr" },
   { value: TileIntegration.qbittorrent, label: "qBittorrent" },
@@ -104,6 +110,10 @@ const INTEGRATIONS = [
   { value: TileIntegration.news, label: "News" },
   { value: TileIntegration.stocks, label: "Stocks" },
 ] as const;
+
+// Pre-group the integrations by category (News, Media, Downloads, Server,
+// Other) for the dropdown. "None" is rendered separately at the top.
+const INTEGRATION_GROUPS = groupByCategory(INTEGRATIONS, (i) => i.value);
 
 type ImageSource = "upload" | "library" | "url";
 
@@ -702,10 +712,18 @@ export default function TileEditModal({ open, onOpenChange, tile, mode }: TileEd
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {INTEGRATIONS.map((i) => (
-                  <SelectItem key={i.value} value={i.value}>
-                    {i.label}
-                  </SelectItem>
+                <SelectItem value={NONE}>None</SelectItem>
+                {INTEGRATION_GROUPS.map((group) => (
+                  <SelectGroup key={group.category}>
+                    <SelectLabel className="text-xs uppercase tracking-wider text-muted-foreground">
+                      {group.category}
+                    </SelectLabel>
+                    {group.items.map((i) => (
+                      <SelectItem key={i.value} value={i.value} className="pl-8">
+                        {i.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
                 ))}
               </SelectContent>
             </Select>

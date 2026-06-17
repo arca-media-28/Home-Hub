@@ -480,20 +480,46 @@ router.get("/truenas", requireAuth, async (_req, res) => {
 // ────────────────────────────────────────────────
 // Media Server Widget (Plex or Jellyfin)
 // ────────────────────────────────────────────────
-router.get("/media", requireAuth, async (_req, res) => {
-  // Prefer saved Plex connection details; fall back to env-configured media
-  // server (which may be Plex or Jellyfin).
-  const saved = getSavedConnection("plex");
-  const savedToken = saved.token || saved.apiKey;
+router.get("/media", requireAuth, async (req, res) => {
+  // Which media server backs this tile. "jellyfin" reads the saved Jellyfin
+  // connection; anything else (the default) reads the saved Plex connection.
+  const server = req.query["server"] === "jellyfin" ? "jellyfin" : "plex";
 
-  let serverType = process.env["MEDIA_SERVER_TYPE"] || "jellyfin"; // "plex" | "jellyfin"
-  let baseUrl = process.env["MEDIA_SERVER_URL"];
-  let apiKey = process.env["MEDIA_SERVER_API_KEY"];
+  let serverType: string;
+  let baseUrl: string | undefined;
+  let apiKey: string | undefined;
 
-  if (saved.url && savedToken) {
-    serverType = "plex";
+  if (server === "jellyfin") {
+    // Jellyfin uses a base URL + API key, both stored on the jellyfin
+    // connection. Fall back to the env-configured media server only when no
+    // Jellyfin connection is saved.
+    const saved = getSavedConnection("jellyfin");
+    serverType = "jellyfin";
     baseUrl = saved.url;
-    apiKey = savedToken;
+    apiKey = saved.apiKey;
+    if (!baseUrl || !apiKey) {
+      const envType = process.env["MEDIA_SERVER_TYPE"] || "jellyfin";
+      if (envType === "jellyfin") {
+        baseUrl = process.env["MEDIA_SERVER_URL"];
+        apiKey = process.env["MEDIA_SERVER_API_KEY"];
+      }
+    }
+  } else {
+    // Plex uses a base URL + token (the token may be stored under `token` or
+    // `apiKey`). Fall back to a Plex-typed env media server when unsaved.
+    const saved = getSavedConnection("plex");
+    const savedToken = saved.token || saved.apiKey;
+    serverType = "plex";
+    if (saved.url && savedToken) {
+      baseUrl = saved.url;
+      apiKey = savedToken;
+    } else {
+      const envType = process.env["MEDIA_SERVER_TYPE"] || "jellyfin";
+      if (envType === "plex") {
+        baseUrl = process.env["MEDIA_SERVER_URL"];
+        apiKey = process.env["MEDIA_SERVER_API_KEY"];
+      }
+    }
   }
 
   if (!baseUrl || !apiKey) {

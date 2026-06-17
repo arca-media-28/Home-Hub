@@ -33,13 +33,22 @@ import {
   Radar,
   Globe,
   Tv2,
+  MonitorPlay,
+  ChevronDown,
   Plug,
   X,
 } from "lucide-react";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { groupByCategory } from "@/lib/integrationCategories";
 
 type ServiceKey =
   | "truenas"
   | "plex"
+  | "jellyfin"
   | "sonarr"
   | "radarr"
   | "qbittorrent"
@@ -93,6 +102,12 @@ const SERVICES: ServiceDef[] = [
       API_KEY_FIELD,
       { key: "token", label: "Plex Token", type: "password", placeholder: "X-Plex-Token" },
     ],
+  },
+  {
+    key: "jellyfin",
+    name: "Jellyfin",
+    icon: MonitorPlay,
+    fields: [URL_FIELD, API_KEY_FIELD],
   },
   {
     key: "sonarr",
@@ -356,6 +371,33 @@ function ServiceCard({
   );
 }
 
+// A collapsible group of service cards under a category heading. Expanded by
+// default; collapsed state is local (not persisted across sessions).
+function CategorySection({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(true);
+  return (
+    <Collapsible open={open} onOpenChange={setOpen}>
+      <CollapsibleTrigger className="group flex w-full items-center gap-2 px-1 py-2 text-left">
+        <ChevronDown
+          className={`w-4 h-4 text-primary transition-transform ${open ? "" : "-rotate-90"}`}
+        />
+        <span className="font-bold text-xs uppercase tracking-widest text-foreground">
+          {title}
+        </span>
+      </CollapsibleTrigger>
+      <CollapsibleContent className="space-y-5 pt-1 pb-2">
+        {children}
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
+
 export default function Settings() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -431,13 +473,17 @@ export default function Settings() {
             <span className="animate-pulse">Loading settings…</span>
           </div>
         ) : (
-          <div className="space-y-5">
-            {SERVICES.map((def) => (
-              <ServiceCard
-                key={def.key}
-                def={def}
-                connection={byService.get(def.key)}
-              />
+          <div className="space-y-4">
+            {groupByCategory(SERVICES, (def) => def.key).map((group) => (
+              <CategorySection key={group.category} title={group.category}>
+                {group.items.map((def) => (
+                  <ServiceCard
+                    key={def.key}
+                    def={def}
+                    connection={byService.get(def.key)}
+                  />
+                ))}
+              </CategorySection>
             ))}
           </div>
         )}

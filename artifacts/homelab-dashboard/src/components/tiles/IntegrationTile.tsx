@@ -23,7 +23,8 @@ import { openTileUrl } from "@/lib/utils";
 
 export const INTEGRATION_LABELS: Record<string, string> = {
   [TileIntegration.truenas]: "TrueNAS",
-  [TileIntegration.media]: "Media Server",
+  [TileIntegration.media]: "Plex",
+  [TileIntegration.jellyfin]: "Jellyfin",
   [TileIntegration.sonarr]: "Sonarr",
   [TileIntegration.radarr]: "Radarr",
   [TileIntegration.qbittorrent]: "qBittorrent",
@@ -47,6 +48,9 @@ export interface WidgetProps {
   // Per-tile extra config. Only qBittorrent uses it (category filter) for now;
   // other widgets ignore it.
   tileSettings?: TileSettings | null;
+  // The tile's integration value. MediaTile uses it to pick the backing media
+  // server (Plex vs Jellyfin); other widgets ignore it.
+  integration: string;
 }
 
 function renderStatusView(integration: string, props: WidgetProps) {
@@ -54,6 +58,7 @@ function renderStatusView(integration: string, props: WidgetProps) {
     case TileIntegration.truenas:
       return <TruenasTile {...props} />;
     case TileIntegration.media:
+    case TileIntegration.jellyfin:
       return <MediaTile {...props} />;
     case TileIntegration.sonarr:
       return <SonarrTile {...props} />;
@@ -213,7 +218,7 @@ export default function IntegrationTile({ tile, status }: IntegrationTileProps) 
             )}
           </div>
         )}
-        {renderStatusView(integration, { enabled, density, tileSettings: tile.tileSettings })}
+        {renderStatusView(integration, { enabled, density, tileSettings: tile.tileSettings, integration })}
       </div>
     </div>
   );

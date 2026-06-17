@@ -51,6 +51,7 @@ export type TileIntegration = typeof TileIntegration[keyof typeof TileIntegratio
 export const TileIntegration = {
   truenas: 'truenas',
   media: 'media',
+  jellyfin: 'jellyfin',
   sonarr: 'sonarr',
   radarr: 'radarr',
   qbittorrent: 'qbittorrent',
@@ -259,6 +260,7 @@ export type TileInputIntegration = typeof TileInputIntegration[keyof typeof Tile
 export const TileInputIntegration = {
   truenas: 'truenas',
   media: 'media',
+  jellyfin: 'jellyfin',
   sonarr: 'sonarr',
   radarr: 'radarr',
   qbittorrent: 'qbittorrent',
@@ -310,6 +312,7 @@ export type TileUpdateIntegration = typeof TileUpdateIntegration[keyof typeof Ti
 export const TileUpdateIntegration = {
   truenas: 'truenas',
   media: 'media',
+  jellyfin: 'jellyfin',
   sonarr: 'sonarr',
   radarr: 'radarr',
   qbittorrent: 'qbittorrent',
@@ -796,6 +799,21 @@ export interface NewsData {
   /** Recent headlines parsed from the feed, newest first. */
   items: NewsItem[];
 }
+
+export type GetMediaRecentParams = {
+/**
+ * Which media server the tile is backed by. "plex" resolves the saved Plex connection; "jellyfin" resolves the saved Jellyfin connection. Defaults to "plex" when omitted.
+ */
+server?: GetMediaRecentServer;
+};
+
+export type GetMediaRecentServer = typeof GetMediaRecentServer[keyof typeof GetMediaRecentServer];
+
+
+export const GetMediaRecentServer = {
+  plex: 'plex',
+  jellyfin: 'jellyfin',
+} as const;
 
 export type GetNewsWidgetParams = {
 /**

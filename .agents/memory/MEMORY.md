@@ -19,3 +19,4 @@
 - [ESPN sports API CORS](espn-sports-cors.md) — keyless client-side tile: /scoreboard + /news have CORS (browser-fetchable), /teams does NOT; bake team rosters into a static catalog instead.
 - [tileSettings persistence whitelist](tile-settings-whitelist.md) — new per-tile setting saves 200 but stays demo? add it to pickTileSettings() allow-list in api-server routes/tiles.ts, not just OpenAPI/modal.
 - [Stocks sparkline candles](stocks-sparkline-candles.md) — /widgets/stocks/candles {series:[{symbol,closes}],sample}; sample drifts toward sample changePercent so trend tone matches; "sparkline" metric gates, fetch enabled-gated + slow refresh.
+- [Integration categories + media server param](integration-categories.md) — shared categoryOf/groupByCategory model for both panels; Plex/Jellyfin share /widgets/media disambiguated by ?server= (also in RQ key) → saved plex vs jellyfin connection.

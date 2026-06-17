@@ -293,6 +293,17 @@ paths:
       summary: Get recently added media from Plex or Jellyfin
       security:
         - bearerAuth: []
+      parameters:
+        - name: server
+          in: query
+          required: false
+          description: >-
+            Which media server the tile is backed by. "plex" resolves the saved
+            Plex connection; "jellyfin" resolves the saved Jellyfin connection.
+            Defaults to "plex" when omitted.
+          schema:
+            type: string
+            enum: [plex, jellyfin]
       responses:
         "200":
           description: Recent media items
@@ -630,7 +641,7 @@ paths:
           required: true
           schema:
             type: string
-            enum: [truenas, plex, sonarr, radarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv]
+            enum: [truenas, plex, jellyfin, sonarr, radarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv]
       requestBody:
         required: true
         content:
@@ -664,7 +675,7 @@ paths:
           required: true
           schema:
             type: string
-            enum: [truenas, plex, sonarr, radarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv]
+            enum: [truenas, plex, jellyfin, sonarr, radarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv]
       requestBody:
         required: true
         content:
@@ -749,7 +760,7 @@ components:
           enum: [app, truenas, media, sonarr, radarr, qbittorrent]
         integration:
           type: ["string", "null"]
-          enum: [truenas, media, sonarr, radarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, clock, weather, sports, news, stocks, null]
+          enum: [truenas, media, jellyfin, sonarr, radarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, clock, weather, sports, news, stocks, null]
         gridX:
           type: integer
         gridY:
@@ -828,7 +839,7 @@ components:
           enum: [app, truenas, media, sonarr, radarr, qbittorrent]
         integration:
           type: ["string", "null"]
-          enum: [truenas, media, sonarr, radarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, clock, weather, sports, news, stocks, null]
+          enum: [truenas, media, jellyfin, sonarr, radarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, clock, weather, sports, news, stocks, null]
         gridX:
           type: integer
         gridY:
@@ -871,7 +882,7 @@ components:
       properties:
         integration:
           type: ["string", "null"]
-          enum: [truenas, media, sonarr, radarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, clock, weather, sports, news, stocks, null]
+          enum: [truenas, media, jellyfin, sonarr, radarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, clock, weather, sports, news, stocks, null]
         gridX:
           type: integer
         gridY:

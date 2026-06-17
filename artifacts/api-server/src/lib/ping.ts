@@ -58,6 +58,16 @@ export async function pingService(service: string, v: TestValues): Promise<TestR
       });
       return { ok: true, message: "Connected" };
     }
+    case "jellyfin": {
+      // Jellyfin authenticates with an API key passed as the `api_key` query
+      // param. A successful GET against /System/Info confirms reachability and
+      // a valid key.
+      if (!v.apiKey) return { ok: false, message: "Enter an API Key first." };
+      await httpClient.get(`${base}/System/Info`, {
+        params: { api_key: v.apiKey },
+      });
+      return { ok: true, message: "Connected" };
+    }
     case "sonarr":
     case "radarr": {
       if (!v.apiKey) return { ok: false, message: "Enter an API Key first." };

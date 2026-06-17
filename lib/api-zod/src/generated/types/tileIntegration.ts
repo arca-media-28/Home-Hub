@@ -15,6 +15,7 @@ export type TileIntegration = typeof TileIntegration[keyof typeof TileIntegratio
 export const TileIntegration = {
   truenas: 'truenas',
   media: 'media',
+  jellyfin: 'jellyfin',
   sonarr: 'sonarr',
   radarr: 'radarr',
   qbittorrent: 'qbittorrent',
