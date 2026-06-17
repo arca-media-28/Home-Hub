@@ -89,6 +89,10 @@ export interface SleeperTransaction {
   created: number;
   // Roster ids that added each player (player id → roster id).
   adds: Array<{ playerId: string; rosterId: number }>;
+  // Roster ids that dropped each player (player id → roster id). For trades the
+  // drop roster is the team giving the player up; for waivers/free agents it is
+  // the team that dropped a player to make room.
+  drops: Array<{ playerId: string; rosterId: number }>;
   rosterIds: number[];
 }
 
@@ -149,6 +153,7 @@ interface RawTransaction {
   status?: string;
   created?: number;
   adds?: Record<string, number> | null;
+  drops?: Record<string, number> | null;
   roster_ids?: number[] | null;
 }
 
@@ -169,6 +174,27 @@ interface RawPlayer {
 
 const avatarUrl = (id: string | null | undefined): string | null =>
   id ? `https://sleepercdn.com/avatars/thumbs/${id}` : null;
+
+// Sleeper serves per-player headshots from its CDN keyed by player id and sport,
+// e.g. https://sleepercdn.com/content/nfl/players/thumb/<id>.jpg. Not every
+// player (or sport) has one — team defenses use abbreviations, some ids 404 — so
+// callers must degrade gracefully (initials fallback) when the image fails.
+export function playerHeadshotUrl(
+  sport: string,
+  playerId: string | null | undefined,
+): string | null {
+  if (!playerId) return null;
+  return `https://sleepercdn.com/content/${sport}/players/thumb/${playerId}.jpg`;
+}
+
+// Two-letter initials for a player/team name, used as the avatar fallback when a
+// headshot is missing. Picks the first letter of the first and last word.
+export function nameInitials(name: string): string {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return "?";
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+  return (words[0][0] + words[words.length - 1][0]).toUpperCase();
+}
 
 async function getJson<T>(url: string): Promise<T> {
   const res = await fetch(url);
@@ -326,6 +352,10 @@ export async function fetchTransactions(
       playerId,
       rosterId,
     })),
+    drops: Object.entries(t.drops ?? {}).map(([playerId, rosterId]) => ({
+      playerId,
+      rosterId,
+    })),
     rosterIds: t.roster_ids ?? [],
   }));
 }
@@ -397,13 +427,32 @@ export interface MatchupView {
   outcome: "win" | "loss" | "tie" | null;
 }
 
+// A single player involved in a move, with everything the tile needs to render
+// a small avatar (headshot URL + initials fallback) and a readable label.
+export interface TransactionPlayer {
+  playerId: string;
+  name: string;
+  position: string | null;
+  // CDN headshot URL; may 404, so the tile must fall back to `initials`.
+  avatarUrl: string | null;
+  initials: string;
+}
+
+// One side of a move: a fantasy team and the players it gained/lost. Waivers and
+// free-agent moves have a single party; trades have one party per team so both
+// sides are shown clearly.
+export interface TransactionParty {
+  rosterId: number;
+  teamName: string;
+  added: TransactionPlayer[];
+  dropped: TransactionPlayer[];
+}
+
 export interface TransactionView {
   id: string;
   type: string;
   created: number;
-  playerName: string;
-  // The fantasy team that made the move (added the player).
-  teamName: string;
+  parties: TransactionParty[];
 }
 
 // Resolve a roster's display name: the manager's custom team name when set,
@@ -519,35 +568,78 @@ export function buildMatchup(
   };
 }
 
-// Flatten transactions into a recent activity feed: one row per added player,
-// newest first. Pending/failed waivers are dropped so the feed shows completed
-// moves only.
+// Resolve a player id into the shape the tile renders (name, position, headshot
+// URL + initials fallback).
+function resolveTransactionPlayer(
+  playerId: string,
+  players: Map<string, SleeperPlayer> | undefined,
+  sport: string,
+): TransactionPlayer {
+  const player = players?.get(playerId);
+  const name = player?.name ?? `Player ${playerId}`;
+  return {
+    playerId,
+    name,
+    position: player?.position ?? null,
+    avatarUrl: playerHeadshotUrl(sport, playerId),
+    initials: nameInitials(name),
+  };
+}
+
+// Build a recent activity feed: one entry per completed transaction, newest
+// first, with adds/drops grouped by team. A waiver/free-agent move has a single
+// party (the team that made it); a trade has one party per team, so the tile can
+// show both sides clearly. Pending/failed moves are dropped.
 export function buildTransactionFeed(
   transactions: SleeperTransaction[],
   rosters: SleeperRoster[],
   users: SleeperLeagueUser[],
   players: Map<string, SleeperPlayer> | undefined,
+  sport: string,
 ): TransactionView[] {
-  const rows: TransactionView[] = [];
   const sorted = [...transactions]
     .filter((t) => t.status === "complete")
     .sort((a, b) => b.created - a.created);
+
+  const rows: TransactionView[] = [];
   for (const t of sorted) {
+    // Group every add/drop by the roster it belongs to. The same grouping works
+    // for all move types: free agents/waivers collapse to one roster, trades
+    // produce one party per team.
+    const byRoster = new Map<number, TransactionParty>();
+    const party = (rosterId: number): TransactionParty => {
+      let p = byRoster.get(rosterId);
+      if (!p) {
+        p = {
+          rosterId,
+          teamName: rosterTeamName(rosterId, rosters, users),
+          added: [],
+          dropped: [],
+        };
+        byRoster.set(rosterId, p);
+      }
+      return p;
+    };
     for (const add of t.adds) {
-      const player = players?.get(add.playerId);
-      const playerName = player
-        ? player.position
-          ? `${player.name} (${player.position})`
-          : player.name
-        : `Player ${add.playerId}`;
-      rows.push({
-        id: `${t.id}-${add.playerId}`,
-        type: t.type,
-        created: t.created,
-        playerName,
-        teamName: rosterTeamName(add.rosterId, rosters, users),
-      });
+      party(add.rosterId).added.push(
+        resolveTransactionPlayer(add.playerId, players, sport),
+      );
     }
+    for (const drop of t.drops) {
+      party(drop.rosterId).dropped.push(
+        resolveTransactionPlayer(drop.playerId, players, sport),
+      );
+    }
+
+    const parties = [...byRoster.values()];
+    if (parties.length === 0) continue; // nothing actionable to show
+
+    rows.push({
+      id: t.id,
+      type: t.type,
+      created: t.created,
+      parties,
+    });
   }
   return rows;
 }

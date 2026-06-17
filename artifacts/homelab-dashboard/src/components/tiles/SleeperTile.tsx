@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Trophy, ArrowRightLeft } from "lucide-react";
 import type { WidgetProps } from "./IntegrationTile";
@@ -15,13 +16,18 @@ import {
   buildMatchup,
   buildTransactionFeed,
   transactionTypeLabel,
+  type TransactionView,
+  type TransactionPlayer,
 } from "@/lib/sleeper";
 import {
   tileBudget,
   SECTION_PX,
   SLEEPER_MATCHUP_PX,
   SLEEPER_STANDING_ROW_PX,
-  SLEEPER_TRANSACTION_ROW_PX,
+  SLEEPER_TX_HEADER_PX,
+  SLEEPER_TX_TEAM_PX,
+  SLEEPER_TX_PLAYER_PX,
+  SLEEPER_TX_BLOCK_PX,
   listColumnClass,
   listColumnStyle,
 } from "./metrics";
@@ -33,6 +39,78 @@ function Placeholder({ children }: { children: React.ReactNode }) {
       <span>{children}</span>
     </div>
   );
+}
+
+// Small round player headshot that degrades to initials when no image is
+// available or the CDN request fails (many ids — defenses, stale players —
+// have no headshot).
+function PlayerAvatar({ player }: { player: TransactionPlayer }) {
+  const [failed, setFailed] = useState(false);
+  const showImg = player.avatarUrl && !failed;
+  return (
+    <span className="flex-shrink-0 inline-flex h-5 w-5 items-center justify-center overflow-hidden rounded-full bg-muted text-[8px] font-semibold text-muted-foreground">
+      {showImg ? (
+        <img
+          src={player.avatarUrl!}
+          alt=""
+          width={20}
+          height={20}
+          loading="lazy"
+          onError={() => setFailed(true)}
+          className="h-5 w-5 object-cover"
+        />
+      ) : (
+        player.initials
+      )}
+    </span>
+  );
+}
+
+// One add/drop line: avatar + name (+ position), tinted by direction. Added
+// players read normally; dropped players are muted with a leading minus.
+function PlayerLine({
+  player,
+  dropped,
+}: {
+  player: TransactionPlayer;
+  dropped?: boolean;
+}) {
+  return (
+    <div
+      className={`flex items-center gap-1.5 text-xs leading-snug min-w-0 ${
+        dropped ? "text-muted-foreground" : ""
+      }`}
+    >
+      <PlayerAvatar player={player} />
+      <span
+        className={`flex-shrink-0 font-bold ${
+          dropped ? "text-red-500" : "text-green-500"
+        }`}
+        aria-hidden="true"
+      >
+        {dropped ? "−" : "+"}
+      </span>
+      <span className="truncate">
+        {player.name}
+        {player.position ? (
+          <span className="text-muted-foreground"> ({player.position})</span>
+        ) : null}
+      </span>
+    </div>
+  );
+}
+
+// Estimated rendered height of one move block, so the reveal budget can decide
+// how many whole moves fit (rows are variable height — a trade with many players
+// is taller than a single free-agent pickup).
+function estimateTransactionHeight(tx: TransactionView): number {
+  const isTrade = tx.parties.length > 1;
+  let px = SLEEPER_TX_HEADER_PX + SLEEPER_TX_BLOCK_PX;
+  for (const party of tx.parties) {
+    if (isTrade) px += SLEEPER_TX_TEAM_PX;
+    px += (party.added.length + party.dropped.length) * SLEEPER_TX_PLAYER_PX;
+  }
+  return px;
 }
 
 // Slow-changing data: league metadata, rosters, users, season state, and the
@@ -169,7 +247,13 @@ export default function SleeperTile({ density, tileSettings }: WidgetProps) {
         )
       : null;
   const transactions = showTransactions
-    ? buildTransactionFeed(txQuery.data ?? [], rosters, users, playersQuery.data)
+    ? buildTransactionFeed(
+        txQuery.data ?? [],
+        rosters,
+        users,
+        playersQuery.data,
+        sport,
+      )
     : [];
 
   // Density-aware reveal in metric-priority order: matchup, then standings,
@@ -183,12 +267,30 @@ export default function SleeperTile({ density, tileSettings }: WidgetProps) {
     standingRows = budget.list(SECTION_PX, SLEEPER_STANDING_ROW_PX, standings.length);
   }
 
-  let txRows = 0;
+  // Recent moves are variable-height blocks (a trade with many players is taller
+  // than a single pickup), so we can't use budget.list's fixed-row math. Instead
+  // we greedily reveal whole moves while they fit the remaining space. We render
+  // into the same multi-column container but budget against a single column's
+  // worth of height, which guarantees no vertical clip (more columns only makes
+  // the section shorter). The first move is forced only when nothing else has
+  // been shown yet, mirroring the budget's "never leave the body empty" rule.
+  const visibleTransactions: TransactionView[] = [];
   if (showTransactions && transactions.length > 0) {
-    txRows = budget.list(SECTION_PX, SLEEPER_TRANSACTION_ROW_PX, transactions.length);
+    const forceFirst = !showMatchupBlock && standingRows === 0;
+    let remaining = budget.remaining - SECTION_PX;
+    for (const tx of transactions) {
+      const h = estimateTransactionHeight(tx);
+      const first = visibleTransactions.length === 0;
+      if ((first && forceFirst) || h <= remaining) {
+        visibleTransactions.push(tx);
+        remaining -= h;
+      } else {
+        break;
+      }
+    }
   }
 
-  if (!showMatchupBlock && standingRows === 0 && txRows === 0) {
+  if (!showMatchupBlock && standingRows === 0 && visibleTransactions.length === 0) {
     if (offSeason) {
       return <Placeholder>Season complete — no standings yet.</Placeholder>;
     }
@@ -293,24 +395,48 @@ export default function SleeperTile({ density, tileSettings }: WidgetProps) {
         </div>
       )}
 
-      {txRows > 0 && (
+      {visibleTransactions.length > 0 && (
         <div className="space-y-1.5 min-h-0">
           <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
             <ArrowRightLeft className="w-3 h-3" />
             Recent moves
           </div>
           <div
-            className={listColumnClass(budget.columns, "space-y-1")}
+            className={listColumnClass(budget.columns, "space-y-2")}
             style={listColumnStyle(budget.columns)}
           >
-            {transactions.slice(0, txRows).map((tx) => (
-              <div key={tx.id} className="space-y-0.5">
-                <div className="text-xs leading-snug truncate">{tx.playerName}</div>
-                <div className="text-[10px] text-muted-foreground truncate">
-                  {transactionTypeLabel(tx.type)} · {tx.teamName}
+            {visibleTransactions.map((tx) => {
+              const isTrade = tx.parties.length > 1;
+              return (
+                <div key={tx.id} className="space-y-1">
+                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground truncate">
+                    {transactionTypeLabel(tx.type)}
+                    {!isTrade && tx.parties[0]
+                      ? ` · ${tx.parties[0].teamName}`
+                      : ""}
+                  </div>
+                  {tx.parties.map((party) => (
+                    <div key={party.rosterId} className="space-y-0.5">
+                      {isTrade && (
+                        <div className="text-[10px] font-semibold truncate">
+                          {party.teamName}
+                        </div>
+                      )}
+                      {party.added.map((p) => (
+                        <PlayerLine key={`a-${p.playerId}`} player={p} />
+                      ))}
+                      {party.dropped.map((p) => (
+                        <PlayerLine
+                          key={`d-${p.playerId}`}
+                          player={p}
+                          dropped
+                        />
+                      ))}
+                    </div>
+                  ))}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}

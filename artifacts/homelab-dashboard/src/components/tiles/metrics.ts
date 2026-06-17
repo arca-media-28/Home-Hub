@@ -216,7 +216,12 @@ export const SECTION_PX = 26; // a section label/header incl. top spacing
 // its section reveal is consistent with the rest of the system.
 export const SLEEPER_MATCHUP_PX = 112; // matchup block: two team rows + actual/projected scores + vs
 export const SLEEPER_STANDING_ROW_PX = 22; // one ranked standings row (text-xs)
-export const SLEEPER_TRANSACTION_ROW_PX = 36; // two-line transaction row
+// Recent-moves rendering is per-transaction (variable height) rather than a
+// fixed row, so SleeperTile estimates each move's height from these parts.
+export const SLEEPER_TX_HEADER_PX = 16; // a move's type/time header line
+export const SLEEPER_TX_TEAM_PX = 15; // a trade party's team-name heading
+export const SLEEPER_TX_PLAYER_PX = 24; // one player line (20px avatar + label)
+export const SLEEPER_TX_BLOCK_PX = 10; // a move block's own padding/margin
 
 export interface TileBudget {
   // Measured body width, for any width-dependent layout choices.

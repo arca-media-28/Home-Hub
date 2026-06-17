@@ -34,6 +34,19 @@ read endpoints are fully public, so all data is fetched directly in the browser
 - Large blobs (`/players/<sport>`, projections) are cached aggressively and
   gated so most tiles never pay for them.
 
+## Recent moves (transactions) rendering
+- The feed is grouped **per-transaction**, not per-player: `buildTransactionFeed`
+  groups every add/drop by rosterId into `parties` (1 party = waiver/free agent,
+  2 parties = trade so both sides show). Sleeper trade `drops` map gives the
+  team that gave a player up.
+- Player headshots: `https://sleepercdn.com/content/<sport>/players/thumb/<id>.jpg`
+  (sport-keyed). Many ids 404 (defenses, stale players) — `PlayerAvatar` MUST
+  fall back to `nameInitials()` via `<img onError>`.
+- Move blocks are **variable height**, so the tile can't use `budget.list`'s
+  fixed-row math. It greedily reveals whole moves against `budget.remaining`
+  (estimated via `estimateTransactionHeight`), budgeting one column's height and
+  rendering into `budget.columns` (safe under-fill; more columns only shortens).
+
 ## Wiring reminder
 Adding a new integration tile touches the standard set: openapi.yaml settings +
 all three integration enums (then run api-spec codegen), api-server
