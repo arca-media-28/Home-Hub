@@ -30,14 +30,14 @@ export interface ThemeMeta {
 
 export const THEMES: ThemeMeta[] = [
   {
-    id: "rack",
-    name: "Rack",
-    description: "Dark terminal — mono, sharp corners, grid, flat",
+    id: "friction",
+    name: "Friction",
+    description: "Industrial — royal blue, red, bold caps",
     dark: true,
-    radius: "0rem",
-    font: "'Space Mono', ui-monospace, monospace",
-    swatch: { background: "#0a0a0c", surface: "#0f0f12", primary: "#ffb000", accent: "#ffb000" },
-    defaults: { primary: "#ffb000", background: "#0a0a0c" },
+    radius: "0.25rem",
+    font: "'Outfit', ui-sans-serif, system-ui, sans-serif",
+    swatch: { background: "#11264f", surface: "#16305e", primary: "#d23f30", accent: "#d23f30" },
+    defaults: { primary: "#d23f30", background: "#11264f" },
   },
   {
     id: "hearth",
@@ -60,14 +60,14 @@ export const THEMES: ThemeMeta[] = [
     defaults: { primary: "#7c5cff", background: "#0b0a1a" },
   },
   {
-    id: "friction",
-    name: "Friction",
-    description: "Industrial — royal blue, red, bold caps",
+    id: "rack",
+    name: "Rack",
+    description: "Dark terminal — mono, sharp corners, grid, flat",
     dark: true,
-    radius: "0.25rem",
-    font: "'Outfit', ui-sans-serif, system-ui, sans-serif",
-    swatch: { background: "#11264f", surface: "#16305e", primary: "#d23f30", accent: "#d23f30" },
-    defaults: { primary: "#d23f30", background: "#11264f" },
+    radius: "0rem",
+    font: "'Space Mono', ui-monospace, monospace",
+    swatch: { background: "#0a0a0c", surface: "#0f0f12", primary: "#ffb000", accent: "#ffb000" },
+    defaults: { primary: "#ffb000", background: "#0a0a0c" },
   },
   {
     id: "workshop",
@@ -91,7 +91,7 @@ export const THEMES: ThemeMeta[] = [
   },
 ];
 
-export const DEFAULT_THEME: ThemeId = "rack";
+export const DEFAULT_THEME: ThemeId = "friction";
 export const THEME_KEY = "homehub:theme";
 export const COLORS_KEY = "homehub:colors";
 
