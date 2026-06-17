@@ -12,9 +12,10 @@ import type { ReactNode } from "react";
 import type { WidgetProps } from "./IntegrationTile";
 import { tileBudget, SECTION_PX, MEDIA_ROW_PX } from "./metrics";
 
-// A media cover. When the item carries a Plex deep link, it becomes a link that
-// opens the item directly in Plex in a new tab; otherwise it renders inert.
-function Cover({ thumb, title, url }: { thumb: string | null | undefined; title: string; url: string | null | undefined }) {
+// A media cover. When the item carries a deep link, it becomes a link that opens
+// the item directly in the media server (Plex/Jellyfin) in a new tab; otherwise
+// it renders inert.
+function Cover({ thumb, title, url, serverLabel }: { thumb: string | null | undefined; title: string; url: string | null | undefined; serverLabel: string }) {
   const inner = thumb ? (
     <img
       src={thumb}
@@ -33,7 +34,7 @@ function Cover({ thumb, title, url }: { thumb: string | null | undefined; title:
         href={url}
         target="_blank"
         rel="noopener noreferrer"
-        title={`Open "${title}" in Plex`}
+        title={`Open "${title}" in ${serverLabel}`}
         className="flex-shrink-0 hover:opacity-80 transition-opacity"
         onClick={(e) => e.stopPropagation()}
       >
@@ -44,16 +45,19 @@ function Cover({ thumb, title, url }: { thumb: string | null | undefined; title:
   return inner;
 }
 
-// The title/secondary-text block for a media row. When the item carries a Plex
-// deep link the whole block becomes a link that opens the item in Plex in a new
-// tab; otherwise it renders as plain, non-clickable text.
+// The title/secondary-text block for a media row. When the item carries a deep
+// link the whole block becomes a link that opens the item in the media server
+// (Plex/Jellyfin) in a new tab; otherwise it renders as plain, non-clickable
+// text.
 function TitleLink({
   title,
   url,
+  serverLabel,
   children,
 }: {
   title: string;
   url: string | null | undefined;
+  serverLabel: string;
   children: ReactNode;
 }) {
   if (url) {
@@ -62,7 +66,7 @@ function TitleLink({
         href={url}
         target="_blank"
         rel="noopener noreferrer"
-        title={`Open "${title}" in Plex`}
+        title={`Open "${title}" in ${serverLabel}`}
         onClick={(e) => e.stopPropagation()}
         className="block min-w-0 flex-1 rounded-sm hover:text-primary transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
       >
@@ -93,6 +97,7 @@ export default function MediaTile({ enabled, density, integration }: WidgetProps
   // reads the saved Plex connection. Continue Watching is Plex-only.
   const server = integration === TileIntegration.jellyfin ? "jellyfin" : "plex";
   const isPlex = server === "plex";
+  const serverLabel = isPlex ? "Plex" : "Jellyfin";
 
   const showRecent = enabled.has("recent");
   const showContinue = enabled.has("continue") && isPlex;
@@ -157,8 +162,8 @@ export default function MediaTile({ enabled, density, integration }: WidgetProps
           </div>
           {continueItems.slice(0, continueCount).map((item) => (
             <div key={item.id} className="flex items-center gap-2 min-w-0">
-              <Cover thumb={item.thumb} title={item.title} url={item.url} />
-              <TitleLink title={item.title} url={item.url}>
+              <Cover thumb={item.thumb} title={item.title} url={item.url} serverLabel={serverLabel} />
+              <TitleLink title={item.title} url={item.url} serverLabel={serverLabel}>
                 <p className="text-xs font-medium truncate">{item.seriesName || item.title}</p>
                 {item.seriesName && <p className="text-xs text-muted-foreground truncate">{item.title}</p>}
                 {item.progress != null && (
@@ -185,8 +190,8 @@ export default function MediaTile({ enabled, density, integration }: WidgetProps
             const { primary, secondary } = recentLines(item);
             return (
               <div key={item.id} className="flex items-center gap-2 min-w-0">
-                <Cover thumb={item.thumb} title={item.title} url={item.url} />
-                <TitleLink title={item.title} url={item.url}>
+                <Cover thumb={item.thumb} title={item.title} url={item.url} serverLabel={serverLabel} />
+                <TitleLink title={item.title} url={item.url} serverLabel={serverLabel}>
                   <p className="text-xs font-medium truncate">{primary}</p>
                   <p className="text-xs text-muted-foreground capitalize truncate">{secondary}</p>
                 </TitleLink>

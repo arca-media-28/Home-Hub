@@ -81,6 +81,37 @@ async function fetchPlexMachineId(
   }
 }
 
+// Build a deep link that opens a Jellyfin library item directly in the Jellyfin
+// web app. Needs the server's web base URL, its ServerId (from /System/Info) and
+// the item id. Returns null when either id piece is missing so callers can omit
+// the link gracefully.
+function jellyfinDeepLink(
+  baseUrl: string,
+  serverId: string | undefined,
+  itemId: string | undefined,
+): string | null {
+  if (!serverId || itemId == null) return null;
+  return `${baseUrl}/web/index.html#!/details?id=${encodeURIComponent(itemId)}&serverId=${encodeURIComponent(serverId)}`;
+}
+
+// Resolve the Jellyfin server's Id from its System/Info endpoint. The /Items
+// list response doesn't carry the ServerId needed for web deep links, so source
+// it here in parallel. Returns undefined on any failure so callers fall back to
+// url:null and the tile still renders (additive — must never cause a 502).
+async function fetchJellyfinServerId(
+  baseUrl: string,
+  apiKey: string,
+): Promise<string | undefined> {
+  try {
+    const r = await httpClient.get(`${baseUrl}/System/Info`, {
+      params: { api_key: apiKey },
+    });
+    return r.data?.Id ?? undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 // ────────────────────────────────────────────────
 // TrueNAS SCALE Widget
 // ────────────────────────────────────────────────
@@ -560,19 +591,26 @@ router.get("/media", requireAuth, async (req, res) => {
 
   try {
     if (serverType === "jellyfin") {
-      const r = await httpClient.get(`${baseUrl}/Items`, {
-        params: {
-          SortBy: "DateCreated",
-          SortOrder: "Descending",
-          IncludeItemTypes: "Movie,Episode,Series",
-          Limit: 6,
-          Recursive: true,
-          Fields: "PrimaryImageAspectRatio,DateCreated",
-          ImageTypeLimit: 1,
-          EnableImageTypes: "Primary,Thumb",
-          api_key: apiKey,
-        },
-      });
+      // The /Items list omits the ServerId needed for web deep links, so resolve
+      // it from /System/Info in parallel. fetchJellyfinServerId swallows its own
+      // errors → if it can't be resolved, deep links fall back to null but the
+      // tile still renders (additive — never a 502 from the server-id call).
+      const [r, serverId] = await Promise.all([
+        httpClient.get(`${baseUrl}/Items`, {
+          params: {
+            SortBy: "DateCreated",
+            SortOrder: "Descending",
+            IncludeItemTypes: "Movie,Episode,Series",
+            Limit: 6,
+            Recursive: true,
+            Fields: "PrimaryImageAspectRatio,DateCreated",
+            ImageTypeLimit: 1,
+            EnableImageTypes: "Primary,Thumb",
+            api_key: apiKey,
+          },
+        }),
+        fetchJellyfinServerId(baseUrl, apiKey),
+      ]);
       const items = (r.data?.Items ?? []).map((item: { Id: string; Name: string; Type: string; ProductionYear?: number; ImageTags?: { Primary?: string }; DateCreated?: string; SeriesName?: string; ParentIndexNumber?: number; IndexNumber?: number }) => {
         const type = item.Type.toLowerCase();
         // Jellyfin episodes carry the show name in SeriesName; build an SxxEyy
@@ -593,7 +631,7 @@ router.get("/media", requireAuth, async (req, res) => {
           addedAt: item.DateCreated ?? null,
           seriesName,
           seasonLabel,
-          url: null,
+          url: jellyfinDeepLink(baseUrl, serverId, item.Id),
         };
       });
       res.json(items);

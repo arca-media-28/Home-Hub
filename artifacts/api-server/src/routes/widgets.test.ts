@@ -627,6 +627,54 @@ describe("GET /widgets/media", () => {
     expect(res.body[0].url).toBeNull();
   });
 
+  it("builds a Jellyfin deep link from the /System/Info ServerId + item id", async () => {
+    findByService.mockReturnValue(
+      connRow({ service: "jellyfin", url: "https://jelly.local", api_key: "jelly-key" }),
+    );
+    // The /Items list omits the ServerId; it is sourced from the separate
+    // /System/Info call. Route GETs by URL so each returns its own payload.
+    httpGet.mockImplementation((url: string) => {
+      if (String(url).endsWith("/System/Info")) {
+        return Promise.resolve({ data: { Id: "srv-abc" } });
+      }
+      return Promise.resolve({
+        data: { Items: [{ Id: "item-9", Name: "Oppenheimer", Type: "Movie", ProductionYear: 2023 }] },
+      });
+    });
+
+    const res = await request(app).get("/widgets/media?server=jellyfin");
+    expect(res.status).toBe(200);
+    expect(res.body[0]).toMatchObject({ id: "item-9", title: "Oppenheimer", type: "movie" });
+    // The deep link opens the Jellyfin web app for the exact item, scoped to the
+    // resolved server id.
+    expect(res.body[0].url).toBe(
+      "https://jelly.local/web/index.html#!/details?id=item-9&serverId=srv-abc",
+    );
+    // The ServerId must come from a dedicated /System/Info request.
+    expect(httpGet.mock.calls.some(([u]: [string]) => String(u).endsWith("/System/Info"))).toBe(true);
+  });
+
+  it("omits the Jellyfin deep link when /System/Info cannot resolve the ServerId", async () => {
+    findByService.mockReturnValue(
+      connRow({ service: "jellyfin", url: "https://jelly.local", api_key: "jelly-key" }),
+    );
+    // /System/Info fails → no deep link can be built, but the recently-added
+    // list still renders. The System/Info failure must not 502.
+    httpGet.mockImplementation((url: string) => {
+      if (String(url).endsWith("/System/Info")) {
+        return Promise.reject(httpError(500));
+      }
+      return Promise.resolve({
+        data: { Items: [{ Id: "item-9", Name: "Oppenheimer", Type: "Movie" }] },
+      });
+    });
+
+    const res = await request(app).get("/widgets/media?server=jellyfin");
+    expect(res.status).toBe(200);
+    expect(res.body[0]).toMatchObject({ id: "item-9", title: "Oppenheimer" });
+    expect(res.body[0].url).toBeNull();
+  });
+
   it("returns 502 on upstream failure (no mock fallback)", async () => {
     findByService.mockReturnValue(
       connRow({
