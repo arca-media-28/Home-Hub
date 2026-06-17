@@ -315,7 +315,7 @@ router.put("/:id", requireAuth, (req: AuthRequest, res) => {
     gridH?: number;
     name?: string;
     url?: string;
-    bgColor?: string;
+    bgColor?: string | null;
     imageUrl?: string;
     imageFit?: string;
     imagePosition?: string | null;

@@ -84,8 +84,9 @@ const NONE = "none";
 // editor swatch/preview shows the same token instead of a baked-in hex.
 const THEME_BG_PREVIEW = "hsl(var(--card))";
 // Neutral starting point for the color picker when opening it on a theme-default
-// tile (the first drag turns the background into an explicit color).
-const PICKER_FALLBACK = "#1c1c20";
+// tile (the first drag turns the background into an explicit color). A mid-gray
+// avoids accidentally committing near-black when the user just grazes the picker.
+const PICKER_FALLBACK = "#888888";
 
 // Optional integrations a tile can attach. "None" keeps the tile a plain
 // app/link shortcut.
@@ -628,7 +629,10 @@ export default function TileEditModal({ open, onOpenChange, tile, mode }: TileEd
           : (integration as typeof TileIntegration[keyof typeof TileIntegration]),
       name: name || undefined,
       url: url || undefined,
-      bgColor: bgColor || undefined,
+      // Send the raw value so clearing (null) reaches the body and the server
+      // writes NULL; otherwise an undefined field is dropped and the old color
+      // sticks. A non-empty string sets an explicit per-tile color as before.
+      bgColor: bgColor,
       // Send "" to explicitly clear the image when removed; placement fields are
       // only sent when an image is present.
       imageUrl: imageUrl || "",

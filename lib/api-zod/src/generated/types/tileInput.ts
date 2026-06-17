@@ -19,7 +19,8 @@ export interface TileInput {
   gridH: number;
   name?: string;
   url?: string;
-  bgColor?: string;
+  /** @nullable */
+  bgColor?: string | null;
   imageUrl?: string;
   imageFit?: string;
   imagePosition?: string;

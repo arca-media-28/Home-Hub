@@ -286,7 +286,8 @@ export interface TileInput {
   gridH: number;
   name?: string;
   url?: string;
-  bgColor?: string;
+  /** @nullable */
+  bgColor?: string | null;
   imageUrl?: string;
   imageFit?: string;
   imagePosition?: string;
@@ -337,7 +338,8 @@ export interface TileUpdate {
   gridH?: number;
   name?: string;
   url?: string;
-  bgColor?: string;
+  /** @nullable */
+  bgColor?: string | null;
   /** @nullable */
   imageUrl?: string | null;
   imageFit?: string;

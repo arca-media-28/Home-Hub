@@ -17,7 +17,8 @@ export interface TileUpdate {
   gridH?: number;
   name?: string;
   url?: string;
-  bgColor?: string;
+  /** @nullable */
+  bgColor?: string | null;
   /** @nullable */
   imageUrl?: string | null;
   imageFit?: string;

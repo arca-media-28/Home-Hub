@@ -864,7 +864,7 @@ components:
         url:
           type: string
         bgColor:
-          type: string
+          type: ["string", "null"]
         imageUrl:
           type: string
         imageFit:
@@ -907,7 +907,7 @@ components:
         url:
           type: string
         bgColor:
-          type: string
+          type: ["string", "null"]
         imageUrl:
           type: ["string", "null"]
         imageFit:
