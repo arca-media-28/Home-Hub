@@ -14,6 +14,8 @@ export * from './continueWatchingItem';
 export * from './errorResponse';
 export * from './ersatzTvChannel';
 export * from './ersatzTvData';
+export * from './getMediaContinueParams';
+export * from './getMediaContinueServer';
 export * from './getMediaRecentParams';
 export * from './getMediaRecentServer';
 export * from './getNewsWidgetParams';

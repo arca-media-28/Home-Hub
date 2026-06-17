@@ -318,9 +318,20 @@ paths:
     get:
       operationId: getMediaContinue
       tags: [widgets]
-      summary: Get in-progress / on-deck media to continue watching from Plex
+      summary: Get in-progress / on-deck media to continue watching from Plex or Jellyfin
       security:
         - bearerAuth: []
+      parameters:
+        - name: server
+          in: query
+          required: false
+          description: >-
+            Which media server the tile is backed by. "plex" resolves the saved
+            Plex connection (On Deck); "jellyfin" resolves the saved Jellyfin
+            connection (Resume items). Defaults to "plex" when omitted.
+          schema:
+            type: string
+            enum: [plex, jellyfin]
       responses:
         "200":
           description: Continue watching items

@@ -815,6 +815,21 @@ export const GetMediaRecentServer = {
   jellyfin: 'jellyfin',
 } as const;
 
+export type GetMediaContinueParams = {
+/**
+ * Which media server the tile is backed by. "plex" resolves the saved Plex connection (On Deck); "jellyfin" resolves the saved Jellyfin connection (Resume items). Defaults to "plex" when omitted.
+ */
+server?: GetMediaContinueServer;
+};
+
+export type GetMediaContinueServer = typeof GetMediaContinueServer[keyof typeof GetMediaContinueServer];
+
+
+export const GetMediaContinueServer = {
+  plex: 'plex',
+  jellyfin: 'jellyfin',
+} as const;
+
 export type GetNewsWidgetParams = {
 /**
  * The RSS or Atom feed URL to fetch. When omitted, representative demo headlines are returned so an unconfigured tile still renders.

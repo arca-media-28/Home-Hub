@@ -697,31 +697,134 @@ router.get("/media", requireAuth, async (req, res) => {
 // ────────────────────────────────────────────────
 // Continue Watching Widget (Plex On Deck)
 // ────────────────────────────────────────────────
-router.get("/media/continue", requireAuth, async (_req, res) => {
-  // Resolve the connection the same way the /media route does. Continue Watching
-  // is a Plex-only feature, so we only act on a Plex-typed connection.
-  const saved = getSavedConnection("plex");
-  const savedToken = saved.token || saved.apiKey;
+router.get("/media/continue", requireAuth, async (req, res) => {
+  // Which media server backs this tile. "jellyfin" reads the saved Jellyfin
+  // connection (Resume items); anything else (the default) reads the saved Plex
+  // connection (On Deck).
+  const server = req.query["server"] === "jellyfin" ? "jellyfin" : "plex";
 
-  let serverType = process.env["MEDIA_SERVER_TYPE"] || "jellyfin";
-  let baseUrl = process.env["MEDIA_SERVER_URL"];
-  let apiKey = process.env["MEDIA_SERVER_API_KEY"];
+  let serverType: string;
+  let baseUrl: string | undefined;
+  let apiKey: string | undefined;
 
-  if (saved.url && savedToken) {
-    serverType = "plex";
+  if (server === "jellyfin") {
+    // Jellyfin uses a base URL + API key, both stored on the jellyfin
+    // connection. Fall back to the env-configured media server only when no
+    // Jellyfin connection is saved.
+    const saved = getSavedConnection("jellyfin");
+    serverType = "jellyfin";
     baseUrl = saved.url;
-    apiKey = savedToken;
+    apiKey = saved.apiKey;
+    if (!baseUrl || !apiKey) {
+      const envType = process.env["MEDIA_SERVER_TYPE"] || "jellyfin";
+      if (envType === "jellyfin") {
+        baseUrl = process.env["MEDIA_SERVER_URL"];
+        apiKey = process.env["MEDIA_SERVER_API_KEY"];
+      }
+    }
+  } else {
+    // Plex uses a base URL + token (stored under `token` or `apiKey`). Fall back
+    // to a Plex-typed env media server when unsaved.
+    const saved = getSavedConnection("plex");
+    const savedToken = saved.token || saved.apiKey;
+    serverType = "plex";
+    if (saved.url && savedToken) {
+      baseUrl = saved.url;
+      apiKey = savedToken;
+    } else {
+      const envType = process.env["MEDIA_SERVER_TYPE"] || "jellyfin";
+      if (envType === "plex") {
+        baseUrl = process.env["MEDIA_SERVER_URL"];
+        apiKey = process.env["MEDIA_SERVER_API_KEY"];
+      }
+    }
   }
 
-  // Unconfigured (or non-Plex env server) → return built-in sample data so the
-  // tile has something to show, consistent with the /media convention.
-  if (serverType !== "plex" || !baseUrl || !apiKey) {
+  // Unconfigured → return built-in sample data so the tile has something to
+  // show, consistent with the /media convention.
+  if (!baseUrl || !apiKey) {
     // Sample items carry a demo deep link so the poster/title click-through can
-    // be tested before a real Plex server is connected.
+    // be tested before a real media server is connected.
     res.json([
       { id: "1", title: "Chapter 7", type: "episode", seriesName: "Severance", thumb: null, progress: 42, url: plexDeepLink(SAMPLE_PLEX_MACHINE_ID, "1") },
       { id: "2", title: "Dune: Part Two", type: "movie", seriesName: null, thumb: null, progress: 18, url: plexDeepLink(SAMPLE_PLEX_MACHINE_ID, "2") },
     ]);
+    return;
+  }
+
+  // Jellyfin: the resume fetch has its OWN try/catch so a resume failure is
+  // additive — it degrades to an empty list (200) rather than a 502, per the
+  // tile contract (Continue Watching is a supplementary section that must never
+  // take the tile down). The Plex On Deck path below keeps its 502-on-failure
+  // behavior unchanged.
+  if (serverType === "jellyfin") {
+    try {
+      // Jellyfin exposes resume/in-progress items via /Items/Resume. The list
+      // omits the ServerId needed for web deep links, so resolve it from
+      // /System/Info in parallel. fetchJellyfinServerId swallows its own errors
+      // → deep links fall back to null but the tile still renders (additive —
+      // never a 502 from the server-id call alone).
+      const [r, serverId] = await Promise.all([
+        httpClient.get(`${baseUrl}/Items/Resume`, {
+          params: {
+            IncludeItemTypes: "Movie,Episode",
+            Limit: 12,
+            Recursive: true,
+            Fields: "PrimaryImageAspectRatio",
+            ImageTypeLimit: 1,
+            EnableImageTypes: "Primary,Thumb",
+            api_key: apiKey,
+          },
+        }),
+        fetchJellyfinServerId(baseUrl, apiKey),
+      ]);
+      const items = (r.data?.Items ?? []).map(
+        (item: {
+          Id: string;
+          Name: string;
+          Type: string;
+          SeriesName?: string;
+          ImageTags?: { Primary?: string };
+          SeriesId?: string;
+          SeriesPrimaryImageTag?: string;
+          UserData?: { PlaybackPositionTicks?: number };
+          RunTimeTicks?: number;
+        }) => {
+          const type = item.Type.toLowerCase();
+          // Episodes carry the show name in SeriesName. Progress is the played
+          // fraction (PlaybackPositionTicks / RunTimeTicks), as a 0–100 percent.
+          const seriesName = type === "episode" ? item.SeriesName ?? null : null;
+          const positionTicks = item.UserData?.PlaybackPositionTicks;
+          const progress =
+            positionTicks != null && item.RunTimeTicks
+              ? Math.round((positionTicks / item.RunTimeTicks) * 100)
+              : null;
+          // Prefer the item's own primary image; for episodes fall back to the
+          // series poster when the episode has no still of its own.
+          let thumb: string | null = null;
+          if (item.ImageTags?.Primary) {
+            thumb = `${baseUrl}/Items/${item.Id}/Images/Primary?api_key=${apiKey}&maxHeight=200`;
+          } else if (item.SeriesId && item.SeriesPrimaryImageTag) {
+            thumb = `${baseUrl}/Items/${item.SeriesId}/Images/Primary?api_key=${apiKey}&maxHeight=200`;
+          }
+          return {
+            id: item.Id,
+            title: item.Name,
+            type,
+            seriesName,
+            thumb,
+            progress,
+            url: jellyfinDeepLink(baseUrl, serverId, item.Id),
+          };
+        },
+      );
+      res.json(items);
+    } catch (err) {
+      // Additive: a Jellyfin resume failure never 502s — the tile keeps its
+      // other sections (e.g. Recently Added) and just shows no resume items.
+      logger.error({ reason: normalizeHttpError(err) }, "Jellyfin continue watching widget error");
+      res.json([]);
+    }
     return;
   }
 

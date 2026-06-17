@@ -452,8 +452,12 @@ export const GetMediaRecentResponse = zod.array(GetMediaRecentResponseItem)
 
 
 /**
- * @summary Get in-progress / on-deck media to continue watching from Plex
+ * @summary Get in-progress / on-deck media to continue watching from Plex or Jellyfin
  */
+export const GetMediaContinueQueryParams = zod.object({
+  "server": zod.enum(['plex', 'jellyfin']).optional().describe('Which media server the tile is backed by. \"plex\" resolves the saved Plex connection (On Deck); \"jellyfin\" resolves the saved Jellyfin connection (Resume items). Defaults to \"plex\" when omitted.')
+})
+
 export const GetMediaContinueResponseItem = zod.object({
   "id": zod.string(),
   "title": zod.string(),

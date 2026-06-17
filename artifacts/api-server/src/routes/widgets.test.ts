@@ -796,6 +796,124 @@ describe("GET /widgets/media/continue", () => {
     expect(res.status).toBe(502);
     expect(res.body.error).toMatch(/continue watching/i);
   });
+
+  it("normalizes Jellyfin Resume: SeriesName + PlaybackPositionTicks/RunTimeTicks progress", async () => {
+    findByService.mockReturnValue(
+      connRow({ service: "jellyfin", url: "https://jelly.local", api_key: "jelly-key" }),
+    );
+    // /Items/Resume omits the ServerId; the deep link sources it from the
+    // separate /System/Info call. Route GETs by URL so each returns its payload.
+    httpGet.mockImplementation((url: string) => {
+      if (String(url).endsWith("/System/Info")) {
+        return Promise.resolve({ data: { Id: "srv-abc" } });
+      }
+      return Promise.resolve({
+        data: {
+          Items: [
+            {
+              Id: "item-7",
+              Name: "Chapter 7",
+              Type: "Episode",
+              SeriesName: "Severance",
+              ImageTags: { Primary: "tag1" },
+              UserData: { PlaybackPositionTicks: 6000000000 },
+              RunTimeTicks: 12000000000,
+            },
+          ],
+        },
+      });
+    });
+
+    const res = await request(app).get("/widgets/media/continue?server=jellyfin");
+    expect(res.status).toBe(200);
+    expect(res.body[0]).toMatchObject({
+      id: "item-7",
+      title: "Chapter 7",
+      type: "episode",
+      seriesName: "Severance",
+      progress: 50, // 6000000000 / 12000000000 → 50%
+    });
+    // Deep link opens the Jellyfin web app for the exact item, scoped to the
+    // resolved server id.
+    expect(res.body[0].url).toBe(
+      "https://jelly.local/web/index.html#!/details?id=item-7&serverId=srv-abc",
+    );
+    // The resume list must come from the dedicated /Items/Resume endpoint.
+    expect(httpGet.mock.calls.some(([u]: [string]) => String(u).endsWith("/Items/Resume"))).toBe(true);
+  });
+
+  it("falls back to the series poster when a Jellyfin episode has no primary image", async () => {
+    findByService.mockReturnValue(
+      connRow({ service: "jellyfin", url: "https://jelly.local", api_key: "jelly-key" }),
+    );
+    httpGet.mockImplementation((url: string) => {
+      if (String(url).endsWith("/System/Info")) {
+        return Promise.resolve({ data: { Id: "srv-abc" } });
+      }
+      return Promise.resolve({
+        data: {
+          Items: [
+            {
+              Id: "item-7",
+              Name: "Chapter 7",
+              Type: "Episode",
+              SeriesName: "Severance",
+              SeriesId: "series-1",
+              SeriesPrimaryImageTag: "stag",
+              UserData: { PlaybackPositionTicks: 3000000000 },
+              RunTimeTicks: 12000000000,
+            },
+          ],
+        },
+      });
+    });
+
+    const res = await request(app).get("/widgets/media/continue?server=jellyfin");
+    expect(res.status).toBe(200);
+    expect(res.body[0].progress).toBe(25); // 3000000000 / 12000000000 → 25%
+    // No episode still → thumb sources the series' primary image instead.
+    expect(res.body[0].thumb).toContain("/Items/series-1/Images/Primary");
+  });
+
+  it("omits the Jellyfin deep link when /System/Info cannot resolve the ServerId", async () => {
+    findByService.mockReturnValue(
+      connRow({ service: "jellyfin", url: "https://jelly.local", api_key: "jelly-key" }),
+    );
+    // /System/Info fails → no deep link can be built, but the resume list still
+    // renders. The System/Info failure must not 502.
+    httpGet.mockImplementation((url: string) => {
+      if (String(url).endsWith("/System/Info")) {
+        return Promise.reject(httpError(500));
+      }
+      return Promise.resolve({
+        data: { Items: [{ Id: "item-7", Name: "Dune: Part Two", Type: "Movie" }] },
+      });
+    });
+
+    const res = await request(app).get("/widgets/media/continue?server=jellyfin");
+    expect(res.status).toBe(200);
+    expect(res.body[0]).toMatchObject({ id: "item-7", title: "Dune: Part Two", seriesName: null, progress: null });
+    expect(res.body[0].url).toBeNull();
+  });
+
+  it("degrades to an empty list (200, never 502) when the Jellyfin Resume call fails", async () => {
+    findByService.mockReturnValue(
+      connRow({ service: "jellyfin", url: "https://jelly.local", api_key: "jelly-key" }),
+    );
+    // The resume fetch is additive: a failure must NOT take the tile down with a
+    // 502 — Continue Watching is a supplementary section, so the route returns an
+    // empty list and the tile keeps its other sections (e.g. Recently Added).
+    httpGet.mockImplementation((url: string) => {
+      if (String(url).endsWith("/System/Info")) {
+        return Promise.resolve({ data: { Id: "srv-abc" } });
+      }
+      return Promise.reject(httpError(500));
+    });
+
+    const res = await request(app).get("/widgets/media/continue?server=jellyfin");
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual([]);
+  });
 });
 
 // ── Sonarr ──────────────────────────────────────────────────────────────────

@@ -27,6 +27,7 @@ import type {
   ContinueWatchingItem,
   ErrorResponse,
   ErsatzTvData,
+  GetMediaContinueParams,
   GetMediaRecentParams,
   GetNewsWidgetParams,
   GetStockCandlesParams,
@@ -1111,20 +1112,27 @@ export function useGetMediaRecent<TData = Awaited<ReturnType<typeof getMediaRece
 
 
 
-export const getGetMediaContinueUrl = () => {
+export const getGetMediaContinueUrl = (params?: GetMediaContinueParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/api/widgets/media/continue`
+  return stringifiedParams.length > 0 ? `/api/widgets/media/continue?${stringifiedParams}` : `/api/widgets/media/continue`
 }
 
 /**
- * @summary Get in-progress / on-deck media to continue watching from Plex
+ * @summary Get in-progress / on-deck media to continue watching from Plex or Jellyfin
  */
-export const getMediaContinue = async ( options?: RequestInit): Promise<ContinueWatchingItem[]> => {
+export const getMediaContinue = async (params?: GetMediaContinueParams, options?: RequestInit): Promise<ContinueWatchingItem[]> => {
 
-  return customFetch<ContinueWatchingItem[]>(getGetMediaContinueUrl(),
+  return customFetch<ContinueWatchingItem[]>(getGetMediaContinueUrl(params),
   {
     ...options,
     method: 'GET'
@@ -1137,23 +1145,23 @@ export const getMediaContinue = async ( options?: RequestInit): Promise<Continue
 
 
 
-export const getGetMediaContinueQueryKey = () => {
+export const getGetMediaContinueQueryKey = (params?: GetMediaContinueParams,) => {
     return [
-    `/api/widgets/media/continue`
+    `/api/widgets/media/continue`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getGetMediaContinueQueryOptions = <TData = Awaited<ReturnType<typeof getMediaContinue>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMediaContinue>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetMediaContinueQueryOptions = <TData = Awaited<ReturnType<typeof getMediaContinue>>, TError = ErrorType<unknown>>(params?: GetMediaContinueParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMediaContinue>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetMediaContinueQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getGetMediaContinueQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMediaContinue>>> = ({ signal }) => getMediaContinue({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMediaContinue>>> = ({ signal }) => getMediaContinue(params, { signal, ...requestOptions });
 
 
 
@@ -1167,15 +1175,15 @@ export type GetMediaContinueQueryError = ErrorType<unknown>
 
 
 /**
- * @summary Get in-progress / on-deck media to continue watching from Plex
+ * @summary Get in-progress / on-deck media to continue watching from Plex or Jellyfin
  */
 
 export function useGetMediaContinue<TData = Awaited<ReturnType<typeof getMediaContinue>>, TError = ErrorType<unknown>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMediaContinue>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ params?: GetMediaContinueParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMediaContinue>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getGetMediaContinueQueryOptions(options)
+  const queryOptions = getGetMediaContinueQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

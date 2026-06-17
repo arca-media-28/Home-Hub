@@ -38,6 +38,7 @@ export const METRIC_CATALOG: Record<string, MetricDef[]> = {
   ],
   [TileIntegration.jellyfin]: [
     { key: "recent", label: "Recently added" },
+    { key: "continue", label: "Continue Watching" },
   ],
   [TileIntegration.pihole]: [
     { key: "queries", label: "DNS queries today" },

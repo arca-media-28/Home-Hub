@@ -94,20 +94,21 @@ function recentLines(item: MediaItem): { primary: string; secondary: string } {
 export default function MediaTile({ enabled, density, integration }: WidgetProps) {
   // Pick the backing media server from the tile's integration. A Jellyfin tile
   // reads the saved Jellyfin connection; everything else (the "media" tile)
-  // reads the saved Plex connection. Continue Watching is Plex-only.
+  // reads the saved Plex connection. Continue Watching works for both.
   const server = integration === TileIntegration.jellyfin ? "jellyfin" : "plex";
   const isPlex = server === "plex";
   const serverLabel = isPlex ? "Plex" : "Jellyfin";
 
   const showRecent = enabled.has("recent");
-  const showContinue = enabled.has("continue") && isPlex;
+  const showContinue = enabled.has("continue");
 
   const recentParams = { server } as const;
   const recent = useGetMediaRecent(recentParams, {
     query: { queryKey: getGetMediaRecentQueryKey(recentParams), refetchInterval: 30_000, enabled: showRecent },
   });
-  const cont = useGetMediaContinue({
-    query: { queryKey: getGetMediaContinueQueryKey(), refetchInterval: 30_000, enabled: showContinue },
+  const continueParams = { server } as const;
+  const cont = useGetMediaContinue(continueParams, {
+    query: { queryKey: getGetMediaContinueQueryKey(continueParams), refetchInterval: 30_000, enabled: showContinue },
   });
 
   if (!showRecent && !showContinue) {
