@@ -15,14 +15,19 @@ export default function AppTile({ tile }: AppTileProps) {
   const image = resolveImageStyle(tile);
   const title = resolveTitleStyle(tile);
 
+  // When enabled, the tile body scrolls instead of clipping overflowing
+  // content. The image background layer keeps its own overflow-hidden below so
+  // pan/zoom framing is unaffected.
+  const scrollable = Boolean(tile.tileSettings?.scrollable);
+
   return (
     <div
-      className="w-full h-full overflow-hidden flex flex-col items-center justify-center relative group cursor-pointer select-none"
+      className={`w-full h-full ${scrollable ? "overflow-auto" : "overflow-hidden"} flex flex-col items-center justify-center relative group cursor-pointer select-none`}
       style={{ background: bg }}
       onClick={() => openTileUrl(tile.url)}
     >
       {hasImage && (
-        <div className={image.wrapperClassName} style={image.wrapperStyle}>
+        <div className={`${image.wrapperClassName} overflow-hidden`} style={image.wrapperStyle}>
           <img
             src={tile.imageUrl!}
             alt={tile.name || "tile"}

@@ -150,6 +150,10 @@ export default function IntegrationTile({ tile, status }: IntegrationTileProps) 
   // needs to know whether the header occupies space.
   const density = tileDensity(tile.gridW, tile.gridH, measured, showHeader);
 
+  // When enabled, the live-status body scrolls instead of clipping overflowing
+  // content. The header (and its image background) stay fixed and clipped.
+  const scrollable = Boolean(tile.tileSettings?.scrollable);
+
   return (
     <div className="w-full h-full flex flex-col overflow-hidden">
       {/* Styled header carrying the tile's custom name, background and image. */}
@@ -200,7 +204,7 @@ export default function IntegrationTile({ tile, status }: IntegrationTileProps) 
           collapsed, the status dot / open-link float here so neither is lost. */}
       <div
         ref={bodyRef}
-        className={`relative flex-1 min-h-0 overflow-hidden ${showHeader ? "border-t border-border" : ""}`}
+        className={`relative flex-1 min-h-0 ${scrollable ? "overflow-auto" : "overflow-hidden"} ${showHeader ? "border-t border-border" : ""}`}
       >
         {!showHeader && (statusDot || tile.url) && (
           <div className="absolute top-1.5 right-1.5 z-10 flex items-center gap-1.5">

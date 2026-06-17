@@ -222,6 +222,12 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
   );
   const [stockSearch, setStockSearch] = useState<string>("");
 
+  // Generic per-tile option (applies to every tile): when on, the tile body
+  // scrolls instead of clipping content that overflows its grid bounds.
+  const [scrollable, setScrollable] = useState<boolean>(
+    tile?.tileSettings?.scrollable ?? false,
+  );
+
   useEffect(() => {
     if (open) {
       const placement = normalizePlacement(tile ?? {});
@@ -260,6 +266,7 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
       setNewsTestError(null);
       setStockWatchlist(tile?.tileSettings?.stockWatchlist ?? []);
       setStockSearch("");
+      setScrollable(tile?.tileSettings?.scrollable ?? false);
       setShowColorPicker(false);
       setShowTitleColorPicker(false);
     }
@@ -660,33 +667,40 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
       metrics: integration === NONE ? null : metrics,
       // tileSettings carries per-widget config: the qBittorrent category
       // filter, the clock format options, the weather options, or the sports
-      // options. Every other tile clears it.
-      tileSettings: isQbittorrent
-        ? { categoryFilter, groupByCategory }
-        : isClock
-          ? { clockFormat, clockShowSeconds, clockShowDate }
-          : isWeather
-            ? {
-                weatherAutoLocate,
-                weatherLocation: weatherLocation.trim() || null,
-                weatherUnits,
-              }
-            : isSports
+      // options. The generic "scrollable" option applies to every tile, so it
+      // is merged in below regardless of integration.
+      tileSettings: (() => {
+        const widget = isQbittorrent
+          ? { categoryFilter, groupByCategory }
+          : isClock
+            ? { clockFormat, clockShowSeconds, clockShowDate }
+            : isWeather
               ? {
-                  sportsLeagues,
-                  sportsTeams,
-                  sportsShowScores,
-                  sportsShowNews,
+                  weatherAutoLocate,
+                  weatherLocation: weatherLocation.trim() || null,
+                  weatherUnits,
                 }
-              : isNews
+              : isSports
                 ? {
-                    newsFeedUrl: newsFeedUrl.trim() || null,
-                    newsMaxItems,
-                    newsShowTimestamp,
+                    sportsLeagues,
+                    sportsTeams,
+                    sportsShowScores,
+                    sportsShowNews,
                   }
-                : isStocks
-                  ? { stockWatchlist }
-                  : null,
+                : isNews
+                  ? {
+                      newsFeedUrl: newsFeedUrl.trim() || null,
+                      newsMaxItems,
+                      newsShowTimestamp,
+                    }
+                  : isStocks
+                    ? { stockWatchlist }
+                    : null;
+        // Only emit a settings object when there is something to store; an
+        // un-scrolled plain tile keeps tileSettings null as before.
+        if (!widget && !scrollable) return null;
+        return { ...(widget ?? {}), scrollable };
+      })(),
       gridX: tile?.gridX ?? defaultGridPos?.x ?? 0,
       gridY: tile?.gridY ?? defaultGridPos?.y ?? 0,
       gridW: tile?.gridW ?? 4,
@@ -1175,6 +1189,20 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
                 onCheckedChange={(c) => setHideTitle(c === true)}
               />
               <span className="text-sm">Hide title text</span>
+            </label>
+          )}
+
+          {!isSpacer && (
+            <label
+              htmlFor="scrollable"
+              className="flex items-center gap-2 cursor-pointer select-none"
+            >
+              <Checkbox
+                id="scrollable"
+                checked={scrollable}
+                onCheckedChange={(c) => setScrollable(c === true)}
+              />
+              <span className="text-sm">Scrollable content</span>
             </label>
           )}
 

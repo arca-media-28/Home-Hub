@@ -107,7 +107,8 @@ export const GetTilesResponseItem = zod.object({
   "symbol": zod.string().describe('Ticker symbol (e.g. \"AAPL\"), stored uppercased.'),
   "shares": zod.number().nullish().describe('Optional number of shares held. When present (and > 0) the tile shows this row\'s position value and gain\/loss.'),
   "costBasis": zod.number().nullish().describe('Optional average cost per share. Used with shares to compute gain\/loss. Null or absent when not tracking cost.')
-})).nullish().describe('Per-tile watchlist of stock symbols for the Stocks tile. Each entry carries an uppercased ticker symbol and optional share quantity and average cost basis per share, which turn the watchlist into a lightweight portfolio. Null or absent means none set (the tile shows demo\/sample quotes).')
+})).nullish().describe('Per-tile watchlist of stock symbols for the Stocks tile. Each entry carries an uppercased ticker symbol and optional share quantity and average cost basis per share, which turn the watchlist into a lightweight portfolio. Null or absent means none set (the tile shows demo\/sample quotes).'),
+  "scrollable": zod.boolean().nullish().describe('When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.'),
   "createdAt": zod.string().optional()
 })
@@ -156,7 +157,8 @@ export const CreateTileBody = zod.object({
   "symbol": zod.string().describe('Ticker symbol (e.g. \"AAPL\"), stored uppercased.'),
   "shares": zod.number().nullish().describe('Optional number of shares held. When present (and > 0) the tile shows this row\'s position value and gain\/loss.'),
   "costBasis": zod.number().nullish().describe('Optional average cost per share. Used with shares to compute gain\/loss. Null or absent when not tracking cost.')
-})).nullish().describe('Per-tile watchlist of stock symbols for the Stocks tile. Each entry carries an uppercased ticker symbol and optional share quantity and average cost basis per share, which turn the watchlist into a lightweight portfolio. Null or absent means none set (the tile shows demo\/sample quotes).')
+})).nullish().describe('Per-tile watchlist of stock symbols for the Stocks tile. Each entry carries an uppercased ticker symbol and optional share quantity and average cost basis per share, which turn the watchlist into a lightweight portfolio. Null or absent means none set (the tile shows demo\/sample quotes).'),
+  "scrollable": zod.boolean().nullish().describe('When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.')
 })
 
@@ -209,7 +211,8 @@ export const GetTileResponse = zod.object({
   "symbol": zod.string().describe('Ticker symbol (e.g. \"AAPL\"), stored uppercased.'),
   "shares": zod.number().nullish().describe('Optional number of shares held. When present (and > 0) the tile shows this row\'s position value and gain\/loss.'),
   "costBasis": zod.number().nullish().describe('Optional average cost per share. Used with shares to compute gain\/loss. Null or absent when not tracking cost.')
-})).nullish().describe('Per-tile watchlist of stock symbols for the Stocks tile. Each entry carries an uppercased ticker symbol and optional share quantity and average cost basis per share, which turn the watchlist into a lightweight portfolio. Null or absent means none set (the tile shows demo\/sample quotes).')
+})).nullish().describe('Per-tile watchlist of stock symbols for the Stocks tile. Each entry carries an uppercased ticker symbol and optional share quantity and average cost basis per share, which turn the watchlist into a lightweight portfolio. Null or absent means none set (the tile shows demo\/sample quotes).'),
+  "scrollable": zod.boolean().nullish().describe('When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.'),
   "createdAt": zod.string().optional()
 })
@@ -260,7 +263,8 @@ export const UpdateTileBody = zod.object({
   "symbol": zod.string().describe('Ticker symbol (e.g. \"AAPL\"), stored uppercased.'),
   "shares": zod.number().nullish().describe('Optional number of shares held. When present (and > 0) the tile shows this row\'s position value and gain\/loss.'),
   "costBasis": zod.number().nullish().describe('Optional average cost per share. Used with shares to compute gain\/loss. Null or absent when not tracking cost.')
-})).nullish().describe('Per-tile watchlist of stock symbols for the Stocks tile. Each entry carries an uppercased ticker symbol and optional share quantity and average cost basis per share, which turn the watchlist into a lightweight portfolio. Null or absent means none set (the tile shows demo\/sample quotes).')
+})).nullish().describe('Per-tile watchlist of stock symbols for the Stocks tile. Each entry carries an uppercased ticker symbol and optional share quantity and average cost basis per share, which turn the watchlist into a lightweight portfolio. Null or absent means none set (the tile shows demo\/sample quotes).'),
+  "scrollable": zod.boolean().nullish().describe('When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.')
 })
 
@@ -305,7 +309,8 @@ export const UpdateTileResponse = zod.object({
   "symbol": zod.string().describe('Ticker symbol (e.g. \"AAPL\"), stored uppercased.'),
   "shares": zod.number().nullish().describe('Optional number of shares held. When present (and > 0) the tile shows this row\'s position value and gain\/loss.'),
   "costBasis": zod.number().nullish().describe('Optional average cost per share. Used with shares to compute gain\/loss. Null or absent when not tracking cost.')
-})).nullish().describe('Per-tile watchlist of stock symbols for the Stocks tile. Each entry carries an uppercased ticker symbol and optional share quantity and average cost basis per share, which turn the watchlist into a lightweight portfolio. Null or absent means none set (the tile shows demo\/sample quotes).')
+})).nullish().describe('Per-tile watchlist of stock symbols for the Stocks tile. Each entry carries an uppercased ticker symbol and optional share quantity and average cost basis per share, which turn the watchlist into a lightweight portfolio. Null or absent means none set (the tile shows demo\/sample quotes).'),
+  "scrollable": zod.boolean().nullish().describe('When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.'),
   "createdAt": zod.string().optional()
 })
@@ -373,7 +378,8 @@ export const SaveLayoutResponseItem = zod.object({
   "symbol": zod.string().describe('Ticker symbol (e.g. \"AAPL\"), stored uppercased.'),
   "shares": zod.number().nullish().describe('Optional number of shares held. When present (and > 0) the tile shows this row\'s position value and gain\/loss.'),
   "costBasis": zod.number().nullish().describe('Optional average cost per share. Used with shares to compute gain\/loss. Null or absent when not tracking cost.')
-})).nullish().describe('Per-tile watchlist of stock symbols for the Stocks tile. Each entry carries an uppercased ticker symbol and optional share quantity and average cost basis per share, which turn the watchlist into a lightweight portfolio. Null or absent means none set (the tile shows demo\/sample quotes).')
+})).nullish().describe('Per-tile watchlist of stock symbols for the Stocks tile. Each entry carries an uppercased ticker symbol and optional share quantity and average cost basis per share, which turn the watchlist into a lightweight portfolio. Null or absent means none set (the tile shows demo\/sample quotes).'),
+  "scrollable": zod.boolean().nullish().describe('When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.'),
   "createdAt": zod.string().optional()
 })

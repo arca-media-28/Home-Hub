@@ -45,6 +45,7 @@ interface TileSettings {
   newsMaxItems?: number | null;
   newsShowTimestamp?: boolean | null;
   stockWatchlist?: StockWatchEntry[] | null;
+  scrollable?: boolean | null;
 }
 
 // A single watchlist entry for the Stocks tile: a ticker symbol plus optional
@@ -169,6 +170,11 @@ function pickTileSettings(obj: Record<string, unknown>): TileSettings {
       .filter((e): e is StockWatchEntry => e !== null);
   } else if (obj["stockWatchlist"] === null) {
     result.stockWatchlist = null;
+  }
+  if (typeof obj["scrollable"] === "boolean") {
+    result.scrollable = obj["scrollable"];
+  } else if (obj["scrollable"] === null) {
+    result.scrollable = null;
   }
   return result;
 }

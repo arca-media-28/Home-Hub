@@ -439,19 +439,28 @@ export default function Dashboard() {
               containerPadding={[0, 0]}
               draggableHandle=".drag-handle"
             >
-              {tiles.map((tile) => (
+              {tiles.map((tile) => {
+                // Per-tile overflow: when "scrollable" is on, the tile body
+                // scrolls instead of clipping. The image background sub-layer
+                // keeps its own overflow-hidden so framing is unaffected. The
+                // spacer tile is layout-only and always clips.
+                const overflowClass =
+                  tile.integration !== "spacer" && tile.tileSettings?.scrollable
+                    ? "overflow-auto"
+                    : "overflow-hidden";
+                return (
                 <div
                   key={String(tile.id)}
                   className={
                     tile.integration === "spacer"
                       ? // Spacer: invisible in locked mode (no surface, no
                         // click target), a dashed ghost in edit mode.
-                        `relative overflow-hidden transition-all ${
+                        `relative ${overflowClass} transition-all ${
                           editMode
                             ? "ring-1 ring-primary/40 hover:ring-primary cursor-default"
                             : "pointer-events-none"
                         }`
-                      : `relative overflow-hidden border border-border shadow-sm bg-card transition-all ${
+                      : `relative ${overflowClass} border border-border shadow-sm bg-card transition-all ${
                           editMode ? "ring-1 ring-primary/40 hover:ring-primary cursor-default" : "hover:border-primary/40"
                         }`
                   }
@@ -480,7 +489,8 @@ export default function Dashboard() {
                     editMode,
                   )}
                 </div>
-              ))}
+                );
+              })}
             </Grid>
             )}
           </div>
