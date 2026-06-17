@@ -467,6 +467,12 @@ describe("GET /widgets/media", () => {
     expect(res.status).toBe(200);
     expect(Array.isArray(res.body)).toBe(true);
     expect(res.body).toHaveLength(3);
+    // Sample items carry a demo deep link so the click-through can be tested
+    // before a real Plex server is connected.
+    expect(res.body[0].url).toBe(
+      "https://app.plex.tv/desktop/#!/server/demo/details?key=%2Flibrary%2Fmetadata%2F1",
+    );
+    expect(res.body.every((i: { url: string | null }) => typeof i.url === "string")).toBe(true);
     expect(httpGet).not.toHaveBeenCalled();
   });
 
@@ -565,7 +571,7 @@ describe("GET /widgets/media", () => {
     });
   });
 
-  it("builds a Plex deep link from machineIdentifier + ratingKey", async () => {
+  it("builds a Plex deep link from the /identity machineIdentifier + ratingKey", async () => {
     findByService.mockReturnValue(
       connRow({
         service: "plex",
@@ -573,13 +579,16 @@ describe("GET /widgets/media", () => {
         extra: JSON.stringify({ token: "plex-token" }),
       }),
     );
-    httpGet.mockResolvedValue({
-      data: {
-        MediaContainer: {
-          machineIdentifier: "abc123",
-          Metadata: [{ ratingKey: 42, title: "Severance", type: "show" }],
-        },
-      },
+    // The recentlyAdded container omits machineIdentifier; it is sourced from
+    // the separate /identity call instead. Route GETs by URL so each returns its
+    // own payload.
+    httpGet.mockImplementation((url: string) => {
+      if (String(url).endsWith("/identity")) {
+        return Promise.resolve({ data: { MediaContainer: { machineIdentifier: "abc123" } } });
+      }
+      return Promise.resolve({
+        data: { MediaContainer: { Metadata: [{ ratingKey: 42, title: "Severance", type: "show" }] } },
+      });
     });
 
     const res = await request(app).get("/widgets/media");
@@ -589,9 +598,11 @@ describe("GET /widgets/media", () => {
     expect(res.body[0].url).toBe(
       "https://app.plex.tv/desktop/#!/server/abc123/details?key=%2Flibrary%2Fmetadata%2F42",
     );
+    // The machineIdentifier must come from a dedicated /identity request.
+    expect(httpGet.mock.calls.some(([u]: [string]) => String(u).endsWith("/identity"))).toBe(true);
   });
 
-  it("omits the deep link when the server machineIdentifier is missing", async () => {
+  it("omits the deep link when /identity cannot resolve the machineIdentifier", async () => {
     findByService.mockReturnValue(
       connRow({
         service: "plex",
@@ -599,17 +610,20 @@ describe("GET /widgets/media", () => {
         extra: JSON.stringify({ token: "plex-token" }),
       }),
     );
-    // No machineIdentifier on the container root → no deep link can be built.
-    httpGet.mockResolvedValue({
-      data: {
-        MediaContainer: {
-          Metadata: [{ ratingKey: 42, title: "Severance", type: "show" }],
-        },
-      },
+    // /identity fails (or omits the id) → no deep link can be built, but the
+    // recentlyAdded list still renders. The identity failure must not 502.
+    httpGet.mockImplementation((url: string) => {
+      if (String(url).endsWith("/identity")) {
+        return Promise.reject(httpError(500));
+      }
+      return Promise.resolve({
+        data: { MediaContainer: { Metadata: [{ ratingKey: 42, title: "Severance", type: "show" }] } },
+      });
     });
 
     const res = await request(app).get("/widgets/media");
     expect(res.status).toBe(200);
+    expect(res.body[0]).toMatchObject({ id: "42", title: "Severance" });
     expect(res.body[0].url).toBeNull();
   });
 
@@ -637,6 +651,11 @@ describe("GET /widgets/media/continue", () => {
     expect(Array.isArray(res.body)).toBe(true);
     expect(res.body).toHaveLength(2);
     expect(res.body[0]).toMatchObject({ title: "Chapter 7", seriesName: "Severance", progress: 42 });
+    // Sample items carry a demo deep link so the click-through can be tested
+    // before a real Plex server is connected.
+    expect(res.body[0].url).toBe(
+      "https://app.plex.tv/desktop/#!/server/demo/details?key=%2Flibrary%2Fmetadata%2F1",
+    );
     expect(httpGet).not.toHaveBeenCalled();
   });
 
@@ -648,23 +667,28 @@ describe("GET /widgets/media/continue", () => {
         extra: JSON.stringify({ token: "plex-token" }),
       }),
     );
-    httpGet.mockResolvedValue({
-      data: {
-        MediaContainer: {
-          machineIdentifier: "srv-1",
-          Metadata: [
-            {
-              ratingKey: 55,
-              title: "Chapter 7",
-              type: "episode",
-              grandparentTitle: "Severance",
-              viewOffset: 600000,
-              duration: 1200000,
-              thumb: "/t.jpg",
-            },
-          ],
+    // onDeck omits machineIdentifier; the deep link sources it from /identity.
+    httpGet.mockImplementation((url: string) => {
+      if (String(url).endsWith("/identity")) {
+        return Promise.resolve({ data: { MediaContainer: { machineIdentifier: "srv-1" } } });
+      }
+      return Promise.resolve({
+        data: {
+          MediaContainer: {
+            Metadata: [
+              {
+                ratingKey: 55,
+                title: "Chapter 7",
+                type: "episode",
+                grandparentTitle: "Severance",
+                viewOffset: 600000,
+                duration: 1200000,
+                thumb: "/t.jpg",
+              },
+            ],
+          },
         },
-      },
+      });
     });
 
     const res = await request(app).get("/widgets/media/continue");
@@ -676,11 +700,12 @@ describe("GET /widgets/media/continue", () => {
       seriesName: "Severance",
       progress: 50, // 600000 / 1200000 → 50%
     });
-    // Deep link is built from machineIdentifier + ratingKey.
+    // Deep link is built from the /identity machineIdentifier + ratingKey.
     expect(res.body[0].url).toBe(
       "https://app.plex.tv/desktop/#!/server/srv-1/details?key=%2Flibrary%2Fmetadata%2F55",
     );
-    // Token rides as the X-Plex-Token header against the onDeck endpoint.
+    // Token rides as the X-Plex-Token header against the onDeck endpoint (the
+    // first GET; /identity is fetched in parallel).
     const [url, opts] = httpGet.mock.calls[0]!;
     expect(String(url)).toContain("/library/onDeck");
     expect(opts.headers["X-Plex-Token"]).toBe("plex-token");

@@ -56,6 +56,31 @@ function plexDeepLink(machineId: string | undefined, ratingKey: string | undefin
   return `https://app.plex.tv/desktop/#!/server/${machineId}/details?key=${key}`;
 }
 
+// A placeholder machineIdentifier used to build deep links for the built-in
+// sample/demo media items (shown when no Plex server is configured). These links
+// open app.plex.tv so users can verify the poster/title click-through works
+// before connecting a real server; they won't resolve to a real library item.
+const SAMPLE_PLEX_MACHINE_ID = "demo";
+
+// Resolve the Plex server's machineIdentifier from its identity endpoint. The
+// library-list endpoints (/library/recentlyAdded, /library/onDeck) omit it from
+// their MediaContainer root, so deep links must source it here. Returns
+// undefined on any failure so callers fall back to url:null and the tile still
+// renders (this is additive — it must never turn the request into a 502).
+async function fetchPlexMachineId(
+  baseUrl: string,
+  apiKey: string,
+): Promise<string | undefined> {
+  try {
+    const r = await httpClient.get(`${baseUrl}/identity`, {
+      headers: { "X-Plex-Token": apiKey, Accept: "application/json" },
+    });
+    return r.data?.MediaContainer?.machineIdentifier ?? undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 // ────────────────────────────────────────────────
 // TrueNAS SCALE Widget
 // ────────────────────────────────────────────────
@@ -523,10 +548,12 @@ router.get("/media", requireAuth, async (req, res) => {
   }
 
   if (!baseUrl || !apiKey) {
+    // Sample items carry a demo deep link so the poster/title click-through can
+    // be tested before a real Plex server is connected.
     res.json([
-      { id: "1", title: "The Last of Us", type: "show", year: 2023, thumb: null, addedAt: new Date().toISOString() },
-      { id: "2", title: "Oppenheimer", type: "movie", year: 2023, thumb: null, addedAt: new Date().toISOString() },
-      { id: "3", title: "Severance", type: "show", year: 2022, thumb: null, addedAt: new Date().toISOString() },
+      { id: "1", title: "The Last of Us", type: "show", year: 2023, thumb: null, addedAt: new Date().toISOString(), url: plexDeepLink(SAMPLE_PLEX_MACHINE_ID, "1") },
+      { id: "2", title: "Oppenheimer", type: "movie", year: 2023, thumb: null, addedAt: new Date().toISOString(), url: plexDeepLink(SAMPLE_PLEX_MACHINE_ID, "2") },
+      { id: "3", title: "Severance", type: "show", year: 2022, thumb: null, addedAt: new Date().toISOString(), url: plexDeepLink(SAMPLE_PLEX_MACHINE_ID, "3") },
     ]);
     return;
   }
@@ -573,12 +600,16 @@ router.get("/media", requireAuth, async (req, res) => {
     } else {
       // Plex — recently added items. The token rides as the X-Plex-Token header
       // and is also appended to thumbnail URLs so the browser can load them.
-      const r = await httpClient.get(`${baseUrl}/library/recentlyAdded`, {
-        headers: { "X-Plex-Token": apiKey, Accept: "application/json" },
-      });
-      // The server's machineIdentifier (on the container root) is needed to build
-      // app.plex.tv deep links for each item.
-      const machineId: string | undefined = r.data?.MediaContainer?.machineIdentifier;
+      // The server's machineIdentifier (needed for app.plex.tv deep links) is
+      // NOT included on the recentlyAdded container, so fetch it from /identity
+      // in parallel. fetchPlexMachineId swallows its own errors → if it can't be
+      // resolved, deep links fall back to null but the tile still renders.
+      const [r, machineId] = await Promise.all([
+        httpClient.get(`${baseUrl}/library/recentlyAdded`, {
+          headers: { "X-Plex-Token": apiKey, Accept: "application/json" },
+        }),
+        fetchPlexMachineId(baseUrl, apiKey),
+      ]);
       const items = (r.data?.MediaContainer?.Metadata ?? []).slice(0, 6).map(
         (item: {
           ratingKey: string;
@@ -647,18 +678,26 @@ router.get("/media/continue", requireAuth, async (_req, res) => {
   // Unconfigured (or non-Plex env server) → return built-in sample data so the
   // tile has something to show, consistent with the /media convention.
   if (serverType !== "plex" || !baseUrl || !apiKey) {
+    // Sample items carry a demo deep link so the poster/title click-through can
+    // be tested before a real Plex server is connected.
     res.json([
-      { id: "1", title: "Chapter 7", type: "episode", seriesName: "Severance", thumb: null, progress: 42, url: null },
-      { id: "2", title: "Dune: Part Two", type: "movie", seriesName: null, thumb: null, progress: 18, url: null },
+      { id: "1", title: "Chapter 7", type: "episode", seriesName: "Severance", thumb: null, progress: 42, url: plexDeepLink(SAMPLE_PLEX_MACHINE_ID, "1") },
+      { id: "2", title: "Dune: Part Two", type: "movie", seriesName: null, thumb: null, progress: 18, url: plexDeepLink(SAMPLE_PLEX_MACHINE_ID, "2") },
     ]);
     return;
   }
 
   try {
-    const r = await httpClient.get(`${baseUrl}/library/onDeck`, {
-      headers: { "X-Plex-Token": apiKey, Accept: "application/json" },
-    });
-    const machineId: string | undefined = r.data?.MediaContainer?.machineIdentifier;
+    // The onDeck container omits the server's machineIdentifier, so resolve it
+    // from /identity in parallel to build app.plex.tv deep links. The identity
+    // fetch swallows its own errors → deep links fall back to null on failure
+    // while the tile still renders (never a 502 from the identity call alone).
+    const [r, machineId] = await Promise.all([
+      httpClient.get(`${baseUrl}/library/onDeck`, {
+        headers: { "X-Plex-Token": apiKey, Accept: "application/json" },
+      }),
+      fetchPlexMachineId(baseUrl, apiKey),
+    ]);
     const items = (r.data?.MediaContainer?.Metadata ?? []).map(
       (item: {
         ratingKey: string;
