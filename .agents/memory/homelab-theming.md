@@ -14,15 +14,25 @@ per-component rewrite.
 --ring/--secondary/--muted/--accent`, the `--app-font-*` family, and `--radius` propagates to every
 Button/Input/Card/Dialog/Dropdown/Select automatically.
 
-**Multi-theme system (3 themes):** the old single `:root` + mirrored `.dark` is GONE. There is now a
-real theme picker. Themes were deliberately consolidated from 6 minor recolors to 3 MAJORLY distinct
-ones (user feedback: prefer fewer, dramatically different themes). The three: **Rack** (dark
-terminal — mono, sharp 0-radius, hard grid bg, flat, UPPERCASE wide-tracked labels, amber),
-**Hearth** (warm light editorial — Fraunces serif headings, 1.25rem radius, gradient wash, soft
-diffuse shadows, near-borderless cards, sentence case, burnt orange), **Nebula** (cosmic dark —
+**Multi-theme system (6 themes):** the old single `:root` + mirrored `.dark` is GONE. There is now a
+real theme picker. History: consolidated from 6 minor recolors to 3 MAJORLY distinct ones, then later
+expanded back to 6 distinct ones (each pushed hard to read as its own product). The six:
+**Rack** (dark terminal — mono, sharp 0-radius, hard grid bg, flat, UPPERCASE wide-tracked labels,
+amber), **Hearth** (warm light editorial — Fraunces serif headings, 1.25rem radius, gradient wash,
+soft diffuse shadows, near-borderless cards, sentence case, burnt orange), **Nebula** (cosmic dark —
 Space Grotesk, glassy translucent `.bg-card` w/ backdrop-blur, violet glow shadows + glow borders,
-radial glow bg no grid, sentence case, violet/cyan). `:root` holds shared constants + Rack (dark
-default); each alternate theme is a `[data-theme="hearth|nebula"]` override block
+radial glow bg no grid, sentence case, violet/cyan), **Friction** (logo-inspired industrial — deep
+royal blue bg + RED primary AND red-family accent + white, Outfit, 0.25rem, KEEPS UPPERCASE caps,
+red-corner-flare + steel grid bg), **Workshop** (skeuomorphism — light brushed-metal, Nunito Sans,
+0.625rem, drops caps; `.bg-card` gets a top-down gloss gradient + inset bevel highlights + realistic
+drop shadow, `.bg-primary` gets a gel gradient + inset highlight, `.bg-dot-pattern` = vertical
+machining streaks), **Pebble** (neumorphism — soft monochrome grey, Inter, 1rem, drops caps;
+card==background SAME color, borders transparent, extrusion ENTIRELY via dual shadow: `--app-shadow-*`
+AND a `.bg-card` box-shadow set to `Npx Npx … dark, -Npx -Npx … light`, `.bg-dot-pattern: none`).
+Skeuo/neu structural recipes live in the unlayered `.bg-card`/`.bg-primary` overrides (beat shadow
+utilities by source order; tile inline `background-color` only overrides color, not box-shadow/image).
+`:root` holds shared constants + Rack (dark default); each alternate theme is a `[data-theme="..."]`
+override block
 (full palette/fonts/radius/elevate). To add/remove a theme you MUST update THREE places: `ThemeId`
 type + `THEMES` array in `src/lib/theme.ts`, the `KNOWN` array in the `index.html` before-paint
 script, and the `[data-theme=...]` blocks in `index.css` (token block + structural-traits section).

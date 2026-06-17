@@ -3,7 +3,7 @@
 // it can run before first paint. This module owns the theme metadata, the React
 // state, and persistence, and delegates the DOM work to that global.
 
-export type ThemeId = "rack" | "hearth" | "nebula";
+export type ThemeId = "rack" | "hearth" | "nebula" | "friction" | "workshop" | "pebble";
 
 export interface ThemeMeta {
   id: ThemeId;
@@ -58,6 +58,36 @@ export const THEMES: ThemeMeta[] = [
     font: "'Space Grotesk', ui-sans-serif, system-ui, sans-serif",
     swatch: { background: "#0b0a1a", surface: "#15123a", primary: "#7c5cff", accent: "#22d3ee" },
     defaults: { primary: "#7c5cff", background: "#0b0a1a" },
+  },
+  {
+    id: "friction",
+    name: "Friction",
+    description: "Industrial — royal blue, red, bold caps",
+    dark: true,
+    radius: "0.25rem",
+    font: "'Outfit', ui-sans-serif, system-ui, sans-serif",
+    swatch: { background: "#11264f", surface: "#16305e", primary: "#d23f30", accent: "#d23f30" },
+    defaults: { primary: "#d23f30", background: "#11264f" },
+  },
+  {
+    id: "workshop",
+    name: "Workshop",
+    description: "Skeuomorphic — brushed metal, glossy, beveled",
+    dark: false,
+    radius: "0.625rem",
+    font: "'Nunito Sans', ui-sans-serif, system-ui, sans-serif",
+    swatch: { background: "#bbc3cc", surface: "#e1e7ec", primary: "#2774b3", accent: "#cf9836" },
+    defaults: { primary: "#2774b3", background: "#bbc3cc" },
+  },
+  {
+    id: "pebble",
+    name: "Pebble",
+    description: "Neumorphic — soft monochrome, extruded, big radius",
+    dark: false,
+    radius: "1rem",
+    font: "'Inter', ui-sans-serif, system-ui, sans-serif",
+    swatch: { background: "#dfe2e9", surface: "#e6e9ef", primary: "#5a6ad6", accent: "#5a6ad6" },
+    defaults: { primary: "#5a6ad6", background: "#dfe2e9" },
   },
 ];
 

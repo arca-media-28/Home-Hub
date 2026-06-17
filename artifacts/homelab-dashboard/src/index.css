@@ -258,6 +258,153 @@
   --radius: 0.75rem;
 }
 
+/* FRICTION — industrial racing: royal blue field, red primary, white, bold caps */
+[data-theme="friction"] {
+  --button-outline: rgba(255,255,255, .12);
+  --badge-outline: rgba(255,255,255, .06);
+  --elevate-1: rgba(255,255,255, .05);
+  --elevate-2: rgba(255,255,255, .10);
+
+  --background: 224 52% 13%;
+  --foreground: 0 0% 96%;
+  --border: 224 38% 30%;
+  --card: 224 46% 17%;
+  --card-foreground: 0 0% 96%;
+  --card-border: 224 38% 30%;
+  --sidebar: 224 52% 13%;
+  --sidebar-foreground: 0 0% 96%;
+  --sidebar-border: 224 38% 30%;
+  --sidebar-primary: 6 68% 52%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 6 48% 30%;
+  --sidebar-accent-foreground: 0 0% 100%;
+  --sidebar-ring: 6 68% 52%;
+  --popover: 224 46% 17%;
+  --popover-foreground: 0 0% 96%;
+  --popover-border: 224 38% 30%;
+  --primary: 6 68% 52%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 224 40% 22%;
+  --secondary-foreground: 0 0% 96%;
+  --muted: 224 36% 24%;
+  --muted-foreground: 220 18% 72%;
+  --accent: 6 50% 32%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 100%;
+  --input: 224 38% 30%;
+  --ring: 6 68% 52%;
+
+  --chart-1: 6 68% 52%;
+  --chart-2: 0 0% 96%;
+  --chart-3: 214 80% 62%;
+  --chart-4: 38 90% 56%;
+  --chart-5: 160 55% 50%;
+
+  --app-font-sans: 'Outfit', ui-sans-serif, system-ui, sans-serif;
+  --app-font-serif: Georgia, serif;
+  --app-font-mono: 'Space Mono', ui-monospace, 'Courier New', monospace;
+  --radius: 0.25rem;
+}
+
+/* WORKSHOP — skeuomorphic: brushed metal panels, glossy gel, beveled, Nunito Sans */
+[data-theme="workshop"] {
+  --button-outline: rgba(38,50,70, .20);
+  --badge-outline: rgba(38,50,70, .12);
+  --elevate-1: rgba(30,40,60, .05);
+  --elevate-2: rgba(30,40,60, .10);
+
+  --background: 214 16% 78%;
+  --foreground: 215 25% 18%;
+  --border: 214 16% 62%;
+  --card: 210 18% 90%;
+  --card-foreground: 215 25% 18%;
+  --card-border: 214 16% 64%;
+  --sidebar: 214 16% 80%;
+  --sidebar-foreground: 215 25% 18%;
+  --sidebar-border: 214 16% 62%;
+  --sidebar-primary: 210 64% 42%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 210 20% 84%;
+  --sidebar-accent-foreground: 215 25% 18%;
+  --sidebar-ring: 210 64% 42%;
+  --popover: 210 20% 92%;
+  --popover-foreground: 215 25% 18%;
+  --popover-border: 214 16% 64%;
+  --primary: 210 64% 42%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 210 16% 85%;
+  --secondary-foreground: 215 25% 18%;
+  --muted: 210 14% 82%;
+  --muted-foreground: 214 14% 40%;
+  --accent: 210 20% 86%;
+  --accent-foreground: 215 25% 18%;
+  --destructive: 4 72% 50%;
+  --destructive-foreground: 0 0% 100%;
+  --input: 214 16% 64%;
+  --ring: 210 64% 42%;
+
+  --chart-1: 210 64% 42%;
+  --chart-2: 35 70% 50%;
+  --chart-3: 150 45% 42%;
+  --chart-4: 280 40% 55%;
+  --chart-5: 4 65% 52%;
+
+  --app-font-sans: 'Nunito Sans', ui-sans-serif, system-ui, sans-serif;
+  --app-font-serif: Georgia, serif;
+  --app-font-mono: 'Space Mono', ui-monospace, 'Courier New', monospace;
+  --radius: 0.625rem;
+}
+
+/* PEBBLE — neumorphic: soft monochrome, same-color surfaces, dual shadows, Inter */
+[data-theme="pebble"] {
+  --button-outline: rgba(0,0,0, .04);
+  --badge-outline: rgba(0,0,0, .04);
+  --elevate-1: rgba(0,0,0, .03);
+  --elevate-2: rgba(0,0,0, .06);
+
+  --background: 222 16% 90%;
+  --foreground: 222 16% 30%;
+  --border: 222 16% 86%;
+  --card: 222 16% 90%;
+  --card-foreground: 222 16% 30%;
+  --card-border: 222 16% 90%;
+  --sidebar: 222 16% 90%;
+  --sidebar-foreground: 222 16% 30%;
+  --sidebar-border: 222 16% 86%;
+  --sidebar-primary: 232 58% 55%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 222 16% 88%;
+  --sidebar-accent-foreground: 222 16% 30%;
+  --sidebar-ring: 232 58% 55%;
+  --popover: 222 16% 92%;
+  --popover-foreground: 222 16% 30%;
+  --popover-border: 222 16% 86%;
+  --primary: 232 58% 55%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 222 16% 88%;
+  --secondary-foreground: 222 16% 30%;
+  --muted: 222 16% 87%;
+  --muted-foreground: 222 10% 50%;
+  --accent: 222 16% 88%;
+  --accent-foreground: 222 16% 30%;
+  --destructive: 4 70% 56%;
+  --destructive-foreground: 0 0% 100%;
+  --input: 222 16% 86%;
+  --ring: 232 58% 55%;
+
+  --chart-1: 232 58% 55%;
+  --chart-2: 190 55% 52%;
+  --chart-3: 280 45% 62%;
+  --chart-4: 150 45% 52%;
+  --chart-5: 30 70% 58%;
+
+  --app-font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --app-font-serif: Georgia, serif;
+  --app-font-mono: 'Space Mono', ui-monospace, 'Courier New', monospace;
+  --radius: 1rem;
+}
+
 /* ============================================================
  * Structural theme traits — variety beyond color. Each theme gets
  * its own elevation, ambient background, and typographic voice so
@@ -286,6 +433,30 @@
   --app-shadow-xl: 0 16px 48px hsl(255 95% 62% / .34);
   --app-shadow-2xl: 0 0 70px hsl(255 95% 62% / .32), 0 26px 64px rgba(0,0,0,.6);
 }
+/* Friction — solid, heavy dark drop shadows (industrial, no glow). */
+[data-theme="friction"] {
+  --app-shadow-sm: 0 1px 2px rgba(0,0,0,.5);
+  --app-shadow-md: 0 4px 14px rgba(0,0,0,.5);
+  --app-shadow-lg: 0 12px 30px rgba(0,0,0,.55);
+  --app-shadow-xl: 0 18px 40px rgba(0,0,0,.6);
+  --app-shadow-2xl: 0 28px 64px rgba(0,0,0,.7);
+}
+/* Workshop — pronounced realistic drop shadows under raised metal panels. */
+[data-theme="workshop"] {
+  --app-shadow-sm: 0 1px 2px hsl(215 30% 25% / .25);
+  --app-shadow-md: 0 3px 8px hsl(215 30% 25% / .30);
+  --app-shadow-lg: 0 10px 24px hsl(215 30% 25% / .35);
+  --app-shadow-xl: 0 16px 36px hsl(215 30% 25% / .40);
+  --app-shadow-2xl: 0 26px 56px hsl(215 30% 25% / .45);
+}
+/* Pebble — signature neumorphic dual shadow: dark bottom-right, light top-left. */
+[data-theme="pebble"] {
+  --app-shadow-sm: 2px 2px 5px hsl(222 24% 72% / .6), -2px -2px 5px hsl(0 0% 100% / .75);
+  --app-shadow-md: 4px 4px 10px hsl(222 24% 72% / .6), -4px -4px 10px hsl(0 0% 100% / .8);
+  --app-shadow-lg: 7px 7px 16px hsl(222 24% 72% / .55), -7px -7px 16px hsl(0 0% 100% / .85);
+  --app-shadow-xl: 10px 10px 24px hsl(222 24% 72% / .5), -10px -10px 24px hsl(0 0% 100% / .9);
+  --app-shadow-2xl: 14px 14px 32px hsl(222 24% 72% / .5), -14px -14px 32px hsl(0 0% 100% / .9);
+}
 
 /* Ambient backgrounds — Rack keeps its technical grid (the default
    .bg-dot-pattern below); Hearth gets a soft warm gradient wash with no
@@ -307,6 +478,34 @@
   background-attachment: fixed;
 }
 
+/* Friction — royal-blue field with a red corner flare and a faint steel grid,
+   echoing the logo's blue/red/white identity. */
+[data-theme="friction"] .bg-dot-pattern {
+  background-image:
+    radial-gradient(900px 520px at 100% -12%, hsl(6 68% 52% / .16), transparent 55%),
+    radial-gradient(760px 480px at -6% 110%, hsl(214 70% 55% / .12), transparent 55%),
+    linear-gradient(hsl(214 60% 62% / .06) 1px, transparent 1px),
+    linear-gradient(90deg, hsl(214 60% 62% / .06) 1px, transparent 1px);
+  background-size: cover, cover, 26px 26px, 26px 26px;
+  background-attachment: fixed;
+}
+
+/* Workshop — brushed-aluminum field: fine vertical machining streaks over a
+   top-down metal gradient. */
+[data-theme="workshop"] .bg-dot-pattern {
+  background-image:
+    repeating-linear-gradient(90deg, hsl(214 16% 75% / .55) 0px, hsl(210 18% 82% / .55) 2px, hsl(214 16% 73% / .55) 3px),
+    linear-gradient(to bottom, hsl(210 20% 86%), hsl(214 16% 73%));
+  background-size: 4px 100%, cover;
+  background-attachment: fixed;
+}
+
+/* Pebble — flat monochrome field so the soft extruded shadows read cleanly. */
+[data-theme="pebble"] .bg-dot-pattern {
+  background-image: none;
+  background-color: hsl(222 16% 90%);
+}
+
 /* Nebula reads as glass: translucent, blurred card surfaces over the glow.
    (Dropdowns/popovers use --popover and are unaffected.) */
 [data-theme="nebula"] .bg-card {
@@ -315,16 +514,57 @@
   -webkit-backdrop-filter: blur(12px);
 }
 
+/* Workshop surfaces read as real brushed-metal panels: a glossy top highlight
+   fading to a shaded base, an inset bevel, and a realistic drop shadow. */
+[data-theme="workshop"] .bg-card {
+  background-image: linear-gradient(
+    to bottom,
+    hsl(0 0% 100% / .55),
+    hsl(214 16% 82% / .12) 44%,
+    hsl(214 18% 68% / .14)
+  );
+  box-shadow:
+    inset 0 1px 0 hsl(0 0% 100% / .7),
+    inset 0 -1px 0 hsl(214 22% 38% / .22),
+    0 2px 4px hsl(215 30% 25% / .22),
+    0 10px 22px hsl(215 30% 25% / .20);
+  border-color: hsl(214 16% 64%);
+}
+/* Workshop primary buttons get a glossy gel finish. */
+[data-theme="workshop"] .bg-primary {
+  background-image: linear-gradient(to bottom, hsl(0 0% 100% / .22), hsl(0 0% 0% / .14));
+  box-shadow:
+    inset 0 1px 0 hsl(0 0% 100% / .35),
+    0 2px 4px hsl(215 30% 25% / .30);
+}
+
+/* Pebble surfaces are extruded from the same-color background by the dual
+   neumorphic shadow and have no visible border. */
+[data-theme="pebble"] .bg-card {
+  background-color: hsl(222 16% 90%);
+  box-shadow:
+    6px 6px 14px hsl(222 24% 72% / .55),
+    -6px -6px 14px hsl(0 0% 100% / .85);
+  border-color: transparent;
+}
+
 /* Typographic voice — only Rack keeps the techy UPPERCASE + wide tracking;
-   Hearth and Nebula drop the caps so neither reads as a Rack recolor. */
+   the soft/editorial themes drop the caps so they don't read as a Rack recolor.
+   Friction keeps the caps: stencil-bold labels suit its industrial identity. */
 [data-theme="hearth"] .uppercase,
-[data-theme="nebula"] .uppercase {
+[data-theme="nebula"] .uppercase,
+[data-theme="workshop"] .uppercase,
+[data-theme="pebble"] .uppercase {
   text-transform: none;
 }
 [data-theme="hearth"] .tracking-widest,
 [data-theme="nebula"] .tracking-widest,
+[data-theme="workshop"] .tracking-widest,
+[data-theme="pebble"] .tracking-widest,
 [data-theme="hearth"] .tracking-wider,
-[data-theme="nebula"] .tracking-wider {
+[data-theme="nebula"] .tracking-wider,
+[data-theme="workshop"] .tracking-wider,
+[data-theme="pebble"] .tracking-wider {
   letter-spacing: normal;
 }
 
