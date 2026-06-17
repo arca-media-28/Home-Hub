@@ -11,6 +11,8 @@ import {
   tileBudget,
   SECTION_PX,
   TWO_LINE_ROW_PX,
+  listColumnClass,
+  listColumnStyle,
 } from "./metrics";
 
 function Placeholder({ children }: { children: React.ReactNode }) {
@@ -212,21 +214,26 @@ export default function SportsTile({ density, tileSettings }: WidgetProps) {
     // never starved by a long scoreboard), then hand the leftover space to
     // whichever section still has the most unshown items. The body clips
     // overflow, so on a very small tile both still show their guaranteed row.
-    let pool = budget.remaining - 2 * SECTION_PX - SCORE_ROW_PX - HEADLINE_ROW_PX;
+    // Each row's vertical cost is amortized across the resolved columns, so a
+    // wide tile reveals proportionally more rows (they flow into the grid).
+    const colDiv = budget.columns;
+    const scoreCost = SCORE_ROW_PX / colDiv;
+    const headlineCost = HEADLINE_ROW_PX / colDiv;
+    let pool = budget.remaining - 2 * SECTION_PX - scoreCost - headlineCost;
     scoreRows = 1;
     headlineRows = 1;
     for (;;) {
-      const canScore = scoreRows < scores.length && pool >= SCORE_ROW_PX;
-      const canNews = headlineRows < headlines.length && pool >= HEADLINE_ROW_PX;
+      const canScore = scoreRows < scores.length && pool >= scoreCost;
+      const canNews = headlineRows < headlines.length && pool >= headlineCost;
       if (!canScore && !canNews) break;
       const scoreDeficit = scores.length - scoreRows;
       const newsDeficit = headlines.length - headlineRows;
       if (canScore && (!canNews || scoreDeficit >= newsDeficit)) {
         scoreRows++;
-        pool -= SCORE_ROW_PX;
+        pool -= scoreCost;
       } else {
         headlineRows++;
-        pool -= HEADLINE_ROW_PX;
+        pool -= headlineCost;
       }
     }
   } else if (scoresActive) {
@@ -243,7 +250,10 @@ export default function SportsTile({ density, tileSettings }: WidgetProps) {
             <Trophy className="w-3 h-3" />
             Scores
           </div>
-          <div className="space-y-1.5">
+          <div
+            className={listColumnClass(budget.columns, "space-y-1.5")}
+            style={listColumnStyle(budget.columns)}
+          >
             {scores.slice(0, scoreRows).map((g) => (
               <ScoreRow key={g.id} game={g} logoSize={logoSize} />
             ))}
@@ -257,7 +267,10 @@ export default function SportsTile({ density, tileSettings }: WidgetProps) {
             <Newspaper className="w-3 h-3" />
             News
           </div>
-          <div className="space-y-1.5">
+          <div
+            className={listColumnClass(budget.columns, "space-y-1.5")}
+            style={listColumnStyle(budget.columns)}
+          >
             {headlines.slice(0, headlineRows).map((h) => (
               <HeadlineRow key={h.id} item={h} />
             ))}

@@ -101,4 +101,29 @@ describe("IntegrationTile scrollable toggle", () => {
     const body = bodyEl(container);
     expect(body.className).toContain("overflow-auto");
   });
+
+  it("wraps the widget in a min-h-full layer so content can grow past the body", () => {
+    // The fix for "scroll reveals nothing": widget roots are h-full, which pins
+    // them to the body height and clips. An auto-height min-h-full wrapper lets
+    // that h-full resolve to content height so the body actually scrolls.
+    const { container } = render(
+      <IntegrationTile
+        tile={makeTile({
+          integration: "clock",
+          tileSettings: { scrollable: true },
+        })}
+      />,
+    );
+    const body = bodyEl(container);
+    const wrapper = body.querySelector(":scope > .min-h-full");
+    expect(wrapper, "expected a min-h-full wrapper inside the scrollable body").toBeTruthy();
+  });
+
+  it("does not add the min-h-full wrapper when not scrollable (byte-for-byte path)", () => {
+    const { container } = render(
+      <IntegrationTile tile={makeTile({ integration: "clock" })} />,
+    );
+    const body = bodyEl(container);
+    expect(body.querySelector(":scope > .min-h-full")).toBeNull();
+  });
 });

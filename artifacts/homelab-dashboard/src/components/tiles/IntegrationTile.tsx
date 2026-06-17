@@ -146,13 +146,14 @@ export default function IntegrationTile({ tile, status }: IntegrationTileProps) 
   // the status dot / open-link affordance over the widget body instead.
   const showHeader = !tile.hideTitle || hasImage;
 
-  // Density from the measured body (or grid-seeded for first paint). The seed
-  // needs to know whether the header occupies space.
-  const density = tileDensity(tile.gridW, tile.gridH, measured, showHeader);
-
   // When enabled, the live-status body scrolls instead of clipping overflowing
   // content. The header (and its image background) stay fixed and clipped.
   const scrollable = Boolean(tile.tileSettings?.scrollable);
+
+  // Density from the measured body (or grid-seeded for first paint). The seed
+  // needs to know whether the header occupies space; `scrollable` makes reveal
+  // budgets unbounded so widgets render everything for the body to scroll.
+  const density = tileDensity(tile.gridW, tile.gridH, measured, showHeader, scrollable);
 
   return (
     <div className="w-full h-full flex flex-col overflow-hidden">
@@ -222,7 +223,17 @@ export default function IntegrationTile({ tile, status }: IntegrationTileProps) 
             )}
           </div>
         )}
-        {renderStatusView(integration, { enabled, density, tileSettings: tile.tileSettings, integration })}
+        {scrollable ? (
+          // The widget roots are `h-full`; inside this auto-height wrapper that
+          // resolves to their content height, so they grow past the body (which
+          // scrolls) instead of pinning to it and clipping. `min-h-full` keeps a
+          // short widget filling the body as before.
+          <div className="min-h-full">
+            {renderStatusView(integration, { enabled, density, tileSettings: tile.tileSettings, integration })}
+          </div>
+        ) : (
+          renderStatusView(integration, { enabled, density, tileSettings: tile.tileSettings, integration })
+        )}
       </div>
     </div>
   );

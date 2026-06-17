@@ -1,7 +1,7 @@
 import { useGetErsatzTvWidget, getGetErsatzTvWidgetQueryKey } from "@workspace/api-client-react";
 import { Tv2, Radio } from "lucide-react";
 import type { WidgetProps } from "./IntegrationTile";
-import { tileBudget, STAT_ROW_PX, ROW_PX, SECTION_PX, TWO_LINE_ROW_PX } from "./metrics";
+import { tileBudget, STAT_ROW_PX, ROW_PX, SECTION_PX, TWO_LINE_ROW_PX, listColumnClass, listColumnStyle } from "./metrics";
 
 export default function ErsatztvTile({ enabled, density }: WidgetProps) {
   const { data, isLoading, isError } = useGetErsatzTvWidget({
@@ -85,7 +85,10 @@ export default function ErsatztvTile({ enabled, density }: WidgetProps) {
       )}
 
       {channelRows > 0 && (
-        <div className="flex-1 min-h-0 flex flex-col gap-1.5 overflow-hidden">
+        <div
+          className={`flex-1 min-h-0 overflow-hidden ${listColumnClass(budget.columns, "flex flex-col gap-1.5")}`}
+          style={listColumnStyle(budget.columns)}
+        >
           {visibleChannels.map((c) => (
             <div key={`${c.number}-${c.name}`} className="flex items-start gap-2">
               <span className="flex-shrink-0 text-[10px] font-semibold tabular-nums text-muted-foreground mt-0.5 min-w-[1.5rem] text-right">

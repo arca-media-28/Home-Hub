@@ -2,6 +2,7 @@ import { useGetNewsWidget, getGetNewsWidgetQueryKey } from "@workspace/api-clien
 import type { NewsItem } from "@workspace/api-client-react";
 import { Newspaper } from "lucide-react";
 import type { WidgetProps } from "./IntegrationTile";
+import { tileColumns, listColumnClass, listColumnStyle } from "./metrics";
 import { normalizeTileUrl, openTileUrl } from "@/lib/utils";
 
 const NEWS_DEFAULT_LIMIT = 8;
@@ -111,9 +112,13 @@ export default function NewsTile({ density, tileSettings }: WidgetProps) {
   // headline list is rendered into a vertically scrollable body, so a taller
   // tile reveals more headlines at once while a short one stays scrollable.
   const detailed = density.bodyHeight >= 150;
+  const columns = tileColumns(density.bodyWidth);
 
   return (
-    <div className="w-full h-full flex flex-col p-3 gap-1.5 overflow-y-auto text-foreground">
+    <div
+      className={`w-full h-full p-3 overflow-y-auto text-foreground ${listColumnClass(columns, "flex flex-col gap-1.5")}`}
+      style={listColumnStyle(columns)}
+    >
       {data.items.map((item, i) => {
         const time = showTimestamp ? relativeTime(item.published) : null;
         const src = item.source || data.feedTitle || null;

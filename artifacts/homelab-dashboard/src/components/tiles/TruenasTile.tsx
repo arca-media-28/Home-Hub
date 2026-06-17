@@ -1,7 +1,7 @@
 import { useGetTruenasMetrics, getGetTruenasMetricsQueryKey } from "@workspace/api-client-react";
 import { HardDrive, ArrowDown, ArrowUp } from "lucide-react";
 import type { WidgetProps } from "./IntegrationTile";
-import { tileBudget, BAR_PX, ROW_PX, SECTION_PX } from "./metrics";
+import { tileBudget, BAR_PX, ROW_PX, SECTION_PX, listColumnClass, listColumnStyle } from "./metrics";
 
 // Compact inline sparkline. Draws one polyline per series sharing a single
 // min/max scale so multiple lines (e.g. network in/out) are comparable. Purely
@@ -191,7 +191,10 @@ export default function TruenasTile({ enabled, density }: WidgetProps) {
         )}
       </div>
       {showPools && (
-        <div className="space-y-1 border-t border-border pt-2 mt-auto">
+        <div
+          className={`${listColumnClass(budget.columns, "space-y-1")} border-t border-border pt-2 mt-auto`}
+          style={listColumnStyle(budget.columns)}
+        >
           {pools.map((pool) => {
             const pct = (pool.usedBytes / pool.totalBytes) * 100;
             return (
@@ -206,7 +209,10 @@ export default function TruenasTile({ enabled, density }: WidgetProps) {
         </div>
       )}
       {showDisks && (
-        <div className={`space-y-1 border-t border-border pt-2 ${showPools ? "" : "mt-auto"}`}>
+        <div
+          className={`${listColumnClass(budget.columns, "space-y-1")} border-t border-border pt-2 ${showPools ? "" : "mt-auto"}`}
+          style={listColumnStyle(budget.columns)}
+        >
           {disks.map((disk) => {
             // A drive is degraded when SMART reports failure or it runs hot
             // (≥50°C). Hot-but-passing reads as a warning; a SMART failure is an

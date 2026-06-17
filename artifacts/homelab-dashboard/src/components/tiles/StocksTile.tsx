@@ -7,7 +7,7 @@ import {
 import type { StockQuote } from "@workspace/api-client-react";
 import { TrendingUp, TrendingDown } from "lucide-react";
 import type { WidgetProps } from "./IntegrationTile";
-import { tileBudget, ROW_PX, TWO_LINE_ROW_PX, STAT_ROW_PX } from "./metrics";
+import { tileBudget, ROW_PX, TWO_LINE_ROW_PX, STAT_ROW_PX, listColumnClass, listColumnStyle } from "./metrics";
 
 // Compact inline sparkline of recent closing prices. Renders a single polyline
 // scaled to fit the given box, colored by overall direction (first → last). The
@@ -194,7 +194,10 @@ export default function StocksTile({ enabled, density, tileSettings }: WidgetPro
         </div>
       )}
 
-      <div className="flex-1 flex flex-col gap-1.5 min-h-0">
+      <div
+        className={`flex-1 min-h-0 ${listColumnClass(budget.columns, "flex flex-col gap-1.5")}`}
+        style={listColumnStyle(budget.columns)}
+      >
         {visibleRows.map(({ quote, shares, costBasis }) => {
           const positionValue = shares != null ? quote.price * shares : null;
           const gainLoss =

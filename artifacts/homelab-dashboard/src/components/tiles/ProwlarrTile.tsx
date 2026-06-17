@@ -5,6 +5,7 @@ import {
 import { Radar, AlertTriangle } from "lucide-react";
 import type { WidgetProps } from "./IntegrationTile";
 import { resolveProwlarrLayout } from "./prowlarrLayout";
+import { tileColumns, listColumnClass, listColumnStyle } from "./metrics";
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
@@ -39,6 +40,7 @@ export default function ProwlarrTile({ enabled, density }: WidgetProps) {
   }
 
   const layout = resolveProwlarrLayout(density.level, enabled);
+  const columns = tileColumns(density.bodyWidth);
 
   // Healthy = enabled AND reachable. Disabled indexers are intentionally off, so
   // they don't count toward "online".
@@ -69,7 +71,10 @@ export default function ProwlarrTile({ enabled, density }: WidgetProps) {
       {layout.showIndexerList && (
         // Larger tiles show the full per-indexer list; it scrolls if it can't
         // all fit so no indexer is ever silently dropped.
-        <div className="flex-1 min-h-0 overflow-y-auto space-y-1 border-t border-border pt-2">
+        <div
+          className={`flex-1 min-h-0 overflow-y-auto border-t border-border pt-2 ${listColumnClass(columns, "space-y-1")}`}
+          style={listColumnStyle(columns)}
+        >
           {data.indexers.map((ix) => {
             const dot = !ix.enabled
               ? "bg-muted-foreground"

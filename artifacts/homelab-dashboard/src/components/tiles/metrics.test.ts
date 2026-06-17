@@ -5,6 +5,9 @@ import {
   resolveEnabledMetrics,
   tileDensity,
   tileBudget,
+  tileColumns,
+  listColumnClass,
+  listColumnStyle,
   seedBodyHeight,
   METRIC_CATALOG,
   ROW_PX,
@@ -139,6 +142,82 @@ describe("tileBudget (progressive reveal by measured space)", () => {
   it("returns 0 rows for a section with no available data", () => {
     const budget = tileBudget(tileDensity(1, 1, { width: 200, height: 400 }));
     expect(budget.list(SECTION_PX, ROW_PX, 0)).toBe(0);
+  });
+});
+
+describe("tileColumns (horizontal reveal by measured width)", () => {
+  it("stays a single column until the body is at least two columns wide", () => {
+    expect(tileColumns(0)).toBe(1);
+    expect(tileColumns(229)).toBe(1);
+    expect(tileColumns(230)).toBe(1); // exactly one column's worth
+    expect(tileColumns(459)).toBe(1);
+    expect(tileColumns(460)).toBe(2); // two columns' worth
+  });
+
+  it("adds a column for each ~230px of width, capped at 4", () => {
+    expect(tileColumns(690)).toBe(3);
+    expect(tileColumns(920)).toBe(4);
+    expect(tileColumns(5000)).toBe(4); // capped
+  });
+
+  it("falls back to a single column for non-finite/invalid widths", () => {
+    expect(tileColumns(Number.POSITIVE_INFINITY)).toBe(1);
+    expect(tileColumns(-100)).toBe(1);
+    expect(tileColumns(Number.NaN)).toBe(1);
+  });
+});
+
+describe("listColumnClass / listColumnStyle", () => {
+  it("keeps the widget's single-column class verbatim for one column", () => {
+    expect(listColumnClass(1, "space-y-1")).toBe("space-y-1");
+    expect(listColumnStyle(1)).toBeUndefined();
+  });
+
+  it("switches to a CSS grid with the resolved column count for multi-column", () => {
+    expect(listColumnClass(3, "space-y-1")).toBe("grid gap-x-4 gap-y-1.5");
+    expect(listColumnStyle(3)).toEqual({
+      gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+    });
+  });
+});
+
+describe("tileBudget columns + scrollable", () => {
+  it("derives the budget's column count from the measured body width", () => {
+    const narrow = tileBudget(tileDensity(1, 1, { width: 200, height: 300 }));
+    expect(narrow.columns).toBe(1);
+
+    const wide = tileBudget(tileDensity(1, 1, { width: 700, height: 300 }));
+    expect(wide.columns).toBe(3);
+  });
+
+  it("fits proportionally more rows when the body is wider (multi-column)", () => {
+    const single = tileBudget(tileDensity(1, 1, { width: 200, height: 200 }));
+    const singleRows = single.list(SECTION_PX, ROW_PX, 40);
+
+    const triple = tileBudget(tileDensity(1, 1, { width: 700, height: 200 }));
+    const tripleRows = triple.list(SECTION_PX, ROW_PX, 40);
+
+    expect(triple.columns).toBe(3);
+    expect(tripleRows).toBeGreaterThan(singleRows);
+  });
+
+  it("reveals every row/block when the tile is scrollable (unbounded)", () => {
+    // A tiny scrollable body would normally clip, but scroll means nothing is
+    // hidden — the budget is unbounded so all content renders and the body
+    // scrolls.
+    const scroll = tileBudget(
+      tileDensity(1, 1, { width: 200, height: 20 }, true, true),
+    );
+    expect(scroll.remaining).toBe(Number.POSITIVE_INFINITY);
+    expect(scroll.list(SECTION_PX, ROW_PX, 50)).toBe(50);
+    expect(scroll.block(40)).toBe(true);
+    expect(scroll.block(40)).toBe(true);
+  });
+
+  it("forces the coarse level to 'lg' when scrollable so level-gated lists show", () => {
+    const d = tileDensity(1, 1, { width: 200, height: 20 }, true, true);
+    expect(d.level).toBe("lg");
+    expect(d.scrollable).toBe(true);
   });
 });
 

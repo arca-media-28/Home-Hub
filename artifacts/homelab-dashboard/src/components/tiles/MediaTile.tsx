@@ -10,7 +10,7 @@ import {
 import { Tv, PlayCircle } from "lucide-react";
 import type { ReactNode } from "react";
 import type { WidgetProps } from "./IntegrationTile";
-import { tileBudget, SECTION_PX, MEDIA_ROW_PX } from "./metrics";
+import { tileBudget, SECTION_PX, MEDIA_ROW_PX, listColumnClass, listColumnStyle } from "./metrics";
 
 // A media cover. When the item carries a deep link, it becomes a link that opens
 // the item directly in the media server (Plex/Jellyfin) in a new tab; otherwise
@@ -161,23 +161,28 @@ export default function MediaTile({ enabled, density, integration }: WidgetProps
             <PlayCircle className="w-3.5 h-3.5" />
             Continue Watching
           </div>
-          {continueItems.slice(0, continueCount).map((item) => (
-            <div key={item.id} className="flex items-center gap-2 min-w-0">
-              <Cover thumb={item.thumb} title={item.title} url={item.url} serverLabel={serverLabel} />
-              <TitleLink title={item.title} url={item.url} serverLabel={serverLabel}>
-                <p className="text-xs font-medium truncate">{item.seriesName || item.title}</p>
-                {item.seriesName && <p className="text-xs text-muted-foreground truncate">{item.title}</p>}
-                {item.progress != null && (
-                  <div className="h-1 bg-muted overflow-hidden mt-0.5">
-                    <div
-                      className="h-full bg-primary transition-all duration-700"
-                      style={{ width: `${Math.min(100, Math.max(0, item.progress))}%` }}
-                    />
-                  </div>
-                )}
-              </TitleLink>
-            </div>
-          ))}
+          <div
+            className={listColumnClass(budget.columns, "space-y-1.5")}
+            style={listColumnStyle(budget.columns)}
+          >
+            {continueItems.slice(0, continueCount).map((item) => (
+              <div key={item.id} className="flex items-center gap-2 min-w-0">
+                <Cover thumb={item.thumb} title={item.title} url={item.url} serverLabel={serverLabel} />
+                <TitleLink title={item.title} url={item.url} serverLabel={serverLabel}>
+                  <p className="text-xs font-medium truncate">{item.seriesName || item.title}</p>
+                  {item.seriesName && <p className="text-xs text-muted-foreground truncate">{item.title}</p>}
+                  {item.progress != null && (
+                    <div className="h-1 bg-muted overflow-hidden mt-0.5">
+                      <div
+                        className="h-full bg-primary transition-all duration-700"
+                        style={{ width: `${Math.min(100, Math.max(0, item.progress))}%` }}
+                      />
+                    </div>
+                  )}
+                </TitleLink>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
@@ -187,18 +192,23 @@ export default function MediaTile({ enabled, density, integration }: WidgetProps
             <Tv className="w-3.5 h-3.5" />
             Recently Added
           </div>
-          {recentItems.slice(0, recentCount).map((item) => {
-            const { primary, secondary } = recentLines(item);
-            return (
-              <div key={item.id} className="flex items-center gap-2 min-w-0">
-                <Cover thumb={item.thumb} title={item.title} url={item.url} serverLabel={serverLabel} />
-                <TitleLink title={item.title} url={item.url} serverLabel={serverLabel}>
-                  <p className="text-xs font-medium truncate">{primary}</p>
-                  <p className="text-xs text-muted-foreground capitalize truncate">{secondary}</p>
-                </TitleLink>
-              </div>
-            );
-          })}
+          <div
+            className={listColumnClass(budget.columns, "space-y-1.5")}
+            style={listColumnStyle(budget.columns)}
+          >
+            {recentItems.slice(0, recentCount).map((item) => {
+              const { primary, secondary } = recentLines(item);
+              return (
+                <div key={item.id} className="flex items-center gap-2 min-w-0">
+                  <Cover thumb={item.thumb} title={item.title} url={item.url} serverLabel={serverLabel} />
+                  <TitleLink title={item.title} url={item.url} serverLabel={serverLabel}>
+                    <p className="text-xs font-medium truncate">{primary}</p>
+                    <p className="text-xs text-muted-foreground capitalize truncate">{secondary}</p>
+                  </TitleLink>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
     </div>

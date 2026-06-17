@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import { TileIntegration } from "@workspace/api-client-react";
 
 // ── Metric catalogs ──────────────────────────────────────────────────────────
@@ -119,6 +120,11 @@ export interface TileDensity {
   bodyWidth: number;
   // Coarse hint derived from bodyHeight, kept for any width/layout tweaks.
   level: DensityLevel;
+  // When the tile's "scrollable" option is on, the body scrolls instead of
+  // clipping, so widgets must stop hiding content: reveal budgets read as
+  // unbounded and the coarse level is pinned to the largest tier. Centralizing
+  // it here lets every widget honor scroll with little or no widget-side change.
+  scrollable: boolean;
 }
 
 // Estimate the body's pixel height from grid units, used only as a seed for the
@@ -149,10 +155,44 @@ export function tileDensity(
   gridH: number,
   measured?: { width: number; height: number } | null,
   showHeader = true,
+  scrollable = false,
 ): TileDensity {
   const bodyHeight = measured ? measured.height : seedBodyHeight(gridH, showHeader);
   const bodyWidth = measured ? measured.width : seedBodyWidth(gridW);
-  return { bodyHeight, bodyWidth, level: levelFor(bodyHeight) };
+  // When the body scrolls, nothing is hidden — so the coarse level reads as the
+  // largest tier so level-gated widgets (e.g. Prowlarr's indexer list) also show
+  // their full content.
+  const level = scrollable ? "lg" : levelFor(bodyHeight);
+  return { bodyHeight, bodyWidth, level, scrollable };
+}
+
+// ── Horizontal columns ────────────────────────────────────────────────────────
+// Short, wide tiles otherwise hide content vertically while leaving the right
+// side empty. To use that room, the revealed list/row-heavy sections flow into
+// multiple columns once the body is wide enough. The count is driven purely by
+// the measured body width — a narrow tile stays a single column — and capped so
+// rows never get too cramped to read.
+const COLUMN_WIDTH_PX = 230;
+const MAX_COLUMNS = 4;
+
+export function tileColumns(bodyWidth: number): number {
+  if (!Number.isFinite(bodyWidth) || bodyWidth <= 0) return 1;
+  return Math.max(1, Math.min(MAX_COLUMNS, Math.floor(bodyWidth / COLUMN_WIDTH_PX)));
+}
+
+// Class + style helpers a widget applies to a list container so its rows flow
+// into the resolved number of columns. With a single column the widget keeps its
+// existing vertical-spacing class verbatim (so the non-multi-column path is
+// byte-for-byte unchanged); with more columns it switches to a CSS grid that
+// fills left-to-right, preserving metric-priority reading order.
+export function listColumnClass(columns: number, singleColumnClass: string): string {
+  return columns > 1 ? "grid gap-x-4 gap-y-1.5" : singleColumnClass;
+}
+
+export function listColumnStyle(columns: number): CSSProperties | undefined {
+  return columns > 1
+    ? { gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }
+    : undefined;
 }
 
 // ── Reveal budget ─────────────────────────────────────────────────────────────
@@ -175,25 +215,39 @@ export const SECTION_PX = 26; // a section label/header incl. top spacing
 export interface TileBudget {
   // Measured body width, for any width-dependent layout choices.
   readonly width: number;
-  // Remaining vertical pixels (after the widget's own padding).
+  // Remaining vertical pixels (after the widget's own padding). Reads as
+  // Infinity when the tile is scrollable (nothing is hidden).
   readonly remaining: number;
+  // How many columns the revealed list/row sections should flow into, derived
+  // from the measured body width (1 when narrow). Widgets pass this to
+  // listColumnClass/listColumnStyle when rendering their rows.
+  readonly columns: number;
   // Reveal a fixed-height block. Returns true (and deducts) if it fits or if it
-  // is the first item requested; false otherwise.
+  // is the first item requested; false otherwise. Always true when scrollable.
   block(px: number): boolean;
   // Reveal a list section with `headerPx` of fixed chrome and `available` rows
   // of `rowPx` each. Returns the number of rows to render (0 hides the whole
-  // section). Guarantees at least one row if nothing has been shown yet.
+  // section). Rows fill the configured columns, so a wider tile fits more rows
+  // before anything is hidden. Guarantees at least one row if nothing has been
+  // shown yet, and returns every available row when scrollable.
   list(headerPx: number, rowPx: number, available: number): number;
 }
 
 // Build a budget from a density. `paddingY` is the widget root's own vertical
-// padding (p-3 → 24px) which is not part of the content space for reveal.
+// padding (p-3 → 24px) which is not part of the content space for reveal. When
+// the tile is scrollable the body scrolls instead of clipping, so the vertical
+// budget reads as unbounded (every block/row is revealed) while the column count
+// still applies so the revealed content uses the horizontal space too.
 export function tileBudget(density: TileDensity, paddingY = 24): TileBudget {
-  let remaining = Math.max(0, density.bodyHeight - paddingY);
+  const columns = tileColumns(density.bodyWidth);
+  let remaining = density.scrollable
+    ? Number.POSITIVE_INFINITY
+    : Math.max(0, density.bodyHeight - paddingY);
   let shown = 0;
 
   return {
     width: density.bodyWidth,
+    columns,
     get remaining() {
       return remaining;
     },
@@ -211,11 +265,16 @@ export function tileBudget(density: TileDensity, paddingY = 24): TileBudget {
       const force = shown === 0;
       if (!force && headerPx > remaining) return 0;
       const afterHeader = remaining - headerPx;
-      let rows = Math.floor(afterHeader / Math.max(1, rowPx));
+      // Each column holds `rowsPerColumn` rows, so the section's row capacity
+      // scales with the column count while its vertical cost is the height of a
+      // single column's worth of rows.
+      const rowsPerColumn = Math.floor(afterHeader / Math.max(1, rowPx));
+      let rows = rowsPerColumn * columns;
       if (rows < 1 && force) rows = 1; // never leave the body empty
       rows = Math.max(0, Math.min(available, rows));
       if (rows === 0) return 0; // header alone is useless — hide the section
-      remaining = afterHeader - rows * rowPx;
+      const rowsTall = Math.ceil(rows / columns);
+      remaining = afterHeader - rowsTall * rowPx;
       shown += 1 + rows;
       return rows;
     },

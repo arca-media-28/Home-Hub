@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useGetTailscaleStatus, getGetTailscaleStatusQueryKey } from "@workspace/api-client-react";
 import { Network, ArrowUpRight, Copy, Check, KeyRound, AlertTriangle } from "lucide-react";
 import type { WidgetProps } from "./IntegrationTile";
-import { tileBudget, STAT_ROW_PX, ROW_PX, SECTION_PX, TWO_LINE_ROW_PX } from "./metrics";
+import { tileBudget, STAT_ROW_PX, ROW_PX, SECTION_PX, TWO_LINE_ROW_PX, listColumnClass, listColumnStyle } from "./metrics";
 
 // The first tailnet IPv4 (100.x) address is what users almost always want to
 // grab; fall back to the first address of any kind when no IPv4 is present.
@@ -158,7 +158,10 @@ export default function TailscaleTile({ enabled, density }: WidgetProps) {
       )}
 
       {deviceRows > 0 && (
-        <div className="flex-1 min-h-0 flex flex-col gap-1.5 overflow-hidden">
+        <div
+          className={`flex-1 min-h-0 overflow-hidden ${listColumnClass(budget.columns, "flex flex-col gap-1.5")}`}
+          style={listColumnStyle(budget.columns)}
+        >
           {visibleDevices.map((d) => {
             const ip = primaryAddress(d.addresses);
             const copied = copiedId === d.id;

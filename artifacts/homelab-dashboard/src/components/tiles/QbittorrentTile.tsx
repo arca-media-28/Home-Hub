@@ -1,7 +1,7 @@
 import { useGetQbittorrentStatus, getGetQbittorrentStatusQueryKey } from "@workspace/api-client-react";
 import { Download, Upload, ArrowDownToLine } from "lucide-react";
 import type { WidgetProps } from "./IntegrationTile";
-import { tileBudget, SECTION_PX, ROW_PX, TWO_LINE_ROW_PX } from "./metrics";
+import { tileBudget, SECTION_PX, ROW_PX, TWO_LINE_ROW_PX, listColumnClass, listColumnStyle } from "./metrics";
 
 function formatSpeed(bytesPerSec: number | null | undefined): string {
   const b = bytesPerSec ?? 0;
@@ -145,7 +145,10 @@ export default function QbittorrentTile({ enabled, density, tileSettings }: Widg
                 <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground truncate">
                   {g.category}
                 </div>
-                <div className="space-y-1.5">
+                <div
+                  className={listColumnClass(budget.columns, "space-y-1.5")}
+                  style={listColumnStyle(budget.columns)}
+                >
                   {g.items.map((t, i) => (
                     <TorrentRow key={`${t.name}-${i}`} torrent={t} showCategory={false} />
                   ))}
@@ -154,7 +157,10 @@ export default function QbittorrentTile({ enabled, density, tileSettings }: Widg
             ))}
           </div>
         ) : (
-          <div className="flex-1 space-y-1.5">
+          <div
+            className={`flex-1 ${listColumnClass(budget.columns, "space-y-1.5")}`}
+            style={listColumnStyle(budget.columns)}
+          >
             {torrents.slice(0, flatCount).map((t, i) => (
               <TorrentRow key={`${t.name}-${i}`} torrent={t} showCategory={filterActive} />
             ))}

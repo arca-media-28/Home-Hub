@@ -1,7 +1,7 @@
 import { useGetRadarrQueue, getGetRadarrQueueQueryKey } from "@workspace/api-client-react";
 import { Film } from "lucide-react";
 import type { WidgetProps } from "./IntegrationTile";
-import { tileBudget, SECTION_PX, ROW_PX, TWO_LINE_ROW_PX } from "./metrics";
+import { tileBudget, SECTION_PX, ROW_PX, TWO_LINE_ROW_PX, listColumnClass, listColumnStyle } from "./metrics";
 
 function formatBytes(bytes: number | null | undefined): string {
   if (!bytes) return "";
@@ -55,37 +55,47 @@ export default function RadarrTile({ enabled, density }: WidgetProps) {
       {hasQueue && (
         <div className="space-y-1">
           <p className="text-xs text-muted-foreground">Downloading</p>
-          {data.queue.slice(0, queueCount).map((item) => (
-            <div key={item.id} className="min-w-0">
-              <div className="flex justify-between items-center">
-                <span className="text-xs font-medium truncate max-w-[70%]">{item.title}</span>
-                <span className="text-xs text-muted-foreground">{formatBytes(item.size)}</span>
-              </div>
-              {item.progress != null && (
-                <div className="h-1 bg-muted overflow-hidden mt-0.5">
-                  <div
-                    className="h-full bg-primary transition-all duration-700"
-                    style={{ width: `${item.progress}%` }}
-                  />
+          <div
+            className={listColumnClass(budget.columns, "space-y-1")}
+            style={listColumnStyle(budget.columns)}
+          >
+            {data.queue.slice(0, queueCount).map((item) => (
+              <div key={item.id} className="min-w-0">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs font-medium truncate max-w-[70%]">{item.title}</span>
+                  <span className="text-xs text-muted-foreground">{formatBytes(item.size)}</span>
                 </div>
-              )}
-            </div>
-          ))}
+                {item.progress != null && (
+                  <div className="h-1 bg-muted overflow-hidden mt-0.5">
+                    <div
+                      className="h-full bg-primary transition-all duration-700"
+                      style={{ width: `${item.progress}%` }}
+                    />
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
       {hasUpcoming && (
         <div className="space-y-1 border-t border-border pt-2 mt-auto">
           <p className="text-xs text-muted-foreground">Upcoming</p>
-          {data.upcoming.slice(0, upcomingCount).map((item) => (
-            <div key={item.id} className="flex justify-between text-xs">
-              <span className="truncate max-w-[70%] font-medium">
-                {item.title}
-                {item.year != null ? ` (${item.year})` : ""}
-              </span>
-              <span className="text-muted-foreground flex-shrink-0 ml-1">{item.releaseDate}</span>
-            </div>
-          ))}
+          <div
+            className={listColumnClass(budget.columns, "space-y-1")}
+            style={listColumnStyle(budget.columns)}
+          >
+            {data.upcoming.slice(0, upcomingCount).map((item) => (
+              <div key={item.id} className="flex justify-between text-xs">
+                <span className="truncate max-w-[70%] font-medium">
+                  {item.title}
+                  {item.year != null ? ` (${item.year})` : ""}
+                </span>
+                <span className="text-muted-foreground flex-shrink-0 ml-1">{item.releaseDate}</span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

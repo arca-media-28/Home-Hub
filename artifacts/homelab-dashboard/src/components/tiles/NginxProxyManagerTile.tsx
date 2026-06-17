@@ -4,7 +4,7 @@ import {
 } from "@workspace/api-client-react";
 import { Network, Lock, LockOpen, ShieldAlert } from "lucide-react";
 import type { WidgetProps } from "./IntegrationTile";
-import { tileBudget, STAT_ROW_PX, SECTION_PX, ROW_PX } from "./metrics";
+import { tileBudget, STAT_ROW_PX, SECTION_PX, ROW_PX, listColumnClass, listColumnStyle } from "./metrics";
 
 function Stat({
   label,
@@ -82,7 +82,10 @@ export default function NginxProxyManagerTile({ enabled, density }: WidgetProps)
       )}
 
       {showList && (
-        <div className="space-y-1 border-t border-border pt-2 mt-auto">
+        <div
+          className={`${listColumnClass(budget.columns, "space-y-1")} border-t border-border pt-2 mt-auto`}
+          style={listColumnStyle(budget.columns)}
+        >
           {hosts.map((host) => {
             const domain = host.domainNames[0] ?? `Host #${host.id}`;
             return (
