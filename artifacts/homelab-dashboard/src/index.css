@@ -732,3 +732,23 @@
   transition: opacity 0.15s ease;
 }
 .react-resizable-handle-se:hover { opacity: 1; }
+
+/* DOM-level hard-lock: when edit mode is off, react-grid-layout's
+   isDraggable/isResizable props are not always honoured through the CJS shim,
+   so force the grid inert regardless of prop state. Removes resize handles
+   entirely and disables drag/select on the items themselves. */
+.grid-locked .react-resizable-handle {
+  display: none !important;
+  pointer-events: none !important;
+}
+.grid-locked .react-grid-item {
+  cursor: default !important;
+  /* keep clicks/links working (pointer-events stays auto) but block drags */
+  touch-action: auto;
+}
+/* Only suppress text selection while actively editing, so a drag never
+   highlights tile text. Locked tiles keep normal selection behaviour. */
+.grid-editing .react-grid-item {
+  user-select: none;
+  -webkit-user-select: none;
+}

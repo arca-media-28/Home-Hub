@@ -374,7 +374,7 @@ export default function Dashboard() {
           <div>
             {gridWidth !== null && (
             <Grid
-              className="layout"
+              className={`layout ${editMode ? "grid-editing" : "grid-locked"}`}
               layout={layout}
               cols={cols}
               rowHeight={ROW_HEIGHT}
