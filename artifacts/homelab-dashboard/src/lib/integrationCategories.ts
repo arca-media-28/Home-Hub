@@ -10,6 +10,7 @@ export const CATEGORY_ORDER = [
   "Media",
   "Downloads",
   "Server",
+  "Organization",
   "Other",
 ] as const;
 
@@ -37,8 +38,9 @@ const CATEGORY_BY_KEY: Record<string, Category> = {
   "nginx-proxy-manager": "Server",
   tailscale: "Server",
   pihole: "Server",
-  // Layout helpers
-  spacer: "Other",
+  // Layout / organization helpers
+  spacer: "Organization",
+  divider: "Organization",
 };
 
 // The category for a given integration / service key. Unmapped keys land in

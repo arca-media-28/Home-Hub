@@ -131,6 +131,18 @@ function renderTileContent(tile: Tile, status: ServiceStatus | undefined, editMo
       </div>
     );
   }
+  // The divider is a layout-only tile: a low-profile section heading users drop
+  // between groups of tiles. It shows its label as styled text (no card
+  // surface) and stays visible in both locked and edit modes.
+  if (tile.integration === "divider") {
+    return (
+      <div className="absolute inset-0 flex items-center px-1">
+        <span className="text-sm font-bold uppercase tracking-widest text-muted-foreground truncate">
+          {tile.name || "Section"}
+        </span>
+      </div>
+    );
+  }
   // Every tile renders as a styled app/link card. When an integration is
   // attached it also shows a compact live-status section from that service.
   if (tile.integration) {
@@ -445,17 +457,22 @@ export default function Dashboard() {
                 // scrolls instead of clipping. The image background sub-layer
                 // keeps its own overflow-hidden so framing is unaffected. The
                 // spacer tile is layout-only and always clips.
+                const isLayoutTile =
+                  tile.integration === "spacer" || tile.integration === "divider";
                 const overflowClass =
-                  tile.integration !== "spacer" && tile.tileSettings?.scrollable
+                  !isLayoutTile && tile.tileSettings?.scrollable
                     ? "overflow-auto"
                     : "overflow-hidden";
                 return (
                 <div
                   key={String(tile.id)}
                   className={
-                    tile.integration === "spacer"
-                      ? // Spacer: invisible in locked mode (no surface, no
-                        // click target), a dashed ghost in edit mode.
+                    isLayoutTile
+                      ? // Layout tiles (spacer/divider) carry no card surface.
+                        // The spacer is invisible in locked mode; the divider
+                        // shows its label text. Neither is a click target when
+                        // locked, but both keep the edit ring so they can be
+                        // moved, resized, or deleted.
                         `relative ${overflowClass} transition-all ${
                           editMode
                             ? "ring-1 ring-primary/40 hover:ring-primary cursor-default"

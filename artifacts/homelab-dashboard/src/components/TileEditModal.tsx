@@ -114,6 +114,7 @@ const INTEGRATIONS = [
   { value: TileIntegration.news, label: "News" },
   { value: TileIntegration.stocks, label: "Stocks" },
   { value: TileIntegration.spacer, label: "Spacer" },
+  { value: TileIntegration.divider, label: "Section Label" },
 ] as const;
 
 // Pre-group the integrations by category (News, Media, Downloads, Server,
@@ -309,6 +310,13 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
   // image, background, or live data. Only its size/position matter, so the
   // editor strips every content field and shows a short description instead.
   const isSpacer = integration === TileIntegration.spacer;
+  // The divider is a layout-only section heading. It keeps a label (Name)
+  // field but, like the spacer, strips URL, image, background, and metrics so
+  // only its text and size/position matter.
+  const isDivider = integration === TileIntegration.divider;
+  // Layout-only tiles (spacer + divider) share the same stripped editor: no
+  // URL, image, background, or metric sections.
+  const isLayoutTile = isSpacer || isDivider;
 
   // Teams for the chosen leagues, for the dependent team multi-select. Sourced
   // from the baked-in catalog (ESPN's /teams endpoint isn't CORS-enabled), so
@@ -642,20 +650,21 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
         integration === NONE
           ? null
           : (integration as typeof TileIntegration[keyof typeof TileIntegration]),
-      // A spacer carries no content: clear name/url/background/image so that
-      // converting an existing tile into a spacer leaves nothing behind.
+      // A spacer carries no content at all; a divider keeps only its label
+      // (name). Both clear url/background/image so converting an existing tile
+      // into a layout tile leaves nothing behind.
       name: isSpacer ? "" : name || undefined,
-      url: isSpacer ? "" : url || undefined,
+      url: isLayoutTile ? "" : url || undefined,
       // Send the raw value so clearing (null) reaches the body and the server
       // writes NULL; otherwise an undefined field is dropped and the old color
       // sticks. A non-empty string sets an explicit per-tile color as before.
-      bgColor: isSpacer ? null : bgColor,
+      bgColor: isLayoutTile ? null : bgColor,
       // Send "" to explicitly clear the image when removed; placement fields are
       // only sent when an image is present.
-      imageUrl: isSpacer ? "" : imageUrl || "",
-      imageFit: !isSpacer && imageUrl ? imageFit : undefined,
-      imagePosition: !isSpacer && imageUrl ? imagePosition : undefined,
-      imageScale: !isSpacer && imageUrl ? imageScale : undefined,
+      imageUrl: isLayoutTile ? "" : imageUrl || "",
+      imageFit: !isLayoutTile && imageUrl ? imageFit : undefined,
+      imagePosition: !isLayoutTile && imageUrl ? imagePosition : undefined,
+      imageScale: !isLayoutTile && imageUrl ? imageScale : undefined,
       // Title size/placement only applies to plain app/link tiles; integration
       // (widget) tiles keep their fixed header layout, so clear those fields.
       titleSize: integration === NONE ? titleSize : null,
@@ -730,8 +739,12 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
         <div className="space-y-4 py-2">
           {!isSpacer && (
             <div className="space-y-1.5">
-              <Label>Name</Label>
-              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="My App" />
+              <Label>{isDivider ? "Label" : "Name"}</Label>
+              <Input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder={isDivider ? "Media" : "My App"}
+              />
             </div>
           )}
 
@@ -768,6 +781,14 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
               completely transparent on the dashboard and only shows a dashed
               outline while editing. Just drag and resize it to shape your
               layout.
+            </p>
+          )}
+
+          {isDivider && (
+            <p className="text-sm text-muted-foreground border-t border-border pt-4">
+              A section heading tile for grouping. It shows the label text above
+              with no card background — drop it between groups of tiles and
+              resize it to span a row.
             </p>
           )}
 
@@ -1167,7 +1188,7 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
             />
           )}
 
-          {!isSpacer && (
+          {!isLayoutTile && (
             <div className="space-y-1.5">
               <Label>URL</Label>
               <Input
@@ -1178,7 +1199,7 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
             </div>
           )}
 
-          {!isSpacer && (
+          {!isLayoutTile && (
             <label
               htmlFor="hide-title"
               className="flex items-center gap-2 cursor-pointer select-none"
@@ -1192,7 +1213,7 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
             </label>
           )}
 
-          {!isSpacer && (
+          {!isLayoutTile && (
             <label
               htmlFor="scrollable"
               className="flex items-center gap-2 cursor-pointer select-none"
@@ -1257,7 +1278,7 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
             </div>
           )}
 
-          {!isSpacer && (
+          {!isLayoutTile && (
           <div className="space-y-1.5">
             <Label>Background Color</Label>
             <div className="flex items-center gap-2">
@@ -1308,7 +1329,7 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
           </div>
           )}
 
-          {!isSpacer && (
+          {!isLayoutTile && (
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label>Image</Label>
@@ -1462,7 +1483,7 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
           </div>
           )}
 
-          {!isSpacer && imageUrl && (
+          {!isLayoutTile && imageUrl && (
             <div className="space-y-3">
               <div className="space-y-1.5">
                 <Label>Fit</Label>
