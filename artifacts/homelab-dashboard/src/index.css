@@ -484,9 +484,8 @@
   background-image:
     radial-gradient(900px 520px at 100% -12%, hsl(6 68% 52% / .16), transparent 55%),
     radial-gradient(760px 480px at -6% 110%, hsl(214 70% 55% / .12), transparent 55%),
-    linear-gradient(hsl(214 60% 62% / .06) 1px, transparent 1px),
-    linear-gradient(90deg, hsl(214 60% 62% / .06) 1px, transparent 1px);
-  background-size: cover, cover, 26px 26px, 26px 26px;
+    radial-gradient(hsl(214 60% 62% / .10) 1.5px, transparent 1.5px);
+  background-size: cover, cover, 26px 26px;
   background-attachment: fixed;
 }
 
