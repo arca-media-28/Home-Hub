@@ -6,10 +6,12 @@ import {
   useGetMe,
   useGetTiles,
   useSaveLayout,
+  useCreateTile,
   useGetConnectionsStatus,
   getGetMeQueryKey,
   getGetTilesQueryKey,
   getGetConnectionsStatusQueryKey,
+  TileType,
   type Tile,
   type ServiceStatus,
 } from "@workspace/api-client-react";
@@ -37,6 +39,7 @@ import {
   Pencil,
   Check,
   Loader2,
+  SeparatorHorizontal,
   Settings as SettingsIcon,
 } from "lucide-react";
 
@@ -240,6 +243,23 @@ export default function Dashboard() {
     },
   });
 
+  // Quick-add for the layout-only spacer tile. A spacer has no settings, so it
+  // skips the editor entirely and drops straight into the first empty slot.
+  const createTile = useCreateTile({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getGetTilesQueryKey() });
+      },
+      onError: (err) => {
+        toast({
+          title: "Failed to add spacer",
+          description: err.message,
+          variant: "destructive",
+        });
+      },
+    },
+  });
+
   const layout = tiles.map(tileToLayout);
   const cols = gridWidth !== null ? colsForWidth(gridWidth) : MIN_COLS;
 
@@ -310,6 +330,22 @@ export default function Dashboard() {
     setModalOpen(true);
   }
 
+  function addSpacer() {
+    // Spacers carry no content — drop a default 4×4 gap into the first empty
+    // slot without opening the editor. It lands movable/resizable like any tile.
+    const pos = findFirstEmptyPosition(tiles, 4, 4, cols);
+    createTile.mutate({
+      data: {
+        type: TileType.app,
+        integration: "spacer",
+        gridX: pos.x,
+        gridY: pos.y,
+        gridW: 4,
+        gridH: 4,
+      },
+    });
+  }
+
   function openEditModal(tile: Tile) {
     if (!editMode) return;
     setSelectedTile(tile);
@@ -354,10 +390,22 @@ export default function Dashboard() {
             ) : null}
 
             {editMode && (
-              <Button size="sm" variant="default" className="gap-1.5" onClick={openCreateModal}>
-                <Plus className="w-3.5 h-3.5" />
-                Add tile
-              </Button>
+              <>
+                <Button size="sm" variant="default" className="gap-1.5" onClick={openCreateModal}>
+                  <Plus className="w-3.5 h-3.5" />
+                  Add tile
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5"
+                  onClick={addSpacer}
+                  disabled={createTile.isPending}
+                >
+                  <SeparatorHorizontal className="w-3.5 h-3.5" />
+                  Add spacer
+                </Button>
+              </>
             )}
 
             <Button
