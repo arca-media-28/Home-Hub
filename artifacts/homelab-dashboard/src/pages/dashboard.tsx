@@ -75,6 +75,38 @@ function tileToLayout(tile: Tile) {
   };
 }
 
+// Scan the grid row by row, column by column for the first rectangular slot of
+// size (w × h) that is fully unoccupied by existing tiles. Returns {x, y} of the
+// first free slot, or {x: 0, y: maxY} (below every existing tile) as a safe
+// fallback if nothing fits within the scan depth.
+function findFirstEmptyPosition(
+  existing: Pick<Tile, "gridX" | "gridY" | "gridW" | "gridH">[],
+  w: number,
+  h: number,
+  cols: number,
+): { x: number; y: number } {
+  const maxX = Math.max(0, cols - w);
+  const maxY = existing.reduce((acc, t) => Math.max(acc, t.gridY + t.gridH), 0);
+
+  const overlaps = (x: number, y: number): boolean =>
+    existing.some(
+      (t) =>
+        x < t.gridX + t.gridW &&
+        x + w > t.gridX &&
+        y < t.gridY + t.gridH &&
+        y + h > t.gridY,
+    );
+
+  // Scan one row past the current content so a slot just below also gets found.
+  for (let y = 0; y <= maxY; y++) {
+    for (let x = 0; x <= maxX; x++) {
+      if (!overlaps(x, y)) return { x, y };
+    }
+  }
+
+  return { x: 0, y: maxY };
+}
+
 // Maps a tile's integration to the saved connection it pings. Plain app/link
 // tiles (no integration) have no backing service and so get no reachability dot.
 const INTEGRATION_SERVICE: Record<string, string> = {
@@ -105,6 +137,13 @@ export default function Dashboard() {
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedTile, setSelectedTile] = useState<Tile | undefined>(undefined);
   const [modalMode, setModalMode] = useState<EditMode>("create");
+  // Grid slot a newly-created tile should occupy, computed at the moment the
+  // create modal opens so the tile lands in the first empty cell instead of
+  // stacking at (0, 0).
+  const [createGridPos, setCreateGridPos] = useState<{ x: number; y: number }>({
+    x: 0,
+    y: 0,
+  });
   // null until the real container width is measured. Gating the grid render on
   // a measured width (instead of starting from a hard-coded guess) keeps the
   // column count correct on the very first paint, so saved tile positions are
@@ -242,6 +281,9 @@ export default function Dashboard() {
   function openCreateModal() {
     setSelectedTile(undefined);
     setModalMode("create");
+    // Drop the new (default 4×4) tile into the first empty grid slot rather
+    // than stacking it on top of whatever already sits at (0, 0).
+    setCreateGridPos(findFirstEmptyPosition(tiles, 4, 4, cols));
     setModalOpen(true);
   }
 
@@ -429,6 +471,7 @@ export default function Dashboard() {
         onOpenChange={setModalOpen}
         tile={selectedTile}
         mode={modalMode}
+        defaultGridPos={createGridPos}
       />
     </div>
   );

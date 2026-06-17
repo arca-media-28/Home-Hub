@@ -75,6 +75,9 @@ interface TileEditModalProps {
   onOpenChange: (open: boolean) => void;
   tile?: Tile;
   mode: EditMode;
+  // Grid slot a brand-new tile should occupy. Computed by the dashboard from the
+  // first empty cell that fits the default tile size; only used when creating.
+  defaultGridPos?: { x: number; y: number };
 }
 
 const NONE = "none";
@@ -118,7 +121,7 @@ const INTEGRATION_GROUPS = groupByCategory(INTEGRATIONS, (i) => i.value);
 
 type ImageSource = "upload" | "library" | "url";
 
-export default function TileEditModal({ open, onOpenChange, tile, mode }: TileEditModalProps) {
+export default function TileEditModal({ open, onOpenChange, tile, mode, defaultGridPos }: TileEditModalProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -677,8 +680,8 @@ export default function TileEditModal({ open, onOpenChange, tile, mode }: TileEd
                 : isStocks
                   ? { stockWatchlist }
                   : null,
-      gridX: tile?.gridX ?? 0,
-      gridY: tile?.gridY ?? 0,
+      gridX: tile?.gridX ?? defaultGridPos?.x ?? 0,
+      gridY: tile?.gridY ?? defaultGridPos?.y ?? 0,
       gridW: tile?.gridW ?? 4,
       gridH: tile?.gridH ?? 4,
     };
