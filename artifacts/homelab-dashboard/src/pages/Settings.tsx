@@ -371,8 +371,33 @@ function ServiceCard({
   );
 }
 
+// Persist each category's collapsed/expanded state in localStorage, keyed per
+// category, so a user's choice survives reloads and sessions. Defaults to
+// expanded the first time (matching the original behaviour).
+const COLLAPSE_STORAGE_PREFIX = "settings.category.open.";
+
+function readCategoryOpen(title: string): boolean {
+  if (typeof window === "undefined") return true;
+  try {
+    const stored = window.localStorage.getItem(COLLAPSE_STORAGE_PREFIX + title);
+    return stored === null ? true : stored === "true";
+  } catch {
+    return true;
+  }
+}
+
+function writeCategoryOpen(title: string, open: boolean) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(COLLAPSE_STORAGE_PREFIX + title, String(open));
+  } catch {
+    // Ignore storage failures (e.g. private mode); state stays in-memory only.
+  }
+}
+
 // A collapsible group of service cards under a category heading. Expanded by
-// default; collapsed state is local (not persisted across sessions).
+// default the first time; the collapsed state is remembered per category across
+// reloads and sessions via localStorage.
 function CategorySection({
   title,
   children,
@@ -380,9 +405,15 @@ function CategorySection({
   title: string;
   children: React.ReactNode;
 }) {
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(() => readCategoryOpen(title));
+
+  function handleOpenChange(next: boolean) {
+    setOpen(next);
+    writeCategoryOpen(title, next);
+  }
+
   return (
-    <Collapsible open={open} onOpenChange={setOpen}>
+    <Collapsible open={open} onOpenChange={handleOpenChange}>
       <CollapsibleTrigger className="group flex w-full items-center gap-2 px-1 py-2 text-left">
         <ChevronDown
           className={`w-4 h-4 text-primary transition-transform ${open ? "" : "-rotate-90"}`}
