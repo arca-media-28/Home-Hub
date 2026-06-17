@@ -1677,6 +1677,24 @@ interface ErsatzChannel {
   tvgId: string;
 }
 
+// Decode the XML/HTML entities that appear in ErsatzTV's M3U and XMLTV feeds.
+// Handles the five named entities plus numeric character references in both
+// decimal (`&#39;`) and hex (`&#x27;`) forms so titles like "Limmy's Show!"
+// render correctly instead of showing the raw `&#39;`. The numeric pass runs
+// first so a literal "&amp;#39;" still resolves to "&" rather than "'".
+function decodeXmlEntities(value: string): string {
+  return value
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) =>
+      String.fromCodePoint(parseInt(hex, 16)),
+    )
+    .replace(/&#(\d+);/g, (_, dec) => String.fromCodePoint(parseInt(dec, 10)))
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&amp;/g, "&");
+}
+
 // Parse the channel rows out of an ErsatzTV M3U playlist. Each channel is a
 // `#EXTINF:` line carrying tvg-* attributes followed by the stream URL; we only
 // need the attributes (number, name, id) for the tile.
@@ -1694,7 +1712,7 @@ function parseM3uChannels(m3u: string): ErsatzChannel[] {
     // The display name is the text after the trailing comma; fall back to
     // tvg-name when the comma form is absent.
     const commaName = line.slice(line.indexOf(",") + 1).trim();
-    const name = commaName || attr("tvg-name") || number;
+    const name = decodeXmlEntities(commaName || attr("tvg-name") || number);
     if (!number && !name) continue;
     channels.push({ number, name, tvgId });
   }
@@ -1734,15 +1752,10 @@ function parseXmltvNowPlaying(xml: string, nowMs: number): Map<string, string> {
     const stop = parseXmltvTime(stopRaw);
     if (Number.isNaN(start) || Number.isNaN(stop)) continue;
     if (nowMs < start || nowMs >= stop) continue;
-    const title = body
+    const rawTitle = body
       .match(/<title\b[^>]*>([\s\S]*?)<\/title>/)?.[1]
-      ?.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/, "$1")
-      .replace(/&amp;/g, "&")
-      .replace(/&lt;/g, "<")
-      .replace(/&gt;/g, ">")
-      .replace(/&quot;/g, '"')
-      .replace(/&apos;/g, "'")
-      .trim();
+      ?.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/, "$1");
+    const title = rawTitle ? decodeXmlEntities(rawTitle).trim() : undefined;
     if (title) nowPlaying.set(channel, title);
   }
   return nowPlaying;
