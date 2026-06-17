@@ -429,14 +429,16 @@ export default function Dashboard() {
             <Grid
               className={`layout ${editMode ? "grid-editing" : "grid-locked"}`}
               layout={layout}
-              cols={cols}
-              rowHeight={ROW_HEIGHT}
               width={gridWidth}
+              gridConfig={{
+                cols,
+                rowHeight: ROW_HEIGHT,
+                margin: [GRID_MARGIN, GRID_MARGIN],
+                containerPadding: [0, 0],
+              }}
               dragConfig={{ enabled: editMode, handle: ".drag-handle" }}
               resizeConfig={{ enabled: editMode }}
               onLayoutChange={handleLayoutChange}
-              margin={[GRID_MARGIN, GRID_MARGIN]}
-              containerPadding={[0, 0]}
             >
               {tiles.map((tile) => {
                 // Per-tile overflow: when "scrollable" is on, the tile body
