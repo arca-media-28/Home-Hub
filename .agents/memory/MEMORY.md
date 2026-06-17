@@ -20,3 +20,4 @@
 - [tileSettings persistence whitelist](tile-settings-whitelist.md) — new per-tile setting saves 200 but stays demo? add it to pickTileSettings() allow-list in api-server routes/tiles.ts, not just OpenAPI/modal.
 - [Stocks sparkline candles](stocks-sparkline-candles.md) — /widgets/stocks/candles {series:[{symbol,closes}],sample}; sample drifts toward sample changePercent so trend tone matches; "sparkline" metric gates, fetch enabled-gated + slow refresh.
 - [Integration categories + media server param](integration-categories.md) — shared categoryOf/groupByCategory model for both panels; Plex/Jellyfin share /widgets/media disambiguated by ?server= (also in RQ key) → saved plex vs jellyfin connection.
+- [Plex machineIdentifier resolution](plex-machineid-resolution.md) — deep-link machineId resolves /identity then server root `/`, parses JSON AND XML; additive (failure logs warn + url:null, never 502).

@@ -62,23 +62,55 @@ function plexDeepLink(machineId: string | undefined, ratingKey: string | undefin
 // before connecting a real server; they won't resolve to a real library item.
 const SAMPLE_PLEX_MACHINE_ID = "demo";
 
-// Resolve the Plex server's machineIdentifier from its identity endpoint. The
-// library-list endpoints (/library/recentlyAdded, /library/onDeck) omit it from
-// their MediaContainer root, so deep links must source it here. Returns
-// undefined on any failure so callers fall back to url:null and the tile still
-// renders (this is additive — it must never turn the request into a 502).
+// Pull a Plex machineIdentifier out of a single response body. Plex normally
+// honors `Accept: application/json` and returns { MediaContainer: { ... } }, but
+// some setups (reverse proxies, older PMS) ignore the header and return XML as a
+// string. Handle both: read the JSON field when present, else regex it out of
+// the raw XML. Returns undefined when the field can't be found.
+function extractPlexMachineId(data: unknown): string | undefined {
+  if (data && typeof data === "object") {
+    const id = (data as { MediaContainer?: { machineIdentifier?: string } })
+      .MediaContainer?.machineIdentifier;
+    if (id) return id;
+  }
+  if (typeof data === "string") {
+    const m = data.match(/machineIdentifier="([^"]+)"/);
+    if (m?.[1]) return m[1];
+  }
+  return undefined;
+}
+
+// Resolve the Plex server's machineIdentifier needed for app.plex.tv deep links.
+// The library-list endpoints (/library/recentlyAdded, /library/onDeck) omit it
+// from their MediaContainer root, so source it here. Tries /identity first, then
+// falls back to the server root MediaContainer (`/`), which also carries the
+// field — this covers servers where /identity is blocked, returns an unexpected
+// shape, or omits the identifier. Logs a warning when every endpoint fails so
+// the cause is visible. Returns undefined on total failure so callers fall back
+// to url:null and the tile still renders (additive — must never cause a 502).
 async function fetchPlexMachineId(
   baseUrl: string,
   apiKey: string,
 ): Promise<string | undefined> {
-  try {
-    const r = await httpClient.get(`${baseUrl}/identity`, {
-      headers: { "X-Plex-Token": apiKey, Accept: "application/json" },
-    });
-    return r.data?.MediaContainer?.machineIdentifier ?? undefined;
-  } catch {
-    return undefined;
+  const paths = ["/identity", "/"];
+  let lastReason: unknown;
+  for (const path of paths) {
+    try {
+      const r = await httpClient.get(`${baseUrl}${path}`, {
+        headers: { "X-Plex-Token": apiKey, Accept: "application/json" },
+      });
+      const id = extractPlexMachineId(r.data);
+      if (id) return id;
+      lastReason = `no machineIdentifier in ${path} response (status ${r.status})`;
+    } catch (err) {
+      lastReason = normalizeHttpError(err);
+    }
   }
+  logger.warn(
+    { reason: lastReason },
+    "Plex machineIdentifier resolution failed — deep links will be absent",
+  );
+  return undefined;
 }
 
 // Build a deep link that opens a Jellyfin library item directly in the Jellyfin

@@ -627,6 +627,65 @@ describe("GET /widgets/media", () => {
     expect(res.body[0].url).toBeNull();
   });
 
+  it("falls back to the server root when /identity omits the machineIdentifier", async () => {
+    findByService.mockReturnValue(
+      connRow({
+        service: "plex",
+        url: "https://plex.local",
+        extra: JSON.stringify({ token: "plex-token" }),
+      }),
+    );
+    // Some servers omit machineIdentifier from /identity; the server root
+    // MediaContainer still carries it, so resolution must fall back to "/".
+    httpGet.mockImplementation((url: string) => {
+      const u = String(url);
+      if (u.endsWith("/identity")) {
+        return Promise.resolve({ data: { MediaContainer: {} } });
+      }
+      if (u.endsWith("/library/recentlyAdded")) {
+        return Promise.resolve({
+          data: { MediaContainer: { Metadata: [{ ratingKey: 42, title: "Severance", type: "show" }] } },
+        });
+      }
+      // Server root ("/") carries the machineIdentifier.
+      return Promise.resolve({ data: { MediaContainer: { machineIdentifier: "root-id" } } });
+    });
+
+    const res = await request(app).get("/widgets/media");
+    expect(res.status).toBe(200);
+    expect(res.body[0].url).toBe(
+      "https://app.plex.tv/desktop/#!/server/root-id/details?key=%2Flibrary%2Fmetadata%2F42",
+    );
+  });
+
+  it("parses the machineIdentifier out of an XML /identity response", async () => {
+    findByService.mockReturnValue(
+      connRow({
+        service: "plex",
+        url: "https://plex.local",
+        extra: JSON.stringify({ token: "plex-token" }),
+      }),
+    );
+    // Some setups ignore Accept: application/json and return XML as a string;
+    // the identifier must still be extracted via regex.
+    httpGet.mockImplementation((url: string) => {
+      if (String(url).endsWith("/identity")) {
+        return Promise.resolve({
+          data: '<MediaContainer size="0" machineIdentifier="xml-id" version="1.0" />',
+        });
+      }
+      return Promise.resolve({
+        data: { MediaContainer: { Metadata: [{ ratingKey: 42, title: "Severance", type: "show" }] } },
+      });
+    });
+
+    const res = await request(app).get("/widgets/media");
+    expect(res.status).toBe(200);
+    expect(res.body[0].url).toBe(
+      "https://app.plex.tv/desktop/#!/server/xml-id/details?key=%2Flibrary%2Fmetadata%2F42",
+    );
+  });
+
   it("builds a Jellyfin deep link from the /System/Info ServerId + item id", async () => {
     findByService.mockReturnValue(
       connRow({ service: "jellyfin", url: "https://jelly.local", api_key: "jelly-key" }),
