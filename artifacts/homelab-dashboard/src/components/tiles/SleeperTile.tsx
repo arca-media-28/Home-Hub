@@ -75,12 +75,8 @@ function PlayerLine({
   player: TransactionPlayer;
   dropped?: boolean;
 }) {
-  return (
-    <div
-      className={`flex items-center gap-1.5 text-xs leading-snug min-w-0 ${
-        dropped ? "text-muted-foreground" : ""
-      }`}
-    >
+  const body = (
+    <>
       <PlayerAvatar player={player} />
       <span
         className={`flex-shrink-0 font-bold ${
@@ -96,8 +92,31 @@ function PlayerLine({
           <span className="text-muted-foreground"> ({player.position})</span>
         ) : null}
       </span>
-    </div>
+    </>
   );
+
+  const baseClass = `flex items-center gap-1.5 text-xs leading-snug min-w-0 ${
+    dropped ? "text-muted-foreground" : ""
+  }`;
+
+  // Link to the player's Sleeper page when a URL can be built, mirroring how the
+  // Sports tile links games to box scores. Stays an inert div otherwise.
+  if (player.profileUrl) {
+    return (
+      <a
+        href={player.profileUrl}
+        target="_blank"
+        rel="noreferrer"
+        title={`${player.name} — open on Sleeper`}
+        onClick={(e) => e.stopPropagation()}
+        className={`${baseClass} rounded-sm hover:text-primary transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring`}
+      >
+        {body}
+      </a>
+    );
+  }
+
+  return <div className={baseClass}>{body}</div>;
 }
 
 // Estimated rendered height of one move block, so the reveal budget can decide
@@ -383,7 +402,20 @@ export default function SleeperTile({ density, tileSettings }: WidgetProps) {
                   <span className="w-4 flex-shrink-0 tabular-nums text-muted-foreground">
                     {row.rank}
                   </span>
-                  <span className="truncate">{row.teamName}</span>
+                  {row.profileUrl ? (
+                    <a
+                      href={row.profileUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      title={`${row.teamName} — open on Sleeper`}
+                      onClick={(e) => e.stopPropagation()}
+                      className="truncate rounded-sm hover:text-primary transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    >
+                      {row.teamName}
+                    </a>
+                  ) : (
+                    <span className="truncate">{row.teamName}</span>
+                  )}
                 </span>
                 <span className="flex-shrink-0 tabular-nums text-muted-foreground">
                   {row.wins}-{row.losses}

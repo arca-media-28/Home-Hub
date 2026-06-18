@@ -59,6 +59,7 @@ export interface SleeperRoster {
 
 export interface SleeperLeagueUser {
   userId: string;
+  username: string | null;
   displayName: string;
   teamName: string | null;
   avatar: string | null;
@@ -187,6 +188,28 @@ export function playerHeadshotUrl(
   return `https://sleepercdn.com/content/${sport}/players/thumb/${playerId}.jpg`;
 }
 
+// Public Sleeper player page for a player, e.g.
+// https://sleeper.com/players/nfl/<id>. Used to link a move's player line to
+// their stats/news, mirroring how the Sports tile links games to box scores.
+// Returns null when no id is available so callers can stay inert.
+export function playerProfileUrl(
+  sport: string,
+  playerId: string | null | undefined,
+): string | null {
+  if (!playerId) return null;
+  return `https://sleeper.com/players/${sport}/${playerId}`;
+}
+
+// Public Sleeper user profile for a manager, e.g. https://sleeper.com/u/<name>.
+// Used to link a standings team name to that manager's Sleeper page. Returns
+// null when no username is available so callers can stay inert.
+export function userProfileUrl(
+  username: string | null | undefined,
+): string | null {
+  if (!username) return null;
+  return `https://sleeper.com/u/${encodeURIComponent(username)}`;
+}
+
 // Two-letter initials for a player/team name, used as the avatar fallback when a
 // headshot is missing. Picks the first letter of the first and last word.
 export function nameInitials(name: string): string {
@@ -277,6 +300,7 @@ export async function fetchLeagueUsers(leagueId: string): Promise<SleeperLeagueU
   const raw = await getJson<RawUser[]>(`${BASE}/league/${leagueId}/users`);
   return (raw ?? []).map((u) => ({
     userId: u.user_id ?? "",
+    username: u.username ?? null,
     displayName: u.display_name ?? "Manager",
     teamName: u.metadata?.team_name ?? null,
     avatar: avatarUrl(u.avatar),
@@ -409,6 +433,9 @@ export interface StandingRow {
   pointsFor: number;
   // True for the configured user's own team, so the tile can highlight it.
   isSelf: boolean;
+  // Public Sleeper profile of the team's manager, or null when no URL can be
+  // built (e.g. an unclaimed roster) so the tile stays inert.
+  profileUrl: string | null;
 }
 
 export interface MatchupSide {
@@ -436,6 +463,8 @@ export interface TransactionPlayer {
   // CDN headshot URL; may 404, so the tile must fall back to `initials`.
   avatarUrl: string | null;
   initials: string;
+  // Public Sleeper player page, or null when no URL can be built (stays inert).
+  profileUrl: string | null;
 }
 
 // One side of a move: a fantasy team and the players it gained/lost. Waivers and
@@ -486,6 +515,9 @@ export function buildStandings(
     losses: r.losses,
     ties: r.ties,
     pointsFor: r.pointsFor,
+    profileUrl: userProfileUrl(
+      r.ownerId ? users.find((u) => u.userId === r.ownerId)?.username : null,
+    ),
     isSelf: Boolean(selfUserId && r.ownerId === selfUserId),
   }));
 }
@@ -583,6 +615,7 @@ function resolveTransactionPlayer(
     position: player?.position ?? null,
     avatarUrl: playerHeadshotUrl(sport, playerId),
     initials: nameInitials(name),
+    profileUrl: playerProfileUrl(sport, playerId),
   };
 }
 
