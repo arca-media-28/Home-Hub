@@ -40,6 +40,7 @@ import {
   Check,
   Loader2,
   SeparatorHorizontal,
+  Heading,
   Settings as SettingsIcon,
 } from "lucide-react";
 
@@ -346,6 +347,24 @@ export default function Dashboard() {
     });
   }
 
+  function addDivider() {
+    // Dividers are layout-only section headings carrying just a label. Drop a
+    // default 4×4 divider into the first empty slot without opening the editor;
+    // it lands movable/resizable/editable like any tile and can be renamed.
+    const pos = findFirstEmptyPosition(tiles, 4, 4, cols);
+    createTile.mutate({
+      data: {
+        type: TileType.app,
+        integration: "divider",
+        name: "Section",
+        gridX: pos.x,
+        gridY: pos.y,
+        gridW: 4,
+        gridH: 4,
+      },
+    });
+  }
+
   function openEditModal(tile: Tile) {
     if (!editMode) return;
     setSelectedTile(tile);
@@ -404,6 +423,16 @@ export default function Dashboard() {
                 >
                   <SeparatorHorizontal className="w-3.5 h-3.5" />
                   Add spacer
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5"
+                  onClick={addDivider}
+                  disabled={createTile.isPending}
+                >
+                  <Heading className="w-3.5 h-3.5" />
+                  Add divider
                 </Button>
               </>
             )}
