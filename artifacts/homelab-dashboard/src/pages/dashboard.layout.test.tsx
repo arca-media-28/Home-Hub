@@ -43,13 +43,18 @@ type CapturedGridProps = {
 let capturedGridProps: CapturedGridProps | null = null;
 
 vi.mock("react-grid-layout", () => ({
+  // react-grid-layout v2 takes the column count via `gridConfig.cols` (the
+  // top-level `cols` prop is ignored in that version), so read it from there —
+  // falling back to a top-level `cols` keeps the test robust across versions.
   default: (props: {
-    cols: number;
+    cols?: number;
+    gridConfig?: { cols?: number };
     width: number;
     layout: GridLayoutItem[];
     children?: React.ReactNode;
   }) => {
-    capturedGridProps = { cols: props.cols, width: props.width, layout: props.layout };
+    const cols = props.gridConfig?.cols ?? props.cols ?? 0;
+    capturedGridProps = { cols, width: props.width, layout: props.layout };
     return <div data-testid="grid">{props.children}</div>;
   },
 }));
@@ -63,6 +68,7 @@ vi.mock("@workspace/api-client-react", () => ({
     isPending: false,
     isError: false,
   }),
+  useCreateTile: () => ({ mutate: vi.fn(), isPending: false, isError: false }),
   getGetMeQueryKey: () => ["/api/me"],
   getGetTilesQueryKey: () => ["/api/tiles"],
   getGetConnectionsStatusQueryKey: () => ["/api/connections/status"],
