@@ -65,10 +65,10 @@ describe("resolveEnabledMetrics", () => {
 
 describe("tileDensity", () => {
   it("seeds body height/width from grid units when no measurement is given", () => {
-    // gridH=3 with a header → 3*80 + 2*12 - 45 = 219px of body.
+    // gridH=3 with a header → 3*40 + 2*12 - 45 = 99px of body.
     const d = tileDensity(2, 3);
     expect(d.bodyHeight).toBe(seedBodyHeight(3, true));
-    expect(d.bodyHeight).toBe(219);
+    expect(d.bodyHeight).toBe(99);
     expect(d.bodyWidth).toBeGreaterThan(0);
   });
 
