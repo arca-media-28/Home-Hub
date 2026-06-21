@@ -48,6 +48,12 @@ Thumbs.db
 .cache/
 .local/
 
+# Playwright e2e output
+/test-results/
+/playwright-report/
+/blob-report/
+/.playwright/
+
 # Local environment — real secrets, never commit (.env.example is the tracked template)
 .env
 !.env.example
