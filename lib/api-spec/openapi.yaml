@@ -495,7 +495,7 @@ paths:
             seam additional sources (Spotify, Jellyfin, Navidrome) plug into.
           schema:
             type: string
-            enum: [plex]
+            enum: [plex, spotify]
       responses:
         "200":
           description: Now-playing track and queue
@@ -750,6 +750,132 @@ paths:
                 $ref: "#/components/schemas/ServiceConnection"
         "400":
           description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /connections/spotify/credentials:
+    post:
+      operationId: saveSpotifyCredentials
+      tags: [connections]
+      summary: Save the Spotify app Client ID and Client Secret used for OAuth
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SpotifyCredentialsInput"
+      responses:
+        "200":
+          description: Updated Spotify link status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SpotifyStatus"
+
+  /connections/spotify/status:
+    get:
+      operationId: getSpotifyStatus
+      tags: [connections]
+      summary: Report whether Spotify is configured and a user account is linked
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Spotify link status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SpotifyStatus"
+
+  /connections/spotify/authorize:
+    post:
+      operationId: startSpotifyAuth
+      tags: [connections]
+      summary: Begin the Spotify OAuth flow and return the authorize URL to visit
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SpotifyAuthInput"
+      responses:
+        "200":
+          description: The Spotify authorize URL the browser should navigate to
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SpotifyAuthUrl"
+        "400":
+          description: Spotify credentials are not configured yet
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /connections/spotify/disconnect:
+    post:
+      operationId: disconnectSpotify
+      tags: [connections]
+      summary: Unlink the Spotify account (clears stored OAuth tokens)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Updated Spotify link status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SpotifyStatus"
+
+  /connections/spotify/token:
+    get:
+      operationId: getSpotifyToken
+      tags: [connections]
+      summary: Get a fresh Spotify access token for the Web Playback SDK
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: A short-lived access token, or null when not linked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SpotifyToken"
+
+  /widgets/spotify/command:
+    post:
+      operationId: sendSpotifyCommand
+      tags: [widgets]
+      summary: Remote-control the active Spotify device (play/pause/skip/transfer)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SpotifyCommandInput"
+      responses:
+        "200":
+          description: The command was accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SpotifyCommandResult"
+        "404":
+          description: No active Spotify device to control
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "502":
+          description: Spotify could not be reached or rejected the command
           content:
             application/json:
               schema:
@@ -1335,6 +1461,92 @@ components:
           type: boolean
         message:
           type: string
+
+    SpotifyCredentialsInput:
+      type: object
+      required: [clientId, clientSecret]
+      properties:
+        clientId:
+          description: The Spotify application's Client ID.
+          type: string
+        clientSecret:
+          description: The Spotify application's Client Secret.
+          type: string
+
+    SpotifyStatus:
+      type: object
+      required: [configured, connected, redirectUri]
+      properties:
+        configured:
+          description: True once a Client ID and Client Secret have been saved.
+          type: boolean
+        connected:
+          description: True once a Spotify user account has been linked via OAuth.
+          type: boolean
+        premium:
+          description: >-
+            Whether the linked account is Spotify Premium (required for
+            in-browser Web Playback SDK streaming). Null when not connected.
+          type: ["boolean", "null"]
+        displayName:
+          description: The linked Spotify account's display name. Null when not connected.
+          type: ["string", "null"]
+        redirectUri:
+          description: >-
+            The exact OAuth redirect URI the user must add to their Spotify app's
+            allow-list. Derived from the request origin.
+          type: string
+
+    SpotifyAuthInput:
+      type: object
+      required: [origin]
+      properties:
+        origin:
+          description: >-
+            The dashboard's browser origin (e.g. "https://example.repl.co"), used
+            to build the OAuth redirect URI that points back at this server.
+          type: string
+
+    SpotifyAuthUrl:
+      type: object
+      required: [url]
+      properties:
+        url:
+          description: The Spotify accounts authorize URL the browser should navigate to.
+          type: string
+
+    SpotifyToken:
+      type: object
+      required: [accessToken, expiresAt]
+      properties:
+        accessToken:
+          description: A short-lived Spotify access token, or null when not linked.
+          type: ["string", "null"]
+        expiresAt:
+          description: Unix epoch (ms) at which the access token expires. Null when not linked.
+          type: ["number", "null"]
+
+    SpotifyCommandInput:
+      type: object
+      required: [action]
+      properties:
+        action:
+          description: >-
+            The remote-control action to perform on the active Spotify device.
+            "transfer" moves playback to the given deviceId (used to start
+            in-browser Web Playback SDK streaming).
+          type: string
+          enum: [play, pause, next, previous, transfer]
+        deviceId:
+          description: Target device id, required for "transfer".
+          type: ["string", "null"]
+
+    SpotifyCommandResult:
+      type: object
+      required: [ok]
+      properties:
+        ok:
+          type: boolean
 
     ServiceStatus:
       type: object
@@ -1945,6 +2157,51 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/AudioTrack"
+        auth:
+          description: >-
+            Authorization state for sources that require OAuth (Spotify):
+            "connected" when a valid linked account exists, "needed" when the
+            user must link their account in Settings first. Null for sources
+            that need no per-user OAuth (e.g. Plex).
+          type: ["string", "null"]
+          enum: ["connected", "needed", null]
+        premium:
+          description: >-
+            Whether the linked account supports in-browser playback via the
+            Spotify Web Playback SDK (Premium). True enables in-dashboard
+            streaming; false degrades to remote control of an external device.
+            Null when not applicable (non-OAuth sources or not connected).
+          type: ["boolean", "null"]
+        canControl:
+          description: >-
+            True when there is an active remote device the tile can drive
+            (play/pause/skip). False when nothing is controllable right now
+            (no active Spotify device). Null when not applicable.
+          type: ["boolean", "null"]
+        device:
+          description: >-
+            The source's currently active playback device, when one exists
+            (Spotify). Null when there is no active device or not applicable.
+          oneOf:
+            - $ref: "#/components/schemas/AudioDevice"
+            - type: "null"
+
+    AudioDevice:
+      type: object
+      required: [id, name, isActive]
+      properties:
+        id:
+          description: Source-specific device identifier.
+          type: ["string", "null"]
+        name:
+          description: Human-readable device name (e.g. "Living Room", "Web Player").
+          type: string
+        isActive:
+          description: Whether this device is the one currently playing.
+          type: boolean
+        volumePercent:
+          description: Device output volume 0–100, when the source reports it.
+          type: ["number", "null"]
 
     NewsData:
       type: object

@@ -934,7 +934,8 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
               <Label htmlFor="audio-source">Music source</Label>
               <p className="text-xs text-muted-foreground">
                 Where this tile pulls now-playing and the queue from. Plex uses
-                your saved Plex connection.
+                your saved Plex connection; Spotify uses your linked Spotify
+                account (link it in Settings).
               </p>
               <Select value={audioSource} onValueChange={setAudioSource}>
                 <SelectTrigger id="audio-source">
@@ -942,6 +943,7 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="plex">Plex</SelectItem>
+                  <SelectItem value="spotify">Spotify</SelectItem>
                 </SelectContent>
               </Select>
             </div>

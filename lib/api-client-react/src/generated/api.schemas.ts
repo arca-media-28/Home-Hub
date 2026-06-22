@@ -529,6 +529,83 @@ export interface ConnectionTestResult {
   message: string;
 }
 
+export interface SpotifyCredentialsInput {
+  /** The Spotify application's Client ID. */
+  clientId: string;
+  /** The Spotify application's Client Secret. */
+  clientSecret: string;
+}
+
+export interface SpotifyStatus {
+  /** True once a Client ID and Client Secret have been saved. */
+  configured: boolean;
+  /** True once a Spotify user account has been linked via OAuth. */
+  connected: boolean;
+  /**
+     * Whether the linked account is Spotify Premium (required for in-browser Web Playback SDK streaming). Null when not connected.
+     * @nullable
+     */
+  premium?: boolean | null;
+  /**
+     * The linked Spotify account's display name. Null when not connected.
+     * @nullable
+     */
+  displayName?: string | null;
+  /** The exact OAuth redirect URI the user must add to their Spotify app's allow-list. Derived from the request origin. */
+  redirectUri: string;
+}
+
+export interface SpotifyAuthInput {
+  /** The dashboard's browser origin (e.g. "https://example.repl.co"), used to build the OAuth redirect URI that points back at this server. */
+  origin: string;
+}
+
+export interface SpotifyAuthUrl {
+  /** The Spotify accounts authorize URL the browser should navigate to. */
+  url: string;
+}
+
+export interface SpotifyToken {
+  /**
+     * A short-lived Spotify access token, or null when not linked.
+     * @nullable
+     */
+  accessToken: string | null;
+  /**
+     * Unix epoch (ms) at which the access token expires. Null when not linked.
+     * @nullable
+     */
+  expiresAt: number | null;
+}
+
+/**
+ * The remote-control action to perform on the active Spotify device. "transfer" moves playback to the given deviceId (used to start in-browser Web Playback SDK streaming).
+ */
+export type SpotifyCommandInputAction = typeof SpotifyCommandInputAction[keyof typeof SpotifyCommandInputAction];
+
+
+export const SpotifyCommandInputAction = {
+  play: 'play',
+  pause: 'pause',
+  next: 'next',
+  previous: 'previous',
+  transfer: 'transfer',
+} as const;
+
+export interface SpotifyCommandInput {
+  /** The remote-control action to perform on the active Spotify device. "transfer" moves playback to the given deviceId (used to start in-browser Web Playback SDK streaming). */
+  action: SpotifyCommandInputAction;
+  /**
+     * Target device id, required for "transfer".
+     * @nullable
+     */
+  deviceId?: string | null;
+}
+
+export interface SpotifyCommandResult {
+  ok: boolean;
+}
+
 export interface ServiceStatus {
   service: string;
   configured: boolean;
@@ -898,6 +975,35 @@ export interface AudioTrack {
   streamUrl?: string | null;
 }
 
+/**
+ * Authorization state for sources that require OAuth (Spotify): "connected" when a valid linked account exists, "needed" when the user must link their account in Settings first. Null for sources that need no per-user OAuth (e.g. Plex).
+ * @nullable
+ */
+export type AudioPlayerDataAuth = typeof AudioPlayerDataAuth[keyof typeof AudioPlayerDataAuth] | null;
+
+
+export const AudioPlayerDataAuth = {
+  connected: 'connected',
+  needed: 'needed',
+} as const;
+
+export interface AudioDevice {
+  /**
+     * Source-specific device identifier.
+     * @nullable
+     */
+  id: string | null;
+  /** Human-readable device name (e.g. "Living Room", "Web Player"). */
+  name: string;
+  /** Whether this device is the one currently playing. */
+  isActive: boolean;
+  /**
+     * Device output volume 0–100, when the source reports it.
+     * @nullable
+     */
+  volumePercent?: number | null;
+}
+
 export interface AudioPlayerData {
   /** The music source backing this response (e.g. "plex"). */
   source: string;
@@ -907,6 +1013,23 @@ export interface AudioPlayerData {
   nowPlaying: AudioTrack | null;
   /** Ordered list of browser-playable tracks the shared player can step through (skip next/previous). For Plex this is the now-playing track's album, or recent tracks when no session is active. */
   queue: AudioTrack[];
+  /**
+     * Authorization state for sources that require OAuth (Spotify): "connected" when a valid linked account exists, "needed" when the user must link their account in Settings first. Null for sources that need no per-user OAuth (e.g. Plex).
+     * @nullable
+     */
+  auth?: AudioPlayerDataAuth;
+  /**
+     * Whether the linked account supports in-browser playback via the Spotify Web Playback SDK (Premium). True enables in-dashboard streaming; false degrades to remote control of an external device. Null when not applicable (non-OAuth sources or not connected).
+     * @nullable
+     */
+  premium?: boolean | null;
+  /**
+     * True when there is an active remote device the tile can drive (play/pause/skip). False when nothing is controllable right now (no active Spotify device). Null when not applicable.
+     * @nullable
+     */
+  canControl?: boolean | null;
+  /** The source's currently active playback device, when one exists (Spotify). Null when there is no active device or not applicable. */
+  device?: AudioDevice | null;
 }
 
 export interface NewsItem {
@@ -981,6 +1104,7 @@ export type GetAudioPlayerNowPlayingSource = typeof GetAudioPlayerNowPlayingSour
 
 export const GetAudioPlayerNowPlayingSource = {
   plex: 'plex',
+  spotify: 'spotify',
 } as const;
 
 export type GetNewsWidgetParams = {

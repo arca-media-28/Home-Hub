@@ -42,6 +42,9 @@ export interface AudioPlayerControls extends AudioPlayerState {
   // streamed; callers should guard before calling.
   playQueue: (tracks: AudioTrack[], startIndex: number, ownerId: string) => void;
   togglePlay: () => void;
+  // Pause whatever is playing (no-op when idle). Used to honour the single-stream
+  // contract when another engine — e.g. the Spotify Web Playback SDK — takes over.
+  pause: () => void;
   next: () => void;
   prev: () => void;
   // Seek to an absolute position in seconds.
@@ -140,6 +143,11 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
     }
   }, [currentTrack]);
 
+  const pause = useCallback(() => {
+    const el = audioRef.current;
+    if (el && !el.paused) el.pause();
+  }, []);
+
   const next = useCallback(() => {
     if (queue.length === 0) return;
     const i = index + 1;
@@ -234,6 +242,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       ownerId,
       playQueue,
       togglePlay,
+      pause,
       next,
       prev,
       seek,
@@ -250,6 +259,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       ownerId,
       playQueue,
       togglePlay,
+      pause,
       next,
       prev,
       seek,

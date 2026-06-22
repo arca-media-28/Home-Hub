@@ -698,7 +698,7 @@ export const GetErsatzTvWidgetResponse = zod.object({
  * @summary Get the current/last music track and a playable queue for the Audio Player tile
  */
 export const GetAudioPlayerNowPlayingQueryParams = zod.object({
-  "source": zod.enum(['plex']).optional().describe('Which music source backs the tile. \"plex\" resolves the saved Plex connection and returns its current\/last music session plus a browser-playable queue. Defaults to \"plex\" when omitted. This is the seam additional sources (Spotify, Jellyfin, Navidrome) plug into.')
+  "source": zod.enum(['plex', 'spotify']).optional().describe('Which music source backs the tile. \"plex\" resolves the saved Plex connection and returns its current\/last music session plus a browser-playable queue. Defaults to \"plex\" when omitted. This is the seam additional sources (Spotify, Jellyfin, Navidrome) plug into.')
 })
 
 export const GetAudioPlayerNowPlayingResponse = zod.object({
@@ -725,7 +725,16 @@ export const GetAudioPlayerNowPlayingResponse = zod.object({
   "progressMs": zod.number().nullish().describe('Playback offset in milliseconds for the source\'s current session (Plex viewOffset). Only set on the now-playing track of an active remote session; null otherwise.'),
   "state": zod.string().nullish().describe('Remote playback state reported by the source for an active session: \"playing\", \"paused\", or \"stopped\". Null when there is no active session (the track is a queue\/last-played entry, not live).'),
   "streamUrl": zod.string().nullish().describe('Fully-qualified, authenticated audio stream URL an HTML audio element can play directly (Plex part key + token). Null when the source does not expose an in-browser-playable stream (remote-control-only).')
-})).describe('Ordered list of browser-playable tracks the shared player can step through (skip next\/previous). For Plex this is the now-playing track\'s album, or recent tracks when no session is active.')
+})).describe('Ordered list of browser-playable tracks the shared player can step through (skip next\/previous). For Plex this is the now-playing track\'s album, or recent tracks when no session is active.'),
+  "auth": zod.union([zod.literal('connected'),zod.literal('needed'),zod.literal(null)]).nullish().describe('Authorization state for sources that require OAuth (Spotify): \"connected\" when a valid linked account exists, \"needed\" when the user must link their account in Settings first. Null for sources that need no per-user OAuth (e.g. Plex).'),
+  "premium": zod.boolean().nullish().describe('Whether the linked account supports in-browser playback via the Spotify Web Playback SDK (Premium). True enables in-dashboard streaming; false degrades to remote control of an external device. Null when not applicable (non-OAuth sources or not connected).'),
+  "canControl": zod.boolean().nullish().describe('True when there is an active remote device the tile can drive (play\/pause\/skip). False when nothing is controllable right now (no active Spotify device). Null when not applicable.'),
+  "device": zod.union([zod.object({
+  "id": zod.string().nullable().describe('Source-specific device identifier.'),
+  "name": zod.string().describe('Human-readable device name (e.g. \"Living Room\", \"Web Player\").'),
+  "isActive": zod.boolean().describe('Whether this device is the one currently playing.'),
+  "volumePercent": zod.number().nullish().describe('Device output volume 0–100, when the source reports it.')
+}),zod.null()]).optional().describe('The source\'s currently active playback device, when one exists (Spotify). Null when there is no active device or not applicable.')
 })
 
 
@@ -882,6 +891,81 @@ export const UpdateConnectionResponse = zod.object({
   "password": zod.string().nullish(),
   "token": zod.string().nullish(),
   "updatedAt": zod.string().nullish()
+})
+
+
+/**
+ * @summary Save the Spotify app Client ID and Client Secret used for OAuth
+ */
+export const SaveSpotifyCredentialsBody = zod.object({
+  "clientId": zod.string().describe('The Spotify application\'s Client ID.'),
+  "clientSecret": zod.string().describe('The Spotify application\'s Client Secret.')
+})
+
+export const SaveSpotifyCredentialsResponse = zod.object({
+  "configured": zod.boolean().describe('True once a Client ID and Client Secret have been saved.'),
+  "connected": zod.boolean().describe('True once a Spotify user account has been linked via OAuth.'),
+  "premium": zod.boolean().nullish().describe('Whether the linked account is Spotify Premium (required for in-browser Web Playback SDK streaming). Null when not connected.'),
+  "displayName": zod.string().nullish().describe('The linked Spotify account\'s display name. Null when not connected.'),
+  "redirectUri": zod.string().describe('The exact OAuth redirect URI the user must add to their Spotify app\'s allow-list. Derived from the request origin.')
+})
+
+
+/**
+ * @summary Report whether Spotify is configured and a user account is linked
+ */
+export const GetSpotifyStatusResponse = zod.object({
+  "configured": zod.boolean().describe('True once a Client ID and Client Secret have been saved.'),
+  "connected": zod.boolean().describe('True once a Spotify user account has been linked via OAuth.'),
+  "premium": zod.boolean().nullish().describe('Whether the linked account is Spotify Premium (required for in-browser Web Playback SDK streaming). Null when not connected.'),
+  "displayName": zod.string().nullish().describe('The linked Spotify account\'s display name. Null when not connected.'),
+  "redirectUri": zod.string().describe('The exact OAuth redirect URI the user must add to their Spotify app\'s allow-list. Derived from the request origin.')
+})
+
+
+/**
+ * @summary Begin the Spotify OAuth flow and return the authorize URL to visit
+ */
+export const StartSpotifyAuthBody = zod.object({
+  "origin": zod.string().describe('The dashboard\'s browser origin (e.g. \"https:\/\/example.repl.co\"), used to build the OAuth redirect URI that points back at this server.')
+})
+
+export const StartSpotifyAuthResponse = zod.object({
+  "url": zod.string().describe('The Spotify accounts authorize URL the browser should navigate to.')
+})
+
+
+/**
+ * @summary Unlink the Spotify account (clears stored OAuth tokens)
+ */
+export const DisconnectSpotifyResponse = zod.object({
+  "configured": zod.boolean().describe('True once a Client ID and Client Secret have been saved.'),
+  "connected": zod.boolean().describe('True once a Spotify user account has been linked via OAuth.'),
+  "premium": zod.boolean().nullish().describe('Whether the linked account is Spotify Premium (required for in-browser Web Playback SDK streaming). Null when not connected.'),
+  "displayName": zod.string().nullish().describe('The linked Spotify account\'s display name. Null when not connected.'),
+  "redirectUri": zod.string().describe('The exact OAuth redirect URI the user must add to their Spotify app\'s allow-list. Derived from the request origin.')
+})
+
+
+/**
+ * @summary Get a fresh Spotify access token for the Web Playback SDK
+ */
+export const GetSpotifyTokenResponse = zod.object({
+  "accessToken": zod.string().nullable().describe('A short-lived Spotify access token, or null when not linked.'),
+  "expiresAt": zod.number().nullable().describe('Unix epoch (ms) at which the access token expires. Null when not linked.')
+})
+
+
+/**
+ * @summary Remote-control the active Spotify device (play/pause/skip/transfer)
+ */
+export const SendSpotifyCommandBody = zod.object({
+  "action": zod.enum(['play', 'pause', 'next', 'previous', 'transfer']).describe('The remote-control action to perform on the active Spotify device. \"transfer\" moves playback to the given deviceId (used to start in-browser Web Playback SDK streaming).'),
+  "deviceId": zod.string().nullish().describe('Target device id, required for \"transfer\".')
+})
+
+export const SendSpotifyCommandResponse = zod.object({
+  "ok": zod.boolean()
 })
 
 

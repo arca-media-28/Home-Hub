@@ -5,6 +5,8 @@
  * HomeHub API
  * OpenAPI spec version: 0.1.0
  */
+import type { AudioDevice } from './audioDevice';
+import type { AudioPlayerDataAuth } from './audioPlayerDataAuth';
 import type { AudioTrack } from './audioTrack';
 
 export interface AudioPlayerData {
@@ -16,4 +18,21 @@ export interface AudioPlayerData {
   nowPlaying: AudioTrack | null;
   /** Ordered list of browser-playable tracks the shared player can step through (skip next/previous). For Plex this is the now-playing track's album, or recent tracks when no session is active. */
   queue: AudioTrack[];
+  /**
+     * Authorization state for sources that require OAuth (Spotify): "connected" when a valid linked account exists, "needed" when the user must link their account in Settings first. Null for sources that need no per-user OAuth (e.g. Plex).
+     * @nullable
+     */
+  auth?: AudioPlayerDataAuth;
+  /**
+     * Whether the linked account supports in-browser playback via the Spotify Web Playback SDK (Premium). True enables in-dashboard streaming; false degrades to remote control of an external device. Null when not applicable (non-OAuth sources or not connected).
+     * @nullable
+     */
+  premium?: boolean | null;
+  /**
+     * True when there is an active remote device the tile can drive (play/pause/skip). False when nothing is controllable right now (no active Spotify device). Null when not applicable.
+     * @nullable
+     */
+  canControl?: boolean | null;
+  /** The source's currently active playback device, when one exists (Spotify). Null when there is no active device or not applicable. */
+  device?: AudioDevice | null;
 }

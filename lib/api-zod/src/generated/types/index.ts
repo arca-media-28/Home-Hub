@@ -6,7 +6,9 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './audioDevice';
 export * from './audioPlayerData';
+export * from './audioPlayerDataAuth';
 export * from './audioTrack';
 export * from './authCredentials';
 export * from './authResponse';
@@ -54,6 +56,14 @@ export * from './serviceStatus';
 export * from './sonarrData';
 export * from './sonarrQueueItem';
 export * from './sonarrUpcomingItem';
+export * from './spotifyAuthInput';
+export * from './spotifyAuthUrl';
+export * from './spotifyCommandInput';
+export * from './spotifyCommandInputAction';
+export * from './spotifyCommandResult';
+export * from './spotifyCredentialsInput';
+export * from './spotifyStatus';
+export * from './spotifyToken';
 export * from './stockCandlesData';
 export * from './stockCandleSeries';
 export * from './stockData';

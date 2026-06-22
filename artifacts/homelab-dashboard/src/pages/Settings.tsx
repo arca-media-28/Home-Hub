@@ -5,8 +5,13 @@ import {
   useGetConnections,
   useUpdateConnection,
   useTestConnection,
+  useGetSpotifyStatus,
+  useSaveSpotifyCredentials,
+  useStartSpotifyAuth,
+  useDisconnectSpotify,
   getGetConnectionsQueryKey,
   getGetConnectionsStatusQueryKey,
+  getGetSpotifyStatusQueryKey,
   getGetMeQueryKey,
   type ServiceConnection,
   type ServiceConnectionUpdate,
@@ -39,6 +44,9 @@ import {
   ChevronDown,
   Plug,
   X,
+  Copy,
+  ExternalLink,
+  Unplug,
 } from "lucide-react";
 import {
   Collapsible,
@@ -389,6 +397,291 @@ function ServiceCard({
   );
 }
 
+// Spotify needs a bespoke card: it uses OAuth (Client ID/Secret + an account
+// link round-trip) rather than the simple credential form the other services
+// share. The user registers their own Spotify app — no Replit integration
+// exists — so we surface the exact redirect URI they must allow-list.
+function SpotifyCard() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const { data: status, isLoading } = useGetSpotifyStatus({
+    query: { queryKey: getGetSpotifyStatusQueryKey() },
+  });
+
+  const [clientId, setClientId] = useState("");
+  const [clientSecret, setClientSecret] = useState("");
+
+  const refreshStatus = () =>
+    queryClient.invalidateQueries({ queryKey: getGetSpotifyStatusQueryKey() });
+
+  const saveMutation = useSaveSpotifyCredentials({
+    mutation: {
+      onSuccess: (next) => {
+        queryClient.setQueryData(getGetSpotifyStatusQueryKey(), next);
+        toast({ title: "Spotify credentials saved" });
+      },
+      onError: () =>
+        toast({
+          title: "Couldn’t save credentials",
+          description: "Check the Client ID and Secret and try again.",
+          variant: "destructive",
+        }),
+    },
+  });
+
+  const authMutation = useStartSpotifyAuth({
+    mutation: {
+      onError: () =>
+        toast({
+          title: "Couldn’t start Spotify sign-in",
+          description: "Save your Client ID and Secret first.",
+          variant: "destructive",
+        }),
+    },
+  });
+
+  const disconnectMutation = useDisconnectSpotify({
+    mutation: {
+      onSuccess: (next) => {
+        queryClient.setQueryData(getGetSpotifyStatusQueryKey(), next);
+        toast({ title: "Spotify disconnected" });
+      },
+      onError: () => refreshStatus(),
+    },
+  });
+
+  // The OAuth popup posts its result here when it returns; refresh status and
+  // toast in this (the dashboard) tab.
+  useEffect(() => {
+    function onMessage(e: MessageEvent) {
+      if (e.origin !== window.location.origin) return;
+      if (e.data?.type !== "spotify-auth") return;
+      queryClient.invalidateQueries({ queryKey: getGetSpotifyStatusQueryKey() });
+      if (e.data.result === "connected") {
+        toast({ title: "Spotify connected" });
+      } else {
+        toast({
+          title: "Spotify connection failed",
+          description: "Please try linking your account again.",
+          variant: "destructive",
+        });
+      }
+    }
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, [queryClient, toast]);
+
+  const configured = status?.configured ?? false;
+  const connected = status?.connected ?? false;
+  const redirectUri = status?.redirectUri ?? "";
+
+  function handleSaveCredentials(e: React.FormEvent) {
+    e.preventDefault();
+    if (!clientId.trim() || !clientSecret.trim()) return;
+    saveMutation.mutate({ data: { clientId: clientId.trim(), clientSecret: clientSecret.trim() } });
+  }
+
+  function handleConnect() {
+    // Spotify's consent page refuses to be framed (it sets frame-ancestors), and
+    // the dashboard runs inside Replit's preview iframe — so navigating in-place
+    // shows "accounts.spotify.com refused to connect". Open the flow in a
+    // top-level popup instead. The window MUST be opened synchronously inside the
+    // click handler (before the await) or the browser's popup blocker kills it.
+    const popup = window.open("about:blank", "spotify-auth", "width=520,height=720");
+
+    // Send the full base URL (host + SPA base path) so the server can build the
+    // host-root redirect URI and a base-path-aware return URL.
+    const origin = window.location.origin + import.meta.env.BASE_URL;
+    authMutation.mutate(
+      { data: { origin } },
+      {
+        onSuccess: (res) => {
+          if (popup && !popup.closed) {
+            popup.location.href = res.url;
+          } else {
+            // Popup was blocked — try a fresh top-level tab as a fallback.
+            window.open(res.url, "_blank", "noopener");
+          }
+        },
+        onError: () => popup?.close(),
+      },
+    );
+  }
+
+  function copyRedirect() {
+    navigator.clipboard
+      ?.writeText(redirectUri)
+      .then(() => toast({ title: "Redirect URI copied" }))
+      .catch(() => {
+        /* clipboard blocked — user can still select the text manually */
+      });
+  }
+
+  return (
+    <div className="border border-border bg-card relative">
+      <div className="absolute top-0 left-0 h-full w-0.5 bg-primary/60" />
+      <div className="flex items-center justify-between gap-2.5 px-5 py-4 border-b border-border">
+        <div className="flex items-center gap-2.5">
+          <Music className="w-4 h-4 text-primary" />
+          <h2 className="font-bold text-sm uppercase tracking-widest text-foreground">Spotify</h2>
+        </div>
+        {!isLoading && (
+          <span
+            className={`text-[10px] uppercase tracking-wider font-bold ${
+              connected ? "text-primary" : "text-muted-foreground"
+            }`}
+          >
+            {connected ? "Connected" : configured ? "Not linked" : "Not configured"}
+          </span>
+        )}
+      </div>
+
+      <div className="p-5 space-y-4">
+        <p className="text-xs text-muted-foreground">
+          Create an app at the{" "}
+          <a
+            href="https://developer.spotify.com/dashboard"
+            target="_blank"
+            rel="noreferrer"
+            className="text-primary inline-flex items-center gap-0.5 hover:underline"
+          >
+            Spotify Developer Dashboard
+            <ExternalLink className="w-3 h-3" />
+          </a>
+          , then add the redirect URI below to it and paste the Client ID and Secret here.
+        </p>
+
+        {/* Redirect URI to allow-list in the Spotify app */}
+        <div className="space-y-1.5">
+          <Label className="text-xs uppercase tracking-wider text-muted-foreground">
+            Redirect URI
+          </Label>
+          <div className="flex items-center gap-2">
+            <code className="flex-1 truncate border border-border bg-muted/40 px-2 py-1.5 text-xs text-foreground">
+              {redirectUri || "—"}
+            </code>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={copyRedirect}
+              disabled={!redirectUri}
+              className="gap-1.5"
+            >
+              <Copy className="w-3.5 h-3.5" />
+              Copy
+            </Button>
+          </div>
+        </div>
+
+        {/* Client credentials */}
+        <form onSubmit={handleSaveCredentials} className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label
+              htmlFor="spotify-client-id"
+              className="text-xs uppercase tracking-wider text-muted-foreground"
+            >
+              Client ID
+            </Label>
+            <Input
+              id="spotify-client-id"
+              autoComplete="off"
+              placeholder={configured ? "•••• saved ••••" : "Spotify Client ID"}
+              value={clientId}
+              onChange={(e) => setClientId(e.target.value)}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label
+              htmlFor="spotify-client-secret"
+              className="text-xs uppercase tracking-wider text-muted-foreground"
+            >
+              Client Secret
+            </Label>
+            <Input
+              id="spotify-client-secret"
+              type="password"
+              autoComplete="off"
+              placeholder={configured ? "•••• saved ••••" : "Spotify Client Secret"}
+              value={clientSecret}
+              onChange={(e) => setClientSecret(e.target.value)}
+            />
+          </div>
+          <div className="sm:col-span-2 flex items-center justify-between gap-3">
+            <div className="min-h-5 text-xs">
+              {connected && status?.displayName ? (
+                <span className="text-muted-foreground">
+                  Linked as <span className="text-foreground">{status.displayName}</span>
+                  {status.premium === false && " · remote-only (no Premium)"}
+                  {status.premium === true && " · Premium"}
+                </span>
+              ) : null}
+            </div>
+            <Button
+              type="submit"
+              size="sm"
+              disabled={saveMutation.isPending || !clientId.trim() || !clientSecret.trim()}
+              className="gap-1.5"
+            >
+              {saveMutation.isPending ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  Saving…
+                </>
+              ) : (
+                "Save credentials"
+              )}
+            </Button>
+          </div>
+        </form>
+      </div>
+
+      <div className="flex items-center justify-between gap-3 px-5 py-4 border-t border-border">
+        <div className="text-xs text-muted-foreground">
+          {connected
+            ? "Your Spotify account is linked."
+            : configured
+              ? "Credentials saved — link your account to finish."
+              : "Save credentials to enable account linking."}
+        </div>
+        {connected ? (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => disconnectMutation.mutate()}
+            disabled={disconnectMutation.isPending}
+            className="gap-1.5"
+          >
+            {disconnectMutation.isPending ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <Unplug className="w-3.5 h-3.5" />
+            )}
+            Disconnect
+          </Button>
+        ) : (
+          <Button
+            type="button"
+            size="sm"
+            onClick={handleConnect}
+            disabled={!configured || authMutation.isPending}
+            className="gap-1.5"
+          >
+            {authMutation.isPending ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <Plug className="w-3.5 h-3.5" />
+            )}
+            Connect Spotify
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // Persist each category's collapsed/expanded state in localStorage, keyed per
 // category, so a user's choice survives reloads and sessions. Defaults to
 // expanded the first time (matching the original behaviour).
@@ -458,6 +751,48 @@ export default function Settings() {
   useEffect(() => {
     if (meError) setLocation("/login");
   }, [meError, setLocation]);
+
+  // Surface the result of the Spotify OAuth round-trip (the server redirects back
+  // here with ?spotify=connected|error), then strip the param so it doesn't
+  // re-fire on refresh.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const result = params.get("spotify");
+    if (!result) return;
+
+    // When this page is the OAuth popup (opened by handleConnect), hand the
+    // result back to the dashboard tab and close — the opener refreshes status
+    // and shows the toast. Same-origin, so opener access is allowed.
+    if (window.opener && window.opener !== window) {
+      try {
+        window.opener.postMessage(
+          { type: "spotify-auth", result },
+          window.location.origin,
+        );
+      } catch {
+        /* opener gone/blocked — fall through to top-level handling below */
+      }
+      window.close();
+      return;
+    }
+
+    if (result === "connected") {
+      toast({ title: "Spotify connected" });
+    } else if (result === "error") {
+      toast({
+        title: "Spotify connection failed",
+        description: "Please try linking your account again.",
+        variant: "destructive",
+      });
+    }
+    params.delete("spotify");
+    const query = params.toString();
+    window.history.replaceState(
+      {},
+      "",
+      window.location.pathname + (query ? `?${query}` : ""),
+    );
+  }, [toast]);
 
   const {
     data: connections,
@@ -532,6 +867,8 @@ export default function Settings() {
                     connection={byService.get(def.key)}
                   />
                 ))}
+                {/* Spotify lives in Media but uses its own OAuth card. */}
+                {group.category === "Media" && <SpotifyCard />}
               </CategorySection>
             ))}
           </div>

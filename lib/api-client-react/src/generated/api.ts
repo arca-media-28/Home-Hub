@@ -49,6 +49,13 @@ import type {
   ServiceConnectionUpdate,
   ServiceStatus,
   SonarrData,
+  SpotifyAuthInput,
+  SpotifyAuthUrl,
+  SpotifyCommandInput,
+  SpotifyCommandResult,
+  SpotifyCredentialsInput,
+  SpotifyStatus,
+  SpotifyToken,
   StockCandlesData,
   StockData,
   StockSearchData,
@@ -2685,5 +2692,442 @@ export const useUpdateConnection = <TError = ErrorType<ErrorResponse>,
         TContext
       > => {
       return useMutation(getUpdateConnectionMutationOptions(options));
+    }
+
+export const getSaveSpotifyCredentialsUrl = () => {
+
+
+
+
+  return `/api/connections/spotify/credentials`
+}
+
+/**
+ * @summary Save the Spotify app Client ID and Client Secret used for OAuth
+ */
+export const saveSpotifyCredentials = async (spotifyCredentialsInput: SpotifyCredentialsInput, options?: RequestInit): Promise<SpotifyStatus> => {
+
+  return customFetch<SpotifyStatus>(getSaveSpotifyCredentialsUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      spotifyCredentialsInput,)
+  }
+);}
+
+
+
+
+export const getSaveSpotifyCredentialsMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveSpotifyCredentials>>, TError,{data: BodyType<SpotifyCredentialsInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof saveSpotifyCredentials>>, TError,{data: BodyType<SpotifyCredentialsInput>}, TContext> => {
+
+const mutationKey = ['saveSpotifyCredentials'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof saveSpotifyCredentials>>, {data: BodyType<SpotifyCredentialsInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  saveSpotifyCredentials(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SaveSpotifyCredentialsMutationResult = NonNullable<Awaited<ReturnType<typeof saveSpotifyCredentials>>>
+    export type SaveSpotifyCredentialsMutationBody = BodyType<SpotifyCredentialsInput>
+    export type SaveSpotifyCredentialsMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Save the Spotify app Client ID and Client Secret used for OAuth
+ */
+export const useSaveSpotifyCredentials = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveSpotifyCredentials>>, TError,{data: BodyType<SpotifyCredentialsInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof saveSpotifyCredentials>>,
+        TError,
+        {data: BodyType<SpotifyCredentialsInput>},
+        TContext
+      > => {
+      return useMutation(getSaveSpotifyCredentialsMutationOptions(options));
+    }
+
+export const getGetSpotifyStatusUrl = () => {
+
+
+
+
+  return `/api/connections/spotify/status`
+}
+
+/**
+ * @summary Report whether Spotify is configured and a user account is linked
+ */
+export const getSpotifyStatus = async ( options?: RequestInit): Promise<SpotifyStatus> => {
+
+  return customFetch<SpotifyStatus>(getGetSpotifyStatusUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetSpotifyStatusQueryKey = () => {
+    return [
+    `/api/connections/spotify/status`
+    ] as const;
+    }
+
+
+export const getGetSpotifyStatusQueryOptions = <TData = Awaited<ReturnType<typeof getSpotifyStatus>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSpotifyStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetSpotifyStatusQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSpotifyStatus>>> = ({ signal }) => getSpotifyStatus({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getSpotifyStatus>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetSpotifyStatusQueryResult = NonNullable<Awaited<ReturnType<typeof getSpotifyStatus>>>
+export type GetSpotifyStatusQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Report whether Spotify is configured and a user account is linked
+ */
+
+export function useGetSpotifyStatus<TData = Awaited<ReturnType<typeof getSpotifyStatus>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSpotifyStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetSpotifyStatusQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getStartSpotifyAuthUrl = () => {
+
+
+
+
+  return `/api/connections/spotify/authorize`
+}
+
+/**
+ * @summary Begin the Spotify OAuth flow and return the authorize URL to visit
+ */
+export const startSpotifyAuth = async (spotifyAuthInput: SpotifyAuthInput, options?: RequestInit): Promise<SpotifyAuthUrl> => {
+
+  return customFetch<SpotifyAuthUrl>(getStartSpotifyAuthUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      spotifyAuthInput,)
+  }
+);}
+
+
+
+
+export const getStartSpotifyAuthMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof startSpotifyAuth>>, TError,{data: BodyType<SpotifyAuthInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof startSpotifyAuth>>, TError,{data: BodyType<SpotifyAuthInput>}, TContext> => {
+
+const mutationKey = ['startSpotifyAuth'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof startSpotifyAuth>>, {data: BodyType<SpotifyAuthInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  startSpotifyAuth(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type StartSpotifyAuthMutationResult = NonNullable<Awaited<ReturnType<typeof startSpotifyAuth>>>
+    export type StartSpotifyAuthMutationBody = BodyType<SpotifyAuthInput>
+    export type StartSpotifyAuthMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Begin the Spotify OAuth flow and return the authorize URL to visit
+ */
+export const useStartSpotifyAuth = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof startSpotifyAuth>>, TError,{data: BodyType<SpotifyAuthInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof startSpotifyAuth>>,
+        TError,
+        {data: BodyType<SpotifyAuthInput>},
+        TContext
+      > => {
+      return useMutation(getStartSpotifyAuthMutationOptions(options));
+    }
+
+export const getDisconnectSpotifyUrl = () => {
+
+
+
+
+  return `/api/connections/spotify/disconnect`
+}
+
+/**
+ * @summary Unlink the Spotify account (clears stored OAuth tokens)
+ */
+export const disconnectSpotify = async ( options?: RequestInit): Promise<SpotifyStatus> => {
+
+  return customFetch<SpotifyStatus>(getDisconnectSpotifyUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getDisconnectSpotifyMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof disconnectSpotify>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof disconnectSpotify>>, TError,void, TContext> => {
+
+const mutationKey = ['disconnectSpotify'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof disconnectSpotify>>, void> = () => {
+
+
+          return  disconnectSpotify(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DisconnectSpotifyMutationResult = NonNullable<Awaited<ReturnType<typeof disconnectSpotify>>>
+
+    export type DisconnectSpotifyMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Unlink the Spotify account (clears stored OAuth tokens)
+ */
+export const useDisconnectSpotify = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof disconnectSpotify>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof disconnectSpotify>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getDisconnectSpotifyMutationOptions(options));
+    }
+
+export const getGetSpotifyTokenUrl = () => {
+
+
+
+
+  return `/api/connections/spotify/token`
+}
+
+/**
+ * @summary Get a fresh Spotify access token for the Web Playback SDK
+ */
+export const getSpotifyToken = async ( options?: RequestInit): Promise<SpotifyToken> => {
+
+  return customFetch<SpotifyToken>(getGetSpotifyTokenUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetSpotifyTokenQueryKey = () => {
+    return [
+    `/api/connections/spotify/token`
+    ] as const;
+    }
+
+
+export const getGetSpotifyTokenQueryOptions = <TData = Awaited<ReturnType<typeof getSpotifyToken>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSpotifyToken>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetSpotifyTokenQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSpotifyToken>>> = ({ signal }) => getSpotifyToken({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getSpotifyToken>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetSpotifyTokenQueryResult = NonNullable<Awaited<ReturnType<typeof getSpotifyToken>>>
+export type GetSpotifyTokenQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get a fresh Spotify access token for the Web Playback SDK
+ */
+
+export function useGetSpotifyToken<TData = Awaited<ReturnType<typeof getSpotifyToken>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSpotifyToken>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetSpotifyTokenQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getSendSpotifyCommandUrl = () => {
+
+
+
+
+  return `/api/widgets/spotify/command`
+}
+
+/**
+ * @summary Remote-control the active Spotify device (play/pause/skip/transfer)
+ */
+export const sendSpotifyCommand = async (spotifyCommandInput: SpotifyCommandInput, options?: RequestInit): Promise<SpotifyCommandResult> => {
+
+  return customFetch<SpotifyCommandResult>(getSendSpotifyCommandUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      spotifyCommandInput,)
+  }
+);}
+
+
+
+
+export const getSendSpotifyCommandMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendSpotifyCommand>>, TError,{data: BodyType<SpotifyCommandInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof sendSpotifyCommand>>, TError,{data: BodyType<SpotifyCommandInput>}, TContext> => {
+
+const mutationKey = ['sendSpotifyCommand'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof sendSpotifyCommand>>, {data: BodyType<SpotifyCommandInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  sendSpotifyCommand(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SendSpotifyCommandMutationResult = NonNullable<Awaited<ReturnType<typeof sendSpotifyCommand>>>
+    export type SendSpotifyCommandMutationBody = BodyType<SpotifyCommandInput>
+    export type SendSpotifyCommandMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Remote-control the active Spotify device (play/pause/skip/transfer)
+ */
+export const useSendSpotifyCommand = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendSpotifyCommand>>, TError,{data: BodyType<SpotifyCommandInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof sendSpotifyCommand>>,
+        TError,
+        {data: BodyType<SpotifyCommandInput>},
+        TContext
+      > => {
+      return useMutation(getSendSpotifyCommandMutationOptions(options));
     }
 

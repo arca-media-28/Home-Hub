@@ -5,6 +5,17 @@ import { connectionStmts } from "../lib/db.js";
 import { httpClient, cloudHttpClient, normalizeBaseUrl, normalizeHttpError } from "../lib/http.js";
 import { fetchPiholeData } from "../lib/pihole.js";
 import { logger } from "../lib/logger.js";
+import {
+  getSpotifyConnection,
+  getValidAccessToken,
+  getProfile,
+  getPlayback,
+  getQueue,
+  sendCommand,
+  type SpotifyTrackObject,
+  type SpotifyPlayback,
+  type SpotifyCommand,
+} from "../lib/spotify.js";
 
 const router = Router();
 
@@ -955,11 +966,128 @@ function mapPlexTrack(
   };
 }
 
+// Map a Spotify track object to the shared AudioTrack shape. Spotify never gives
+// a direct stream URL (playback is remote or via the Web Playback SDK), so
+// streamUrl is always null — the tile drives it through command endpoints / SDK
+// instead of the shared <audio> engine.
+function mapSpotifyTrack(item: SpotifyTrackObject, playback: SpotifyPlayback | null): {
+  id: string;
+  title: string;
+  artist: string | null;
+  album: string | null;
+  artwork: string | null;
+  durationMs: number | null;
+  progressMs: number | null;
+  state: string | null;
+  streamUrl: null;
+} {
+  const artist = (item.artists ?? []).map((a) => a.name).filter(Boolean).join(", ") || null;
+  const artwork = item.album?.images?.[0]?.url ?? null;
+  return {
+    id: item.id ?? "",
+    title: item.name ?? "Unknown track",
+    artist,
+    album: item.album?.name ?? null,
+    artwork,
+    durationMs: typeof item.duration_ms === "number" ? item.duration_ms : null,
+    progressMs: playback && typeof playback.progress_ms === "number" ? playback.progress_ms : null,
+    state: playback ? (playback.is_playing ? "playing" : "paused") : null,
+    streamUrl: null,
+  };
+}
+
+async function handleSpotifyAudio(res: import("express").Response): Promise<void> {
+  const conn = getSpotifyConnection();
+  const linked = Boolean(conn.clientId && conn.clientSecret && conn.tokens.refreshToken);
+
+  // Not linked → an actionable "connect" state rather than demo content, so the
+  // tile prompts the user to link their account in Settings.
+  if (!linked) {
+    res.json({
+      source: "spotify",
+      sample: false,
+      auth: "needed",
+      premium: null,
+      canControl: false,
+      device: null,
+      nowPlaying: null,
+      queue: [],
+    });
+    return;
+  }
+
+  try {
+    const token = await getValidAccessToken();
+    // Premium gates in-browser playback; failure here shouldn't break the tile.
+    let premium: boolean | null = null;
+    try {
+      premium = (await getProfile(token)).premium;
+    } catch {
+      premium = null;
+    }
+
+    const playback = await getPlayback(token);
+    if (!playback || !playback.item) {
+      res.json({
+        source: "spotify",
+        sample: false,
+        auth: "connected",
+        premium,
+        canControl: false,
+        device: null,
+        nowPlaying: null,
+        queue: [],
+      });
+      return;
+    }
+
+    const nowPlaying = mapSpotifyTrack(playback.item, playback);
+    const device = playback.device
+      ? {
+          id: playback.device.id ?? null,
+          name: playback.device.name ?? "Unknown device",
+          isActive: Boolean(playback.device.is_active),
+          volumePercent:
+            typeof playback.device.volume_percent === "number"
+              ? playback.device.volume_percent
+              : null,
+        }
+      : null;
+
+    // The upcoming queue is additive — degrade to just now-playing on failure.
+    let queue = [nowPlaying];
+    try {
+      const upcoming = await getQueue(token);
+      queue = [nowPlaying, ...upcoming.map((t) => mapSpotifyTrack(t, null))];
+    } catch (err) {
+      logger.warn({ reason: normalizeHttpError(err) }, "Spotify queue fetch failed — using now-playing only");
+    }
+
+    res.json({
+      source: "spotify",
+      sample: false,
+      auth: "connected",
+      premium,
+      canControl: Boolean(device),
+      device,
+      nowPlaying,
+      queue,
+    });
+  } catch (err) {
+    logger.error({ reason: normalizeHttpError(err) }, "Spotify audio player widget error");
+    res.status(502).json({ error: "Failed to fetch Spotify playback" });
+  }
+}
+
 router.get("/audioplayer", requireAuth, async (req, res) => {
-  // Only Plex is wired up today; any other/absent value resolves to plex so the
-  // tile keeps working as new sources are added behind this same query param.
+  // Source selects the music backend. Spotify uses the linked OAuth account;
+  // anything else resolves to Plex (the original/default source).
+  const requested = String(req.query["source"] ?? "plex");
+  if (requested === "spotify") {
+    await handleSpotifyAudio(res);
+    return;
+  }
   const source = "plex";
-  void req.query["source"];
 
   // Plex stores the token under `token` or `apiKey`. Fall back to a Plex-typed
   // env media server when no Plex connection is saved (mirrors /media).
@@ -1053,6 +1181,43 @@ router.get("/audioplayer", requireAuth, async (req, res) => {
   } catch (err) {
     logger.error({ reason: normalizeHttpError(err) }, "Audio player widget error");
     res.status(502).json({ error: "Failed to fetch audio player data" });
+  }
+});
+
+// POST /widgets/spotify/command — remote-control the active Spotify device.
+// Backs the Audio Player tile's play/pause/skip buttons and the "transfer"
+// action that hands playback to the in-browser Web Playback SDK device.
+const SPOTIFY_ACTIONS: SpotifyCommand[] = ["play", "pause", "next", "previous", "transfer"];
+
+router.post("/spotify/command", requireAuth, async (req, res) => {
+  const body = (req.body ?? {}) as { action?: string; deviceId?: string | null };
+  const action = body.action as SpotifyCommand | undefined;
+  if (!action || !SPOTIFY_ACTIONS.includes(action)) {
+    res.status(400).json({ error: "Unknown action" });
+    return;
+  }
+  if (action === "transfer" && !body.deviceId) {
+    res.status(400).json({ error: "transfer requires a deviceId" });
+    return;
+  }
+
+  const conn = getSpotifyConnection();
+  if (!conn.clientId || !conn.clientSecret || !conn.tokens.refreshToken) {
+    res.status(404).json({ error: "Spotify account is not linked" });
+    return;
+  }
+
+  try {
+    const token = await getValidAccessToken();
+    const result = await sendCommand(token, action, body.deviceId ?? undefined);
+    if (result === "no-device") {
+      res.status(404).json({ error: "No active Spotify device" });
+      return;
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    logger.error({ reason: normalizeHttpError(err) }, "Spotify command error");
+    res.status(502).json({ error: "Failed to control Spotify" });
   }
 });
 

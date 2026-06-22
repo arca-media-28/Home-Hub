@@ -30,6 +30,7 @@ const CATEGORY_BY_KEY: Record<string, Category> = {
   jellyfin: "Media",
   ersatztv: "Media",
   audioplayer: "Media",
+  spotify: "Media",
   // Downloads
   qbittorrent: "Downloads",
   sonarr: "Downloads",
