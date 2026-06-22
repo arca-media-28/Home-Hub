@@ -15,6 +15,13 @@ description: How the Audio Player tile and the shared playback engine are struct
 - A track is streamable only if it carries `streamUrl`; demo/sample payloads set `streamUrl=null`, which disables in-browser controls.
 - **How to apply:** add the source to the OpenAPI `source` enum + the `audioSource` Select in `TileEditModal`, then branch in the `/audioplayer` route.
 
+## Jellyfin source
+- Reuses the saved `jellyfin` connection (url + apiKey), same resolution as the `/media` route (env fallback gated on `MEDIA_SERVER_TYPE==="jellyfin"`). No OAuth.
+- Now-playing from `GET /Sessions` → first session whose `NowPlayingItem.Type==="Audio"`; progress/paused live on the session's `PlayState` (PositionTicks/IsPaused), NOT on the item. Ticks are 100ns units → divide by 10,000 for ms.
+- Queue = the album's tracks via `GET /Items?ParentId={AlbumId}&IncludeItemTypes=Audio&Recursive=true` (additive, degrades to now-playing only). No session → recently-added audio via `GET /Items?IncludeItemTypes=Audio&SortBy=DateCreated&...`.
+- streamUrl uses the transcode endpoint `${baseUrl}/Audio/{id}/stream.mp3?api_key=KEY&audioCodec=mp3` so the shared `<audio>` engine plays any source codec (FLAC etc.) — `.mp3` suffix forces mp3, avoids HLS/UserId requirements of `/universal`.
+- Frontend: Jellyfin routes to the SAME `StreamAudioPlayer` as Plex (only Spotify gets its own component); source type widened to `"plex"|"jellyfin"`.
+
 ## Spotify source
 - Manual OAuth (no Replit integration). Creds + tokens live in the `service_connections` row keyed `spotify` (`api_key`=clientId, `password`=clientSecret, `extra`=JSON tokens). Spotify is NOT in the generic SERVICES/health-scheduler — it has its own Settings card and `/connections/spotify/*` routes mounted BEFORE the generic connections router.
 - OAuth base-path trap: `/api` is proxied at HOST ROOT but the SPA is served under `BASE_PATH`. Frontend sends authorize body `origin = window.location.origin + import.meta.env.BASE_URL`; backend derives redirectUri = `<hostOrigin>/api/connections/spotify/callback` and returnTo = `<base>/settings`. Callback redirects to `returnTo?spotify=connected|error`.

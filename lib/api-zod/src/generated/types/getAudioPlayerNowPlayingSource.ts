@@ -12,4 +12,5 @@ export type GetAudioPlayerNowPlayingSource = typeof GetAudioPlayerNowPlayingSour
 export const GetAudioPlayerNowPlayingSource = {
   plex: 'plex',
   spotify: 'spotify',
+  jellyfin: 'jellyfin',
 } as const;

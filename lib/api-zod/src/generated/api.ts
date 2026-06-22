@@ -698,7 +698,7 @@ export const GetErsatzTvWidgetResponse = zod.object({
  * @summary Get the current/last music track and a playable queue for the Audio Player tile
  */
 export const GetAudioPlayerNowPlayingQueryParams = zod.object({
-  "source": zod.enum(['plex', 'spotify']).optional().describe('Which music source backs the tile. \"plex\" resolves the saved Plex connection and returns its current\/last music session plus a browser-playable queue. Defaults to \"plex\" when omitted. This is the seam additional sources (Spotify, Jellyfin, Navidrome) plug into.')
+  "source": zod.enum(['plex', 'spotify', 'jellyfin']).optional().describe('Which music source backs the tile. \"plex\" resolves the saved Plex connection and \"jellyfin\" the saved Jellyfin connection; each returns its current\/last music session plus a browser-playable queue. \"spotify\" uses the linked Spotify account. Defaults to \"plex\" when omitted. This is the seam additional sources (Navidrome) plug into.')
 })
 
 export const GetAudioPlayerNowPlayingResponse = zod.object({

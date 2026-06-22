@@ -9,7 +9,7 @@ import type { GetAudioPlayerNowPlayingSource } from './getAudioPlayerNowPlayingS
 
 export type GetAudioPlayerNowPlayingParams = {
 /**
- * Which music source backs the tile. "plex" resolves the saved Plex connection and returns its current/last music session plus a browser-playable queue. Defaults to "plex" when omitted. This is the seam additional sources (Spotify, Jellyfin, Navidrome) plug into.
+ * Which music source backs the tile. "plex" resolves the saved Plex connection and "jellyfin" the saved Jellyfin connection; each returns its current/last music session plus a browser-playable queue. "spotify" uses the linked Spotify account. Defaults to "plex" when omitted. This is the seam additional sources (Navidrome) plug into.
  */
 source?: GetAudioPlayerNowPlayingSource;
 };

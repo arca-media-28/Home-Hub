@@ -11,8 +11,9 @@ import { Artwork, fmtTime } from "./audioShared";
 import SpotifyAudioPlayer from "./SpotifyAudioPlayer";
 
 // Audio Player tile. Branches on the configured source: Spotify (OAuth + remote
-// control / Web Playback SDK) renders a dedicated component, while Plex (and the
-// default) uses the shared in-browser <audio> stream engine below.
+// control / Web Playback SDK) renders a dedicated component, while Plex and
+// Jellyfin (and the default) use the shared in-browser <audio> stream engine
+// below.
 export default function AudioPlayerTile(props: WidgetProps) {
   const source = (props.tileSettings?.audioSource as string | undefined) ?? "plex";
   if (source === "spotify") {
@@ -22,7 +23,8 @@ export default function AudioPlayerTile(props: WidgetProps) {
 }
 
 function StreamAudioPlayer({ enabled, density, tileSettings }: WidgetProps) {
-  const source = (tileSettings?.audioSource as "plex" | undefined) ?? "plex";
+  const source =
+    (tileSettings?.audioSource as "plex" | "jellyfin" | undefined) ?? "plex";
   const params = { source };
   const {
     data,

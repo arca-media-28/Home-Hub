@@ -966,6 +966,174 @@ function mapPlexTrack(
   };
 }
 
+// A single Jellyfin audio item as returned by /Items, /Sessions
+// (NowPlayingItem), or an album's children. Only the fields the Audio Player
+// tile needs are modeled.
+interface JellyfinAudioItem {
+  Id?: string;
+  Name?: string;
+  Type?: string;
+  Artists?: string[];
+  AlbumArtist?: string;
+  Album?: string;
+  AlbumId?: string;
+  RunTimeTicks?: number;
+  ImageTags?: { Primary?: string };
+  AlbumPrimaryImageTag?: string;
+}
+
+// Map a Jellyfin audio item to the shared AudioTrack shape. Jellyfin reports
+// durations/offsets in "ticks" (100-nanosecond units → 10,000 ticks per ms).
+// `live` carries the active session's PlayState (position + paused) when this is
+// the now-playing track; pass null for plain queue/recent entries. streamUrl
+// uses the .mp3 transcode endpoint so the browser's <audio> element can play it
+// directly regardless of the source file's codec (e.g. FLAC).
+const JELLYFIN_TICKS_PER_MS = 10_000;
+function mapJellyfinTrack(
+  item: JellyfinAudioItem,
+  baseUrl: string,
+  apiKey: string,
+  live: { positionTicks?: number; isPaused?: boolean } | null,
+) {
+  const id = String(item.Id ?? "");
+  const artist =
+    (item.Artists ?? []).filter(Boolean).join(", ") || item.AlbumArtist || null;
+  // Prefer the track's own primary image; fall back to the album's artwork.
+  let artwork: string | null = null;
+  if (item.ImageTags?.Primary) {
+    artwork = `${baseUrl}/Items/${id}/Images/Primary?api_key=${apiKey}&maxHeight=200`;
+  } else if (item.AlbumId && item.AlbumPrimaryImageTag) {
+    artwork = `${baseUrl}/Items/${item.AlbumId}/Images/Primary?api_key=${apiKey}&maxHeight=200`;
+  }
+  return {
+    id,
+    title: item.Name ?? "Unknown track",
+    artist,
+    album: item.Album ?? null,
+    artwork,
+    durationMs:
+      typeof item.RunTimeTicks === "number"
+        ? Math.round(item.RunTimeTicks / JELLYFIN_TICKS_PER_MS)
+        : null,
+    progressMs:
+      live && typeof live.positionTicks === "number"
+        ? Math.round(live.positionTicks / JELLYFIN_TICKS_PER_MS)
+        : null,
+    state: live ? (live.isPaused ? "paused" : "playing") : null,
+    streamUrl: id
+      ? `${baseUrl}/Audio/${id}/stream.mp3?api_key=${apiKey}&audioCodec=mp3`
+      : null,
+  };
+}
+
+// Resolve the saved Jellyfin connection (base URL + API key), falling back to a
+// Jellyfin-typed env media server when none is saved — mirrors the /media route.
+function resolveJellyfinAudioConnection(): {
+  baseUrl: string | undefined;
+  apiKey: string | undefined;
+} {
+  const saved = getSavedConnection("jellyfin");
+  let baseUrl = saved.url;
+  let apiKey = saved.apiKey;
+  if (!baseUrl || !apiKey) {
+    const envType = process.env["MEDIA_SERVER_TYPE"] || "jellyfin";
+    if (envType === "jellyfin") {
+      baseUrl = process.env["MEDIA_SERVER_URL"];
+      apiKey = process.env["MEDIA_SERVER_API_KEY"];
+    }
+  }
+  return { baseUrl, apiKey };
+}
+
+// Audio Player — Jellyfin source. Reads the saved Jellyfin connection, returns
+// the current music session (with progress) when one is playing, otherwise the
+// most recently added music tracks. Each real track carries an authenticated,
+// browser-playable .mp3 stream URL so the shared <audio> engine can play it.
+async function handleJellyfinAudio(res: import("express").Response): Promise<void> {
+  const { baseUrl, apiKey } = resolveJellyfinAudioConnection();
+
+  // Unconfigured → built-in demo content (sample:true). streamUrl stays null so
+  // the tile labels it not-live and disables in-browser streaming.
+  if (!baseUrl || !apiKey) {
+    const demo = [
+      { id: "1", title: "Dreams", artist: "Fleetwood Mac", album: "Rumours", artwork: null, durationMs: 257_000, progressMs: 72_000, state: "playing", streamUrl: null },
+      { id: "2", title: "The Chain", artist: "Fleetwood Mac", album: "Rumours", artwork: null, durationMs: 271_000, progressMs: null, state: null, streamUrl: null },
+      { id: "3", title: "Go Your Own Way", artist: "Fleetwood Mac", album: "Rumours", artwork: null, durationMs: 218_000, progressMs: null, state: null, streamUrl: null },
+    ];
+    res.json({ source: "jellyfin", sample: true, nowPlaying: demo[0], queue: demo });
+    return;
+  }
+
+  try {
+    // Prefer the active music session: /Sessions lists everything playing now;
+    // pick the first whose NowPlayingItem is an Audio track. Its album becomes
+    // the queue so skip next/previous works.
+    const sessions = await httpClient.get(`${baseUrl}/Sessions`, {
+      params: { api_key: apiKey },
+    });
+    const session = (sessions.data ?? []).find(
+      (s: { NowPlayingItem?: { Type?: string } }) =>
+        s?.NowPlayingItem?.Type === "Audio",
+    ) as
+      | {
+          NowPlayingItem?: JellyfinAudioItem;
+          PlayState?: { PositionTicks?: number; IsPaused?: boolean };
+        }
+      | undefined;
+
+    if (session?.NowPlayingItem) {
+      const npItem = session.NowPlayingItem;
+      const playState = session.PlayState ?? {};
+      const nowPlaying = mapJellyfinTrack(npItem, baseUrl, apiKey, {
+        positionTicks: playState.PositionTicks,
+        isPaused: playState.IsPaused,
+      });
+      // Best-effort: fetch the album's tracks for skip next/previous. A failure
+      // here is additive — the queue degrades to just the now-playing track.
+      let queue = [nowPlaying];
+      if (npItem.AlbumId) {
+        try {
+          const album = await httpClient.get(`${baseUrl}/Items`, {
+            params: {
+              ParentId: npItem.AlbumId,
+              IncludeItemTypes: "Audio",
+              Recursive: true,
+              SortBy: "ParentIndexNumber,IndexNumber,SortName",
+              api_key: apiKey,
+            },
+          });
+          const tracks = (album.data?.Items ?? []) as JellyfinAudioItem[];
+          if (tracks.length > 0) {
+            queue = tracks.map((t) => mapJellyfinTrack(t, baseUrl, apiKey, null));
+          }
+        } catch (err) {
+          logger.warn({ reason: normalizeHttpError(err) }, "Jellyfin album queue fetch failed — using now-playing only");
+        }
+      }
+      res.json({ source: "jellyfin", sample: false, nowPlaying, queue });
+      return;
+    }
+
+    // No active session → fall back to the most recently added music tracks.
+    const recent = await httpClient.get(`${baseUrl}/Items`, {
+      params: {
+        IncludeItemTypes: "Audio",
+        SortBy: "DateCreated",
+        SortOrder: "Descending",
+        Recursive: true,
+        Limit: 25,
+        api_key: apiKey,
+      },
+    });
+    const tracks = (recent.data?.Items ?? []) as JellyfinAudioItem[];
+    const queue = tracks.map((t) => mapJellyfinTrack(t, baseUrl, apiKey, null));
+    res.json({ source: "jellyfin", sample: false, nowPlaying: queue[0] ?? null, queue });
+  } catch (err) {
+    logger.error({ reason: normalizeHttpError(err) }, "Jellyfin audio player widget error");
+    res.status(502).json({ error: "Failed to fetch audio player data" });
+  }
+}
+
 // Map a Spotify track object to the shared AudioTrack shape. Spotify never gives
 // a direct stream URL (playback is remote or via the Web Playback SDK), so
 // streamUrl is always null — the tile drives it through command endpoints / SDK
@@ -1085,6 +1253,10 @@ router.get("/audioplayer", requireAuth, async (req, res) => {
   const requested = String(req.query["source"] ?? "plex");
   if (requested === "spotify") {
     await handleSpotifyAudio(res);
+    return;
+  }
+  if (requested === "jellyfin") {
+    await handleJellyfinAudio(res);
     return;
   }
   const source = "plex";
