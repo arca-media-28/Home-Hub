@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import type { AudioTrack } from "@workspace/api-client-react";
+import { scrobbleSubsonic } from "@workspace/api-client-react";
 
 // ── Shared app-level audio playback engine ───────────────────────────────────
 // A single <audio> element lives here, above the router, so playback persists as
@@ -56,6 +57,26 @@ const AudioPlayerContext = createContext<AudioPlayerControls | null>(null);
 
 const VOLUME_KEY = "audioPlayer.volume";
 
+// The opaque owner id Subsonic/Navidrome tiles use to drive the global player.
+// When the player is owned by this source we report playback back to the server.
+const SUBSONIC_OWNER = "audioplayer:subsonic";
+// How often to refresh the Subsonic "now playing" session while a track plays.
+// Subsonic now-playing entries expire after a few minutes, so a periodic ping
+// keeps the dashboard visible as a live session to other clients.
+const NOW_PLAYING_PING_MS = 60_000;
+
+// Best-effort report of dashboard playback back to Navidrome / Subsonic. The
+// server reuses the saved `subsonic` connection. submission=false registers a
+// "now playing" ping; submission=true registers a completed play (scrobble).
+// Reporting is purely additive — any failure (no connection, server down) is
+// swallowed so it can never interrupt playback.
+function reportSubsonicScrobble(id: string | undefined, submission: boolean): void {
+  if (!id) return;
+  void scrobbleSubsonic({ id, submission }).catch(() => {
+    // Intentionally ignored: playback reporting must never break the player.
+  });
+}
+
 function readStoredVolume(): number {
   const raw = typeof localStorage !== "undefined" ? localStorage.getItem(VOLUME_KEY) : null;
   const n = raw == null ? NaN : Number(raw);
@@ -90,12 +111,16 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
   // the latest values without being re-bound on every change.
   const queueRef = useRef<AudioTrack[]>(queue);
   const indexRef = useRef(index);
+  const ownerIdRef = useRef<string | null>(ownerId);
   useEffect(() => {
     queueRef.current = queue;
   }, [queue]);
   useEffect(() => {
     indexRef.current = index;
   }, [index]);
+  useEffect(() => {
+    ownerIdRef.current = ownerId;
+  }, [ownerId]);
 
   // Load and play a specific index of the current/given queue. Always points the
   // element at a fresh src so switching tracks restarts cleanly.
@@ -206,6 +231,12 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
     // Auto-advance to the next track when one finishes.
     const onEnded = () => {
       const q = queueRef.current;
+      // A track that played to its natural end counts as a completed play —
+      // report it to Subsonic (submission=true) so it bumps the server's play
+      // counts. Manual skips do NOT come through here, so they aren't scrobbled.
+      if (ownerIdRef.current === SUBSONIC_OWNER) {
+        reportSubsonicScrobble(q[indexRef.current]?.id, true);
+      }
       const nextIndex = indexRef.current + 1;
       if (nextIndex < q.length) {
         setIndex(nextIndex);
@@ -229,6 +260,22 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       el.removeEventListener("ended", onEnded);
     };
   }, [getAudio, loadAndPlay]);
+
+  // While the dashboard streams a Subsonic track, keep the server's "now
+  // playing" session alive: ping submission=false when the track starts (and on
+  // resume) and refresh it periodically until it stops. This makes the dashboard
+  // appear as a live session to other Subsonic clients. Completed plays are
+  // reported separately from the `ended` handler (submission=true).
+  useEffect(() => {
+    if (ownerId !== SUBSONIC_OWNER || !isPlaying) return;
+    const id = currentTrack?.id;
+    if (!id) return;
+    reportSubsonicScrobble(id, false);
+    const interval = setInterval(() => {
+      reportSubsonicScrobble(id, false);
+    }, NOW_PLAYING_PING_MS);
+    return () => clearInterval(interval);
+  }, [ownerId, isPlaying, currentTrack?.id]);
 
   const value = useMemo<AudioPlayerControls>(
     () => ({

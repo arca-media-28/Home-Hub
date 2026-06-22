@@ -606,6 +606,20 @@ export interface SpotifyCommandResult {
   ok: boolean;
 }
 
+export interface SubsonicScrobbleInput {
+  /**
+     * The Subsonic song id the dashboard is/was streaming.
+     * @minLength 1
+     */
+  id: string;
+  /** false (default) registers a "now playing" ping that refreshes the dashboard's live session without incrementing play counts; true registers a completed play (a real scrobble) and bumps play counts. */
+  submission?: boolean;
+}
+
+export interface SubsonicScrobbleResult {
+  ok: boolean;
+}
+
 export interface ServiceStatus {
   service: string;
   configured: boolean;

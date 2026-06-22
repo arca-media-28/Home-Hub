@@ -71,6 +71,8 @@ export * from './stockQuote';
 export * from './stockSearchData';
 export * from './stockSearchResult';
 export * from './stockWatchEntry';
+export * from './subsonicScrobbleInput';
+export * from './subsonicScrobbleResult';
 export * from './tailscaleData';
 export * from './tailscaleDevice';
 export * from './tile';

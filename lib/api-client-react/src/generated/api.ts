@@ -59,6 +59,8 @@ import type {
   StockCandlesData,
   StockData,
   StockSearchData,
+  SubsonicScrobbleInput,
+  SubsonicScrobbleResult,
   TailscaleData,
   Tile,
   TileInput,
@@ -1982,6 +1984,77 @@ export function useGetAudioPlayerNowPlaying<TData = Awaited<ReturnType<typeof ge
 
 
 
+
+export const getScrobbleSubsonicUrl = () => {
+
+
+
+
+  return `/api/widgets/subsonic/scrobble`
+}
+
+/**
+ * @summary Report a Subsonic/Navidrome play to the server so the dashboard appears as a real session (now-playing + play counts) to other clients
+ */
+export const scrobbleSubsonic = async (subsonicScrobbleInput: SubsonicScrobbleInput, options?: RequestInit): Promise<SubsonicScrobbleResult> => {
+
+  return customFetch<SubsonicScrobbleResult>(getScrobbleSubsonicUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      subsonicScrobbleInput,)
+  }
+);}
+
+
+
+
+export const getScrobbleSubsonicMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof scrobbleSubsonic>>, TError,{data: BodyType<SubsonicScrobbleInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof scrobbleSubsonic>>, TError,{data: BodyType<SubsonicScrobbleInput>}, TContext> => {
+
+const mutationKey = ['scrobbleSubsonic'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof scrobbleSubsonic>>, {data: BodyType<SubsonicScrobbleInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  scrobbleSubsonic(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ScrobbleSubsonicMutationResult = NonNullable<Awaited<ReturnType<typeof scrobbleSubsonic>>>
+    export type ScrobbleSubsonicMutationBody = BodyType<SubsonicScrobbleInput>
+    export type ScrobbleSubsonicMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Report a Subsonic/Navidrome play to the server so the dashboard appears as a real session (now-playing + play counts) to other clients
+ */
+export const useScrobbleSubsonic = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof scrobbleSubsonic>>, TError,{data: BodyType<SubsonicScrobbleInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof scrobbleSubsonic>>,
+        TError,
+        {data: BodyType<SubsonicScrobbleInput>},
+        TContext
+      > => {
+      return useMutation(getScrobbleSubsonicMutationOptions(options));
+    }
 
 export const getGetNewsWidgetUrl = (params?: GetNewsWidgetParams,) => {
   const normalizedParams = new URLSearchParams();

@@ -1385,6 +1385,50 @@ async function handleSubsonicAudio(res: import("express").Response): Promise<voi
   }
 }
 
+// POST /widgets/subsonic/scrobble — report a play back to Navidrome / Subsonic.
+// While the dashboard's own <audio> engine streams a Subsonic track, the
+// frontend pings this with submission=false ("now playing") and, on completion,
+// submission=true (a real scrobble). That makes the dashboard show up as a live
+// session and feeds play counts for other Subsonic clients — closing the loop
+// with the read-only progress the tile already surfaces. Reuses the saved
+// `subsonic` connection + salted-token auth. Failures are surfaced as errors but
+// the caller treats them as non-fatal so playback never breaks.
+router.post("/subsonic/scrobble", requireAuth, async (req, res) => {
+  const body = (req.body ?? {}) as { id?: unknown; submission?: unknown };
+  const id = typeof body.id === "string" ? body.id : "";
+  if (!id) {
+    res.status(400).json({ error: "A track id is required" });
+    return;
+  }
+  const submission = body.submission === true;
+
+  const saved = getSavedConnection("subsonic");
+  const baseUrl = saved.url;
+  const username = saved.username;
+  const password = saved.password;
+  if (!baseUrl || !username || !password) {
+    res.status(404).json({ error: "No Subsonic / Navidrome connection is configured" });
+    return;
+  }
+
+  try {
+    const auth = subsonicAuthParams(username, password);
+    // scrobble.view returns an empty ok envelope; subsonicGet throws on a failed
+    // status, so a thrown error here means the server rejected the scrobble.
+    await subsonicGet(baseUrl, "scrobble.view", auth, {
+      id,
+      submission: submission ? "true" : "false",
+    });
+    res.json({ ok: true });
+  } catch (err) {
+    logger.warn(
+      { reason: normalizeHttpError(err), submission },
+      "Subsonic scrobble failed",
+    );
+    res.status(502).json({ error: "Failed to report play to Subsonic" });
+  }
+});
+
 router.get("/audioplayer", requireAuth, async (req, res) => {
   // Source selects the music backend. Spotify uses the linked OAuth account;
   // anything else resolves to Plex (the original/default source).

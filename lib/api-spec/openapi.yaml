@@ -511,6 +511,47 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /widgets/subsonic/scrobble:
+    post:
+      operationId: scrobbleSubsonic
+      tags: [widgets]
+      summary: >-
+        Report a Subsonic/Navidrome play to the server so the dashboard appears
+        as a real session (now-playing + play counts) to other clients
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubsonicScrobbleInput"
+      responses:
+        "200":
+          description: The scrobble was accepted by the server
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubsonicScrobbleResult"
+        "400":
+          description: Missing or invalid track id
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: No Subsonic / Navidrome connection is configured
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "502":
+          description: The Subsonic server could not be reached or rejected the scrobble
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /widgets/news:
     get:
       operationId: getNewsWidget
@@ -1543,6 +1584,28 @@ components:
           type: ["string", "null"]
 
     SpotifyCommandResult:
+      type: object
+      required: [ok]
+      properties:
+        ok:
+          type: boolean
+
+    SubsonicScrobbleInput:
+      type: object
+      required: [id]
+      properties:
+        id:
+          description: The Subsonic song id the dashboard is/was streaming.
+          type: string
+          minLength: 1
+        submission:
+          description: >-
+            false (default) registers a "now playing" ping that refreshes the
+            dashboard's live session without incrementing play counts; true
+            registers a completed play (a real scrobble) and bumps play counts.
+          type: boolean
+
+    SubsonicScrobbleResult:
       type: object
       required: [ok]
       properties:

@@ -739,6 +739,22 @@ export const GetAudioPlayerNowPlayingResponse = zod.object({
 
 
 /**
+ * @summary Report a Subsonic/Navidrome play to the server so the dashboard appears as a real session (now-playing + play counts) to other clients
+ */
+
+
+
+export const ScrobbleSubsonicBody = zod.object({
+  "id": zod.string().min(1).describe('The Subsonic song id the dashboard is\/was streaming.'),
+  "submission": zod.boolean().optional().describe('false (default) registers a \"now playing\" ping that refreshes the dashboard\'s live session without incrementing play counts; true registers a completed play (a real scrobble) and bumps play counts.')
+})
+
+export const ScrobbleSubsonicResponse = zod.object({
+  "ok": zod.boolean()
+})
+
+
+/**
  * @summary Fetch and parse recent headlines from an RSS/Atom feed URL
  */
 export const GetNewsWidgetQueryParams = zod.object({
