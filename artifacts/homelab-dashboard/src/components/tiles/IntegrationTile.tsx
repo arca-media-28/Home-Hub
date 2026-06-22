@@ -19,6 +19,7 @@ import SportsTile from "./SportsTile";
 import NewsTile from "./NewsTile";
 import StocksTile from "./StocksTile";
 import SleeperTile from "./SleeperTile";
+import AudioPlayerTile from "./AudioPlayerTile";
 import { resolveEnabledMetrics, tileDensity, type TileDensity } from "./metrics";
 import { resolveImageStyle } from "./imageStyle";
 import { openTileUrl } from "@/lib/utils";
@@ -42,6 +43,7 @@ export const INTEGRATION_LABELS: Record<string, string> = {
   [TileIntegration.news]: "News",
   [TileIntegration.stocks]: "Stocks",
   [TileIntegration.sleeper]: "Fantasy",
+  [TileIntegration.audioplayer]: "Audio Player",
 };
 
 // Props every integration widget receives: the resolved set of enabled metric
@@ -94,6 +96,8 @@ function renderStatusView(integration: string, props: WidgetProps) {
       return <StocksTile {...props} />;
     case TileIntegration.sleeper:
       return <SleeperTile {...props} />;
+    case TileIntegration.audioplayer:
+      return <AudioPlayerTile {...props} />;
     default:
       return null;
   }

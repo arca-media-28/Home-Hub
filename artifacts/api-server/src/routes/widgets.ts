@@ -909,6 +909,154 @@ router.get("/media/continue", requireAuth, async (req, res) => {
 });
 
 // ────────────────────────────────────────────────
+// Audio Player Widget
+// ────────────────────────────────────────────────
+// Backs the Audio Player tile. The shared client-side playback engine streams
+// the returned tracks; this endpoint only resolves the source's now-playing
+// track and a browser-playable queue. "source" selects the backing service —
+// only "plex" exists today; it is the seam Spotify/Jellyfin/Navidrome plug into.
+
+// A single Plex track row (from /status/sessions or a library listing) mapped to
+// the AudioTrack shape. `live` carries Player.state + viewOffset for the active
+// session's now-playing track; library/queue entries pass live:false so state
+// and progressMs stay null (they are not a live session).
+interface PlexTrackRow {
+  ratingKey?: string | number;
+  title?: string;
+  grandparentTitle?: string;
+  parentTitle?: string;
+  thumb?: string;
+  parentThumb?: string;
+  grandparentThumb?: string;
+  duration?: number;
+  viewOffset?: number;
+  Player?: { state?: string };
+  Media?: { Part?: { key?: string }[] }[];
+}
+
+function mapPlexTrack(
+  item: PlexTrackRow,
+  baseUrl: string,
+  token: string,
+  live: boolean,
+) {
+  const thumbPath = item.thumb || item.parentThumb || item.grandparentThumb;
+  const partKey = item.Media?.[0]?.Part?.[0]?.key;
+  return {
+    id: String(item.ratingKey ?? ""),
+    title: item.title ?? "Unknown track",
+    artist: item.grandparentTitle ?? null,
+    album: item.parentTitle ?? null,
+    artwork: thumbPath ? `${baseUrl}${thumbPath}?X-Plex-Token=${token}` : null,
+    durationMs: typeof item.duration === "number" ? item.duration : null,
+    progressMs: live && typeof item.viewOffset === "number" ? item.viewOffset : null,
+    state: live ? item.Player?.state ?? null : null,
+    streamUrl: partKey ? `${baseUrl}${partKey}?X-Plex-Token=${token}` : null,
+  };
+}
+
+router.get("/audioplayer", requireAuth, async (req, res) => {
+  // Only Plex is wired up today; any other/absent value resolves to plex so the
+  // tile keeps working as new sources are added behind this same query param.
+  const source = "plex";
+  void req.query["source"];
+
+  // Plex stores the token under `token` or `apiKey`. Fall back to a Plex-typed
+  // env media server when no Plex connection is saved (mirrors /media).
+  const saved = getSavedConnection("plex");
+  const savedToken = saved.token || saved.apiKey;
+  let baseUrl: string | undefined;
+  let token: string | undefined;
+  if (saved.url && savedToken) {
+    baseUrl = saved.url;
+    token = savedToken;
+  } else {
+    const envType = process.env["MEDIA_SERVER_TYPE"] || "jellyfin";
+    if (envType === "plex") {
+      baseUrl = process.env["MEDIA_SERVER_URL"];
+      token = process.env["MEDIA_SERVER_API_KEY"];
+    }
+  }
+
+  // Unconfigured → built-in demo content (sample:true). streamUrl stays null so
+  // the tile labels it not-live and disables in-browser streaming.
+  if (!baseUrl || !token) {
+    const demo = [
+      { id: "1", title: "Dreams", artist: "Fleetwood Mac", album: "Rumours", artwork: null, durationMs: 257_000, progressMs: 72_000, state: "playing", streamUrl: null },
+      { id: "2", title: "The Chain", artist: "Fleetwood Mac", album: "Rumours", artwork: null, durationMs: 271_000, progressMs: null, state: null, streamUrl: null },
+      { id: "3", title: "Go Your Own Way", artist: "Fleetwood Mac", album: "Rumours", artwork: null, durationMs: 218_000, progressMs: null, state: null, streamUrl: null },
+    ];
+    res.json({ source, sample: true, nowPlaying: demo[0], queue: demo });
+    return;
+  }
+
+  try {
+    // Prefer the active music session: /status/sessions lists everything playing
+    // now; pick the first audio track. When one exists, the queue is its album.
+    const sessions = await httpClient.get(`${baseUrl}/status/sessions`, {
+      headers: { "X-Plex-Token": token, Accept: "application/json" },
+    });
+    const session = (sessions.data?.MediaContainer?.Metadata ?? []).find(
+      (m: { type?: string }) => m.type === "track",
+    ) as (PlexTrackRow & { parentRatingKey?: string | number }) | undefined;
+
+    if (session) {
+      const nowPlaying = mapPlexTrack(session, baseUrl, token, true);
+      // Best-effort: fetch the album's tracks for skip next/previous. A failure
+      // here is additive — the queue degrades to just the now-playing track.
+      let queue = [nowPlaying];
+      if (session.parentRatingKey != null) {
+        try {
+          const album = await httpClient.get(
+            `${baseUrl}/library/metadata/${session.parentRatingKey}/children`,
+            { headers: { "X-Plex-Token": token, Accept: "application/json" } },
+          );
+          const tracks = (album.data?.MediaContainer?.Metadata ?? []) as PlexTrackRow[];
+          if (tracks.length > 0) {
+            queue = tracks.map((t) => mapPlexTrack(t, baseUrl!, token!, false));
+          }
+        } catch (err) {
+          logger.warn({ reason: normalizeHttpError(err) }, "Plex album queue fetch failed — using now-playing only");
+        }
+      }
+      res.json({ source, sample: false, nowPlaying, queue });
+      return;
+    }
+
+    // No active session → fall back to the most recently added music tracks.
+    // Locate the music library section (type "artist"), then list its tracks
+    // (type=10) newest-first. nowPlaying is the first of that list.
+    const sections = await httpClient.get(`${baseUrl}/library/sections`, {
+      headers: { "X-Plex-Token": token, Accept: "application/json" },
+    });
+    const musicSection = (sections.data?.MediaContainer?.Directory ?? []).find(
+      (d: { type?: string }) => d.type === "artist",
+    ) as { key?: string } | undefined;
+
+    if (!musicSection?.key) {
+      // Configured but no music library — return an empty, non-sample payload so
+      // the tile shows an honest empty state rather than demo content.
+      res.json({ source, sample: false, nowPlaying: null, queue: [] });
+      return;
+    }
+
+    const recent = await httpClient.get(
+      `${baseUrl}/library/sections/${musicSection.key}/all`,
+      {
+        headers: { "X-Plex-Token": token, Accept: "application/json" },
+        params: { type: 10, sort: "addedAt:desc", "X-Plex-Container-Size": 25 },
+      },
+    );
+    const tracks = (recent.data?.MediaContainer?.Metadata ?? []) as PlexTrackRow[];
+    const queue = tracks.map((t) => mapPlexTrack(t, baseUrl!, token!, false));
+    res.json({ source, sample: false, nowPlaying: queue[0] ?? null, queue });
+  } catch (err) {
+    logger.error({ reason: normalizeHttpError(err) }, "Audio player widget error");
+    res.status(502).json({ error: "Failed to fetch audio player data" });
+  }
+});
+
+// ────────────────────────────────────────────────
 // Sonarr Widget
 // ────────────────────────────────────────────────
 router.get("/sonarr", requireAuth, async (_req, res) => {

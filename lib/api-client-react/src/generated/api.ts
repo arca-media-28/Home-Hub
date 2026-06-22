@@ -20,6 +20,7 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  AudioPlayerData,
   AuthCredentials,
   AuthResponse,
   ConnectionHealth,
@@ -27,6 +28,7 @@ import type {
   ContinueWatchingItem,
   ErrorResponse,
   ErsatzTvData,
+  GetAudioPlayerNowPlayingParams,
   GetMediaContinueParams,
   GetMediaRecentParams,
   GetNewsWidgetParams,
@@ -1878,6 +1880,90 @@ export function useGetErsatzTvWidget<TData = Awaited<ReturnType<typeof getErsatz
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetErsatzTvWidgetQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetAudioPlayerNowPlayingUrl = (params?: GetAudioPlayerNowPlayingParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/widgets/audioplayer?${stringifiedParams}` : `/api/widgets/audioplayer`
+}
+
+/**
+ * @summary Get the current/last music track and a playable queue for the Audio Player tile
+ */
+export const getAudioPlayerNowPlaying = async (params?: GetAudioPlayerNowPlayingParams, options?: RequestInit): Promise<AudioPlayerData> => {
+
+  return customFetch<AudioPlayerData>(getGetAudioPlayerNowPlayingUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAudioPlayerNowPlayingQueryKey = (params?: GetAudioPlayerNowPlayingParams,) => {
+    return [
+    `/api/widgets/audioplayer`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetAudioPlayerNowPlayingQueryOptions = <TData = Awaited<ReturnType<typeof getAudioPlayerNowPlaying>>, TError = ErrorType<ErrorResponse>>(params?: GetAudioPlayerNowPlayingParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAudioPlayerNowPlaying>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAudioPlayerNowPlayingQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAudioPlayerNowPlaying>>> = ({ signal }) => getAudioPlayerNowPlaying(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAudioPlayerNowPlaying>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAudioPlayerNowPlayingQueryResult = NonNullable<Awaited<ReturnType<typeof getAudioPlayerNowPlaying>>>
+export type GetAudioPlayerNowPlayingQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Get the current/last music track and a playable queue for the Audio Player tile
+ */
+
+export function useGetAudioPlayerNowPlaying<TData = Awaited<ReturnType<typeof getAudioPlayerNowPlaying>>, TError = ErrorType<ErrorResponse>>(
+ params?: GetAudioPlayerNowPlayingParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAudioPlayerNowPlaying>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAudioPlayerNowPlayingQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

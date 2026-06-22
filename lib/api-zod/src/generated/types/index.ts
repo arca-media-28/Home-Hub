@@ -6,6 +6,8 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './audioPlayerData';
+export * from './audioTrack';
 export * from './authCredentials';
 export * from './authResponse';
 export * from './connectionHealth';
@@ -14,6 +16,8 @@ export * from './continueWatchingItem';
 export * from './errorResponse';
 export * from './ersatzTvChannel';
 export * from './ersatzTvData';
+export * from './getAudioPlayerNowPlayingParams';
+export * from './getAudioPlayerNowPlayingSource';
 export * from './getMediaContinueParams';
 export * from './getMediaContinueServer';
 export * from './getMediaRecentParams';

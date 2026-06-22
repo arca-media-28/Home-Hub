@@ -25,6 +25,7 @@ export const TileUpdateIntegration = {
   prowlarr: 'prowlarr',
   tailscale: 'tailscale',
   ersatztv: 'ersatztv',
+  audioplayer: 'audioplayer',
   clock: 'clock',
   weather: 'weather',
   sports: 'sports',

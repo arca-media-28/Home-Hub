@@ -477,6 +477,39 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErsatzTvData"
 
+  /widgets/audioplayer:
+    get:
+      operationId: getAudioPlayerNowPlaying
+      tags: [widgets]
+      summary: Get the current/last music track and a playable queue for the Audio Player tile
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: source
+          in: query
+          required: false
+          description: >-
+            Which music source backs the tile. "plex" resolves the saved Plex
+            connection and returns its current/last music session plus a
+            browser-playable queue. Defaults to "plex" when omitted. This is the
+            seam additional sources (Spotify, Jellyfin, Navidrome) plug into.
+          schema:
+            type: string
+            enum: [plex]
+      responses:
+        "200":
+          description: Now-playing track and queue
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AudioPlayerData"
+        "502":
+          description: The configured music source could not be reached
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /widgets/news:
     get:
       operationId: getNewsWidget
@@ -786,7 +819,7 @@ components:
           enum: [app, truenas, media, sonarr, radarr, lidarr, qbittorrent]
         integration:
           type: ["string", "null"]
-          enum: [truenas, media, jellyfin, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, clock, weather, sports, news, stocks, sleeper, spacer, divider, null]
+          enum: [truenas, media, jellyfin, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, audioplayer, clock, weather, sports, news, stocks, sleeper, spacer, divider, null]
         gridX:
           type: integer
         gridY:
@@ -865,7 +898,7 @@ components:
           enum: [app, truenas, media, sonarr, radarr, lidarr, qbittorrent]
         integration:
           type: ["string", "null"]
-          enum: [truenas, media, jellyfin, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, clock, weather, sports, news, stocks, sleeper, spacer, divider, null]
+          enum: [truenas, media, jellyfin, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, audioplayer, clock, weather, sports, news, stocks, sleeper, spacer, divider, null]
         gridX:
           type: integer
         gridY:
@@ -908,7 +941,7 @@ components:
       properties:
         integration:
           type: ["string", "null"]
-          enum: [truenas, media, jellyfin, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, clock, weather, sports, news, stocks, sleeper, spacer, divider, null]
+          enum: [truenas, media, jellyfin, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, audioplayer, clock, weather, sports, news, stocks, sleeper, spacer, divider, null]
         gridX:
           type: integer
         gridY:
@@ -1090,6 +1123,12 @@ components:
             When true, the Fantasy tile shows recent waiver/trade transactions.
             Absent or null defaults to true.
           type: ["boolean", "null"]
+        audioSource:
+          description: >-
+            Which music source backs an Audio Player tile (e.g. "plex"). Absent
+            or null defaults to "plex". This is the seam additional sources
+            (Spotify, Jellyfin, Navidrome) plug into later.
+          type: ["string", "null"]
         scrollable:
           description: >-
             When true, the tile body shows a scrollbar when its content
@@ -1833,6 +1872,79 @@ components:
             Title of the programme currently airing on the channel (start ≤ now
             < stop in the EPG). Null when nothing is currently scheduled.
           type: ["string", "null"]
+
+    AudioTrack:
+      type: object
+      required: [id, title]
+      properties:
+        id:
+          description: Stable identifier for the track within its source.
+          type: string
+        title:
+          description: The track title.
+          type: string
+        artist:
+          description: Track artist (Plex grandparentTitle). Null when unknown.
+          type: ["string", "null"]
+        album:
+          description: Album the track belongs to (Plex parentTitle). Null when unknown.
+          type: ["string", "null"]
+        artwork:
+          description: >-
+            Fully-qualified, authenticated album-art URL the browser can load
+            directly (Plex token appended). Null when the source has no artwork.
+          type: ["string", "null"]
+        durationMs:
+          description: Track length in milliseconds. Null when the source omits it.
+          type: ["number", "null"]
+        progressMs:
+          description: >-
+            Playback offset in milliseconds for the source's current session
+            (Plex viewOffset). Only set on the now-playing track of an active
+            remote session; null otherwise.
+          type: ["number", "null"]
+        state:
+          description: >-
+            Remote playback state reported by the source for an active session:
+            "playing", "paused", or "stopped". Null when there is no active
+            session (the track is a queue/last-played entry, not live).
+          type: ["string", "null"]
+        streamUrl:
+          description: >-
+            Fully-qualified, authenticated audio stream URL an HTML audio element
+            can play directly (Plex part key + token). Null when the source does
+            not expose an in-browser-playable stream (remote-control-only).
+          type: ["string", "null"]
+
+    AudioPlayerData:
+      type: object
+      required: [source, sample, nowPlaying, queue]
+      properties:
+        source:
+          description: The music source backing this response (e.g. "plex").
+          type: string
+        sample:
+          description: >-
+            True when the track(s) are built-in demo content (the source is not
+            configured), so the tile can label playback as not-live and disable
+            in-browser streaming.
+          type: boolean
+        nowPlaying:
+          description: >-
+            The source's current or last music track. For Plex this is the
+            active music session when one exists, otherwise the most recently
+            added/played track. Null when nothing is available.
+          oneOf:
+            - $ref: "#/components/schemas/AudioTrack"
+            - type: "null"
+        queue:
+          description: >-
+            Ordered list of browser-playable tracks the shared player can step
+            through (skip next/previous). For Plex this is the now-playing
+            track's album, or recent tracks when no session is active.
+          type: array
+          items:
+            $ref: "#/components/schemas/AudioTrack"
 
     NewsData:
       type: object

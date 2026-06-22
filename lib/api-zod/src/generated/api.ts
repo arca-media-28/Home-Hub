@@ -70,7 +70,7 @@ export const GetTilesResponseItem = zod.object({
   "id": zod.number(),
   "userId": zod.number(),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'lidarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('clock'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('spacer'),zod.literal('divider'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('spacer'),zod.literal('divider'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -115,6 +115,7 @@ export const GetTilesResponseItem = zod.object({
   "sleeperShowMatchup": zod.boolean().nullish().describe('When true, the Fantasy tile shows the user\'s current-week matchup. Absent or null defaults to true.'),
   "sleeperShowStandings": zod.boolean().nullish().describe('When true, the Fantasy tile shows the league standings. Absent or null defaults to true.'),
   "sleeperShowTransactions": zod.boolean().nullish().describe('When true, the Fantasy tile shows recent waiver\/trade transactions. Absent or null defaults to true.'),
+  "audioSource": zod.string().nullish().describe('Which music source backs an Audio Player tile (e.g. \"plex\"). Absent or null defaults to \"plex\". This is the seam additional sources (Spotify, Jellyfin, Navidrome) plug into later.'),
   "scrollable": zod.boolean().nullish().describe('When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.'),
   "createdAt": zod.string().optional()
@@ -127,7 +128,7 @@ export const GetTilesResponse = zod.array(GetTilesResponseItem)
  */
 export const CreateTileBody = zod.object({
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'lidarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('clock'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('spacer'),zod.literal('divider'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('spacer'),zod.literal('divider'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -172,6 +173,7 @@ export const CreateTileBody = zod.object({
   "sleeperShowMatchup": zod.boolean().nullish().describe('When true, the Fantasy tile shows the user\'s current-week matchup. Absent or null defaults to true.'),
   "sleeperShowStandings": zod.boolean().nullish().describe('When true, the Fantasy tile shows the league standings. Absent or null defaults to true.'),
   "sleeperShowTransactions": zod.boolean().nullish().describe('When true, the Fantasy tile shows recent waiver\/trade transactions. Absent or null defaults to true.'),
+  "audioSource": zod.string().nullish().describe('Which music source backs an Audio Player tile (e.g. \"plex\"). Absent or null defaults to \"plex\". This is the seam additional sources (Spotify, Jellyfin, Navidrome) plug into later.'),
   "scrollable": zod.boolean().nullish().describe('When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.')
 })
@@ -188,7 +190,7 @@ export const GetTileResponse = zod.object({
   "id": zod.number(),
   "userId": zod.number(),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'lidarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('clock'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('spacer'),zod.literal('divider'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('spacer'),zod.literal('divider'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -233,6 +235,7 @@ export const GetTileResponse = zod.object({
   "sleeperShowMatchup": zod.boolean().nullish().describe('When true, the Fantasy tile shows the user\'s current-week matchup. Absent or null defaults to true.'),
   "sleeperShowStandings": zod.boolean().nullish().describe('When true, the Fantasy tile shows the league standings. Absent or null defaults to true.'),
   "sleeperShowTransactions": zod.boolean().nullish().describe('When true, the Fantasy tile shows recent waiver\/trade transactions. Absent or null defaults to true.'),
+  "audioSource": zod.string().nullish().describe('Which music source backs an Audio Player tile (e.g. \"plex\"). Absent or null defaults to \"plex\". This is the seam additional sources (Spotify, Jellyfin, Navidrome) plug into later.'),
   "scrollable": zod.boolean().nullish().describe('When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.'),
   "createdAt": zod.string().optional()
@@ -247,7 +250,7 @@ export const UpdateTileParams = zod.object({
 })
 
 export const UpdateTileBody = zod.object({
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('clock'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('spacer'),zod.literal('divider'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('spacer'),zod.literal('divider'),zod.literal(null)]).nullish(),
   "gridX": zod.number().optional(),
   "gridY": zod.number().optional(),
   "gridW": zod.number().optional(),
@@ -292,6 +295,7 @@ export const UpdateTileBody = zod.object({
   "sleeperShowMatchup": zod.boolean().nullish().describe('When true, the Fantasy tile shows the user\'s current-week matchup. Absent or null defaults to true.'),
   "sleeperShowStandings": zod.boolean().nullish().describe('When true, the Fantasy tile shows the league standings. Absent or null defaults to true.'),
   "sleeperShowTransactions": zod.boolean().nullish().describe('When true, the Fantasy tile shows recent waiver\/trade transactions. Absent or null defaults to true.'),
+  "audioSource": zod.string().nullish().describe('Which music source backs an Audio Player tile (e.g. \"plex\"). Absent or null defaults to \"plex\". This is the seam additional sources (Spotify, Jellyfin, Navidrome) plug into later.'),
   "scrollable": zod.boolean().nullish().describe('When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.')
 })
@@ -300,7 +304,7 @@ export const UpdateTileResponse = zod.object({
   "id": zod.number(),
   "userId": zod.number(),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'lidarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('clock'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('spacer'),zod.literal('divider'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('spacer'),zod.literal('divider'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -345,6 +349,7 @@ export const UpdateTileResponse = zod.object({
   "sleeperShowMatchup": zod.boolean().nullish().describe('When true, the Fantasy tile shows the user\'s current-week matchup. Absent or null defaults to true.'),
   "sleeperShowStandings": zod.boolean().nullish().describe('When true, the Fantasy tile shows the league standings. Absent or null defaults to true.'),
   "sleeperShowTransactions": zod.boolean().nullish().describe('When true, the Fantasy tile shows recent waiver\/trade transactions. Absent or null defaults to true.'),
+  "audioSource": zod.string().nullish().describe('Which music source backs an Audio Player tile (e.g. \"plex\"). Absent or null defaults to \"plex\". This is the seam additional sources (Spotify, Jellyfin, Navidrome) plug into later.'),
   "scrollable": zod.boolean().nullish().describe('When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.'),
   "createdAt": zod.string().optional()
@@ -376,7 +381,7 @@ export const SaveLayoutResponseItem = zod.object({
   "id": zod.number(),
   "userId": zod.number(),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'lidarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('clock'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('spacer'),zod.literal('divider'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('spacer'),zod.literal('divider'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -421,6 +426,7 @@ export const SaveLayoutResponseItem = zod.object({
   "sleeperShowMatchup": zod.boolean().nullish().describe('When true, the Fantasy tile shows the user\'s current-week matchup. Absent or null defaults to true.'),
   "sleeperShowStandings": zod.boolean().nullish().describe('When true, the Fantasy tile shows the league standings. Absent or null defaults to true.'),
   "sleeperShowTransactions": zod.boolean().nullish().describe('When true, the Fantasy tile shows recent waiver\/trade transactions. Absent or null defaults to true.'),
+  "audioSource": zod.string().nullish().describe('Which music source backs an Audio Player tile (e.g. \"plex\"). Absent or null defaults to \"plex\". This is the seam additional sources (Spotify, Jellyfin, Navidrome) plug into later.'),
   "scrollable": zod.boolean().nullish().describe('When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.'),
   "createdAt": zod.string().optional()
@@ -685,6 +691,41 @@ export const GetErsatzTvWidgetResponse = zod.object({
   "name": zod.string().describe('The channel\'s display name.'),
   "nowPlaying": zod.string().nullable().describe('Title of the programme currently airing on the channel (start ≤ now < stop in the EPG). Null when nothing is currently scheduled.')
 })).describe('Channels and what each is currently airing (from the EPG).')
+})
+
+
+/**
+ * @summary Get the current/last music track and a playable queue for the Audio Player tile
+ */
+export const GetAudioPlayerNowPlayingQueryParams = zod.object({
+  "source": zod.enum(['plex']).optional().describe('Which music source backs the tile. \"plex\" resolves the saved Plex connection and returns its current\/last music session plus a browser-playable queue. Defaults to \"plex\" when omitted. This is the seam additional sources (Spotify, Jellyfin, Navidrome) plug into.')
+})
+
+export const GetAudioPlayerNowPlayingResponse = zod.object({
+  "source": zod.string().describe('The music source backing this response (e.g. \"plex\").'),
+  "sample": zod.boolean().describe('True when the track(s) are built-in demo content (the source is not configured), so the tile can label playback as not-live and disable in-browser streaming.'),
+  "nowPlaying": zod.union([zod.object({
+  "id": zod.string().describe('Stable identifier for the track within its source.'),
+  "title": zod.string().describe('The track title.'),
+  "artist": zod.string().nullish().describe('Track artist (Plex grandparentTitle). Null when unknown.'),
+  "album": zod.string().nullish().describe('Album the track belongs to (Plex parentTitle). Null when unknown.'),
+  "artwork": zod.string().nullish().describe('Fully-qualified, authenticated album-art URL the browser can load directly (Plex token appended). Null when the source has no artwork.'),
+  "durationMs": zod.number().nullish().describe('Track length in milliseconds. Null when the source omits it.'),
+  "progressMs": zod.number().nullish().describe('Playback offset in milliseconds for the source\'s current session (Plex viewOffset). Only set on the now-playing track of an active remote session; null otherwise.'),
+  "state": zod.string().nullish().describe('Remote playback state reported by the source for an active session: \"playing\", \"paused\", or \"stopped\". Null when there is no active session (the track is a queue\/last-played entry, not live).'),
+  "streamUrl": zod.string().nullish().describe('Fully-qualified, authenticated audio stream URL an HTML audio element can play directly (Plex part key + token). Null when the source does not expose an in-browser-playable stream (remote-control-only).')
+}),zod.null()]).describe('The source\'s current or last music track. For Plex this is the active music session when one exists, otherwise the most recently added\/played track. Null when nothing is available.'),
+  "queue": zod.array(zod.object({
+  "id": zod.string().describe('Stable identifier for the track within its source.'),
+  "title": zod.string().describe('The track title.'),
+  "artist": zod.string().nullish().describe('Track artist (Plex grandparentTitle). Null when unknown.'),
+  "album": zod.string().nullish().describe('Album the track belongs to (Plex parentTitle). Null when unknown.'),
+  "artwork": zod.string().nullish().describe('Fully-qualified, authenticated album-art URL the browser can load directly (Plex token appended). Null when the source has no artwork.'),
+  "durationMs": zod.number().nullish().describe('Track length in milliseconds. Null when the source omits it.'),
+  "progressMs": zod.number().nullish().describe('Playback offset in milliseconds for the source\'s current session (Plex viewOffset). Only set on the now-playing track of an active remote session; null otherwise.'),
+  "state": zod.string().nullish().describe('Remote playback state reported by the source for an active session: \"playing\", \"paused\", or \"stopped\". Null when there is no active session (the track is a queue\/last-played entry, not live).'),
+  "streamUrl": zod.string().nullish().describe('Fully-qualified, authenticated audio stream URL an HTML audio element can play directly (Plex part key + token). Null when the source does not expose an in-browser-playable stream (remote-control-only).')
+})).describe('Ordered list of browser-playable tracks the shared player can step through (skip next\/previous). For Plex this is the now-playing track\'s album, or recent tracks when no session is active.')
 })
 
 

@@ -29,6 +29,7 @@ const CATEGORY_BY_KEY: Record<string, Category> = {
   plex: "Media",
   jellyfin: "Media",
   ersatztv: "Media",
+  audioplayer: "Media",
   // Downloads
   qbittorrent: "Downloads",
   sonarr: "Downloads",

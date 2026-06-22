@@ -52,6 +52,7 @@ interface TileSettings {
   sleeperShowMatchup?: boolean | null;
   sleeperShowStandings?: boolean | null;
   sleeperShowTransactions?: boolean | null;
+  audioSource?: string | null;
   scrollable?: boolean | null;
 }
 
@@ -212,6 +213,11 @@ function pickTileSettings(obj: Record<string, unknown>): TileSettings {
     result.sleeperShowTransactions = obj["sleeperShowTransactions"];
   } else if (obj["sleeperShowTransactions"] === null) {
     result.sleeperShowTransactions = null;
+  }
+  if (typeof obj["audioSource"] === "string") {
+    result.audioSource = obj["audioSource"];
+  } else if (obj["audioSource"] === null) {
+    result.audioSource = null;
   }
   if (typeof obj["scrollable"] === "boolean") {
     result.scrollable = obj["scrollable"];

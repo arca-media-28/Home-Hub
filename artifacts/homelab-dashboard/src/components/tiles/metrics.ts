@@ -77,6 +77,13 @@ export const METRIC_CATALOG: Record<string, MetricDef[]> = {
     { key: "sparkline", label: "Trend sparkline" },
     { key: "portfolio", label: "Portfolio totals" },
   ],
+  [TileIntegration.audioplayer]: [
+    { key: "artwork", label: "Album artwork" },
+    { key: "trackInfo", label: "Track / artist" },
+    { key: "progress", label: "Progress bar" },
+    { key: "controls", label: "Playback controls" },
+    { key: "queue", label: "Up next queue" },
+  ],
 };
 
 // All metric keys for an integration (used as the default "show all" set).

@@ -115,6 +115,7 @@ const INTEGRATIONS = [
   { value: TileIntegration.prowlarr, label: "Prowlarr" },
   { value: TileIntegration.tailscale, label: "Tailscale" },
   { value: TileIntegration.ersatztv, label: "ErsatzTV" },
+  { value: TileIntegration.audioplayer, label: "Audio Player" },
   { value: TileIntegration.clock, label: "Local Time" },
   { value: TileIntegration.weather, label: "Weather" },
   { value: TileIntegration.sports, label: "Sports" },
@@ -261,6 +262,12 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
   >("idle");
   const [sleeperLoadError, setSleeperLoadError] = useState<string | null>(null);
 
+  // Audio Player widget options. Which music source backs the tile (only Plex
+  // is wired up today; this is the seam future sources plug into).
+  const [audioSource, setAudioSource] = useState<string>(
+    tile?.tileSettings?.audioSource ?? "plex",
+  );
+
   // Generic per-tile option (applies to every tile): when on, the tile body
   // scrolls instead of clipping content that overflows its grid bounds.
   const [scrollable, setScrollable] = useState<boolean>(
@@ -319,6 +326,7 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
       setSleeperLeagues([]);
       setSleeperLoadState("idle");
       setSleeperLoadError(null);
+      setAudioSource(tile?.tileSettings?.audioSource ?? "plex");
       setScrollable(tile?.tileSettings?.scrollable ?? false);
       setShowColorPicker(false);
       setShowTitleColorPicker(false);
@@ -359,6 +367,7 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
   const isNews = integration === TileIntegration.news;
   const isStocks = integration === TileIntegration.stocks;
   const isSleeper = integration === TileIntegration.sleeper;
+  const isAudioPlayer = integration === TileIntegration.audioplayer;
   // The spacer is a layout-only tile: an invisible gap with no name, URL,
   // image, background, or live data. Only its size/position matter, so the
   // editor strips every content field and shows a short description instead.
@@ -805,7 +814,9 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
                           sleeperShowStandings,
                           sleeperShowTransactions,
                         }
-                      : null;
+                      : isAudioPlayer
+                        ? { audioSource }
+                        : null;
         // Only emit a settings object when there is something to store; an
         // un-scrolled plain tile keeps tileSettings null as before.
         if (!widget && !scrollable) return null;
@@ -915,6 +926,24 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
                   </label>
                 ))}
               </div>
+            </div>
+          )}
+
+          {isAudioPlayer && (
+            <div className="space-y-2 border-t border-border pt-4">
+              <Label htmlFor="audio-source">Music source</Label>
+              <p className="text-xs text-muted-foreground">
+                Where this tile pulls now-playing and the queue from. Plex uses
+                your saved Plex connection.
+              </p>
+              <Select value={audioSource} onValueChange={setAudioSource}>
+                <SelectTrigger id="audio-source">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="plex">Plex</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           )}
 

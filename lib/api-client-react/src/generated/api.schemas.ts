@@ -62,6 +62,7 @@ export const TileIntegration = {
   prowlarr: 'prowlarr',
   tailscale: 'tailscale',
   ersatztv: 'ersatztv',
+  audioplayer: 'audioplayer',
   clock: 'clock',
   weather: 'weather',
   sports: 'sports',
@@ -222,6 +223,11 @@ export type TileSettings = {
      */
   sleeperShowTransactions?: boolean | null;
   /**
+     * Which music source backs an Audio Player tile (e.g. "plex"). Absent or null defaults to "plex". This is the seam additional sources (Spotify, Jellyfin, Navidrome) plug into later.
+     * @nullable
+     */
+  audioSource?: string | null;
+  /**
      * When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).
      * @nullable
      */
@@ -316,6 +322,7 @@ export const TileInputIntegration = {
   prowlarr: 'prowlarr',
   tailscale: 'tailscale',
   ersatztv: 'ersatztv',
+  audioplayer: 'audioplayer',
   clock: 'clock',
   weather: 'weather',
   sports: 'sports',
@@ -373,6 +380,7 @@ export const TileUpdateIntegration = {
   prowlarr: 'prowlarr',
   tailscale: 'tailscale',
   ersatztv: 'ersatztv',
+  audioplayer: 'audioplayer',
   clock: 'clock',
   weather: 'weather',
   sports: 'sports',
@@ -848,6 +856,59 @@ export interface ErsatzTvData {
   channels: ErsatzTvChannel[];
 }
 
+export interface AudioTrack {
+  /** Stable identifier for the track within its source. */
+  id: string;
+  /** The track title. */
+  title: string;
+  /**
+     * Track artist (Plex grandparentTitle). Null when unknown.
+     * @nullable
+     */
+  artist?: string | null;
+  /**
+     * Album the track belongs to (Plex parentTitle). Null when unknown.
+     * @nullable
+     */
+  album?: string | null;
+  /**
+     * Fully-qualified, authenticated album-art URL the browser can load directly (Plex token appended). Null when the source has no artwork.
+     * @nullable
+     */
+  artwork?: string | null;
+  /**
+     * Track length in milliseconds. Null when the source omits it.
+     * @nullable
+     */
+  durationMs?: number | null;
+  /**
+     * Playback offset in milliseconds for the source's current session (Plex viewOffset). Only set on the now-playing track of an active remote session; null otherwise.
+     * @nullable
+     */
+  progressMs?: number | null;
+  /**
+     * Remote playback state reported by the source for an active session: "playing", "paused", or "stopped". Null when there is no active session (the track is a queue/last-played entry, not live).
+     * @nullable
+     */
+  state?: string | null;
+  /**
+     * Fully-qualified, authenticated audio stream URL an HTML audio element can play directly (Plex part key + token). Null when the source does not expose an in-browser-playable stream (remote-control-only).
+     * @nullable
+     */
+  streamUrl?: string | null;
+}
+
+export interface AudioPlayerData {
+  /** The music source backing this response (e.g. "plex"). */
+  source: string;
+  /** True when the track(s) are built-in demo content (the source is not configured), so the tile can label playback as not-live and disable in-browser streaming. */
+  sample: boolean;
+  /** The source's current or last music track. For Plex this is the active music session when one exists, otherwise the most recently added/played track. Null when nothing is available. */
+  nowPlaying: AudioTrack | null;
+  /** Ordered list of browser-playable tracks the shared player can step through (skip next/previous). For Plex this is the now-playing track's album, or recent tracks when no session is active. */
+  queue: AudioTrack[];
+}
+
 export interface NewsItem {
   /** The headline text. */
   title: string;
@@ -906,6 +967,20 @@ export type GetMediaContinueServer = typeof GetMediaContinueServer[keyof typeof 
 export const GetMediaContinueServer = {
   plex: 'plex',
   jellyfin: 'jellyfin',
+} as const;
+
+export type GetAudioPlayerNowPlayingParams = {
+/**
+ * Which music source backs the tile. "plex" resolves the saved Plex connection and returns its current/last music session plus a browser-playable queue. Defaults to "plex" when omitted. This is the seam additional sources (Spotify, Jellyfin, Navidrome) plug into.
+ */
+source?: GetAudioPlayerNowPlayingSource;
+};
+
+export type GetAudioPlayerNowPlayingSource = typeof GetAudioPlayerNowPlayingSource[keyof typeof GetAudioPlayerNowPlayingSource];
+
+
+export const GetAudioPlayerNowPlayingSource = {
+  plex: 'plex',
 } as const;
 
 export type GetNewsWidgetParams = {
