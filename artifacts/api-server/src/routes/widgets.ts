@@ -1249,16 +1249,19 @@ async function handleSpotifyAudio(res: import("express").Response): Promise<void
 }
 
 // Map a Subsonic song to the shared AudioTrack shape. Subsonic reports
-// durations in whole seconds (→ ms) and never exposes a live playback offset, so
-// progressMs/state stay null. Artwork and stream URLs embed the request's
-// salted-token auth so the browser can load them directly; the stream uses
-// `format=mp3` so the shared <audio> engine plays any source codec (FLAC etc.).
-// `live` marks the now-playing entry so its state reads as "playing".
+// durations in whole seconds (→ ms). It exposes no real playback cursor; the
+// caller may pass an estimated `progressMs` derived from a now-playing entry's
+// `minutesAgo` (see estimateSubsonicProgressMs), otherwise it stays null.
+// Artwork and stream URLs embed the request's salted-token auth so the browser
+// can load them directly; the stream uses `format=mp3` so the shared <audio>
+// engine plays any source codec (FLAC etc.). `live` marks the now-playing entry
+// so its state reads as "playing".
 function mapSubsonicTrack(
   song: SubsonicSong,
   baseUrl: string,
   mediaQuery: string,
   live: boolean,
+  progressMs: number | null = null,
 ) {
   const id = String(song.id ?? "");
   const coverArt = song.coverArt ?? song.albumId;
@@ -1271,12 +1274,27 @@ function mapSubsonicTrack(
       ? `${baseUrl}/rest/getCoverArt.view?id=${encodeURIComponent(coverArt)}&size=300&${mediaQuery}`
       : null,
     durationMs: typeof song.duration === "number" ? song.duration * 1000 : null,
-    progressMs: null,
+    progressMs,
     state: live ? "playing" : null,
     streamUrl: id
       ? `${baseUrl}/rest/stream.view?id=${encodeURIComponent(id)}&format=mp3&${mediaQuery}`
       : null,
   };
+}
+
+// Estimate a live playback offset for a now-playing entry. Subsonic exposes no
+// real playback cursor — only `minutesAgo`, how long ago the server last
+// registered the track as playing (whole minutes). We treat that as the elapsed
+// time since the track started and clamp it to the track length so a stale entry
+// never overruns the progress bar. Absent/invalid → null, so the tile falls back
+// to its previous behaviour (no progress) gracefully.
+function estimateSubsonicProgressMs(song: SubsonicSong): number | null {
+  if (typeof song.minutesAgo !== "number" || !Number.isFinite(song.minutesAgo)) {
+    return null;
+  }
+  const elapsedMs = Math.max(0, song.minutesAgo) * 60_000;
+  const durationMs = typeof song.duration === "number" ? song.duration * 1000 : null;
+  return durationMs != null ? Math.min(elapsedMs, durationMs) : elapsedMs;
 }
 
 // Audio Player — Navidrome / Subsonic source. Reuses the saved `subsonic`
@@ -1316,7 +1334,8 @@ async function handleSubsonicAudio(res: import("express").Response): Promise<voi
 
     if (entries.length > 0) {
       const current = entries[0]!;
-      const nowPlaying = mapSubsonicTrack(current, baseUrl, mediaQuery, true);
+      const progressMs = estimateSubsonicProgressMs(current);
+      const nowPlaying = mapSubsonicTrack(current, baseUrl, mediaQuery, true, progressMs);
       // Best-effort: the now-playing track's album becomes the queue so skip
       // next/previous works. A failure here is additive — the queue degrades to
       // just the now-playing track.

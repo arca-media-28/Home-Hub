@@ -43,6 +43,11 @@ export interface SubsonicSong {
   albumId?: string;
   coverArt?: string;
   duration?: number; // seconds
+  // Only present on getNowPlaying entries: how many minutes ago the server last
+  // registered this track as playing. It's the only live-session signal Subsonic
+  // exposes (whole minutes, no sub-minute offset), so we estimate the playback
+  // position from it.
+  minutesAgo?: number;
 }
 
 // Issue a Subsonic REST GET and unwrap the `subsonic-response` envelope.
