@@ -27,6 +27,7 @@ import {
   Clapperboard,
   Tv,
   Film,
+  Music,
   Download,
   Shield,
   Network,
@@ -52,6 +53,7 @@ type ServiceKey =
   | "jellyfin"
   | "sonarr"
   | "radarr"
+  | "lidarr"
   | "qbittorrent"
   | "pihole"
   | "nginx-proxy-manager"
@@ -121,6 +123,12 @@ const SERVICES: ServiceDef[] = [
     key: "radarr",
     name: "Radarr",
     icon: Film,
+    fields: [URL_FIELD, API_KEY_FIELD],
+  },
+  {
+    key: "lidarr",
+    name: "Lidarr",
+    icon: Music,
     fields: [URL_FIELD, API_KEY_FIELD],
   },
   {

@@ -33,6 +33,7 @@ const CATEGORY_BY_KEY: Record<string, Category> = {
   qbittorrent: "Downloads",
   sonarr: "Downloads",
   radarr: "Downloads",
+  lidarr: "Downloads",
   prowlarr: "Downloads",
   // Server
   truenas: "Server",

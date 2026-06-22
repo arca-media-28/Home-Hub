@@ -107,6 +107,7 @@ const INTEGRATIONS = [
   { value: TileIntegration.jellyfin, label: "Jellyfin" },
   { value: TileIntegration.sonarr, label: "Sonarr" },
   { value: TileIntegration.radarr, label: "Radarr" },
+  { value: TileIntegration.lidarr, label: "Lidarr" },
   { value: TileIntegration.qbittorrent, label: "qBittorrent" },
   { value: TileIntegration.truenas, label: "TrueNAS" },
   { value: TileIntegration.pihole, label: "Pi-hole" },

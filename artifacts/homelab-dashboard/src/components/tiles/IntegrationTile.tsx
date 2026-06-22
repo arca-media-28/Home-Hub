@@ -6,6 +6,7 @@ import TruenasTile from "./TruenasTile";
 import MediaTile from "./MediaTile";
 import SonarrTile from "./SonarrTile";
 import RadarrTile from "./RadarrTile";
+import LidarrTile from "./LidarrTile";
 import QbittorrentTile from "./QbittorrentTile";
 import PiholeTile from "./PiholeTile";
 import NginxProxyManagerTile from "./NginxProxyManagerTile";
@@ -28,6 +29,7 @@ export const INTEGRATION_LABELS: Record<string, string> = {
   [TileIntegration.jellyfin]: "Jellyfin",
   [TileIntegration.sonarr]: "Sonarr",
   [TileIntegration.radarr]: "Radarr",
+  [TileIntegration.lidarr]: "Lidarr",
   [TileIntegration.qbittorrent]: "qBittorrent",
   [TileIntegration.pihole]: "Pi-hole",
   [TileIntegration["nginx-proxy-manager"]]: "Nginx Proxy Manager",
@@ -66,6 +68,8 @@ function renderStatusView(integration: string, props: WidgetProps) {
       return <SonarrTile {...props} />;
     case TileIntegration.radarr:
       return <RadarrTile {...props} />;
+    case TileIntegration.lidarr:
+      return <LidarrTile {...props} />;
     case TileIntegration.qbittorrent:
       return <QbittorrentTile {...props} />;
     case TileIntegration.pihole:

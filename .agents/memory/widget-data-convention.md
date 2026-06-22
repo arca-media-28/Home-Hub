@@ -48,7 +48,11 @@ failed before this. The same client backs both the test/ping and the widgets so
   partial data, and only 502 when BOTH fail. Log the failing call by name.
 - Sonarr/Radarr: queue needs `includeSeries`/`includeMovie` (+ `includeEpisode`
   for Sonarr) and returns rows under `records`; calendar needs the same include
-  flags or titles render blank.
+  flags or titles render blank. **Lidarr is the same *arr pattern but its API
+  lives under `/api/v1/` (queue/calendar/system status), NOT `/api/v3/`** — each
+  *arr pins its own API version, so never assume v3. Lidarr calendar entries are
+  albums: `title` is the album, `artist.artistName` is the artist; queue records
+  carry `artist` (use `includeArtist`/`includeAlbum`).
 - qBittorrent: cookie auth — `POST /api/v2/auth/login` (form body) → grab the
   session cookie from `set-cookie`, then send it back as `Cookie:` on
   `/api/v2/torrents/info` and `/api/v2/transfer/info`. **Cookie name is version-

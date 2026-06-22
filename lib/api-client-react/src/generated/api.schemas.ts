@@ -39,6 +39,7 @@ export const TileType = {
   media: 'media',
   sonarr: 'sonarr',
   radarr: 'radarr',
+  lidarr: 'lidarr',
   qbittorrent: 'qbittorrent',
 } as const;
 
@@ -54,6 +55,7 @@ export const TileIntegration = {
   jellyfin: 'jellyfin',
   sonarr: 'sonarr',
   radarr: 'radarr',
+  lidarr: 'lidarr',
   qbittorrent: 'qbittorrent',
   pihole: 'pihole',
   'nginx-proxy-manager': 'nginx-proxy-manager',
@@ -291,6 +293,7 @@ export const TileInputType = {
   media: 'media',
   sonarr: 'sonarr',
   radarr: 'radarr',
+  lidarr: 'lidarr',
   qbittorrent: 'qbittorrent',
 } as const;
 
@@ -306,6 +309,7 @@ export const TileInputIntegration = {
   jellyfin: 'jellyfin',
   sonarr: 'sonarr',
   radarr: 'radarr',
+  lidarr: 'lidarr',
   qbittorrent: 'qbittorrent',
   pihole: 'pihole',
   'nginx-proxy-manager': 'nginx-proxy-manager',
@@ -362,6 +366,7 @@ export const TileUpdateIntegration = {
   jellyfin: 'jellyfin',
   sonarr: 'sonarr',
   radarr: 'radarr',
+  lidarr: 'lidarr',
   qbittorrent: 'qbittorrent',
   pihole: 'pihole',
   'nginx-proxy-manager': 'nginx-proxy-manager',
@@ -659,6 +664,28 @@ export interface RadarrUpcomingItem {
 export interface RadarrData {
   queue: RadarrQueueItem[];
   upcoming: RadarrUpcomingItem[];
+}
+
+export interface LidarrQueueItem {
+  id: number;
+  title: string;
+  status: string;
+  /** @nullable */
+  progress?: number | null;
+  /** @nullable */
+  size?: number | null;
+}
+
+export interface LidarrUpcomingItem {
+  id: number;
+  title: string;
+  artistName?: string;
+  releaseDate: string;
+}
+
+export interface LidarrData {
+  queue: LidarrQueueItem[];
+  upcoming: LidarrUpcomingItem[];
 }
 
 export interface QbittorrentTorrent {

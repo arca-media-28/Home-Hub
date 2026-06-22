@@ -29,6 +29,10 @@ export const METRIC_CATALOG: Record<string, MetricDef[]> = {
     { key: "queue", label: "Download queue" },
     { key: "upcoming", label: "Upcoming releases" },
   ],
+  [TileIntegration.lidarr]: [
+    { key: "queue", label: "Download queue" },
+    { key: "upcoming", label: "Upcoming releases" },
+  ],
   [TileIntegration.qbittorrent]: [
     { key: "speeds", label: "Global speeds" },
     { key: "torrents", label: "Active torrents" },

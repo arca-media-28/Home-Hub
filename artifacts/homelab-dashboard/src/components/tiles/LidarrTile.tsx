@@ -1,0 +1,108 @@
+import { useGetLidarrQueue, getGetLidarrQueueQueryKey } from "@workspace/api-client-react";
+import { Music } from "lucide-react";
+import type { WidgetProps } from "./IntegrationTile";
+import { tileBudget, SECTION_PX, ROW_PX, TWO_LINE_ROW_PX, listColumnClass, listColumnStyle } from "./metrics";
+
+function formatBytes(bytes: number | null | undefined): string {
+  if (!bytes) return "";
+  if (bytes > 1e9) return `${(bytes / 1e9).toFixed(1)} GB`;
+  if (bytes > 1e6) return `${(bytes / 1e6).toFixed(0)} MB`;
+  return `${(bytes / 1e3).toFixed(0)} KB`;
+}
+
+export default function LidarrTile({ enabled, density }: WidgetProps) {
+  const { data, isLoading, isError } = useGetLidarrQueue({
+    query: { queryKey: getGetLidarrQueueQueryKey(), refetchInterval: 30_000 },
+  });
+
+  if (isLoading) {
+    return (
+      <div className="w-full h-full flex items-center justify-center text-muted-foreground text-sm">
+        Loading…
+      </div>
+    );
+  }
+  if (isError || !data) {
+    return (
+      <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground text-sm gap-1">
+        <Music className="w-5 h-5 opacity-50" />
+        <span>Lidarr unavailable</span>
+      </div>
+    );
+  }
+
+  const showQueue = enabled.has("queue");
+  const showUpcoming = enabled.has("upcoming");
+
+  // Reveal the download queue first, then upcoming releases, fitting as many
+  // rows as the measured body allows. Sections that don't fit are hidden whole.
+  const budget = tileBudget(density);
+  const queueCount = budget.list(
+    SECTION_PX,
+    TWO_LINE_ROW_PX,
+    showQueue && data.queue ? data.queue.length : 0,
+  );
+  const upcomingCount = budget.list(
+    SECTION_PX,
+    ROW_PX,
+    showUpcoming && data.upcoming ? data.upcoming.length : 0,
+  );
+  const hasQueue = queueCount > 0;
+  const hasUpcoming = upcomingCount > 0;
+
+  return (
+    <div className="w-full h-full p-3 flex flex-col gap-2">
+      {hasQueue && (
+        <div className="space-y-1">
+          <p className="text-xs text-muted-foreground">Downloading</p>
+          <div
+            className={listColumnClass(budget.columns, "space-y-1")}
+            style={listColumnStyle(budget.columns)}
+          >
+            {data.queue.slice(0, queueCount).map((item) => (
+              <div key={item.id} className="min-w-0">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs font-medium truncate max-w-[70%]">{item.title}</span>
+                  <span className="text-xs text-muted-foreground">{formatBytes(item.size)}</span>
+                </div>
+                {item.progress != null && (
+                  <div className="h-1 bg-muted overflow-hidden mt-0.5">
+                    <div
+                      className="h-full bg-primary transition-all duration-700"
+                      style={{ width: `${item.progress}%` }}
+                    />
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {hasUpcoming && (
+        <div className="space-y-1 border-t border-border pt-2 mt-auto">
+          <p className="text-xs text-muted-foreground">Upcoming</p>
+          <div
+            className={listColumnClass(budget.columns, "space-y-1")}
+            style={listColumnStyle(budget.columns)}
+          >
+            {data.upcoming.slice(0, upcomingCount).map((item) => (
+              <div key={item.id} className="flex justify-between text-xs">
+                <span className="truncate max-w-[70%] font-medium">
+                  {item.artistName ? `${item.artistName} — ${item.title}` : item.title}
+                </span>
+                <span className="text-muted-foreground flex-shrink-0 ml-1">{item.releaseDate}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {!hasQueue && !hasUpcoming && (
+        <div className="flex-1 flex items-center justify-center text-muted-foreground text-xs">
+          {showQueue || showUpcoming ? "Nothing in queue" : "No metrics selected"}
+        </div>
+      )}
+    </div>
+  );
+}

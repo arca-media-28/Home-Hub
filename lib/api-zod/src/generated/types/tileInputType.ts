@@ -15,5 +15,6 @@ export const TileInputType = {
   media: 'media',
   sonarr: 'sonarr',
   radarr: 'radarr',
+  lidarr: 'lidarr',
   qbittorrent: 'qbittorrent',
 } as const;

@@ -18,6 +18,7 @@ export const TileInputIntegration = {
   jellyfin: 'jellyfin',
   sonarr: 'sonarr',
   radarr: 'radarr',
+  lidarr: 'lidarr',
   qbittorrent: 'qbittorrent',
   pihole: 'pihole',
   'nginx-proxy-manager': 'nginx-proxy-manager',

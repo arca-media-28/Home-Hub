@@ -95,6 +95,14 @@ export async function pingService(service: string, v: TestValues): Promise<TestR
       });
       return { ok: true, message: "Connected" };
     }
+    case "lidarr": {
+      // Lidarr's API lives under /api/v1/ (not /api/v3/ like Sonarr/Radarr).
+      if (!v.apiKey) return { ok: false, message: "Enter an API Key first." };
+      await httpClient.get(`${base}/api/v1/system/status`, {
+        headers: { "X-Api-Key": v.apiKey },
+      });
+      return { ok: true, message: "Connected" };
+    }
     case "qbittorrent": {
       if (!v.username || !v.password) {
         return { ok: false, message: "Enter a username and password first." };

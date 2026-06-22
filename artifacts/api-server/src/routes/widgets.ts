@@ -1053,6 +1053,77 @@ router.get("/radarr", requireAuth, async (_req, res) => {
 });
 
 // ────────────────────────────────────────────────
+// Lidarr Widget
+// ────────────────────────────────────────────────
+router.get("/lidarr", requireAuth, async (_req, res) => {
+  const saved = getSavedConnection("lidarr");
+  const baseUrl = saved.url || process.env["LIDARR_URL"];
+  const apiKey = saved.apiKey || process.env["LIDARR_API_KEY"];
+
+  if (!baseUrl || !apiKey) {
+    const now = new Date();
+    const soon = new Date(now.getTime() + 5 * 86400000);
+    res.json({
+      queue: [
+        { id: 1, title: "Tame Impala - Currents", status: "downloading", progress: 58.0, size: 4.2e8 },
+        { id: 2, title: "Radiohead - In Rainbows", status: "paused", progress: 0, size: 3.6e8 },
+      ],
+      upcoming: [
+        { id: 301, title: "The New Album", artistName: "Bonobo", releaseDate: soon.toISOString().split("T")[0]! },
+        { id: 302, title: "Live Sessions", artistName: "Khruangbin", releaseDate: now.toISOString().split("T")[0]! },
+      ],
+    });
+    return;
+  }
+
+  try {
+    // Lidarr's API lives under /api/v1/ (not /api/v3/ like Sonarr/Radarr).
+    const headers = { "X-Api-Key": apiKey };
+    const now = new Date();
+    const end = new Date(now.getTime() + 30 * 86400000);
+
+    const [queueRes, calendarRes] = await Promise.all([
+      // includeArtist/includeAlbum so each queue record carries the artist and
+      // album info; queue is paged and returns its rows under `records`.
+      httpClient.get(`${baseUrl}/api/v1/queue`, {
+        headers,
+        params: { pageSize: 50, includeArtist: true, includeAlbum: true },
+      }),
+      // includeArtist so calendar entries carry the artist name (otherwise the
+      // upcoming list renders blank artists).
+      httpClient.get(`${baseUrl}/api/v1/calendar`, {
+        headers,
+        params: {
+          start: now.toISOString().split("T")[0],
+          end: end.toISOString().split("T")[0],
+          includeArtist: true,
+        },
+      }),
+    ]);
+
+    const queue = (queueRes.data?.records ?? []).slice(0, 5).map((item: { id: number; title: string; status: string; sizeleft?: number; size?: number; artist?: { artistName: string } }) => ({
+      id: item.id,
+      title: item.artist?.artistName ?? item.title,
+      status: item.status,
+      progress: item.size ? Math.round((1 - (item.sizeleft ?? 0) / item.size) * 100) : 0,
+      size: item.size ?? null,
+    }));
+
+    const upcoming = (calendarRes.data ?? []).slice(0, 5).map((album: { id: number; title: string; artist?: { artistName: string }; releaseDate?: string }) => ({
+      id: album.id,
+      title: album.title,
+      artistName: album.artist?.artistName ?? "",
+      releaseDate: album.releaseDate?.split("T")[0] ?? "",
+    }));
+
+    res.json({ queue, upcoming });
+  } catch (err) {
+    logger.error({ reason: normalizeHttpError(err) }, "Lidarr widget error");
+    res.status(502).json({ error: "Failed to fetch Lidarr data" });
+  }
+});
+
+// ────────────────────────────────────────────────
 // qBittorrent Widget
 // ────────────────────────────────────────────────
 // qBittorrent uses session-cookie auth: log in to obtain the session cookie,
