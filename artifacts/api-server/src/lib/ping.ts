@@ -1,5 +1,6 @@
 import { httpClient, cloudHttpClient, normalizeHttpError, normalizeBaseUrl, HTTP_TIMEOUT } from "./http.js";
 import { fetchPiholeData } from "./pihole.js";
+import { subsonicAuthParams, subsonicGet } from "./subsonic.js";
 import type { DbServiceConnection } from "./db.js";
 
 export interface TestValues {
@@ -151,6 +152,18 @@ export async function pingService(service: string, v: TestValues): Promise<TestR
       // unrecognizable payload throw a PiholeError that runPing turns into a
       // clear message.
       await fetchPiholeData(base, v.apiKey);
+      return { ok: true, message: "Connected" };
+    }
+    case "subsonic": {
+      // Navidrome / Subsonic-compatible servers authenticate with a salted token
+      // derived from username + password. A successful ping (subsonic-response
+      // status "ok") confirms reachability and valid credentials; a failed
+      // status throws inside subsonicGet with the server's error message.
+      if (!v.username || !v.password) {
+        return { ok: false, message: "Enter a username and password first." };
+      }
+      const auth = subsonicAuthParams(v.username, v.password);
+      await subsonicGet(base, "ping.view", auth);
       return { ok: true, message: "Connected" };
     }
     default:

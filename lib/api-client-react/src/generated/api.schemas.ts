@@ -1094,7 +1094,7 @@ export const GetMediaContinueServer = {
 
 export type GetAudioPlayerNowPlayingParams = {
 /**
- * Which music source backs the tile. "plex" resolves the saved Plex connection and "jellyfin" the saved Jellyfin connection; each returns its current/last music session plus a browser-playable queue. "spotify" uses the linked Spotify account. Defaults to "plex" when omitted. This is the seam additional sources (Navidrome) plug into.
+ * Which music source backs the tile. "plex" resolves the saved Plex connection, "jellyfin" the saved Jellyfin connection, and "subsonic" the saved Navidrome / Subsonic connection; each returns its current/last music session plus a browser-playable queue. "spotify" uses the linked Spotify account. Defaults to "plex" when omitted.
  */
 source?: GetAudioPlayerNowPlayingSource;
 };
@@ -1106,6 +1106,7 @@ export const GetAudioPlayerNowPlayingSource = {
   plex: 'plex',
   spotify: 'spotify',
   jellyfin: 'jellyfin',
+  subsonic: 'subsonic',
 } as const;
 
 export type GetNewsWidgetParams = {

@@ -13,4 +13,5 @@ export const GetAudioPlayerNowPlayingSource = {
   plex: 'plex',
   spotify: 'spotify',
   jellyfin: 'jellyfin',
+  subsonic: 'subsonic',
 } as const;

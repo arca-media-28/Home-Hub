@@ -24,7 +24,8 @@ export default function AudioPlayerTile(props: WidgetProps) {
 
 function StreamAudioPlayer({ enabled, density, tileSettings }: WidgetProps) {
   const source =
-    (tileSettings?.audioSource as "plex" | "jellyfin" | undefined) ?? "plex";
+    (tileSettings?.audioSource as "plex" | "jellyfin" | "subsonic" | undefined) ??
+    "plex";
   const params = { source };
   const {
     data,

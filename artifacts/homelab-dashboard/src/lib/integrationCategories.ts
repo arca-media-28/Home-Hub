@@ -31,6 +31,7 @@ const CATEGORY_BY_KEY: Record<string, Category> = {
   ersatztv: "Media",
   audioplayer: "Media",
   spotify: "Media",
+  subsonic: "Media",
   // Downloads
   qbittorrent: "Downloads",
   sonarr: "Downloads",

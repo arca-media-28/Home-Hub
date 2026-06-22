@@ -490,13 +490,13 @@ paths:
           required: false
           description: >-
             Which music source backs the tile. "plex" resolves the saved Plex
-            connection and "jellyfin" the saved Jellyfin connection; each returns
-            its current/last music session plus a browser-playable queue.
-            "spotify" uses the linked Spotify account. Defaults to "plex" when
-            omitted. This is the seam additional sources (Navidrome) plug into.
+            connection, "jellyfin" the saved Jellyfin connection, and "subsonic"
+            the saved Navidrome / Subsonic connection; each returns its
+            current/last music session plus a browser-playable queue. "spotify"
+            uses the linked Spotify account. Defaults to "plex" when omitted.
           schema:
             type: string
-            enum: [plex, spotify, jellyfin]
+            enum: [plex, spotify, jellyfin, subsonic]
       responses:
         "200":
           description: Now-playing track and queue
@@ -701,7 +701,7 @@ paths:
           required: true
           schema:
             type: string
-            enum: [truenas, plex, jellyfin, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, stocks]
+            enum: [truenas, plex, jellyfin, subsonic, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, stocks]
       requestBody:
         required: true
         content:
@@ -735,7 +735,7 @@ paths:
           required: true
           schema:
             type: string
-            enum: [truenas, plex, jellyfin, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, stocks]
+            enum: [truenas, plex, jellyfin, subsonic, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, stocks]
       requestBody:
         required: true
         content:

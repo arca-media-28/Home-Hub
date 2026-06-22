@@ -59,6 +59,7 @@ type ServiceKey =
   | "truenas"
   | "plex"
   | "jellyfin"
+  | "subsonic"
   | "sonarr"
   | "radarr"
   | "lidarr"
@@ -120,6 +121,18 @@ const SERVICES: ServiceDef[] = [
     name: "Jellyfin",
     icon: MonitorPlay,
     fields: [URL_FIELD, API_KEY_FIELD],
+  },
+  {
+    key: "subsonic",
+    name: "Navidrome / Subsonic",
+    icon: Music,
+    // Subsonic-compatible servers (Navidrome, Airsonic, Gonic) authenticate with
+    // a username + password using a salted token the backend derives per request.
+    fields: [
+      URL_FIELD,
+      { key: "username", label: "Username", placeholder: "admin" },
+      { key: "password", label: "Password", type: "password", placeholder: "••••••••" },
+    ],
   },
   {
     key: "sonarr",

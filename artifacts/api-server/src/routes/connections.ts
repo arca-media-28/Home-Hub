@@ -10,7 +10,7 @@ import {
 
 const router = Router();
 
-const SUPPORTED_SERVICES = ["truenas", "plex", "jellyfin", "sonarr", "radarr", "lidarr", "qbittorrent", "pihole", "nginx-proxy-manager", "prowlarr", "tailscale", "ersatztv", "stocks"];
+const SUPPORTED_SERVICES = ["truenas", "plex", "jellyfin", "subsonic", "sonarr", "radarr", "lidarr", "qbittorrent", "pihole", "nginx-proxy-manager", "prowlarr", "tailscale", "ersatztv", "stocks"];
 
 function formatConnection(c: DbServiceConnection) {
   let token: string | null = null;

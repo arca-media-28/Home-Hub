@@ -4,6 +4,7 @@ import { requireAuth } from "../lib/auth.js";
 import { connectionStmts } from "../lib/db.js";
 import { httpClient, cloudHttpClient, normalizeBaseUrl, normalizeHttpError } from "../lib/http.js";
 import { fetchPiholeData } from "../lib/pihole.js";
+import { subsonicAuthParams, subsonicGet, subsonicMediaQuery, type SubsonicSong } from "../lib/subsonic.js";
 import { logger } from "../lib/logger.js";
 import {
   getSpotifyConnection,
@@ -1247,6 +1248,124 @@ async function handleSpotifyAudio(res: import("express").Response): Promise<void
   }
 }
 
+// Map a Subsonic song to the shared AudioTrack shape. Subsonic reports
+// durations in whole seconds (→ ms) and never exposes a live playback offset, so
+// progressMs/state stay null. Artwork and stream URLs embed the request's
+// salted-token auth so the browser can load them directly; the stream uses
+// `format=mp3` so the shared <audio> engine plays any source codec (FLAC etc.).
+// `live` marks the now-playing entry so its state reads as "playing".
+function mapSubsonicTrack(
+  song: SubsonicSong,
+  baseUrl: string,
+  mediaQuery: string,
+  live: boolean,
+) {
+  const id = String(song.id ?? "");
+  const coverArt = song.coverArt ?? song.albumId;
+  return {
+    id,
+    title: song.title ?? "Unknown track",
+    artist: song.artist ?? null,
+    album: song.album ?? null,
+    artwork: coverArt
+      ? `${baseUrl}/rest/getCoverArt.view?id=${encodeURIComponent(coverArt)}&size=300&${mediaQuery}`
+      : null,
+    durationMs: typeof song.duration === "number" ? song.duration * 1000 : null,
+    progressMs: null,
+    state: live ? "playing" : null,
+    streamUrl: id
+      ? `${baseUrl}/rest/stream.view?id=${encodeURIComponent(id)}&format=mp3&${mediaQuery}`
+      : null,
+  };
+}
+
+// Audio Player — Navidrome / Subsonic source. Reuses the saved `subsonic`
+// connection (base URL + username/password, salted-token auth). Returns the
+// most recent now-playing entry when one exists, otherwise the newest album's
+// tracks. Each real track carries an authenticated, browser-playable .mp3 stream
+// URL so the shared <audio> engine can play it.
+async function handleSubsonicAudio(res: import("express").Response): Promise<void> {
+  const saved = getSavedConnection("subsonic");
+  const baseUrl = saved.url;
+  const username = saved.username;
+  const password = saved.password;
+
+  // Unconfigured → built-in demo content (sample:true). streamUrl stays null so
+  // the tile labels it not-live and disables in-browser streaming.
+  if (!baseUrl || !username || !password) {
+    const demo = [
+      { id: "1", title: "Dreams", artist: "Fleetwood Mac", album: "Rumours", artwork: null, durationMs: 257_000, progressMs: 72_000, state: "playing", streamUrl: null },
+      { id: "2", title: "The Chain", artist: "Fleetwood Mac", album: "Rumours", artwork: null, durationMs: 271_000, progressMs: null, state: null, streamUrl: null },
+      { id: "3", title: "Go Your Own Way", artist: "Fleetwood Mac", album: "Rumours", artwork: null, durationMs: 218_000, progressMs: null, state: null, streamUrl: null },
+    ];
+    res.json({ source: "subsonic", sample: true, nowPlaying: demo[0], queue: demo });
+    return;
+  }
+
+  try {
+    const auth = subsonicAuthParams(username, password);
+    const mediaQuery = subsonicMediaQuery(auth);
+
+    // Prefer the most recent now-playing entry. getNowPlaying returns
+    // nowPlaying.entry as an array (or a single object on some servers).
+    const np = await subsonicGet(baseUrl, "getNowPlaying.view", auth);
+    const rawEntries = (np["nowPlaying"] as { entry?: unknown } | undefined)?.entry;
+    const entries = (
+      Array.isArray(rawEntries) ? rawEntries : rawEntries ? [rawEntries] : []
+    ) as SubsonicSong[];
+
+    if (entries.length > 0) {
+      const current = entries[0]!;
+      const nowPlaying = mapSubsonicTrack(current, baseUrl, mediaQuery, true);
+      // Best-effort: the now-playing track's album becomes the queue so skip
+      // next/previous works. A failure here is additive — the queue degrades to
+      // just the now-playing track.
+      let queue = [nowPlaying];
+      if (current.albumId) {
+        try {
+          const albumBody = await subsonicGet(baseUrl, "getAlbum.view", auth, {
+            id: current.albumId,
+          });
+          const songs = ((albumBody["album"] as { song?: SubsonicSong[] } | undefined)?.song ??
+            []) as SubsonicSong[];
+          if (songs.length > 0) {
+            queue = songs.map((s) => mapSubsonicTrack(s, baseUrl, mediaQuery, false));
+          }
+        } catch (err) {
+          logger.warn(
+            { reason: normalizeHttpError(err) },
+            "Subsonic album queue fetch failed — using now-playing only",
+          );
+        }
+      }
+      res.json({ source: "subsonic", sample: false, nowPlaying, queue });
+      return;
+    }
+
+    // Nothing playing → fall back to the newest album's tracks.
+    const listBody = await subsonicGet(baseUrl, "getAlbumList2.view", auth, {
+      type: "newest",
+      size: 1,
+    });
+    const albums = ((listBody["albumList2"] as { album?: Array<{ id?: string }> } | undefined)
+      ?.album ?? []) as Array<{ id?: string }>;
+    const newestId = albums[0]?.id;
+    if (!newestId) {
+      // Configured but no albums — honest empty state, not demo content.
+      res.json({ source: "subsonic", sample: false, nowPlaying: null, queue: [] });
+      return;
+    }
+    const albumBody = await subsonicGet(baseUrl, "getAlbum.view", auth, { id: newestId });
+    const songs = ((albumBody["album"] as { song?: SubsonicSong[] } | undefined)?.song ??
+      []) as SubsonicSong[];
+    const queue = songs.map((s) => mapSubsonicTrack(s, baseUrl, mediaQuery, false));
+    res.json({ source: "subsonic", sample: false, nowPlaying: queue[0] ?? null, queue });
+  } catch (err) {
+    logger.error({ reason: normalizeHttpError(err) }, "Subsonic audio player widget error");
+    res.status(502).json({ error: "Failed to fetch audio player data" });
+  }
+}
+
 router.get("/audioplayer", requireAuth, async (req, res) => {
   // Source selects the music backend. Spotify uses the linked OAuth account;
   // anything else resolves to Plex (the original/default source).
@@ -1257,6 +1376,10 @@ router.get("/audioplayer", requireAuth, async (req, res) => {
   }
   if (requested === "jellyfin") {
     await handleJellyfinAudio(res);
+    return;
+  }
+  if (requested === "subsonic") {
+    await handleSubsonicAudio(res);
     return;
   }
   const source = "plex";

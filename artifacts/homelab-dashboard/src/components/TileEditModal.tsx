@@ -933,9 +933,9 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
             <div className="space-y-2 border-t border-border pt-4">
               <Label htmlFor="audio-source">Music source</Label>
               <p className="text-xs text-muted-foreground">
-                Where this tile pulls now-playing and the queue from. Plex and
-                Jellyfin use your saved connections; Spotify uses your linked
-                Spotify account (link it in Settings).
+                Where this tile pulls now-playing and the queue from. Plex,
+                Jellyfin, and Navidrome / Subsonic use your saved connections;
+                Spotify uses your linked Spotify account (link it in Settings).
               </p>
               <Select value={audioSource} onValueChange={setAudioSource}>
                 <SelectTrigger id="audio-source">
@@ -944,6 +944,7 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
                 <SelectContent>
                   <SelectItem value="plex">Plex</SelectItem>
                   <SelectItem value="jellyfin">Jellyfin</SelectItem>
+                  <SelectItem value="subsonic">Navidrome / Subsonic</SelectItem>
                   <SelectItem value="spotify">Spotify</SelectItem>
                 </SelectContent>
               </Select>
