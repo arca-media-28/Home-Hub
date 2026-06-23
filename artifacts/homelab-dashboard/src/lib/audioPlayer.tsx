@@ -42,6 +42,10 @@ export interface AudioPlayerControls extends AudioPlayerState {
   // started it. Tracks without a streamUrl (e.g. demo/sample data) cannot be
   // streamed; callers should guard before calling.
   playQueue: (tracks: AudioTrack[], startIndex: number, ownerId: string) => void;
+  // Append tracks to the end of the current queue, preserving the currently
+  // playing track and position. If nothing is loaded, behaves like playQueue
+  // starting at the top so the first appended track begins playing.
+  enqueue: (tracks: AudioTrack[], ownerId: string) => void;
   togglePlay: () => void;
   // Pause whatever is playing (no-op when idle). Used to honour the single-stream
   // contract when another engine — e.g. the Spotify Web Playback SDK — takes over.
@@ -154,6 +158,26 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       setIndex(i);
       setOwnerId(owner);
       loadAndPlay(playable, i);
+    },
+    [loadAndPlay],
+  );
+
+  const enqueue = useCallback(
+    (tracks: AudioTrack[], owner: string) => {
+      const playable = tracks.filter((t) => Boolean(t.streamUrl));
+      if (playable.length === 0) return;
+      // Nothing loaded yet — start playing the appended tracks from the top so
+      // "Add to queue" on an empty player just works like Play.
+      if (queueRef.current.length === 0) {
+        setQueue(playable);
+        setIndex(0);
+        setOwnerId(owner);
+        loadAndPlay(playable, 0);
+        return;
+      }
+      // Otherwise append, leaving the current track and index untouched so
+      // playback continues uninterrupted.
+      setQueue((prev) => [...prev, ...playable]);
     },
     [loadAndPlay],
   );
@@ -288,6 +312,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       volume,
       ownerId,
       playQueue,
+      enqueue,
       togglePlay,
       pause,
       next,
@@ -305,6 +330,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       volume,
       ownerId,
       playQueue,
+      enqueue,
       togglePlay,
       pause,
       next,

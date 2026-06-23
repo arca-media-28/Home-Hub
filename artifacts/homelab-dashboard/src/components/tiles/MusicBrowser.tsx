@@ -10,7 +10,7 @@ import type {
   BrowseAudioLibraryKind,
   BrowseAudioLibrarySource,
 } from "@workspace/api-client-react";
-import { ChevronRight, Music, Play, Search } from "lucide-react";
+import { ChevronRight, ListPlus, Music, Play, Search } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -207,14 +207,21 @@ export default function MusicBrowser({
 
   // Selecting a container loads it as the queue and starts playing. If nothing
   // playable comes back (e.g. demo / unconfigured), fall back to drilling in.
-  const selectContainer = async (c: AudioContainer) => {
+  // When `append` is set, the container's tracks are added to the end of the
+  // current queue instead of replacing it, and the dialog stays open so users
+  // can keep building up a listening session.
+  const selectContainer = async (c: AudioContainer, append = false) => {
     setBusyId(c.id);
     setError(false);
     try {
       const fetched = await resolveContainerTracks(c);
       if (fetched.some((t) => Boolean(t.streamUrl))) {
-        player.playQueue(fetched, 0, ownerId);
-        onOpenChange(false);
+        if (append) {
+          player.enqueue(fetched, ownerId);
+        } else {
+          player.playQueue(fetched, 0, ownerId);
+          onOpenChange(false);
+        }
       } else {
         openContainer(c);
       }
@@ -230,6 +237,14 @@ export default function MusicBrowser({
     if (!playable) return;
     player.playQueue(tracks, startIndex < 0 ? 0 : startIndex, ownerId);
     onOpenChange(false);
+  };
+
+  // Append tracks to the end of the queue, keeping the dialog open so the user
+  // can continue adding more.
+  const enqueueTracks = (tracks: AudioTrack[]) => {
+    const playable = tracks.some((t) => Boolean(t.streamUrl));
+    if (!playable) return;
+    player.enqueue(tracks, ownerId);
   };
 
   const submitSearch = () => {
@@ -374,44 +389,69 @@ export default function MusicBrowser({
               {tracks.length > 0 && (
                 <div>
                   {tracks.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => playTracks(tracks, 0)}
-                      disabled={!canPlay}
-                      className="mb-2 flex items-center gap-1.5 rounded bg-primary px-2.5 py-1 text-xs text-primary-foreground hover:opacity-90 disabled:opacity-40"
-                    >
-                      <Play size={12} /> Play all
-                    </button>
+                    <div className="mb-2 flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => playTracks(tracks, 0)}
+                        disabled={!canPlay}
+                        className="flex items-center gap-1.5 rounded bg-primary px-2.5 py-1 text-xs text-primary-foreground hover:opacity-90 disabled:opacity-40"
+                      >
+                        <Play size={12} /> Play all
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => enqueueTracks(tracks)}
+                        disabled={!canPlay}
+                        className="flex items-center gap-1.5 rounded border border-border px-2.5 py-1 text-xs text-foreground hover:bg-muted/60 disabled:opacity-40"
+                      >
+                        <ListPlus size={12} /> Add all to queue
+                      </button>
+                    </div>
                   )}
                   <div className="space-y-0.5">
                     {tracks.map((t, i) => (
-                      <button
+                      <div
                         key={t.id || i}
-                        type="button"
-                        onClick={() => playTracks(tracks, i)}
-                        disabled={!t.streamUrl}
-                        className="group flex w-full items-center gap-2 rounded px-1 py-1 text-left hover:bg-muted/60 disabled:cursor-default disabled:hover:bg-transparent"
+                        className="group flex w-full items-center gap-1 rounded pr-1 hover:bg-muted/60"
                       >
-                        <span className="w-5 flex-shrink-0 text-right text-xs tabular-nums text-muted-foreground group-hover:hidden">
-                          {i + 1}
-                        </span>
-                        <Play size={12} className="hidden w-5 flex-shrink-0 text-primary group-hover:block" />
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm" title={t.title}>
-                            {t.title}
+                        <button
+                          type="button"
+                          onClick={() => playTracks(tracks, i)}
+                          disabled={!t.streamUrl}
+                          title={`Play ${t.title}`}
+                          className="flex min-w-0 flex-1 items-center gap-2 rounded px-1 py-1 text-left disabled:cursor-default"
+                        >
+                          <span className="w-5 flex-shrink-0 text-right text-xs tabular-nums text-muted-foreground group-hover:hidden">
+                            {i + 1}
                           </span>
-                          {t.artist && (
-                            <span className="block truncate text-xs text-muted-foreground">
-                              {t.artist}
+                          <Play size={12} className="hidden w-5 flex-shrink-0 text-primary group-hover:block" />
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-sm" title={t.title}>
+                              {t.title}
+                            </span>
+                            {t.artist && (
+                              <span className="block truncate text-xs text-muted-foreground">
+                                {t.artist}
+                              </span>
+                            )}
+                          </span>
+                          {t.durationMs != null && (
+                            <span className="text-[10px] tabular-nums text-muted-foreground">
+                              {fmtTime(t.durationMs, "ms")}
                             </span>
                           )}
-                        </span>
-                        {t.durationMs != null && (
-                          <span className="text-[10px] tabular-nums text-muted-foreground">
-                            {fmtTime(t.durationMs, "ms")}
-                          </span>
-                        )}
-                      </button>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => enqueueTracks([t])}
+                          disabled={!t.streamUrl}
+                          aria-label={`Add ${t.title} to queue`}
+                          title={`Add ${t.title} to queue`}
+                          className="flex-shrink-0 rounded p-1.5 text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100 disabled:cursor-default disabled:opacity-0"
+                        >
+                          <ListPlus size={14} />
+                        </button>
+                      </div>
                     ))}
                   </div>
                 </div>
@@ -465,6 +505,16 @@ export default function MusicBrowser({
                                 aria-hidden="true"
                               />
                             )}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => selectContainer(c, true)}
+                            disabled={busyId === c.id}
+                            aria-label={`Add ${c.title} to queue`}
+                            title={`Add ${c.title} to queue`}
+                            className="flex-shrink-0 rounded p-1.5 text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100 disabled:opacity-40"
+                          >
+                            <ListPlus size={14} />
                           </button>
                           <button
                             type="button"
