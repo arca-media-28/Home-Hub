@@ -177,6 +177,18 @@ function StreamAudioPlayer({ enabled, density, tileSettings }: WidgetProps) {
     player.seek(ratio * liveDuration);
   };
 
+  // "Find music" pill placement. By default it anchors to the left edge of the
+  // playback controls row — the balanced counterpart to the volume control on
+  // the right — but only when that row is shown and the body is wide enough that
+  // a left pill won't crowd the centered transport buttons (or, when present,
+  // the volume control on the right). The p-3 root padding (24px) is subtracted
+  // from the measured body width to get the real horizontal room. When the row
+  // is hidden or too narrow, the pill falls back to the open top-right corner of
+  // the now-playing header so it stays visible without clipping the track info.
+  const volumeShown = isOurs && density.level !== "sm";
+  const controlsRowFits = density.bodyWidth >= (volumeShown ? 300 : 200);
+  const pillAtControls = showBrowser && showControls && controlsRowFits;
+
   return (
     <div className="flex h-full flex-col gap-2 p-3">
       {/* Now playing: artwork + title/artist */}
@@ -210,6 +222,17 @@ function StreamAudioPlayer({ enabled, density, tileSettings }: WidgetProps) {
             </div>
           )}
         </div>
+        {showBrowser && !pillAtControls && (
+          <button
+            type="button"
+            onClick={() => setBrowserOpen(true)}
+            className="flex shrink-0 items-center justify-center rounded-full border border-border p-1.5 text-foreground transition-colors hover:bg-muted"
+            aria-label="Find music"
+            title="Find music"
+          >
+            <Library size={14} aria-hidden="true" />
+          </button>
+        )}
       </div>
 
       {/* Progress bar */}
@@ -277,6 +300,17 @@ function StreamAudioPlayer({ enabled, density, tileSettings }: WidgetProps) {
               />
             </div>
           )}
+          {pillAtControls && (
+            <button
+              type="button"
+              onClick={() => setBrowserOpen(true)}
+              className="absolute left-0 flex items-center justify-center rounded-full border border-border p-1.5 text-foreground transition-colors hover:bg-muted"
+              aria-label="Find music"
+              title="Find music"
+            >
+              <Library size={14} aria-hidden="true" />
+            </button>
+          )}
         </div>
       )}
 
@@ -314,20 +348,6 @@ function StreamAudioPlayer({ enabled, density, tileSettings }: WidgetProps) {
               </button>
             ))}
           </div>
-        </div>
-      )}
-      {showBrowser && (
-        <div className="mt-auto flex justify-center pt-1">
-          <button
-            type="button"
-            onClick={() => setBrowserOpen(true)}
-            className="flex items-center gap-1.5 rounded-full border border-border px-3 py-1 text-xs font-medium text-foreground transition-colors hover:bg-muted"
-            aria-label="Find music"
-            title="Find music"
-          >
-            <Library size={14} aria-hidden="true" />
-            {density.level !== "sm" && <span>Find music</span>}
-          </button>
         </div>
       )}
       {browserNode}
