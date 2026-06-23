@@ -44,6 +44,7 @@ export * from './newsData';
 export * from './newsItem';
 export * from './nginxProxyHost';
 export * from './nginxProxyManagerData';
+export * from './noteChecklistItem';
 export * from './piholeData';
 export * from './piholeDataStatus';
 export * from './prowlarrData';

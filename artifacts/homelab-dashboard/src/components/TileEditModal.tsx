@@ -45,6 +45,13 @@ import {
   type PositionKey,
   type TitleSize,
 } from "@/components/tiles/imageStyle";
+import {
+  NOTE_PRESET_COLORS,
+  NOTE_FONT_SIZES,
+  DEFAULT_NOTE_COLOR,
+  DEFAULT_NOTE_TEXT_COLOR,
+  type NoteFontSize,
+} from "@/components/tiles/NoteTile";
 import { SPORTS_LEAGUES, getLeagueTeams } from "@/lib/sports";
 import {
   fetchSleeperUser,
@@ -122,6 +129,7 @@ const INTEGRATIONS = [
   { value: TileIntegration.sleeper, label: "Fantasy" },
   { value: TileIntegration.news, label: "News" },
   { value: TileIntegration.stocks, label: "Stocks" },
+  { value: TileIntegration.note, label: "Note" },
   { value: TileIntegration.spacer, label: "Spacer" },
   { value: TileIntegration.divider, label: "Section Label" },
 ] as const;
@@ -287,6 +295,20 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
     tile?.tileSettings?.scrollable ?? false,
   );
 
+  // Note (post-it) appearance options. The note's content (body + checklist) is
+  // edited in-place on the tile, not here, so the modal only owns its look.
+  const [noteColor, setNoteColor] = useState<string>(
+    tile?.tileSettings?.noteColor ?? DEFAULT_NOTE_COLOR,
+  );
+  const [noteFontSize, setNoteFontSize] = useState<NoteFontSize>(
+    (tile?.tileSettings?.noteFontSize as NoteFontSize) ?? "md",
+  );
+  const [noteTextColor, setNoteTextColor] = useState<string>(
+    tile?.tileSettings?.noteTextColor ?? DEFAULT_NOTE_TEXT_COLOR,
+  );
+  const [showNoteColorPicker, setShowNoteColorPicker] = useState(false);
+  const [showNoteTextColorPicker, setShowNoteTextColorPicker] = useState(false);
+
   useEffect(() => {
     if (open) {
       const placement = normalizePlacement(tile ?? {});
@@ -345,6 +367,11 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
       setAudioBrowse(tile?.tileSettings?.audioBrowse ?? true);
       setAudioPlaylists(tile?.tileSettings?.audioPlaylists ?? true);
       setScrollable(tile?.tileSettings?.scrollable ?? false);
+      setNoteColor(tile?.tileSettings?.noteColor ?? DEFAULT_NOTE_COLOR);
+      setNoteFontSize((tile?.tileSettings?.noteFontSize as NoteFontSize) ?? "md");
+      setNoteTextColor(tile?.tileSettings?.noteTextColor ?? DEFAULT_NOTE_TEXT_COLOR);
+      setShowNoteColorPicker(false);
+      setShowNoteTextColorPicker(false);
       setShowColorPicker(false);
       setShowTitleColorPicker(false);
     }
@@ -393,9 +420,16 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
   // field but, like the spacer, strips URL, image, background, and metrics so
   // only its text and size/position matter.
   const isDivider = integration === TileIntegration.divider;
+  // The note is a post-it tile: its content (body + checklist) is edited in
+  // place on the tile, so the editor strips name/URL/image/background/metrics
+  // and instead exposes the post-it's appearance (color, font size, text color).
+  const isNote = integration === TileIntegration.note;
   // Layout-only tiles (spacer + divider) share the same stripped editor: no
   // URL, image, background, or metric sections.
   const isLayoutTile = isSpacer || isDivider;
+  // Tiles that carry no link/image/background content: layout helpers plus the
+  // note, which paints its own post-it surface.
+  const isContentless = isLayoutTile || isNote;
 
   // Teams for the chosen leagues, for the dependent team multi-select. Sourced
   // from the baked-in catalog (ESPN's /teams endpoint isn't CORS-enabled), so
@@ -770,18 +804,18 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
       // A spacer carries no content at all; a divider keeps only its label
       // (name). Both clear url/background/image so converting an existing tile
       // into a layout tile leaves nothing behind.
-      name: isSpacer ? "" : name || undefined,
-      url: isLayoutTile ? "" : url || undefined,
+      name: isSpacer || isNote ? "" : name || undefined,
+      url: isContentless ? "" : url || undefined,
       // Send the raw value so clearing (null) reaches the body and the server
       // writes NULL; otherwise an undefined field is dropped and the old color
       // sticks. A non-empty string sets an explicit per-tile color as before.
-      bgColor: isLayoutTile ? null : bgColor,
+      bgColor: isContentless ? null : bgColor,
       // Send "" to explicitly clear the image when removed; placement fields are
       // only sent when an image is present.
-      imageUrl: isLayoutTile ? "" : imageUrl || "",
-      imageFit: !isLayoutTile && imageUrl ? imageFit : undefined,
-      imagePosition: !isLayoutTile && imageUrl ? imagePosition : undefined,
-      imageScale: !isLayoutTile && imageUrl ? imageScale : undefined,
+      imageUrl: isContentless ? "" : imageUrl || "",
+      imageFit: !isContentless && imageUrl ? imageFit : undefined,
+      imagePosition: !isContentless && imageUrl ? imagePosition : undefined,
+      imageScale: !isContentless && imageUrl ? imageScale : undefined,
       // Title size/placement only applies to plain app/link tiles; integration
       // (widget) tiles keep their fixed header layout, so clear those fields.
       titleSize: integration === NONE ? titleSize : null,
@@ -789,8 +823,8 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
       titleColor: integration === NONE ? titleColor : null,
       // Applies to both plain and integration tiles.
       hideTitle,
-      // Plain app/link tiles carry no metric selection.
-      metrics: integration === NONE ? null : metrics,
+      // Plain app/link tiles carry no metric selection; neither does the note.
+      metrics: integration === NONE || isNote ? null : metrics,
       // tileSettings carries per-widget config: the qBittorrent category
       // filter, the clock format options, the weather options, or the sports
       // options. The generic "scrollable" option applies to every tile, so it
@@ -838,7 +872,18 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
                               ? { audioFindMusic, audioSearch, audioBrowse, audioPlaylists }
                               : {}),
                           }
-                        : null;
+                        : isNote
+                          ? {
+                              // Appearance is edited here; the note's content
+                              // (body + checklist) is edited in-place on the
+                              // tile, so preserve whatever is already stored.
+                              noteColor,
+                              noteFontSize,
+                              noteTextColor,
+                              noteBody: tile?.tileSettings?.noteBody ?? null,
+                              noteItems: tile?.tileSettings?.noteItems ?? null,
+                            }
+                          : null;
         // Only emit a settings object when there is something to store; an
         // un-scrolled plain tile keeps tileSettings null as before.
         if (!widget && !scrollable) return null;
@@ -924,6 +969,128 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
               with no card background — drop it between groups of tiles and
               resize it to span a row.
             </p>
+          )}
+
+          {isNote && (
+            <div className="space-y-4 border-t border-border pt-4">
+              <p className="text-sm text-muted-foreground">
+                A colored post-it note. Write its text and tick off checklist
+                items directly on the tile — your edits save automatically. Set
+                its look here.
+              </p>
+
+              <div className="space-y-1.5">
+                <Label>Note color</Label>
+                <div className="flex flex-wrap items-center gap-2">
+                  {NOTE_PRESET_COLORS.map((preset) => (
+                    <button
+                      key={preset.value}
+                      type="button"
+                      onClick={() => setNoteColor(preset.value)}
+                      title={preset.label}
+                      aria-label={preset.label}
+                      aria-pressed={noteColor === preset.value}
+                      className={`h-8 w-8 rounded-md border shadow-sm transition-transform hover:scale-105 ${
+                        noteColor === preset.value
+                          ? "ring-2 ring-ring ring-offset-2 ring-offset-background"
+                          : "border-border"
+                      }`}
+                      style={{ background: preset.value }}
+                    />
+                  ))}
+                </div>
+                <div className="flex items-center gap-2 pt-1">
+                  <button
+                    type="button"
+                    className="w-8 h-8 rounded-md border border-border flex-shrink-0 shadow-sm"
+                    style={{ background: noteColor }}
+                    onClick={() => setShowNoteColorPicker((v) => !v)}
+                    aria-label="Pick custom note color"
+                  />
+                  <Input
+                    value={noteColor}
+                    onChange={(e) => setNoteColor(e.target.value)}
+                    placeholder={DEFAULT_NOTE_COLOR}
+                    className="font-mono text-sm"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="flex-shrink-0"
+                    onClick={() => setNoteColor(DEFAULT_NOTE_COLOR)}
+                    disabled={noteColor === DEFAULT_NOTE_COLOR}
+                    title="Reset to default note color"
+                    aria-label="Reset to default note color"
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                  </Button>
+                </div>
+                {showNoteColorPicker && (
+                  <div className="mt-2">
+                    <HexColorPicker color={noteColor} onChange={setNoteColor} />
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>Font size</Label>
+                <Select
+                  value={noteFontSize}
+                  onValueChange={(v) => setNoteFontSize(v as NoteFontSize)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {NOTE_FONT_SIZES.map((size) => (
+                      <SelectItem key={size.value} value={size.value}>
+                        {size.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>Text color</Label>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    className="w-8 h-8 rounded-md border border-border flex-shrink-0 shadow-sm"
+                    style={{ background: noteTextColor }}
+                    onClick={() => setShowNoteTextColorPicker((v) => !v)}
+                    aria-label="Pick note text color"
+                  />
+                  <Input
+                    value={noteTextColor}
+                    onChange={(e) => setNoteTextColor(e.target.value)}
+                    placeholder={DEFAULT_NOTE_TEXT_COLOR}
+                    className="font-mono text-sm"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="flex-shrink-0"
+                    onClick={() => setNoteTextColor(DEFAULT_NOTE_TEXT_COLOR)}
+                    disabled={noteTextColor === DEFAULT_NOTE_TEXT_COLOR}
+                    title="Reset to default text color"
+                    aria-label="Reset to default text color"
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                  </Button>
+                </div>
+                {showNoteTextColorPicker && (
+                  <div className="mt-2">
+                    <HexColorPicker
+                      color={noteTextColor}
+                      onChange={setNoteTextColor}
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
           )}
 
           {catalog.length > 0 && (
@@ -1568,7 +1735,7 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
             </div>
           )}
 
-          {!isLayoutTile && (
+          {!isContentless && (
             <div className="space-y-1.5">
               <Label>URL</Label>
               <Input
@@ -1579,7 +1746,7 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
             </div>
           )}
 
-          {!isLayoutTile && (
+          {!isContentless && (
             <label
               htmlFor="hide-title"
               className="flex items-center gap-2 cursor-pointer select-none"
@@ -1593,7 +1760,7 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
             </label>
           )}
 
-          {!isLayoutTile && (
+          {!isContentless && (
             <label
               htmlFor="scrollable"
               className="flex items-center gap-2 cursor-pointer select-none"
@@ -1658,7 +1825,7 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
             </div>
           )}
 
-          {!isLayoutTile && (
+          {!isContentless && (
           <div className="space-y-1.5">
             <Label>Background Color</Label>
             <div className="flex items-center gap-2">
@@ -1709,7 +1876,7 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
           </div>
           )}
 
-          {!isLayoutTile && (
+          {!isContentless && (
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label>Image</Label>

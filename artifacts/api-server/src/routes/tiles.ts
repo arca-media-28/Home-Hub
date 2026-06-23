@@ -58,6 +58,27 @@ interface TileSettings {
   audioBrowse?: boolean | null;
   audioPlaylists?: boolean | null;
   scrollable?: boolean | null;
+  noteBody?: string | null;
+  noteItems?: NoteChecklistItem[] | null;
+  noteColor?: string | null;
+  noteFontSize?: "sm" | "md" | "lg" | null;
+  noteTextColor?: string | null;
+}
+
+// A single checklist/to-do item on a Note (post-it) tile: its label text and
+// whether it has been ticked off (rendered with a strike-through).
+interface NoteChecklistItem {
+  text: string;
+  done: boolean;
+}
+
+// Validate/clean a single checklist item. Returns null when there is no usable
+// text so callers can drop garbage rows.
+function pickNoteChecklistItem(raw: unknown): NoteChecklistItem | null {
+  if (!raw || typeof raw !== "object") return null;
+  const obj = raw as Record<string, unknown>;
+  if (typeof obj["text"] !== "string") return null;
+  return { text: obj["text"], done: obj["done"] === true };
 }
 
 // A single watchlist entry for the Stocks tile: a ticker symbol plus optional
@@ -247,6 +268,33 @@ function pickTileSettings(obj: Record<string, unknown>): TileSettings {
     result.scrollable = obj["scrollable"];
   } else if (obj["scrollable"] === null) {
     result.scrollable = null;
+  }
+  if (typeof obj["noteBody"] === "string") {
+    result.noteBody = obj["noteBody"];
+  } else if (obj["noteBody"] === null) {
+    result.noteBody = null;
+  }
+  if (Array.isArray(obj["noteItems"])) {
+    result.noteItems = obj["noteItems"]
+      .map(pickNoteChecklistItem)
+      .filter((e): e is NoteChecklistItem => e !== null);
+  } else if (obj["noteItems"] === null) {
+    result.noteItems = null;
+  }
+  if (typeof obj["noteColor"] === "string") {
+    result.noteColor = obj["noteColor"];
+  } else if (obj["noteColor"] === null) {
+    result.noteColor = null;
+  }
+  if (obj["noteFontSize"] === "sm" || obj["noteFontSize"] === "md" || obj["noteFontSize"] === "lg") {
+    result.noteFontSize = obj["noteFontSize"];
+  } else if (obj["noteFontSize"] === null) {
+    result.noteFontSize = null;
+  }
+  if (typeof obj["noteTextColor"] === "string") {
+    result.noteTextColor = obj["noteTextColor"];
+  } else if (obj["noteTextColor"] === null) {
+    result.noteTextColor = null;
   }
   return result;
 }

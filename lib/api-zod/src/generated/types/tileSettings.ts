@@ -5,6 +5,7 @@
  * HomeHub API
  * OpenAPI spec version: 0.1.0
  */
+import type { NoteChecklistItem } from './noteChecklistItem';
 import type { StockWatchEntry } from './stockWatchEntry';
 
 /**
@@ -157,4 +158,29 @@ export type TileSettings = {
      * @nullable
      */
   scrollable?: boolean | null;
+  /**
+     * Free-form note text for a Note (post-it) tile. Null or absent means an empty note.
+     * @nullable
+     */
+  noteBody?: string | null;
+  /**
+     * Checklist / to-do items for a Note tile. Each item has text and a done flag (rendered with a strike-through when done). Null or absent means no checklist.
+     * @nullable
+     */
+  noteItems?: NoteChecklistItem[] | null;
+  /**
+     * Background color of a Note (post-it) tile as a CSS color string (e.g. a preset note color or a custom hex). Null or absent uses the default post-it yellow.
+     * @nullable
+     */
+  noteColor?: string | null;
+  /**
+     * Font size for a Note tile's text: "sm", "md", or "lg". Absent or null defaults to "md".
+     * @nullable
+     */
+  noteFontSize?: 'sm' | 'md' | 'lg' | null;
+  /**
+     * CSS color for a Note tile's text (note body and checklist). Null or absent uses a sensible dark default that reads on light post-it colors.
+     * @nullable
+     */
+  noteTextColor?: string | null;
 } | null;

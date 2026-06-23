@@ -1083,7 +1083,7 @@ components:
           enum: [app, truenas, media, sonarr, radarr, lidarr, qbittorrent]
         integration:
           type: ["string", "null"]
-          enum: [truenas, media, jellyfin, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, audioplayer, clock, weather, sports, news, stocks, sleeper, spacer, divider, null]
+          enum: [truenas, media, jellyfin, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, audioplayer, clock, weather, sports, news, stocks, sleeper, note, spacer, divider, null]
         gridX:
           type: integer
         gridY:
@@ -1162,7 +1162,7 @@ components:
           enum: [app, truenas, media, sonarr, radarr, lidarr, qbittorrent]
         integration:
           type: ["string", "null"]
-          enum: [truenas, media, jellyfin, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, audioplayer, clock, weather, sports, news, stocks, sleeper, spacer, divider, null]
+          enum: [truenas, media, jellyfin, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, audioplayer, clock, weather, sports, news, stocks, sleeper, note, spacer, divider, null]
         gridX:
           type: integer
         gridY:
@@ -1205,7 +1205,7 @@ components:
       properties:
         integration:
           type: ["string", "null"]
-          enum: [truenas, media, jellyfin, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, audioplayer, clock, weather, sports, news, stocks, sleeper, spacer, divider, null]
+          enum: [truenas, media, jellyfin, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, audioplayer, clock, weather, sports, news, stocks, sleeper, note, spacer, divider, null]
         gridX:
           type: integer
         gridY:
@@ -1422,6 +1422,50 @@ components:
             overflows instead of clipping it at the tile edge. Absent or false
             clips overflowing content (the default).
           type: ["boolean", "null"]
+        noteBody:
+          description: >-
+            Free-form note text for a Note (post-it) tile. Null or absent means
+            an empty note.
+          type: ["string", "null"]
+        noteItems:
+          description: >-
+            Checklist / to-do items for a Note tile. Each item has text and a
+            done flag (rendered with a strike-through when done). Null or absent
+            means no checklist.
+          type: ["array", "null"]
+          items:
+            $ref: "#/components/schemas/NoteChecklistItem"
+        noteColor:
+          description: >-
+            Background color of a Note (post-it) tile as a CSS color string
+            (e.g. a preset note color or a custom hex). Null or absent uses the
+            default post-it yellow.
+          type: ["string", "null"]
+        noteFontSize:
+          description: >-
+            Font size for a Note tile's text: "sm", "md", or "lg". Absent or
+            null defaults to "md".
+          type: ["string", "null"]
+          enum: ["sm", "md", "lg", null]
+        noteTextColor:
+          description: >-
+            CSS color for a Note tile's text (note body and checklist). Null or
+            absent uses a sensible dark default that reads on light post-it
+            colors.
+          type: ["string", "null"]
+
+    NoteChecklistItem:
+      type: object
+      required: [text, done]
+      properties:
+        text:
+          description: The checklist item's label text.
+          type: string
+        done:
+          description: >-
+            Whether the item is checked off. When true the tile renders it with
+            a strike-through.
+          type: boolean
 
     StockWatchEntry:
       type: object

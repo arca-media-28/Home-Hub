@@ -44,6 +44,7 @@ const CATEGORY_BY_KEY: Record<string, Category> = {
   tailscale: "Server",
   pihole: "Server",
   // Layout / organization helpers
+  note: "Organization",
   spacer: "Organization",
   divider: "Organization",
 };

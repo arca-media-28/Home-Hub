@@ -70,7 +70,7 @@ export const GetTilesResponseItem = zod.object({
   "id": zod.number(),
   "userId": zod.number(),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'lidarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('spacer'),zod.literal('divider'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -120,7 +120,15 @@ export const GetTilesResponseItem = zod.object({
   "audioSearch": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Search tab (Plex \/ Subsonic only). Absent or null defaults to true.'),
   "audioBrowse": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Browse tab (recently added \/ albums \/ artists, Plex \/ Subsonic only). Absent or null defaults to true.'),
   "audioPlaylists": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Playlists tab (Plex \/ Subsonic only). Absent or null defaults to true.'),
-  "scrollable": zod.boolean().nullish().describe('When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).')
+  "scrollable": zod.boolean().nullish().describe('When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).'),
+  "noteBody": zod.string().nullish().describe('Free-form note text for a Note (post-it) tile. Null or absent means an empty note.'),
+  "noteItems": zod.array(zod.object({
+  "text": zod.string().describe('The checklist item\'s label text.'),
+  "done": zod.boolean().describe('Whether the item is checked off. When true the tile renders it with a strike-through.')
+})).nullish().describe('Checklist \/ to-do items for a Note tile. Each item has text and a done flag (rendered with a strike-through when done). Null or absent means no checklist.'),
+  "noteColor": zod.string().nullish().describe('Background color of a Note (post-it) tile as a CSS color string (e.g. a preset note color or a custom hex). Null or absent uses the default post-it yellow.'),
+  "noteFontSize": zod.union([zod.literal('sm'),zod.literal('md'),zod.literal('lg'),zod.literal(null)]).nullish().describe('Font size for a Note tile\'s text: \"sm\", \"md\", or \"lg\". Absent or null defaults to \"md\".'),
+  "noteTextColor": zod.string().nullish().describe('CSS color for a Note tile\'s text (note body and checklist). Null or absent uses a sensible dark default that reads on light post-it colors.')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.'),
   "createdAt": zod.string().optional()
 })
@@ -132,7 +140,7 @@ export const GetTilesResponse = zod.array(GetTilesResponseItem)
  */
 export const CreateTileBody = zod.object({
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'lidarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('spacer'),zod.literal('divider'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -182,7 +190,15 @@ export const CreateTileBody = zod.object({
   "audioSearch": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Search tab (Plex \/ Subsonic only). Absent or null defaults to true.'),
   "audioBrowse": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Browse tab (recently added \/ albums \/ artists, Plex \/ Subsonic only). Absent or null defaults to true.'),
   "audioPlaylists": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Playlists tab (Plex \/ Subsonic only). Absent or null defaults to true.'),
-  "scrollable": zod.boolean().nullish().describe('When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).')
+  "scrollable": zod.boolean().nullish().describe('When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).'),
+  "noteBody": zod.string().nullish().describe('Free-form note text for a Note (post-it) tile. Null or absent means an empty note.'),
+  "noteItems": zod.array(zod.object({
+  "text": zod.string().describe('The checklist item\'s label text.'),
+  "done": zod.boolean().describe('Whether the item is checked off. When true the tile renders it with a strike-through.')
+})).nullish().describe('Checklist \/ to-do items for a Note tile. Each item has text and a done flag (rendered with a strike-through when done). Null or absent means no checklist.'),
+  "noteColor": zod.string().nullish().describe('Background color of a Note (post-it) tile as a CSS color string (e.g. a preset note color or a custom hex). Null or absent uses the default post-it yellow.'),
+  "noteFontSize": zod.union([zod.literal('sm'),zod.literal('md'),zod.literal('lg'),zod.literal(null)]).nullish().describe('Font size for a Note tile\'s text: \"sm\", \"md\", or \"lg\". Absent or null defaults to \"md\".'),
+  "noteTextColor": zod.string().nullish().describe('CSS color for a Note tile\'s text (note body and checklist). Null or absent uses a sensible dark default that reads on light post-it colors.')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.')
 })
 
@@ -198,7 +214,7 @@ export const GetTileResponse = zod.object({
   "id": zod.number(),
   "userId": zod.number(),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'lidarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('spacer'),zod.literal('divider'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -248,7 +264,15 @@ export const GetTileResponse = zod.object({
   "audioSearch": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Search tab (Plex \/ Subsonic only). Absent or null defaults to true.'),
   "audioBrowse": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Browse tab (recently added \/ albums \/ artists, Plex \/ Subsonic only). Absent or null defaults to true.'),
   "audioPlaylists": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Playlists tab (Plex \/ Subsonic only). Absent or null defaults to true.'),
-  "scrollable": zod.boolean().nullish().describe('When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).')
+  "scrollable": zod.boolean().nullish().describe('When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).'),
+  "noteBody": zod.string().nullish().describe('Free-form note text for a Note (post-it) tile. Null or absent means an empty note.'),
+  "noteItems": zod.array(zod.object({
+  "text": zod.string().describe('The checklist item\'s label text.'),
+  "done": zod.boolean().describe('Whether the item is checked off. When true the tile renders it with a strike-through.')
+})).nullish().describe('Checklist \/ to-do items for a Note tile. Each item has text and a done flag (rendered with a strike-through when done). Null or absent means no checklist.'),
+  "noteColor": zod.string().nullish().describe('Background color of a Note (post-it) tile as a CSS color string (e.g. a preset note color or a custom hex). Null or absent uses the default post-it yellow.'),
+  "noteFontSize": zod.union([zod.literal('sm'),zod.literal('md'),zod.literal('lg'),zod.literal(null)]).nullish().describe('Font size for a Note tile\'s text: \"sm\", \"md\", or \"lg\". Absent or null defaults to \"md\".'),
+  "noteTextColor": zod.string().nullish().describe('CSS color for a Note tile\'s text (note body and checklist). Null or absent uses a sensible dark default that reads on light post-it colors.')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.'),
   "createdAt": zod.string().optional()
 })
@@ -262,7 +286,7 @@ export const UpdateTileParams = zod.object({
 })
 
 export const UpdateTileBody = zod.object({
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('spacer'),zod.literal('divider'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal(null)]).nullish(),
   "gridX": zod.number().optional(),
   "gridY": zod.number().optional(),
   "gridW": zod.number().optional(),
@@ -312,7 +336,15 @@ export const UpdateTileBody = zod.object({
   "audioSearch": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Search tab (Plex \/ Subsonic only). Absent or null defaults to true.'),
   "audioBrowse": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Browse tab (recently added \/ albums \/ artists, Plex \/ Subsonic only). Absent or null defaults to true.'),
   "audioPlaylists": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Playlists tab (Plex \/ Subsonic only). Absent or null defaults to true.'),
-  "scrollable": zod.boolean().nullish().describe('When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).')
+  "scrollable": zod.boolean().nullish().describe('When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).'),
+  "noteBody": zod.string().nullish().describe('Free-form note text for a Note (post-it) tile. Null or absent means an empty note.'),
+  "noteItems": zod.array(zod.object({
+  "text": zod.string().describe('The checklist item\'s label text.'),
+  "done": zod.boolean().describe('Whether the item is checked off. When true the tile renders it with a strike-through.')
+})).nullish().describe('Checklist \/ to-do items for a Note tile. Each item has text and a done flag (rendered with a strike-through when done). Null or absent means no checklist.'),
+  "noteColor": zod.string().nullish().describe('Background color of a Note (post-it) tile as a CSS color string (e.g. a preset note color or a custom hex). Null or absent uses the default post-it yellow.'),
+  "noteFontSize": zod.union([zod.literal('sm'),zod.literal('md'),zod.literal('lg'),zod.literal(null)]).nullish().describe('Font size for a Note tile\'s text: \"sm\", \"md\", or \"lg\". Absent or null defaults to \"md\".'),
+  "noteTextColor": zod.string().nullish().describe('CSS color for a Note tile\'s text (note body and checklist). Null or absent uses a sensible dark default that reads on light post-it colors.')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.')
 })
 
@@ -320,7 +352,7 @@ export const UpdateTileResponse = zod.object({
   "id": zod.number(),
   "userId": zod.number(),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'lidarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('spacer'),zod.literal('divider'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -370,7 +402,15 @@ export const UpdateTileResponse = zod.object({
   "audioSearch": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Search tab (Plex \/ Subsonic only). Absent or null defaults to true.'),
   "audioBrowse": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Browse tab (recently added \/ albums \/ artists, Plex \/ Subsonic only). Absent or null defaults to true.'),
   "audioPlaylists": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Playlists tab (Plex \/ Subsonic only). Absent or null defaults to true.'),
-  "scrollable": zod.boolean().nullish().describe('When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).')
+  "scrollable": zod.boolean().nullish().describe('When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).'),
+  "noteBody": zod.string().nullish().describe('Free-form note text for a Note (post-it) tile. Null or absent means an empty note.'),
+  "noteItems": zod.array(zod.object({
+  "text": zod.string().describe('The checklist item\'s label text.'),
+  "done": zod.boolean().describe('Whether the item is checked off. When true the tile renders it with a strike-through.')
+})).nullish().describe('Checklist \/ to-do items for a Note tile. Each item has text and a done flag (rendered with a strike-through when done). Null or absent means no checklist.'),
+  "noteColor": zod.string().nullish().describe('Background color of a Note (post-it) tile as a CSS color string (e.g. a preset note color or a custom hex). Null or absent uses the default post-it yellow.'),
+  "noteFontSize": zod.union([zod.literal('sm'),zod.literal('md'),zod.literal('lg'),zod.literal(null)]).nullish().describe('Font size for a Note tile\'s text: \"sm\", \"md\", or \"lg\". Absent or null defaults to \"md\".'),
+  "noteTextColor": zod.string().nullish().describe('CSS color for a Note tile\'s text (note body and checklist). Null or absent uses a sensible dark default that reads on light post-it colors.')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.'),
   "createdAt": zod.string().optional()
 })
@@ -401,7 +441,7 @@ export const SaveLayoutResponseItem = zod.object({
   "id": zod.number(),
   "userId": zod.number(),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'lidarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('spacer'),zod.literal('divider'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -451,7 +491,15 @@ export const SaveLayoutResponseItem = zod.object({
   "audioSearch": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Search tab (Plex \/ Subsonic only). Absent or null defaults to true.'),
   "audioBrowse": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Browse tab (recently added \/ albums \/ artists, Plex \/ Subsonic only). Absent or null defaults to true.'),
   "audioPlaylists": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Playlists tab (Plex \/ Subsonic only). Absent or null defaults to true.'),
-  "scrollable": zod.boolean().nullish().describe('When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).')
+  "scrollable": zod.boolean().nullish().describe('When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).'),
+  "noteBody": zod.string().nullish().describe('Free-form note text for a Note (post-it) tile. Null or absent means an empty note.'),
+  "noteItems": zod.array(zod.object({
+  "text": zod.string().describe('The checklist item\'s label text.'),
+  "done": zod.boolean().describe('Whether the item is checked off. When true the tile renders it with a strike-through.')
+})).nullish().describe('Checklist \/ to-do items for a Note tile. Each item has text and a done flag (rendered with a strike-through when done). Null or absent means no checklist.'),
+  "noteColor": zod.string().nullish().describe('Background color of a Note (post-it) tile as a CSS color string (e.g. a preset note color or a custom hex). Null or absent uses the default post-it yellow.'),
+  "noteFontSize": zod.union([zod.literal('sm'),zod.literal('md'),zod.literal('lg'),zod.literal(null)]).nullish().describe('Font size for a Note tile\'s text: \"sm\", \"md\", or \"lg\". Absent or null defaults to \"md\".'),
+  "noteTextColor": zod.string().nullish().describe('CSS color for a Note tile\'s text (note body and checklist). Null or absent uses a sensible dark default that reads on light post-it colors.')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.'),
   "createdAt": zod.string().optional()
 })
