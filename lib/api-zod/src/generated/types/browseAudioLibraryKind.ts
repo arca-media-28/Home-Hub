@@ -17,4 +17,5 @@ export const BrowseAudioLibraryKind = {
   album: 'album',
   playlists: 'playlists',
   playlist: 'playlist',
+  random: 'random',
 } as const;

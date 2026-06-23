@@ -1772,7 +1772,7 @@ function demoBrowseResult(source: string, kind: string) {
   if (kind === "artists") return { source, sample: true, artists: DEMO_ARTISTS };
   if (kind === "playlists") return { source, sample: true, playlists: DEMO_PLAYLISTS };
   if (kind === "artist") return { source, sample: true, albums: DEMO_ALBUMS };
-  if (kind === "album" || kind === "playlist") {
+  if (kind === "album" || kind === "playlist" || kind === "random") {
     return { source, sample: true, tracks: DEMO_TRACKS };
   }
   // recent / albums
@@ -1868,6 +1868,15 @@ async function plexBrowseLibrary(
     const sectionKey = await findPlexMusicSectionKey(baseUrl, token);
     if (!sectionKey) {
       res.json({ source: "plex", sample: false, albums: [], artists: [] });
+      return;
+    }
+    if (kind === "random") {
+      const rows = await plexMetadata(baseUrl, token, `/library/sections/${sectionKey}/all`, {
+        type: 10,
+        sort: "random",
+        "X-Plex-Container-Size": 20,
+      });
+      res.json({ source: "plex", sample: false, tracks: rows.map((t) => mapPlexTrack(t, baseUrl, token, false)) });
       return;
     }
     if (kind === "artists") {
@@ -1985,6 +1994,12 @@ async function subsonicBrowseLibrary(
       res.json({ source: "subsonic", sample: false, artists: artists.map((a) => mapSubsonicArtist(a, baseUrl, mediaQuery)) });
       return;
     }
+    if (kind === "random") {
+      const body = await subsonicGet(baseUrl, "getRandomSongs.view", auth, { size: 20 });
+      const songs = ((body["randomSongs"] as { song?: SubsonicSong[] } | undefined)?.song ?? []);
+      res.json({ source: "subsonic", sample: false, tracks: songs.map((s) => mapSubsonicTrack(s, baseUrl, mediaQuery, false)) });
+      return;
+    }
     // recent or albums
     const type = kind === "recent" ? "newest" : "alphabeticalByName";
     const size = kind === "recent" ? 40 : 100;
@@ -2011,7 +2026,7 @@ router.get("/audioplayer/search", requireAuth, async (req, res) => {
 
 // GET /widgets/audioplayer/browse — list a source's library / playlists, with
 // drill-down (artist→albums, album→tracks, playlist→tracks).
-const BROWSE_KINDS = ["recent", "albums", "artists", "artist", "album", "playlists", "playlist"];
+const BROWSE_KINDS = ["recent", "albums", "artists", "artist", "album", "playlists", "playlist", "random"];
 const BROWSE_KINDS_NEEDING_ID = ["artist", "album", "playlist"];
 router.get("/audioplayer/browse", requireAuth, async (req, res) => {
   const source = String(req.query["source"] ?? "plex");

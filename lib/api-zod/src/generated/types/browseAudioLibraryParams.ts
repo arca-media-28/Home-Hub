@@ -14,7 +14,7 @@ export type BrowseAudioLibraryParams = {
  */
 source?: BrowseAudioLibrarySource;
 /**
- * What to list. "recent" = recently added albums, "albums" = all albums, "artists" = all artists, "playlists" = all playlists. The drill-down kinds require an id: "artist" returns that artist's albums, "album" returns that album's tracks, "playlist" returns that playlist's tracks.
+ * What to list. "recent" = recently added albums, "albums" = all albums, "artists" = all artists, "playlists" = all playlists, "random" = a flat list of ~20 random playable tracks. The drill-down kinds require an id: "artist" returns that artist's albums, "album" returns that album's tracks, "playlist" returns that playlist's tracks.
  */
 kind: BrowseAudioLibraryKind;
 /**

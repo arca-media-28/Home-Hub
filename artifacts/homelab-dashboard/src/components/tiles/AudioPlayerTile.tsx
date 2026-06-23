@@ -1,10 +1,11 @@
 import {
   useGetAudioPlayerNowPlaying,
   getGetAudioPlayerNowPlayingQueryKey,
+  browseAudioLibrary,
 } from "@workspace/api-client-react";
-import type { AudioTrack } from "@workspace/api-client-react";
+import type { AudioTrack, BrowseAudioLibrarySource } from "@workspace/api-client-react";
 import { useState } from "react";
-import { Music, Play, Pause, SkipBack, SkipForward, Volume2, Library } from "lucide-react";
+import { Music, Play, Pause, SkipBack, SkipForward, Volume2, Library, Dices } from "lucide-react";
 import type { WidgetProps } from "./IntegrationTile";
 import { useAudioPlayer } from "@/lib/audioPlayer";
 import { tileBudget, SECTION_PX, MEDIA_ROW_PX } from "./metrics";
@@ -62,6 +63,44 @@ function StreamAudioPlayer({ enabled, density, tileSettings }: WidgetProps) {
     (browserTabs.search || browserTabs.browse || browserTabs.playlists);
   const [browserOpen, setBrowserOpen] = useState(false);
 
+  // The "dice" button pulls ~20 random tracks from the configured library and
+  // appends them to the queue (starting playback when idle). It rides alongside
+  // "Find music" and is available for the same library-backed sources.
+  const showDice = isLibrarySource;
+  const [shuffling, setShuffling] = useState(false);
+  const shuffleRandom = async () => {
+    if (shuffling) return;
+    setShuffling(true);
+    try {
+      const result = await browseAudioLibrary({
+        source: source as BrowseAudioLibrarySource,
+        kind: "random",
+      });
+      const tracks = (result.tracks ?? []).filter((t) => Boolean(t.streamUrl));
+      // Demo / unconfigured payloads carry no streamUrl — nothing to enqueue, but
+      // the interaction still completes without error (button just re-enables).
+      if (tracks.length > 0) player.enqueue(tracks, ownerId);
+    } catch {
+      // Unreachable source: swallow so the tile never breaks; button re-enables.
+    } finally {
+      setShuffling(false);
+    }
+  };
+
+  const diceButton = (props: { className: string }) =>
+    showDice ? (
+      <button
+        type="button"
+        onClick={shuffleRandom}
+        disabled={shuffling}
+        className={props.className}
+        aria-label="Shuffle 20 random songs into the queue"
+        title="Shuffle 20 random songs"
+      >
+        <Dices size={14} aria-hidden="true" className={shuffling ? "animate-pulse" : undefined} />
+      </button>
+    ) : null;
+
   const browserNode = showBrowser ? (
     <MusicBrowser
       source={source as "plex" | "subsonic"}
@@ -101,15 +140,21 @@ function StreamAudioPlayer({ enabled, density, tileSettings }: WidgetProps) {
       <div className="flex h-full flex-col items-center justify-center gap-2 p-3 text-center text-xs text-muted-foreground">
         <Music size={20} aria-hidden="true" />
         <span>Nothing playing</span>
-        {showBrowser && (
-          <button
-            type="button"
-            onClick={() => setBrowserOpen(true)}
-            className="flex items-center gap-1.5 rounded-full border border-border px-3 py-1 text-xs text-foreground transition-colors hover:bg-muted"
-          >
-            <Library size={13} aria-hidden="true" /> Find music
-          </button>
-        )}
+        <div className="flex items-center gap-1.5">
+          {showBrowser && (
+            <button
+              type="button"
+              onClick={() => setBrowserOpen(true)}
+              className="flex items-center gap-1.5 rounded-full border border-border px-3 py-1 text-xs text-foreground transition-colors hover:bg-muted"
+            >
+              <Library size={13} aria-hidden="true" /> Find music
+            </button>
+          )}
+          {diceButton({
+            className:
+              "flex items-center justify-center rounded-full border border-border p-1.5 text-foreground transition-colors hover:bg-muted disabled:opacity-50",
+          })}
+        </div>
         {browserNode}
       </div>
     );
@@ -222,16 +267,24 @@ function StreamAudioPlayer({ enabled, density, tileSettings }: WidgetProps) {
             </div>
           )}
         </div>
-        {showBrowser && !pillAtControls && (
-          <button
-            type="button"
-            onClick={() => setBrowserOpen(true)}
-            className="flex shrink-0 items-center justify-center rounded-full border border-border p-1.5 text-foreground transition-colors hover:bg-muted"
-            aria-label="Find music"
-            title="Find music"
-          >
-            <Library size={14} aria-hidden="true" />
-          </button>
+        {!pillAtControls && (showBrowser || showDice) && (
+          <div className="flex shrink-0 items-center gap-1.5">
+            {showBrowser && (
+              <button
+                type="button"
+                onClick={() => setBrowserOpen(true)}
+                className="flex items-center justify-center rounded-full border border-border p-1.5 text-foreground transition-colors hover:bg-muted"
+                aria-label="Find music"
+                title="Find music"
+              >
+                <Library size={14} aria-hidden="true" />
+              </button>
+            )}
+            {diceButton({
+              className:
+                "flex items-center justify-center rounded-full border border-border p-1.5 text-foreground transition-colors hover:bg-muted disabled:opacity-50",
+            })}
+          </div>
         )}
       </div>
 
@@ -301,15 +354,21 @@ function StreamAudioPlayer({ enabled, density, tileSettings }: WidgetProps) {
             </div>
           )}
           {pillAtControls && (
-            <button
-              type="button"
-              onClick={() => setBrowserOpen(true)}
-              className="absolute left-0 flex items-center justify-center rounded-full border border-border p-1.5 text-foreground transition-colors hover:bg-muted"
-              aria-label="Find music"
-              title="Find music"
-            >
-              <Library size={14} aria-hidden="true" />
-            </button>
+            <div className="absolute left-0 flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setBrowserOpen(true)}
+                className="flex items-center justify-center rounded-full border border-border p-1.5 text-foreground transition-colors hover:bg-muted"
+                aria-label="Find music"
+                title="Find music"
+              >
+                <Library size={14} aria-hidden="true" />
+              </button>
+              {diceButton({
+                className:
+                  "flex items-center justify-center rounded-full border border-border p-1.5 text-foreground transition-colors hover:bg-muted disabled:opacity-50",
+              })}
+            </div>
           )}
         </div>
       )}

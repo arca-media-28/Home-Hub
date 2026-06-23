@@ -813,7 +813,7 @@ export const SearchAudioLibraryResponse = zod.object({
  */
 export const BrowseAudioLibraryQueryParams = zod.object({
   "source": zod.enum(['plex', 'subsonic']).optional().describe('Which music source to browse. \"plex\" or \"subsonic\". Defaults to \"plex\" when omitted.'),
-  "kind": zod.enum(['recent', 'albums', 'artists', 'artist', 'album', 'playlists', 'playlist']).describe('What to list. \"recent\" = recently added albums, \"albums\" = all albums, \"artists\" = all artists, \"playlists\" = all playlists. The drill-down kinds require an id: \"artist\" returns that artist\'s albums, \"album\" returns that album\'s tracks, \"playlist\" returns that playlist\'s tracks.'),
+  "kind": zod.enum(['recent', 'albums', 'artists', 'artist', 'album', 'playlists', 'playlist', 'random']).describe('What to list. \"recent\" = recently added albums, \"albums\" = all albums, \"artists\" = all artists, \"playlists\" = all playlists, \"random\" = a flat list of ~20 random playable tracks. The drill-down kinds require an id: \"artist\" returns that artist\'s albums, \"album\" returns that album\'s tracks, \"playlist\" returns that playlist\'s tracks.'),
   "id": zod.coerce.string().optional().describe('The container id to drill into. Required for kind=artist, kind=album, and kind=playlist; ignored for the top-level listings.')
 })
 

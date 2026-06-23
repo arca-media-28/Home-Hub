@@ -571,13 +571,14 @@ paths:
           required: true
           description: >-
             What to list. "recent" = recently added albums, "albums" = all
-            albums, "artists" = all artists, "playlists" = all playlists. The
+            albums, "artists" = all artists, "playlists" = all playlists,
+            "random" = a flat list of ~20 random playable tracks. The
             drill-down kinds require an id: "artist" returns that artist's
             albums, "album" returns that album's tracks, "playlist" returns
             that playlist's tracks.
           schema:
             type: string
-            enum: [recent, albums, artists, artist, album, playlists, playlist]
+            enum: [recent, albums, artists, artist, album, playlists, playlist, random]
         - name: id
           in: query
           required: false
