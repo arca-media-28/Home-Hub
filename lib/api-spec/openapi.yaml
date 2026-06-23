@@ -511,6 +511,101 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /widgets/audioplayer/search:
+    get:
+      operationId: searchAudioLibrary
+      tags: [widgets]
+      summary: Search a music source's library for artists, albums, and tracks
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: source
+          in: query
+          required: false
+          description: >-
+            Which music source to search. "plex" resolves the saved Plex
+            connection; "subsonic" the saved Navidrome / Subsonic connection.
+            Defaults to "plex" when omitted.
+          schema:
+            type: string
+            enum: [plex, subsonic]
+        - name: query
+          in: query
+          required: true
+          description: The text to match against artist, album, and track names.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Search results grouped into artists, albums, and tracks
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AudioBrowseResult"
+        "502":
+          description: The configured music source could not be reached
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /widgets/audioplayer/browse:
+    get:
+      operationId: browseAudioLibrary
+      tags: [widgets]
+      summary: Browse a music source's library and playlists (with drill-down)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: source
+          in: query
+          required: false
+          description: >-
+            Which music source to browse. "plex" or "subsonic". Defaults to
+            "plex" when omitted.
+          schema:
+            type: string
+            enum: [plex, subsonic]
+        - name: kind
+          in: query
+          required: true
+          description: >-
+            What to list. "recent" = recently added albums, "albums" = all
+            albums, "artists" = all artists, "playlists" = all playlists. The
+            drill-down kinds require an id: "artist" returns that artist's
+            albums, "album" returns that album's tracks, "playlist" returns
+            that playlist's tracks.
+          schema:
+            type: string
+            enum: [recent, albums, artists, artist, album, playlists, playlist]
+        - name: id
+          in: query
+          required: false
+          description: >-
+            The container id to drill into. Required for kind=artist,
+            kind=album, and kind=playlist; ignored for the top-level listings.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The requested browse listing
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AudioBrowseResult"
+        "400":
+          description: A drill-down kind was requested without the required id
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "502":
+          description: The configured music source could not be reached
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /widgets/subsonic/scrobble:
     post:
       operationId: scrobbleSubsonic
@@ -1297,6 +1392,29 @@ components:
             or null defaults to "plex". This is the seam additional sources
             (Spotify, Jellyfin, Navidrome) plug into later.
           type: ["string", "null"]
+        audioFindMusic:
+          description: >-
+            When true, the Audio Player tile shows the "Find music" button that
+            opens the music browser (Plex / Subsonic only). Absent or null
+            defaults to true.
+          type: ["boolean", "null"]
+        audioSearch:
+          description: >-
+            When true, the Audio Player tile's music browser offers the Search
+            tab (Plex / Subsonic only). Absent or null defaults to true.
+          type: ["boolean", "null"]
+        audioBrowse:
+          description: >-
+            When true, the Audio Player tile's music browser offers the Browse
+            tab (recently added / albums / artists, Plex / Subsonic only).
+            Absent or null defaults to true.
+          type: ["boolean", "null"]
+        audioPlaylists:
+          description: >-
+            When true, the Audio Player tile's music browser offers the
+            Playlists tab (Plex / Subsonic only). Absent or null defaults to
+            true.
+          type: ["boolean", "null"]
         scrollable:
           description: >-
             When true, the tile body shows a scrollbar when its content
@@ -2191,6 +2309,73 @@ components:
             can play directly (Plex part key + token). Null when the source does
             not expose an in-browser-playable stream (remote-control-only).
           type: ["string", "null"]
+
+    AudioContainer:
+      type: object
+      required: [id, kind, title]
+      properties:
+        id:
+          description: >-
+            Stable identifier for the container within its source, used to drill
+            into it via the browse endpoint.
+          type: string
+        kind:
+          description: What this container is, so the client knows how to expand it.
+          type: string
+          enum: [artist, album, playlist]
+        title:
+          description: Display name of the artist, album, or playlist.
+          type: string
+        subtitle:
+          description: >-
+            Secondary line (album artist, track count, etc.). Null when none.
+          type: ["string", "null"]
+        artwork:
+          description: >-
+            Fully-qualified, authenticated cover-art URL the browser can load
+            directly. Null when the source has no artwork.
+          type: ["string", "null"]
+
+    AudioBrowseResult:
+      type: object
+      required: [source, sample]
+      properties:
+        source:
+          description: The music source backing this response ("plex" or "subsonic").
+          type: string
+        sample:
+          description: >-
+            True when the results are built-in demo content (the source is not
+            configured); selecting them yields no real playback.
+          type: boolean
+        artists:
+          description: >-
+            Matching/listed artists (search results or a browse listing). Absent
+            when not applicable to the request.
+          type: array
+          items:
+            $ref: "#/components/schemas/AudioContainer"
+        albums:
+          description: >-
+            Matching/listed albums (search results, a browse listing, or an
+            artist's albums). Absent when not applicable to the request.
+          type: array
+          items:
+            $ref: "#/components/schemas/AudioContainer"
+        playlists:
+          description: >-
+            The source's playlists. Absent when not applicable to the request.
+          type: array
+          items:
+            $ref: "#/components/schemas/AudioContainer"
+        tracks:
+          description: >-
+            Playable tracks (search results, an album's tracks, or a playlist's
+            tracks). Each carries a browser-playable streamUrl for the shared
+            engine. Absent when not applicable to the request.
+          type: array
+          items:
+            $ref: "#/components/schemas/AudioTrack"
 
     AudioPlayerData:
       type: object

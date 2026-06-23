@@ -6,12 +6,18 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './audioBrowseResult';
+export * from './audioContainer';
+export * from './audioContainerKind';
 export * from './audioDevice';
 export * from './audioPlayerData';
 export * from './audioPlayerDataAuth';
 export * from './audioTrack';
 export * from './authCredentials';
 export * from './authResponse';
+export * from './browseAudioLibraryKind';
+export * from './browseAudioLibraryParams';
+export * from './browseAudioLibrarySource';
 export * from './connectionHealth';
 export * from './connectionTestResult';
 export * from './continueWatchingItem';
@@ -49,6 +55,8 @@ export * from './qbittorrentTorrent';
 export * from './radarrData';
 export * from './radarrQueueItem';
 export * from './radarrUpcomingItem';
+export * from './searchAudioLibraryParams';
+export * from './searchAudioLibrarySource';
 export * from './searchStocksParams';
 export * from './serviceConnection';
 export * from './serviceConnectionUpdate';

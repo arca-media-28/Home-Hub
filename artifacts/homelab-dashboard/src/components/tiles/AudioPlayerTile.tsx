@@ -3,11 +3,13 @@ import {
   getGetAudioPlayerNowPlayingQueryKey,
 } from "@workspace/api-client-react";
 import type { AudioTrack } from "@workspace/api-client-react";
-import { Music, Play, Pause, SkipBack, SkipForward, Volume2 } from "lucide-react";
+import { useState } from "react";
+import { Music, Play, Pause, SkipBack, SkipForward, Volume2, Library } from "lucide-react";
 import type { WidgetProps } from "./IntegrationTile";
 import { useAudioPlayer } from "@/lib/audioPlayer";
 import { tileBudget, SECTION_PX, MEDIA_ROW_PX } from "./metrics";
 import { Artwork, fmtTime } from "./audioShared";
+import MusicBrowser from "./MusicBrowser";
 import SpotifyAudioPlayer from "./SpotifyAudioPlayer";
 
 // Audio Player tile. Branches on the configured source: Spotify (OAuth + remote
@@ -44,6 +46,32 @@ function StreamAudioPlayer({ enabled, density, tileSettings }: WidgetProps) {
   const player = useAudioPlayer();
   const isOurs = player.ownerId === ownerId && player.currentTrack != null;
 
+  // The pop-out music browser (search / browse / playlists) is only available
+  // for the library sources that back it; its tabs are per-tile toggles that
+  // default on when absent.
+  const isLibrarySource = source === "plex" || source === "subsonic";
+  const browserTabs = {
+    search: (tileSettings?.audioSearch as boolean | undefined) ?? true,
+    browse: (tileSettings?.audioBrowse as boolean | undefined) ?? true,
+    playlists: (tileSettings?.audioPlaylists as boolean | undefined) ?? true,
+  };
+  const findMusicEnabled = (tileSettings?.audioFindMusic as boolean | undefined) ?? true;
+  const showBrowser =
+    isLibrarySource &&
+    findMusicEnabled &&
+    (browserTabs.search || browserTabs.browse || browserTabs.playlists);
+  const [browserOpen, setBrowserOpen] = useState(false);
+
+  const browserNode = showBrowser ? (
+    <MusicBrowser
+      source={source as "plex" | "subsonic"}
+      ownerId={ownerId}
+      tabs={browserTabs}
+      open={browserOpen}
+      onOpenChange={setBrowserOpen}
+    />
+  ) : null;
+
   if (isLoading && !data) {
     return (
       <div className="flex h-full items-center justify-center p-3 text-xs text-muted-foreground">
@@ -70,16 +98,31 @@ function StreamAudioPlayer({ enabled, density, tileSettings }: WidgetProps) {
 
   if (!displayTrack) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-1 p-3 text-center text-xs text-muted-foreground">
+      <div className="flex h-full flex-col items-center justify-center gap-2 p-3 text-center text-xs text-muted-foreground">
         <Music size={20} aria-hidden="true" />
         <span>Nothing playing</span>
+        {showBrowser && (
+          <button
+            type="button"
+            onClick={() => setBrowserOpen(true)}
+            className="flex items-center gap-1.5 rounded-full border border-border px-3 py-1 text-xs text-foreground transition-colors hover:bg-muted"
+          >
+            <Library size={13} aria-hidden="true" /> Find music
+          </button>
+        )}
+        {browserNode}
       </div>
     );
   }
 
+  // When this tile owns playback, the live player queue (loaded via Find Music or
+  // an earlier start) is authoritative for now-playing and up-next; otherwise we
+  // fall back to the backend's reported session queue.
+  const activeQueue = isOurs ? player.queue : backendQueue;
+
   // Tracks are streamable only when they carry a streamUrl (real source, not the
   // demo payload). Demo/sample data shows now-playing but disables controls.
-  const canStream = backendQueue.some((t) => Boolean(t.streamUrl));
+  const canStream = activeQueue.some((t) => Boolean(t.streamUrl));
 
   // Progress + duration: from the live player when we own playback, else from the
   // backend's reported session (remote Plex session) when present.
@@ -103,15 +146,19 @@ function StreamAudioPlayer({ enabled, density, tileSettings }: WidgetProps) {
   const showProgress = enabled.has("progress") && budget.block(18);
   const showControls = enabled.has("controls") && budget.block(40);
 
-  const restQueue = backendQueue.filter((t) => t.id !== displayTrack.id);
+  // Up-next: when we own playback, the tracks after the live index; otherwise the
+  // backend session queue minus the now-playing track.
+  const restQueue = isOurs
+    ? player.queue.slice(player.index + 1)
+    : backendQueue.filter((t) => t.id !== displayTrack.id);
   const queueRows = enabled.has("queue")
     ? budget.list(SECTION_PX, MEDIA_ROW_PX, restQueue.length)
     : 0;
 
   const startPlayback = (startId: string) => {
     if (!canStream) return;
-    const startIndex = backendQueue.findIndex((t) => t.id === startId);
-    player.playQueue(backendQueue, startIndex < 0 ? 0 : startIndex, ownerId);
+    const startIndex = activeQueue.findIndex((t) => t.id === startId);
+    player.playQueue(activeQueue, startIndex < 0 ? 0 : startIndex, ownerId);
   };
 
   const onTogglePlay = () => {
@@ -269,6 +316,21 @@ function StreamAudioPlayer({ enabled, density, tileSettings }: WidgetProps) {
           </div>
         </div>
       )}
+      {showBrowser && (
+        <div className="mt-auto flex justify-center pt-1">
+          <button
+            type="button"
+            onClick={() => setBrowserOpen(true)}
+            className="flex items-center gap-1.5 rounded-full border border-border px-3 py-1 text-xs font-medium text-foreground transition-colors hover:bg-muted"
+            aria-label="Find music"
+            title="Find music"
+          >
+            <Library size={14} aria-hidden="true" />
+            {density.level !== "sm" && <span>Find music</span>}
+          </button>
+        </div>
+      )}
+      {browserNode}
     </div>
   );
 }

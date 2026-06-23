@@ -267,6 +267,19 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
   const [audioSource, setAudioSource] = useState<string>(
     tile?.tileSettings?.audioSource ?? "plex",
   );
+  // Music-browser tabs (Plex / Subsonic only). Absent defaults to on.
+  const [audioFindMusic, setAudioFindMusic] = useState<boolean>(
+    tile?.tileSettings?.audioFindMusic ?? true,
+  );
+  const [audioSearch, setAudioSearch] = useState<boolean>(
+    tile?.tileSettings?.audioSearch ?? true,
+  );
+  const [audioBrowse, setAudioBrowse] = useState<boolean>(
+    tile?.tileSettings?.audioBrowse ?? true,
+  );
+  const [audioPlaylists, setAudioPlaylists] = useState<boolean>(
+    tile?.tileSettings?.audioPlaylists ?? true,
+  );
 
   // Generic per-tile option (applies to every tile): when on, the tile body
   // scrolls instead of clipping content that overflows its grid bounds.
@@ -327,6 +340,10 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
       setSleeperLoadState("idle");
       setSleeperLoadError(null);
       setAudioSource(tile?.tileSettings?.audioSource ?? "plex");
+      setAudioFindMusic(tile?.tileSettings?.audioFindMusic ?? true);
+      setAudioSearch(tile?.tileSettings?.audioSearch ?? true);
+      setAudioBrowse(tile?.tileSettings?.audioBrowse ?? true);
+      setAudioPlaylists(tile?.tileSettings?.audioPlaylists ?? true);
       setScrollable(tile?.tileSettings?.scrollable ?? false);
       setShowColorPicker(false);
       setShowTitleColorPicker(false);
@@ -815,7 +832,12 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
                           sleeperShowTransactions,
                         }
                       : isAudioPlayer
-                        ? { audioSource }
+                        ? {
+                            audioSource,
+                            ...(audioSource === "plex" || audioSource === "subsonic"
+                              ? { audioFindMusic, audioSearch, audioBrowse, audioPlaylists }
+                              : {}),
+                          }
                         : null;
         // Only emit a settings object when there is something to store; an
         // un-scrolled plain tile keeps tileSettings null as before.
@@ -948,6 +970,66 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
                   <SelectItem value="spotify">Spotify</SelectItem>
                 </SelectContent>
               </Select>
+              {(audioSource === "plex" || audioSource === "subsonic") && (
+                <div className="space-y-2 pt-2">
+                  <Label>Music browser</Label>
+                  <p className="text-xs text-muted-foreground">
+                    The “Find music” button opens a panel to search and browse
+                    your library and load anything as the queue.
+                  </p>
+                  <label
+                    htmlFor="tile-audioFindMusic"
+                    className="flex cursor-pointer select-none items-center justify-between gap-2"
+                  >
+                    <span className="text-sm">Show “Find music” button</span>
+                    <button
+                      id="tile-audioFindMusic"
+                      type="button"
+                      role="switch"
+                      aria-checked={audioFindMusic}
+                      onClick={() => setAudioFindMusic((v) => !v)}
+                      className={`relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full transition-colors ${
+                        audioFindMusic ? "bg-primary" : "bg-muted"
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-background shadow transition-transform ${
+                          audioFindMusic ? "translate-x-4" : "translate-x-0.5"
+                        }`}
+                      />
+                    </button>
+                  </label>
+                  {audioFindMusic && (
+                    <>
+                      <p className="text-xs text-muted-foreground">
+                        Choose which tabs it offers.
+                      </p>
+                      {(
+                        [
+                          ["audioSearch", "Search", audioSearch, setAudioSearch],
+                          ["audioBrowse", "Browse library", audioBrowse, setAudioBrowse],
+                          ["audioPlaylists", "Playlists", audioPlaylists, setAudioPlaylists],
+                        ] as const
+                      ).map(([key, label, value, setValue]) => (
+                        <label
+                          key={key}
+                          htmlFor={`tile-${key}`}
+                          className="flex cursor-pointer select-none items-center gap-2"
+                        >
+                          <input
+                            id={`tile-${key}`}
+                            type="checkbox"
+                            checked={value}
+                            onChange={(e) => setValue(e.target.checked)}
+                            className="h-4 w-4 accent-primary"
+                          />
+                          <span className="text-sm">{label}</span>
+                        </label>
+                      ))}
+                    </>
+                  )}
+                </div>
+              )}
             </div>
           )}
 

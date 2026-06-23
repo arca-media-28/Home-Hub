@@ -228,11 +228,31 @@ export type TileSettings = {
      */
   audioSource?: string | null;
   /**
+     * When true, the Audio Player tile shows the "Find music" button that opens the music browser (Plex / Subsonic only). Absent or null defaults to true.
+     * @nullable
+     */
+  audioFindMusic?: boolean | null;
+  /**
+     * When true, the Audio Player tile's music browser offers the Search tab (Plex / Subsonic only). Absent or null defaults to true.
+     * @nullable
+     */
+  audioSearch?: boolean | null;
+  /**
+     * When true, the Audio Player tile's music browser offers the Browse tab (recently added / albums / artists, Plex / Subsonic only). Absent or null defaults to true.
+     * @nullable
+     */
+  audioBrowse?: boolean | null;
+  /**
+     * When true, the Audio Player tile's music browser offers the Playlists tab (Plex / Subsonic only). Absent or null defaults to true.
+     * @nullable
+     */
+  audioPlaylists?: boolean | null;
+  /**
      * When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).
      * @nullable
      */
   scrollable?: boolean | null;
-} | null | null;
+} | null;
 
 export interface Tile {
   id: number;
@@ -990,6 +1010,52 @@ export interface AudioTrack {
 }
 
 /**
+ * What this container is, so the client knows how to expand it.
+ */
+export type AudioContainerKind = typeof AudioContainerKind[keyof typeof AudioContainerKind];
+
+
+export const AudioContainerKind = {
+  artist: 'artist',
+  album: 'album',
+  playlist: 'playlist',
+} as const;
+
+export interface AudioContainer {
+  /** Stable identifier for the container within its source, used to drill into it via the browse endpoint. */
+  id: string;
+  /** What this container is, so the client knows how to expand it. */
+  kind: AudioContainerKind;
+  /** Display name of the artist, album, or playlist. */
+  title: string;
+  /**
+     * Secondary line (album artist, track count, etc.). Null when none.
+     * @nullable
+     */
+  subtitle?: string | null;
+  /**
+     * Fully-qualified, authenticated cover-art URL the browser can load directly. Null when the source has no artwork.
+     * @nullable
+     */
+  artwork?: string | null;
+}
+
+export interface AudioBrowseResult {
+  /** The music source backing this response ("plex" or "subsonic"). */
+  source: string;
+  /** True when the results are built-in demo content (the source is not configured); selecting them yields no real playback. */
+  sample: boolean;
+  /** Matching/listed artists (search results or a browse listing). Absent when not applicable to the request. */
+  artists?: AudioContainer[];
+  /** Matching/listed albums (search results, a browse listing, or an artist's albums). Absent when not applicable to the request. */
+  albums?: AudioContainer[];
+  /** The source's playlists. Absent when not applicable to the request. */
+  playlists?: AudioContainer[];
+  /** Playable tracks (search results, an album's tracks, or a playlist's tracks). Each carries a browser-playable streamUrl for the shared engine. Absent when not applicable to the request. */
+  tracks?: AudioTrack[];
+}
+
+/**
  * Authorization state for sources that require OAuth (Spotify): "connected" when a valid linked account exists, "needed" when the user must link their account in Settings first. Null for sources that need no per-user OAuth (e.g. Plex).
  * @nullable
  */
@@ -1121,6 +1187,61 @@ export const GetAudioPlayerNowPlayingSource = {
   spotify: 'spotify',
   jellyfin: 'jellyfin',
   subsonic: 'subsonic',
+} as const;
+
+export type SearchAudioLibraryParams = {
+/**
+ * Which music source to search. "plex" resolves the saved Plex connection; "subsonic" the saved Navidrome / Subsonic connection. Defaults to "plex" when omitted.
+ */
+source?: SearchAudioLibrarySource;
+/**
+ * The text to match against artist, album, and track names.
+ */
+query: string;
+};
+
+export type SearchAudioLibrarySource = typeof SearchAudioLibrarySource[keyof typeof SearchAudioLibrarySource];
+
+
+export const SearchAudioLibrarySource = {
+  plex: 'plex',
+  subsonic: 'subsonic',
+} as const;
+
+export type BrowseAudioLibraryParams = {
+/**
+ * Which music source to browse. "plex" or "subsonic". Defaults to "plex" when omitted.
+ */
+source?: BrowseAudioLibrarySource;
+/**
+ * What to list. "recent" = recently added albums, "albums" = all albums, "artists" = all artists, "playlists" = all playlists. The drill-down kinds require an id: "artist" returns that artist's albums, "album" returns that album's tracks, "playlist" returns that playlist's tracks.
+ */
+kind: BrowseAudioLibraryKind;
+/**
+ * The container id to drill into. Required for kind=artist, kind=album, and kind=playlist; ignored for the top-level listings.
+ */
+id?: string;
+};
+
+export type BrowseAudioLibrarySource = typeof BrowseAudioLibrarySource[keyof typeof BrowseAudioLibrarySource];
+
+
+export const BrowseAudioLibrarySource = {
+  plex: 'plex',
+  subsonic: 'subsonic',
+} as const;
+
+export type BrowseAudioLibraryKind = typeof BrowseAudioLibraryKind[keyof typeof BrowseAudioLibraryKind];
+
+
+export const BrowseAudioLibraryKind = {
+  recent: 'recent',
+  albums: 'albums',
+  artists: 'artists',
+  artist: 'artist',
+  album: 'album',
+  playlists: 'playlists',
+  playlist: 'playlist',
 } as const;
 
 export type GetNewsWidgetParams = {

@@ -133,8 +133,28 @@ export type TileSettings = {
      */
   audioSource?: string | null;
   /**
+     * When true, the Audio Player tile shows the "Find music" button that opens the music browser (Plex / Subsonic only). Absent or null defaults to true.
+     * @nullable
+     */
+  audioFindMusic?: boolean | null;
+  /**
+     * When true, the Audio Player tile's music browser offers the Search tab (Plex / Subsonic only). Absent or null defaults to true.
+     * @nullable
+     */
+  audioSearch?: boolean | null;
+  /**
+     * When true, the Audio Player tile's music browser offers the Browse tab (recently added / albums / artists, Plex / Subsonic only). Absent or null defaults to true.
+     * @nullable
+     */
+  audioBrowse?: boolean | null;
+  /**
+     * When true, the Audio Player tile's music browser offers the Playlists tab (Plex / Subsonic only). Absent or null defaults to true.
+     * @nullable
+     */
+  audioPlaylists?: boolean | null;
+  /**
      * When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).
      * @nullable
      */
   scrollable?: boolean | null;
-} | null | null;
+} | null;

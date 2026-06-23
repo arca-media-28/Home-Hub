@@ -1542,6 +1542,496 @@ router.get("/audioplayer", requireAuth, async (req, res) => {
   }
 });
 
+// ────────────────────────────────────────────────
+// Audio Player — library navigation (search / browse / playlists)
+// ────────────────────────────────────────────────
+// Backs the pop-out music browser on Plex and Navidrome / Subsonic Audio Player
+// tiles. These read-only endpoints let the user find music to play: search by
+// name, browse the library (recently added, albums, artists with drill-down),
+// and pick from existing playlists. Anything playable is returned in the same
+// AudioTrack shape the shared playback engine already consumes; containers
+// (artists / albums / playlists) carry an id the client drills into via the
+// browse endpoint. Mirrors the existing widget conventions: built-in demo data
+// when unconfigured (sample:true, streamUrl null), HTTP 502 on a configured
+// source that fails.
+
+// A container (artist / album / playlist) the user can drill into. `kind` tells
+// the client how to expand it; `id` is the source identifier used for browse.
+interface AudioContainer {
+  id: string;
+  kind: "artist" | "album" | "playlist";
+  title: string;
+  subtitle: string | null;
+  artwork: string | null;
+}
+
+// A directory/listing row from Plex (artist, album, or playlist). Plex returns
+// these under MediaContainer.Metadata (and occasionally Directory) with a per-
+// item `type` field. Only the fields the browser needs are modeled.
+interface PlexDirRow {
+  ratingKey?: string | number;
+  title?: string;
+  parentTitle?: string;
+  thumb?: string;
+  composite?: string;
+  leafCount?: number;
+  childCount?: number;
+}
+
+// Resolve the Plex base URL + token for music browsing, mirroring the
+// /audioplayer route: prefer the saved Plex connection, fall back to a
+// Plex-typed env media server. Returns null when neither is configured.
+function resolvePlexAudioConnection(): { baseUrl: string; token: string } | null {
+  const saved = getSavedConnection("plex");
+  const savedToken = saved.token || saved.apiKey;
+  if (saved.url && savedToken) return { baseUrl: saved.url, token: savedToken };
+  const envType = process.env["MEDIA_SERVER_TYPE"] || "jellyfin";
+  if (envType === "plex") {
+    const baseUrl = process.env["MEDIA_SERVER_URL"];
+    const token = process.env["MEDIA_SERVER_API_KEY"];
+    if (baseUrl && token) return { baseUrl, token };
+  }
+  return null;
+}
+
+function plexArtwork(
+  path: string | undefined,
+  baseUrl: string,
+  token: string,
+): string | null {
+  return path ? `${baseUrl}${path}?X-Plex-Token=${token}` : null;
+}
+
+function mapPlexArtist(d: PlexDirRow, baseUrl: string, token: string): AudioContainer {
+  return {
+    id: String(d.ratingKey ?? ""),
+    kind: "artist",
+    title: d.title ?? "Unknown artist",
+    subtitle: typeof d.childCount === "number" ? `${d.childCount} albums` : null,
+    artwork: plexArtwork(d.thumb, baseUrl, token),
+  };
+}
+
+function mapPlexAlbum(d: PlexDirRow, baseUrl: string, token: string): AudioContainer {
+  return {
+    id: String(d.ratingKey ?? ""),
+    kind: "album",
+    title: d.title ?? "Unknown album",
+    subtitle: d.parentTitle ?? null,
+    artwork: plexArtwork(d.thumb, baseUrl, token),
+  };
+}
+
+function mapPlexPlaylist(d: PlexDirRow, baseUrl: string, token: string): AudioContainer {
+  return {
+    id: String(d.ratingKey ?? ""),
+    kind: "playlist",
+    title: d.title ?? "Untitled playlist",
+    subtitle: typeof d.leafCount === "number" ? `${d.leafCount} tracks` : null,
+    artwork: plexArtwork(d.composite ?? d.thumb, baseUrl, token),
+  };
+}
+
+// GET a Plex endpoint and return its MediaContainer.Metadata rows (or []).
+async function plexMetadata(
+  baseUrl: string,
+  token: string,
+  path: string,
+  params?: Record<string, unknown>,
+): Promise<Array<PlexDirRow & PlexTrackRow>> {
+  const r = await httpClient.get(`${baseUrl}${path}`, {
+    headers: { "X-Plex-Token": token, Accept: "application/json" },
+    ...(params ? { params } : {}),
+  });
+  return (r.data?.MediaContainer?.Metadata ?? []) as Array<PlexDirRow & PlexTrackRow>;
+}
+
+// Locate the Plex music library section key (the "artist"-type section). Returns
+// null when the server has no music library.
+async function findPlexMusicSectionKey(
+  baseUrl: string,
+  token: string,
+): Promise<string | null> {
+  const sections = await httpClient.get(`${baseUrl}/library/sections`, {
+    headers: { "X-Plex-Token": token, Accept: "application/json" },
+  });
+  const musicSection = (sections.data?.MediaContainer?.Directory ?? []).find(
+    (d: { type?: string }) => d.type === "artist",
+  ) as { key?: string } | undefined;
+  return musicSection?.key ?? null;
+}
+
+// ── Subsonic library listing rows ────────────────────────────────────────────
+interface SubsonicAlbum {
+  id?: string;
+  name?: string;
+  title?: string;
+  artist?: string;
+  artistId?: string;
+  coverArt?: string;
+  songCount?: number;
+}
+interface SubsonicArtist {
+  id?: string;
+  name?: string;
+  coverArt?: string;
+  albumCount?: number;
+}
+interface SubsonicPlaylist {
+  id?: string;
+  name?: string;
+  coverArt?: string;
+  songCount?: number;
+}
+
+function subsonicCover(
+  coverArt: string | undefined,
+  baseUrl: string,
+  mediaQuery: string,
+): string | null {
+  return coverArt
+    ? `${baseUrl}/rest/getCoverArt.view?id=${encodeURIComponent(coverArt)}&size=300&${mediaQuery}`
+    : null;
+}
+
+function mapSubsonicAlbum(
+  a: SubsonicAlbum,
+  baseUrl: string,
+  mediaQuery: string,
+): AudioContainer {
+  return {
+    id: String(a.id ?? ""),
+    kind: "album",
+    title: a.name ?? a.title ?? "Unknown album",
+    subtitle: a.artist ?? null,
+    artwork: subsonicCover(a.coverArt ?? a.id, baseUrl, mediaQuery),
+  };
+}
+
+function mapSubsonicArtist(
+  a: SubsonicArtist,
+  baseUrl: string,
+  mediaQuery: string,
+): AudioContainer {
+  return {
+    id: String(a.id ?? ""),
+    kind: "artist",
+    title: a.name ?? "Unknown artist",
+    subtitle: typeof a.albumCount === "number" ? `${a.albumCount} albums` : null,
+    artwork: subsonicCover(a.coverArt, baseUrl, mediaQuery),
+  };
+}
+
+function mapSubsonicPlaylist(
+  p: SubsonicPlaylist,
+  baseUrl: string,
+  mediaQuery: string,
+): AudioContainer {
+  return {
+    id: String(p.id ?? ""),
+    kind: "playlist",
+    title: p.name ?? "Untitled playlist",
+    subtitle: typeof p.songCount === "number" ? `${p.songCount} tracks` : null,
+    artwork: subsonicCover(p.coverArt ?? p.id, baseUrl, mediaQuery),
+  };
+}
+
+// Built-in demo content for the browser when a source is unconfigured. Mirrors
+// the demo now-playing payload: streamUrl null so nothing is actually playable.
+const DEMO_TRACKS = [
+  { id: "1", title: "Dreams", artist: "Fleetwood Mac", album: "Rumours", artwork: null, durationMs: 257_000, progressMs: null, state: null, streamUrl: null },
+  { id: "2", title: "The Chain", artist: "Fleetwood Mac", album: "Rumours", artwork: null, durationMs: 271_000, progressMs: null, state: null, streamUrl: null },
+  { id: "3", title: "Go Your Own Way", artist: "Fleetwood Mac", album: "Rumours", artwork: null, durationMs: 218_000, progressMs: null, state: null, streamUrl: null },
+];
+const DEMO_ALBUMS: AudioContainer[] = [
+  { id: "d-album-1", kind: "album", title: "Rumours", subtitle: "Fleetwood Mac", artwork: null },
+  { id: "d-album-2", kind: "album", title: "Hounds of Love", subtitle: "Kate Bush", artwork: null },
+];
+const DEMO_ARTISTS: AudioContainer[] = [
+  { id: "d-artist-1", kind: "artist", title: "Fleetwood Mac", subtitle: "5 albums", artwork: null },
+  { id: "d-artist-2", kind: "artist", title: "Kate Bush", subtitle: "3 albums", artwork: null },
+];
+const DEMO_PLAYLISTS: AudioContainer[] = [
+  { id: "d-playlist-1", kind: "playlist", title: "Chill Mix", subtitle: "12 tracks", artwork: null },
+  { id: "d-playlist-2", kind: "playlist", title: "Workout", subtitle: "20 tracks", artwork: null },
+];
+
+// Demo result for the search endpoint when unconfigured.
+function demoSearchResult(source: string) {
+  return {
+    source,
+    sample: true,
+    artists: DEMO_ARTISTS,
+    albums: DEMO_ALBUMS,
+    tracks: DEMO_TRACKS,
+  };
+}
+
+// Demo result for the browse endpoint when unconfigured, shaped per kind.
+function demoBrowseResult(source: string, kind: string) {
+  if (kind === "artists") return { source, sample: true, artists: DEMO_ARTISTS };
+  if (kind === "playlists") return { source, sample: true, playlists: DEMO_PLAYLISTS };
+  if (kind === "artist") return { source, sample: true, albums: DEMO_ALBUMS };
+  if (kind === "album" || kind === "playlist") {
+    return { source, sample: true, tracks: DEMO_TRACKS };
+  }
+  // recent / albums
+  return { source, sample: true, albums: DEMO_ALBUMS };
+}
+
+// ── Plex search / browse handlers ────────────────────────────────────────────
+async function plexSearchLibrary(
+  res: import("express").Response,
+  query: string,
+): Promise<void> {
+  const conn = resolvePlexAudioConnection();
+  if (!conn) {
+    res.json(demoSearchResult("plex"));
+    return;
+  }
+  if (!query) {
+    res.json({ source: "plex", sample: false, artists: [], albums: [], tracks: [] });
+    return;
+  }
+  try {
+    const r = await httpClient.get(`${conn.baseUrl}/hubs/search`, {
+      headers: { "X-Plex-Token": conn.token, Accept: "application/json" },
+      params: { query, limit: 30 },
+    });
+    const hubs = (r.data?.MediaContainer?.Hub ?? []) as Array<{
+      type?: string;
+      Metadata?: Array<PlexDirRow & PlexTrackRow & { type?: string }>;
+      Directory?: Array<PlexDirRow & { type?: string }>;
+    }>;
+    const artists: AudioContainer[] = [];
+    const albums: AudioContainer[] = [];
+    const tracks: ReturnType<typeof mapPlexTrack>[] = [];
+    for (const hub of hubs) {
+      const items = hub.Metadata ?? hub.Directory ?? [];
+      for (const item of items) {
+        const t = item.type ?? hub.type;
+        if (t === "artist") artists.push(mapPlexArtist(item, conn.baseUrl, conn.token));
+        else if (t === "album") albums.push(mapPlexAlbum(item, conn.baseUrl, conn.token));
+        else if (t === "track") {
+          tracks.push(mapPlexTrack(item as PlexTrackRow, conn.baseUrl, conn.token, false));
+        }
+      }
+    }
+    res.json({
+      source: "plex",
+      sample: false,
+      artists: artists.slice(0, 20),
+      albums: albums.slice(0, 20),
+      tracks: tracks.slice(0, 30),
+    });
+  } catch (err) {
+    logger.error({ reason: normalizeHttpError(err) }, "Plex music search error");
+    res.status(502).json({ error: "Failed to search the music library" });
+  }
+}
+
+async function plexBrowseLibrary(
+  res: import("express").Response,
+  kind: string,
+  id: string,
+): Promise<void> {
+  const conn = resolvePlexAudioConnection();
+  if (!conn) {
+    res.json(demoBrowseResult("plex", kind));
+    return;
+  }
+  const { baseUrl, token } = conn;
+  try {
+    // Drill-down kinds operate on a specific container id.
+    if (kind === "artist") {
+      const rows = await plexMetadata(baseUrl, token, `/library/metadata/${encodeURIComponent(id)}/children`);
+      res.json({ source: "plex", sample: false, albums: rows.map((d) => mapPlexAlbum(d, baseUrl, token)) });
+      return;
+    }
+    if (kind === "album") {
+      const rows = await plexMetadata(baseUrl, token, `/library/metadata/${encodeURIComponent(id)}/children`);
+      res.json({ source: "plex", sample: false, tracks: rows.map((t) => mapPlexTrack(t, baseUrl, token, false)) });
+      return;
+    }
+    if (kind === "playlist") {
+      const rows = await plexMetadata(baseUrl, token, `/playlists/${encodeURIComponent(id)}/items`);
+      res.json({ source: "plex", sample: false, tracks: rows.map((t) => mapPlexTrack(t, baseUrl, token, false)) });
+      return;
+    }
+    if (kind === "playlists") {
+      const rows = await plexMetadata(baseUrl, token, `/playlists`, { playlistType: "audio" });
+      res.json({ source: "plex", sample: false, playlists: rows.map((d) => mapPlexPlaylist(d, baseUrl, token)) });
+      return;
+    }
+
+    // Top-level library listings need the music section key.
+    const sectionKey = await findPlexMusicSectionKey(baseUrl, token);
+    if (!sectionKey) {
+      res.json({ source: "plex", sample: false, albums: [], artists: [] });
+      return;
+    }
+    if (kind === "artists") {
+      const rows = await plexMetadata(baseUrl, token, `/library/sections/${sectionKey}/all`, {
+        type: 8,
+        sort: "titleSort",
+        "X-Plex-Container-Size": 100,
+      });
+      res.json({ source: "plex", sample: false, artists: rows.map((d) => mapPlexArtist(d, baseUrl, token)) });
+      return;
+    }
+    // recent or albums
+    const params =
+      kind === "recent"
+        ? { type: 9, sort: "addedAt:desc", "X-Plex-Container-Size": 40 }
+        : { type: 9, sort: "titleSort", "X-Plex-Container-Size": 100 };
+    const rows = await plexMetadata(baseUrl, token, `/library/sections/${sectionKey}/all`, params);
+    res.json({ source: "plex", sample: false, albums: rows.map((d) => mapPlexAlbum(d, baseUrl, token)) });
+  } catch (err) {
+    logger.error({ reason: normalizeHttpError(err), kind }, "Plex music browse error");
+    res.status(502).json({ error: "Failed to browse the music library" });
+  }
+}
+
+// ── Subsonic search / browse handlers ────────────────────────────────────────
+function subsonicConn() {
+  const saved = getSavedConnection("subsonic");
+  if (!saved.url || !saved.username || !saved.password) return null;
+  return { baseUrl: saved.url, username: saved.username, password: saved.password };
+}
+
+async function subsonicSearchLibrary(
+  res: import("express").Response,
+  query: string,
+): Promise<void> {
+  const conn = subsonicConn();
+  if (!conn) {
+    res.json(demoSearchResult("subsonic"));
+    return;
+  }
+  if (!query) {
+    res.json({ source: "subsonic", sample: false, artists: [], albums: [], tracks: [] });
+    return;
+  }
+  try {
+    const auth = subsonicAuthParams(conn.username, conn.password);
+    const mediaQuery = subsonicMediaQuery(auth);
+    const body = await subsonicGet(conn.baseUrl, "search3.view", auth, {
+      query,
+      artistCount: 20,
+      albumCount: 20,
+      songCount: 30,
+    });
+    const result = (body["searchResult3"] ?? {}) as {
+      artist?: SubsonicArtist[];
+      album?: SubsonicAlbum[];
+      song?: SubsonicSong[];
+    };
+    res.json({
+      source: "subsonic",
+      sample: false,
+      artists: (result.artist ?? []).map((a) => mapSubsonicArtist(a, conn.baseUrl, mediaQuery)),
+      albums: (result.album ?? []).map((a) => mapSubsonicAlbum(a, conn.baseUrl, mediaQuery)),
+      tracks: (result.song ?? []).map((s) => mapSubsonicTrack(s, conn.baseUrl, mediaQuery, false)),
+    });
+  } catch (err) {
+    logger.error({ reason: normalizeHttpError(err) }, "Subsonic music search error");
+    res.status(502).json({ error: "Failed to search the music library" });
+  }
+}
+
+async function subsonicBrowseLibrary(
+  res: import("express").Response,
+  kind: string,
+  id: string,
+): Promise<void> {
+  const conn = subsonicConn();
+  if (!conn) {
+    res.json(demoBrowseResult("subsonic", kind));
+    return;
+  }
+  try {
+    const auth = subsonicAuthParams(conn.username, conn.password);
+    const mediaQuery = subsonicMediaQuery(auth);
+    const { baseUrl } = conn;
+
+    if (kind === "artist") {
+      const body = await subsonicGet(baseUrl, "getArtist.view", auth, { id });
+      const albums = ((body["artist"] as { album?: SubsonicAlbum[] } | undefined)?.album ?? []);
+      res.json({ source: "subsonic", sample: false, albums: albums.map((a) => mapSubsonicAlbum(a, baseUrl, mediaQuery)) });
+      return;
+    }
+    if (kind === "album") {
+      const body = await subsonicGet(baseUrl, "getAlbum.view", auth, { id });
+      const songs = ((body["album"] as { song?: SubsonicSong[] } | undefined)?.song ?? []);
+      res.json({ source: "subsonic", sample: false, tracks: songs.map((s) => mapSubsonicTrack(s, baseUrl, mediaQuery, false)) });
+      return;
+    }
+    if (kind === "playlist") {
+      const body = await subsonicGet(baseUrl, "getPlaylist.view", auth, { id });
+      const entries = ((body["playlist"] as { entry?: SubsonicSong[] } | undefined)?.entry ?? []);
+      res.json({ source: "subsonic", sample: false, tracks: entries.map((s) => mapSubsonicTrack(s, baseUrl, mediaQuery, false)) });
+      return;
+    }
+    if (kind === "playlists") {
+      const body = await subsonicGet(baseUrl, "getPlaylists.view", auth);
+      const lists = ((body["playlists"] as { playlist?: SubsonicPlaylist[] } | undefined)?.playlist ?? []);
+      res.json({ source: "subsonic", sample: false, playlists: lists.map((p) => mapSubsonicPlaylist(p, baseUrl, mediaQuery)) });
+      return;
+    }
+    if (kind === "artists") {
+      const body = await subsonicGet(baseUrl, "getArtists.view", auth);
+      const indexes = ((body["artists"] as { index?: Array<{ artist?: SubsonicArtist[] }> } | undefined)?.index ?? []);
+      const artists = indexes.flatMap((i) => i.artist ?? []);
+      res.json({ source: "subsonic", sample: false, artists: artists.map((a) => mapSubsonicArtist(a, baseUrl, mediaQuery)) });
+      return;
+    }
+    // recent or albums
+    const type = kind === "recent" ? "newest" : "alphabeticalByName";
+    const size = kind === "recent" ? 40 : 100;
+    const body = await subsonicGet(baseUrl, "getAlbumList2.view", auth, { type, size });
+    const albums = ((body["albumList2"] as { album?: SubsonicAlbum[] } | undefined)?.album ?? []);
+    res.json({ source: "subsonic", sample: false, albums: albums.map((a) => mapSubsonicAlbum(a, baseUrl, mediaQuery)) });
+  } catch (err) {
+    logger.error({ reason: normalizeHttpError(err), kind }, "Subsonic music browse error");
+    res.status(502).json({ error: "Failed to browse the music library" });
+  }
+}
+
+// GET /widgets/audioplayer/search — search a source's library by name. Returns
+// artists, albums, and playable tracks for the pop-out music browser.
+router.get("/audioplayer/search", requireAuth, async (req, res) => {
+  const source = String(req.query["source"] ?? "plex");
+  const query = String(req.query["query"] ?? "").trim();
+  if (source === "subsonic") {
+    await subsonicSearchLibrary(res, query);
+    return;
+  }
+  await plexSearchLibrary(res, query);
+});
+
+// GET /widgets/audioplayer/browse — list a source's library / playlists, with
+// drill-down (artist→albums, album→tracks, playlist→tracks).
+const BROWSE_KINDS = ["recent", "albums", "artists", "artist", "album", "playlists", "playlist"];
+const BROWSE_KINDS_NEEDING_ID = ["artist", "album", "playlist"];
+router.get("/audioplayer/browse", requireAuth, async (req, res) => {
+  const source = String(req.query["source"] ?? "plex");
+  const kind = String(req.query["kind"] ?? "");
+  const id = String(req.query["id"] ?? "").trim();
+  if (!BROWSE_KINDS.includes(kind)) {
+    res.status(400).json({ error: "Unknown browse kind" });
+    return;
+  }
+  if (BROWSE_KINDS_NEEDING_ID.includes(kind) && !id) {
+    res.status(400).json({ error: `kind=${kind} requires an id` });
+    return;
+  }
+  if (source === "subsonic") {
+    await subsonicBrowseLibrary(res, kind, id);
+    return;
+  }
+  await plexBrowseLibrary(res, kind, id);
+});
+
 // POST /widgets/spotify/command — remote-control the active Spotify device.
 // Backs the Audio Player tile's play/pause/skip buttons and the "transfer"
 // action that hands playback to the in-browser Web Playback SDK device.

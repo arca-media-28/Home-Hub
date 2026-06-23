@@ -53,6 +53,10 @@ interface TileSettings {
   sleeperShowStandings?: boolean | null;
   sleeperShowTransactions?: boolean | null;
   audioSource?: string | null;
+  audioFindMusic?: boolean | null;
+  audioSearch?: boolean | null;
+  audioBrowse?: boolean | null;
+  audioPlaylists?: boolean | null;
   scrollable?: boolean | null;
 }
 
@@ -218,6 +222,26 @@ function pickTileSettings(obj: Record<string, unknown>): TileSettings {
     result.audioSource = obj["audioSource"];
   } else if (obj["audioSource"] === null) {
     result.audioSource = null;
+  }
+  if (typeof obj["audioFindMusic"] === "boolean") {
+    result.audioFindMusic = obj["audioFindMusic"];
+  } else if (obj["audioFindMusic"] === null) {
+    result.audioFindMusic = null;
+  }
+  if (typeof obj["audioSearch"] === "boolean") {
+    result.audioSearch = obj["audioSearch"];
+  } else if (obj["audioSearch"] === null) {
+    result.audioSearch = null;
+  }
+  if (typeof obj["audioBrowse"] === "boolean") {
+    result.audioBrowse = obj["audioBrowse"];
+  } else if (obj["audioBrowse"] === null) {
+    result.audioBrowse = null;
+  }
+  if (typeof obj["audioPlaylists"] === "boolean") {
+    result.audioPlaylists = obj["audioPlaylists"];
+  } else if (obj["audioPlaylists"] === null) {
+    result.audioPlaylists = null;
   }
   if (typeof obj["scrollable"] === "boolean") {
     result.scrollable = obj["scrollable"];

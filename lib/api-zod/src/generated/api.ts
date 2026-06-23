@@ -116,6 +116,10 @@ export const GetTilesResponseItem = zod.object({
   "sleeperShowStandings": zod.boolean().nullish().describe('When true, the Fantasy tile shows the league standings. Absent or null defaults to true.'),
   "sleeperShowTransactions": zod.boolean().nullish().describe('When true, the Fantasy tile shows recent waiver\/trade transactions. Absent or null defaults to true.'),
   "audioSource": zod.string().nullish().describe('Which music source backs an Audio Player tile (e.g. \"plex\"). Absent or null defaults to \"plex\". This is the seam additional sources (Spotify, Jellyfin, Navidrome) plug into later.'),
+  "audioFindMusic": zod.boolean().nullish().describe('When true, the Audio Player tile shows the \"Find music\" button that opens the music browser (Plex \/ Subsonic only). Absent or null defaults to true.'),
+  "audioSearch": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Search tab (Plex \/ Subsonic only). Absent or null defaults to true.'),
+  "audioBrowse": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Browse tab (recently added \/ albums \/ artists, Plex \/ Subsonic only). Absent or null defaults to true.'),
+  "audioPlaylists": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Playlists tab (Plex \/ Subsonic only). Absent or null defaults to true.'),
   "scrollable": zod.boolean().nullish().describe('When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.'),
   "createdAt": zod.string().optional()
@@ -174,6 +178,10 @@ export const CreateTileBody = zod.object({
   "sleeperShowStandings": zod.boolean().nullish().describe('When true, the Fantasy tile shows the league standings. Absent or null defaults to true.'),
   "sleeperShowTransactions": zod.boolean().nullish().describe('When true, the Fantasy tile shows recent waiver\/trade transactions. Absent or null defaults to true.'),
   "audioSource": zod.string().nullish().describe('Which music source backs an Audio Player tile (e.g. \"plex\"). Absent or null defaults to \"plex\". This is the seam additional sources (Spotify, Jellyfin, Navidrome) plug into later.'),
+  "audioFindMusic": zod.boolean().nullish().describe('When true, the Audio Player tile shows the \"Find music\" button that opens the music browser (Plex \/ Subsonic only). Absent or null defaults to true.'),
+  "audioSearch": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Search tab (Plex \/ Subsonic only). Absent or null defaults to true.'),
+  "audioBrowse": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Browse tab (recently added \/ albums \/ artists, Plex \/ Subsonic only). Absent or null defaults to true.'),
+  "audioPlaylists": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Playlists tab (Plex \/ Subsonic only). Absent or null defaults to true.'),
   "scrollable": zod.boolean().nullish().describe('When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.')
 })
@@ -236,6 +244,10 @@ export const GetTileResponse = zod.object({
   "sleeperShowStandings": zod.boolean().nullish().describe('When true, the Fantasy tile shows the league standings. Absent or null defaults to true.'),
   "sleeperShowTransactions": zod.boolean().nullish().describe('When true, the Fantasy tile shows recent waiver\/trade transactions. Absent or null defaults to true.'),
   "audioSource": zod.string().nullish().describe('Which music source backs an Audio Player tile (e.g. \"plex\"). Absent or null defaults to \"plex\". This is the seam additional sources (Spotify, Jellyfin, Navidrome) plug into later.'),
+  "audioFindMusic": zod.boolean().nullish().describe('When true, the Audio Player tile shows the \"Find music\" button that opens the music browser (Plex \/ Subsonic only). Absent or null defaults to true.'),
+  "audioSearch": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Search tab (Plex \/ Subsonic only). Absent or null defaults to true.'),
+  "audioBrowse": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Browse tab (recently added \/ albums \/ artists, Plex \/ Subsonic only). Absent or null defaults to true.'),
+  "audioPlaylists": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Playlists tab (Plex \/ Subsonic only). Absent or null defaults to true.'),
   "scrollable": zod.boolean().nullish().describe('When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.'),
   "createdAt": zod.string().optional()
@@ -296,6 +308,10 @@ export const UpdateTileBody = zod.object({
   "sleeperShowStandings": zod.boolean().nullish().describe('When true, the Fantasy tile shows the league standings. Absent or null defaults to true.'),
   "sleeperShowTransactions": zod.boolean().nullish().describe('When true, the Fantasy tile shows recent waiver\/trade transactions. Absent or null defaults to true.'),
   "audioSource": zod.string().nullish().describe('Which music source backs an Audio Player tile (e.g. \"plex\"). Absent or null defaults to \"plex\". This is the seam additional sources (Spotify, Jellyfin, Navidrome) plug into later.'),
+  "audioFindMusic": zod.boolean().nullish().describe('When true, the Audio Player tile shows the \"Find music\" button that opens the music browser (Plex \/ Subsonic only). Absent or null defaults to true.'),
+  "audioSearch": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Search tab (Plex \/ Subsonic only). Absent or null defaults to true.'),
+  "audioBrowse": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Browse tab (recently added \/ albums \/ artists, Plex \/ Subsonic only). Absent or null defaults to true.'),
+  "audioPlaylists": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Playlists tab (Plex \/ Subsonic only). Absent or null defaults to true.'),
   "scrollable": zod.boolean().nullish().describe('When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.')
 })
@@ -350,6 +366,10 @@ export const UpdateTileResponse = zod.object({
   "sleeperShowStandings": zod.boolean().nullish().describe('When true, the Fantasy tile shows the league standings. Absent or null defaults to true.'),
   "sleeperShowTransactions": zod.boolean().nullish().describe('When true, the Fantasy tile shows recent waiver\/trade transactions. Absent or null defaults to true.'),
   "audioSource": zod.string().nullish().describe('Which music source backs an Audio Player tile (e.g. \"plex\"). Absent or null defaults to \"plex\". This is the seam additional sources (Spotify, Jellyfin, Navidrome) plug into later.'),
+  "audioFindMusic": zod.boolean().nullish().describe('When true, the Audio Player tile shows the \"Find music\" button that opens the music browser (Plex \/ Subsonic only). Absent or null defaults to true.'),
+  "audioSearch": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Search tab (Plex \/ Subsonic only). Absent or null defaults to true.'),
+  "audioBrowse": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Browse tab (recently added \/ albums \/ artists, Plex \/ Subsonic only). Absent or null defaults to true.'),
+  "audioPlaylists": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Playlists tab (Plex \/ Subsonic only). Absent or null defaults to true.'),
   "scrollable": zod.boolean().nullish().describe('When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.'),
   "createdAt": zod.string().optional()
@@ -427,6 +447,10 @@ export const SaveLayoutResponseItem = zod.object({
   "sleeperShowStandings": zod.boolean().nullish().describe('When true, the Fantasy tile shows the league standings. Absent or null defaults to true.'),
   "sleeperShowTransactions": zod.boolean().nullish().describe('When true, the Fantasy tile shows recent waiver\/trade transactions. Absent or null defaults to true.'),
   "audioSource": zod.string().nullish().describe('Which music source backs an Audio Player tile (e.g. \"plex\"). Absent or null defaults to \"plex\". This is the seam additional sources (Spotify, Jellyfin, Navidrome) plug into later.'),
+  "audioFindMusic": zod.boolean().nullish().describe('When true, the Audio Player tile shows the \"Find music\" button that opens the music browser (Plex \/ Subsonic only). Absent or null defaults to true.'),
+  "audioSearch": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Search tab (Plex \/ Subsonic only). Absent or null defaults to true.'),
+  "audioBrowse": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Browse tab (recently added \/ albums \/ artists, Plex \/ Subsonic only). Absent or null defaults to true.'),
+  "audioPlaylists": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Playlists tab (Plex \/ Subsonic only). Absent or null defaults to true.'),
   "scrollable": zod.boolean().nullish().describe('When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.'),
   "createdAt": zod.string().optional()
@@ -735,6 +759,99 @@ export const GetAudioPlayerNowPlayingResponse = zod.object({
   "isActive": zod.boolean().describe('Whether this device is the one currently playing.'),
   "volumePercent": zod.number().nullish().describe('Device output volume 0–100, when the source reports it.')
 }),zod.null()]).optional().describe('The source\'s currently active playback device, when one exists (Spotify). Null when there is no active device or not applicable.')
+})
+
+
+/**
+ * @summary Search a music source's library for artists, albums, and tracks
+ */
+export const SearchAudioLibraryQueryParams = zod.object({
+  "source": zod.enum(['plex', 'subsonic']).optional().describe('Which music source to search. \"plex\" resolves the saved Plex connection; \"subsonic\" the saved Navidrome \/ Subsonic connection. Defaults to \"plex\" when omitted.'),
+  "query": zod.coerce.string().describe('The text to match against artist, album, and track names.')
+})
+
+export const SearchAudioLibraryResponse = zod.object({
+  "source": zod.string().describe('The music source backing this response (\"plex\" or \"subsonic\").'),
+  "sample": zod.boolean().describe('True when the results are built-in demo content (the source is not configured); selecting them yields no real playback.'),
+  "artists": zod.array(zod.object({
+  "id": zod.string().describe('Stable identifier for the container within its source, used to drill into it via the browse endpoint.'),
+  "kind": zod.enum(['artist', 'album', 'playlist']).describe('What this container is, so the client knows how to expand it.'),
+  "title": zod.string().describe('Display name of the artist, album, or playlist.'),
+  "subtitle": zod.string().nullish().describe('Secondary line (album artist, track count, etc.). Null when none.'),
+  "artwork": zod.string().nullish().describe('Fully-qualified, authenticated cover-art URL the browser can load directly. Null when the source has no artwork.')
+})).optional().describe('Matching\/listed artists (search results or a browse listing). Absent when not applicable to the request.'),
+  "albums": zod.array(zod.object({
+  "id": zod.string().describe('Stable identifier for the container within its source, used to drill into it via the browse endpoint.'),
+  "kind": zod.enum(['artist', 'album', 'playlist']).describe('What this container is, so the client knows how to expand it.'),
+  "title": zod.string().describe('Display name of the artist, album, or playlist.'),
+  "subtitle": zod.string().nullish().describe('Secondary line (album artist, track count, etc.). Null when none.'),
+  "artwork": zod.string().nullish().describe('Fully-qualified, authenticated cover-art URL the browser can load directly. Null when the source has no artwork.')
+})).optional().describe('Matching\/listed albums (search results, a browse listing, or an artist\'s albums). Absent when not applicable to the request.'),
+  "playlists": zod.array(zod.object({
+  "id": zod.string().describe('Stable identifier for the container within its source, used to drill into it via the browse endpoint.'),
+  "kind": zod.enum(['artist', 'album', 'playlist']).describe('What this container is, so the client knows how to expand it.'),
+  "title": zod.string().describe('Display name of the artist, album, or playlist.'),
+  "subtitle": zod.string().nullish().describe('Secondary line (album artist, track count, etc.). Null when none.'),
+  "artwork": zod.string().nullish().describe('Fully-qualified, authenticated cover-art URL the browser can load directly. Null when the source has no artwork.')
+})).optional().describe('The source\'s playlists. Absent when not applicable to the request.'),
+  "tracks": zod.array(zod.object({
+  "id": zod.string().describe('Stable identifier for the track within its source.'),
+  "title": zod.string().describe('The track title.'),
+  "artist": zod.string().nullish().describe('Track artist (Plex grandparentTitle). Null when unknown.'),
+  "album": zod.string().nullish().describe('Album the track belongs to (Plex parentTitle). Null when unknown.'),
+  "artwork": zod.string().nullish().describe('Fully-qualified, authenticated album-art URL the browser can load directly (Plex token appended). Null when the source has no artwork.'),
+  "durationMs": zod.number().nullish().describe('Track length in milliseconds. Null when the source omits it.'),
+  "progressMs": zod.number().nullish().describe('Playback offset in milliseconds for the source\'s current session (Plex viewOffset). Only set on the now-playing track of an active remote session; null otherwise.'),
+  "state": zod.string().nullish().describe('Remote playback state reported by the source for an active session: \"playing\", \"paused\", or \"stopped\". Null when there is no active session (the track is a queue\/last-played entry, not live).'),
+  "streamUrl": zod.string().nullish().describe('Fully-qualified, authenticated audio stream URL an HTML audio element can play directly (Plex part key + token). Null when the source does not expose an in-browser-playable stream (remote-control-only).')
+})).optional().describe('Playable tracks (search results, an album\'s tracks, or a playlist\'s tracks). Each carries a browser-playable streamUrl for the shared engine. Absent when not applicable to the request.')
+})
+
+
+/**
+ * @summary Browse a music source's library and playlists (with drill-down)
+ */
+export const BrowseAudioLibraryQueryParams = zod.object({
+  "source": zod.enum(['plex', 'subsonic']).optional().describe('Which music source to browse. \"plex\" or \"subsonic\". Defaults to \"plex\" when omitted.'),
+  "kind": zod.enum(['recent', 'albums', 'artists', 'artist', 'album', 'playlists', 'playlist']).describe('What to list. \"recent\" = recently added albums, \"albums\" = all albums, \"artists\" = all artists, \"playlists\" = all playlists. The drill-down kinds require an id: \"artist\" returns that artist\'s albums, \"album\" returns that album\'s tracks, \"playlist\" returns that playlist\'s tracks.'),
+  "id": zod.coerce.string().optional().describe('The container id to drill into. Required for kind=artist, kind=album, and kind=playlist; ignored for the top-level listings.')
+})
+
+export const BrowseAudioLibraryResponse = zod.object({
+  "source": zod.string().describe('The music source backing this response (\"plex\" or \"subsonic\").'),
+  "sample": zod.boolean().describe('True when the results are built-in demo content (the source is not configured); selecting them yields no real playback.'),
+  "artists": zod.array(zod.object({
+  "id": zod.string().describe('Stable identifier for the container within its source, used to drill into it via the browse endpoint.'),
+  "kind": zod.enum(['artist', 'album', 'playlist']).describe('What this container is, so the client knows how to expand it.'),
+  "title": zod.string().describe('Display name of the artist, album, or playlist.'),
+  "subtitle": zod.string().nullish().describe('Secondary line (album artist, track count, etc.). Null when none.'),
+  "artwork": zod.string().nullish().describe('Fully-qualified, authenticated cover-art URL the browser can load directly. Null when the source has no artwork.')
+})).optional().describe('Matching\/listed artists (search results or a browse listing). Absent when not applicable to the request.'),
+  "albums": zod.array(zod.object({
+  "id": zod.string().describe('Stable identifier for the container within its source, used to drill into it via the browse endpoint.'),
+  "kind": zod.enum(['artist', 'album', 'playlist']).describe('What this container is, so the client knows how to expand it.'),
+  "title": zod.string().describe('Display name of the artist, album, or playlist.'),
+  "subtitle": zod.string().nullish().describe('Secondary line (album artist, track count, etc.). Null when none.'),
+  "artwork": zod.string().nullish().describe('Fully-qualified, authenticated cover-art URL the browser can load directly. Null when the source has no artwork.')
+})).optional().describe('Matching\/listed albums (search results, a browse listing, or an artist\'s albums). Absent when not applicable to the request.'),
+  "playlists": zod.array(zod.object({
+  "id": zod.string().describe('Stable identifier for the container within its source, used to drill into it via the browse endpoint.'),
+  "kind": zod.enum(['artist', 'album', 'playlist']).describe('What this container is, so the client knows how to expand it.'),
+  "title": zod.string().describe('Display name of the artist, album, or playlist.'),
+  "subtitle": zod.string().nullish().describe('Secondary line (album artist, track count, etc.). Null when none.'),
+  "artwork": zod.string().nullish().describe('Fully-qualified, authenticated cover-art URL the browser can load directly. Null when the source has no artwork.')
+})).optional().describe('The source\'s playlists. Absent when not applicable to the request.'),
+  "tracks": zod.array(zod.object({
+  "id": zod.string().describe('Stable identifier for the track within its source.'),
+  "title": zod.string().describe('The track title.'),
+  "artist": zod.string().nullish().describe('Track artist (Plex grandparentTitle). Null when unknown.'),
+  "album": zod.string().nullish().describe('Album the track belongs to (Plex parentTitle). Null when unknown.'),
+  "artwork": zod.string().nullish().describe('Fully-qualified, authenticated album-art URL the browser can load directly (Plex token appended). Null when the source has no artwork.'),
+  "durationMs": zod.number().nullish().describe('Track length in milliseconds. Null when the source omits it.'),
+  "progressMs": zod.number().nullish().describe('Playback offset in milliseconds for the source\'s current session (Plex viewOffset). Only set on the now-playing track of an active remote session; null otherwise.'),
+  "state": zod.string().nullish().describe('Remote playback state reported by the source for an active session: \"playing\", \"paused\", or \"stopped\". Null when there is no active session (the track is a queue\/last-played entry, not live).'),
+  "streamUrl": zod.string().nullish().describe('Fully-qualified, authenticated audio stream URL an HTML audio element can play directly (Plex part key + token). Null when the source does not expose an in-browser-playable stream (remote-control-only).')
+})).optional().describe('Playable tracks (search results, an album\'s tracks, or a playlist\'s tracks). Each carries a browser-playable streamUrl for the shared engine. Absent when not applicable to the request.')
 })
 
 

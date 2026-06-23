@@ -20,9 +20,11 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  AudioBrowseResult,
   AudioPlayerData,
   AuthCredentials,
   AuthResponse,
+  BrowseAudioLibraryParams,
   ConnectionHealth,
   ConnectionTestResult,
   ContinueWatchingItem,
@@ -44,6 +46,7 @@ import type {
   ProwlarrData,
   QbittorrentData,
   RadarrData,
+  SearchAudioLibraryParams,
   SearchStocksParams,
   ServiceConnection,
   ServiceConnectionUpdate,
@@ -1973,6 +1976,174 @@ export function useGetAudioPlayerNowPlaying<TData = Awaited<ReturnType<typeof ge
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetAudioPlayerNowPlayingQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getSearchAudioLibraryUrl = (params: SearchAudioLibraryParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/widgets/audioplayer/search?${stringifiedParams}` : `/api/widgets/audioplayer/search`
+}
+
+/**
+ * @summary Search a music source's library for artists, albums, and tracks
+ */
+export const searchAudioLibrary = async (params: SearchAudioLibraryParams, options?: RequestInit): Promise<AudioBrowseResult> => {
+
+  return customFetch<AudioBrowseResult>(getSearchAudioLibraryUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getSearchAudioLibraryQueryKey = (params?: SearchAudioLibraryParams,) => {
+    return [
+    `/api/widgets/audioplayer/search`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getSearchAudioLibraryQueryOptions = <TData = Awaited<ReturnType<typeof searchAudioLibrary>>, TError = ErrorType<ErrorResponse>>(params: SearchAudioLibraryParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof searchAudioLibrary>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getSearchAudioLibraryQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof searchAudioLibrary>>> = ({ signal }) => searchAudioLibrary(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof searchAudioLibrary>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type SearchAudioLibraryQueryResult = NonNullable<Awaited<ReturnType<typeof searchAudioLibrary>>>
+export type SearchAudioLibraryQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Search a music source's library for artists, albums, and tracks
+ */
+
+export function useSearchAudioLibrary<TData = Awaited<ReturnType<typeof searchAudioLibrary>>, TError = ErrorType<ErrorResponse>>(
+ params: SearchAudioLibraryParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof searchAudioLibrary>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getSearchAudioLibraryQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getBrowseAudioLibraryUrl = (params: BrowseAudioLibraryParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/widgets/audioplayer/browse?${stringifiedParams}` : `/api/widgets/audioplayer/browse`
+}
+
+/**
+ * @summary Browse a music source's library and playlists (with drill-down)
+ */
+export const browseAudioLibrary = async (params: BrowseAudioLibraryParams, options?: RequestInit): Promise<AudioBrowseResult> => {
+
+  return customFetch<AudioBrowseResult>(getBrowseAudioLibraryUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getBrowseAudioLibraryQueryKey = (params?: BrowseAudioLibraryParams,) => {
+    return [
+    `/api/widgets/audioplayer/browse`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getBrowseAudioLibraryQueryOptions = <TData = Awaited<ReturnType<typeof browseAudioLibrary>>, TError = ErrorType<ErrorResponse>>(params: BrowseAudioLibraryParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof browseAudioLibrary>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getBrowseAudioLibraryQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof browseAudioLibrary>>> = ({ signal }) => browseAudioLibrary(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof browseAudioLibrary>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type BrowseAudioLibraryQueryResult = NonNullable<Awaited<ReturnType<typeof browseAudioLibrary>>>
+export type BrowseAudioLibraryQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Browse a music source's library and playlists (with drill-down)
+ */
+
+export function useBrowseAudioLibrary<TData = Awaited<ReturnType<typeof browseAudioLibrary>>, TError = ErrorType<ErrorResponse>>(
+ params: BrowseAudioLibraryParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof browseAudioLibrary>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getBrowseAudioLibraryQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
