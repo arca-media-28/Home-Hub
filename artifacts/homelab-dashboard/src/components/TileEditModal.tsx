@@ -140,6 +140,7 @@ const INTEGRATIONS = [
   { value: TileIntegration.sleeper, label: "Fantasy" },
   { value: TileIntegration.news, label: "News" },
   { value: TileIntegration.stocks, label: "Stocks" },
+  { value: TileIntegration.eightball, label: "Magic Eight Ball" },
   { value: TileIntegration.note, label: "Note" },
   { value: TileIntegration.spacer, label: "Spacer" },
   { value: TileIntegration.divider, label: "Section Label" },
@@ -480,6 +481,9 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
   const isStocks = integration === TileIntegration.stocks;
   const isSleeper = integration === TileIntegration.sleeper;
   const isAudioPlayer = integration === TileIntegration.audioplayer;
+  // The Magic Eight Ball is a self-contained client-side toy with no link,
+  // image, background, metrics, or settings — only a name and size matter.
+  const isEightball = integration === TileIntegration.eightball;
   // The spacer is a layout-only tile: an invisible gap with no name, URL,
   // image, background, or live data. Only its size/position matter, so the
   // editor strips every content field and shows a short description instead.
@@ -502,7 +506,7 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
   const isLayoutTile = isSpacer || isDivider;
   // Tiles that carry no link/image/background content: layout helpers plus the
   // note and timer, which paint their own surface.
-  const isContentless = isLayoutTile || isNote || isTimer;
+  const isContentless = isLayoutTile || isNote || isTimer || isEightball;
 
   // Teams for the chosen leagues, for the dependent team multi-select. Sourced
   // from the baked-in catalog (ESPN's /teams endpoint isn't CORS-enabled), so
@@ -1074,6 +1078,14 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
               A section heading tile for grouping. It shows the label text above
               with no card background — drop it between groups of tiles and
               resize it to span a row.
+            </p>
+          )}
+
+          {isEightball && (
+            <p className="text-sm text-muted-foreground border-t border-border pt-4">
+              A Magic Eight Ball toy. Click the tile to "shake" it and reveal one
+              of the 20 classic answers. Fully self-contained — no connection or
+              settings needed. Give it a name and resize it to taste.
             </p>
           )}
 

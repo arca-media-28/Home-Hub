@@ -73,6 +73,7 @@ export const TileIntegration = {
   note: 'note',
   spacer: 'spacer',
   divider: 'divider',
+  eightball: 'eightball',
 } as const;
 
 /**
@@ -452,6 +453,7 @@ export const TileInputIntegration = {
   note: 'note',
   spacer: 'spacer',
   divider: 'divider',
+  eightball: 'eightball',
 } as const;
 
 export interface TileInput {
@@ -517,6 +519,7 @@ export const TileUpdateIntegration = {
   note: 'note',
   spacer: 'spacer',
   divider: 'divider',
+  eightball: 'eightball',
 } as const;
 
 export interface TileUpdate {

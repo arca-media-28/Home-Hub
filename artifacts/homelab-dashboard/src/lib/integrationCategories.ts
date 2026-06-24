@@ -24,6 +24,7 @@ const CATEGORY_BY_KEY: Record<string, Category> = {
   sports: "News",
   sleeper: "News",
   stocks: "News",
+  eightball: "Other",
   // Media
   media: "Media",
   plex: "Media",

@@ -36,4 +36,5 @@ export const TileUpdateIntegration = {
   note: 'note',
   spacer: 'spacer',
   divider: 'divider',
+  eightball: 'eightball',
 } as const;
