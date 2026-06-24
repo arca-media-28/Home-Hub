@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, tileStmts, type DbTile } from "../lib/db.js";
+import { db, tileStmts, pageStmts, type DbTile } from "../lib/db.js";
 import { requireAuth, type AuthRequest } from "../lib/auth.js";
 
 const router = Router();
@@ -325,6 +325,7 @@ export function formatTile(t: DbTile) {
   return {
     id: t.id,
     userId: t.user_id,
+    pageId: t.page_id,
     type: t.type,
     integration: t.integration,
     gridX: t.grid_x,
@@ -348,8 +349,21 @@ export function formatTile(t: DbTile) {
   };
 }
 
-// GET /api/tiles
+// GET /api/tiles?pageId= — when a pageId is supplied, return only that page's
+// tiles (after verifying the page belongs to the caller). Omitting pageId
+// returns every tile the user owns, preserving the pre-multi-page behavior.
 router.get("/", requireAuth, (req: AuthRequest, res) => {
+  const pageIdRaw = req.query["pageId"];
+  if (pageIdRaw !== undefined) {
+    const pageId = parseInt(String(pageIdRaw));
+    if (Number.isNaN(pageId) || !pageStmts.findById.get(pageId, req.user!.userId)) {
+      res.status(404).json({ error: "Page not found" });
+      return;
+    }
+    const tiles = tileStmts.findAllByPage.all(req.user!.userId, pageId);
+    res.json(tiles.map(formatTile));
+    return;
+  }
   const tiles = tileStmts.findAllByUser.all(req.user!.userId);
   res.json(tiles.map(formatTile));
 });
@@ -357,6 +371,7 @@ router.get("/", requireAuth, (req: AuthRequest, res) => {
 // POST /api/tiles
 router.post("/", requireAuth, (req: AuthRequest, res) => {
   const body = req.body as {
+    pageId?: number | null;
     type?: string;
     integration?: string | null;
     gridX?: number;
@@ -378,16 +393,34 @@ router.post("/", requireAuth, (req: AuthRequest, res) => {
     tileSettings?: TileSettings | null;
   };
 
+  // Resolve which page this tile belongs to. An explicit pageId must belong to
+  // the caller; otherwise default to the user's first page. (A user always has
+  // at least one page after migration/registration, but tolerate its absence
+  // by storing NULL rather than rejecting.)
+  let pageId: number | null = null;
+  if (body.pageId != null) {
+    const page = pageStmts.findById.get(body.pageId, req.user!.userId);
+    if (!page) {
+      res.status(404).json({ error: "Page not found" });
+      return;
+    }
+    pageId = page.id;
+  } else {
+    const pages = pageStmts.findAllByUser.all(req.user!.userId);
+    pageId = pages[0]?.id ?? null;
+  }
+
   const createTile = db.prepare<
-    [number, string, string | null, number, number, number, number, string | null, string | null, string | null, string | null, string | null, string | null, number | null, string | null, string | null, string | null, number, string | null, string | null],
+    [number, number | null, string, string | null, number, number, number, number, string | null, string | null, string | null, string | null, string | null, string | null, number | null, string | null, string | null, string | null, number, string | null, string | null],
     { id: number }
   >(
-    `INSERT INTO tiles (user_id, type, integration, grid_x, grid_y, grid_w, grid_h, name, url, bg_color, image_url, image_fit, image_position, image_scale, title_size, title_position, title_color, hide_title, metrics, tile_settings)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`
+    `INSERT INTO tiles (user_id, page_id, type, integration, grid_x, grid_y, grid_w, grid_h, name, url, bg_color, image_url, image_fit, image_position, image_scale, title_size, title_position, title_color, hide_title, metrics, tile_settings)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`
   );
 
   const row = createTile.get(
     req.user!.userId,
+    pageId,
     body.type ?? "app",
     body.integration ?? null,
     body.gridX ?? 0,

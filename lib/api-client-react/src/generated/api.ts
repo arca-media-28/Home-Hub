@@ -36,12 +36,16 @@ import type {
   GetNewsWidgetParams,
   GetStockCandlesParams,
   GetStocksWidgetParams,
+  GetTilesParams,
   HealthStatus,
   LayoutUpdate,
   LidarrData,
   MediaItem,
   NewsData,
   NginxProxyManagerData,
+  Page,
+  PageInput,
+  PageReorder,
   PiholeData,
   ProwlarrData,
   QbittorrentData,
@@ -381,20 +385,27 @@ export function useGetMe<TData = Awaited<ReturnType<typeof getMe>>, TError = Err
 
 
 
-export const getGetTilesUrl = () => {
+export const getGetTilesUrl = (params?: GetTilesParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/api/tiles`
+  return stringifiedParams.length > 0 ? `/api/tiles?${stringifiedParams}` : `/api/tiles`
 }
 
 /**
- * @summary List all tiles for the authenticated user
+ * @summary List tiles for the authenticated user (optionally scoped to a page)
  */
-export const getTiles = async ( options?: RequestInit): Promise<Tile[]> => {
+export const getTiles = async (params?: GetTilesParams, options?: RequestInit): Promise<Tile[]> => {
 
-  return customFetch<Tile[]>(getGetTilesUrl(),
+  return customFetch<Tile[]>(getGetTilesUrl(params),
   {
     ...options,
     method: 'GET'
@@ -407,23 +418,23 @@ export const getTiles = async ( options?: RequestInit): Promise<Tile[]> => {
 
 
 
-export const getGetTilesQueryKey = () => {
+export const getGetTilesQueryKey = (params?: GetTilesParams,) => {
     return [
-    `/api/tiles`
+    `/api/tiles`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getGetTilesQueryOptions = <TData = Awaited<ReturnType<typeof getTiles>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTiles>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetTilesQueryOptions = <TData = Awaited<ReturnType<typeof getTiles>>, TError = ErrorType<unknown>>(params?: GetTilesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTiles>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetTilesQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getGetTilesQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTiles>>> = ({ signal }) => getTiles({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTiles>>> = ({ signal }) => getTiles(params, { signal, ...requestOptions });
 
 
 
@@ -437,15 +448,15 @@ export type GetTilesQueryError = ErrorType<unknown>
 
 
 /**
- * @summary List all tiles for the authenticated user
+ * @summary List tiles for the authenticated user (optionally scoped to a page)
  */
 
 export function useGetTiles<TData = Awaited<ReturnType<typeof getTiles>>, TError = ErrorType<unknown>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTiles>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ params?: GetTilesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTiles>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getGetTilesQueryOptions(options)
+  const queryOptions = getGetTilesQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
@@ -817,6 +828,367 @@ export const useSaveLayout = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getSaveLayoutMutationOptions(options));
+    }
+
+export const getGetPagesUrl = () => {
+
+
+
+
+  return `/api/pages`
+}
+
+/**
+ * @summary List the authenticated user's dashboard pages
+ */
+export const getPages = async ( options?: RequestInit): Promise<Page[]> => {
+
+  return customFetch<Page[]>(getGetPagesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPagesQueryKey = () => {
+    return [
+    `/api/pages`
+    ] as const;
+    }
+
+
+export const getGetPagesQueryOptions = <TData = Awaited<ReturnType<typeof getPages>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPages>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPagesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPages>>> = ({ signal }) => getPages({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPages>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPagesQueryResult = NonNullable<Awaited<ReturnType<typeof getPages>>>
+export type GetPagesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List the authenticated user's dashboard pages
+ */
+
+export function useGetPages<TData = Awaited<ReturnType<typeof getPages>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPages>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPagesQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreatePageUrl = () => {
+
+
+
+
+  return `/api/pages`
+}
+
+/**
+ * @summary Create a new dashboard page
+ */
+export const createPage = async (pageInput: PageInput, options?: RequestInit): Promise<Page> => {
+
+  return customFetch<Page>(getCreatePageUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      pageInput,)
+  }
+);}
+
+
+
+
+export const getCreatePageMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createPage>>, TError,{data: BodyType<PageInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createPage>>, TError,{data: BodyType<PageInput>}, TContext> => {
+
+const mutationKey = ['createPage'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createPage>>, {data: BodyType<PageInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createPage(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreatePageMutationResult = NonNullable<Awaited<ReturnType<typeof createPage>>>
+    export type CreatePageMutationBody = BodyType<PageInput>
+    export type CreatePageMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Create a new dashboard page
+ */
+export const useCreatePage = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createPage>>, TError,{data: BodyType<PageInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createPage>>,
+        TError,
+        {data: BodyType<PageInput>},
+        TContext
+      > => {
+      return useMutation(getCreatePageMutationOptions(options));
+    }
+
+export const getReorderPagesUrl = () => {
+
+
+
+
+  return `/api/pages/reorder`
+}
+
+/**
+ * @summary Persist a new page display order
+ */
+export const reorderPages = async (pageReorder: PageReorder, options?: RequestInit): Promise<Page[]> => {
+
+  return customFetch<Page[]>(getReorderPagesUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      pageReorder,)
+  }
+);}
+
+
+
+
+export const getReorderPagesMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reorderPages>>, TError,{data: BodyType<PageReorder>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof reorderPages>>, TError,{data: BodyType<PageReorder>}, TContext> => {
+
+const mutationKey = ['reorderPages'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof reorderPages>>, {data: BodyType<PageReorder>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  reorderPages(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReorderPagesMutationResult = NonNullable<Awaited<ReturnType<typeof reorderPages>>>
+    export type ReorderPagesMutationBody = BodyType<PageReorder>
+    export type ReorderPagesMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Persist a new page display order
+ */
+export const useReorderPages = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reorderPages>>, TError,{data: BodyType<PageReorder>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof reorderPages>>,
+        TError,
+        {data: BodyType<PageReorder>},
+        TContext
+      > => {
+      return useMutation(getReorderPagesMutationOptions(options));
+    }
+
+export const getUpdatePageUrl = (id: number,) => {
+
+
+
+
+  return `/api/pages/${id}`
+}
+
+/**
+ * @summary Rename a dashboard page
+ */
+export const updatePage = async (id: number,
+    pageInput: PageInput, options?: RequestInit): Promise<Page> => {
+
+  return customFetch<Page>(getUpdatePageUrl(id),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      pageInput,)
+  }
+);}
+
+
+
+
+export const getUpdatePageMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updatePage>>, TError,{id: number;data: BodyType<PageInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updatePage>>, TError,{id: number;data: BodyType<PageInput>}, TContext> => {
+
+const mutationKey = ['updatePage'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updatePage>>, {id: number;data: BodyType<PageInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updatePage(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdatePageMutationResult = NonNullable<Awaited<ReturnType<typeof updatePage>>>
+    export type UpdatePageMutationBody = BodyType<PageInput>
+    export type UpdatePageMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Rename a dashboard page
+ */
+export const useUpdatePage = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updatePage>>, TError,{id: number;data: BodyType<PageInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updatePage>>,
+        TError,
+        {id: number;data: BodyType<PageInput>},
+        TContext
+      > => {
+      return useMutation(getUpdatePageMutationOptions(options));
+    }
+
+export const getDeletePageUrl = (id: number,) => {
+
+
+
+
+  return `/api/pages/${id}`
+}
+
+/**
+ * @summary Delete a dashboard page and its tiles
+ */
+export const deletePage = async (id: number, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getDeletePageUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeletePageMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deletePage>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deletePage>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['deletePage'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deletePage>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  deletePage(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeletePageMutationResult = NonNullable<Awaited<ReturnType<typeof deletePage>>>
+
+    export type DeletePageMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Delete a dashboard page and its tiles
+ */
+export const useDeletePage = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deletePage>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deletePage>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getDeletePageMutationOptions(options));
     }
 
 export const getListUploadsUrl = () => {

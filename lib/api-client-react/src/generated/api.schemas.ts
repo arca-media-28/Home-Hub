@@ -290,6 +290,11 @@ export type TileSettings = {
 export interface Tile {
   id: number;
   userId: number;
+  /**
+     * The page this tile belongs to. Null only for tiles that predate the multi-page migration and could not be assigned a page.
+     * @nullable
+     */
+  pageId?: number | null;
   type: TileType;
   /** @nullable */
   integration?: TileIntegration;
@@ -388,6 +393,11 @@ export const TileInputIntegration = {
 } as const;
 
 export interface TileInput {
+  /**
+     * The page to create this tile on. Omit to fall back to the user's first page.
+     * @nullable
+     */
+  pageId?: number | null;
   type: TileInputType;
   /** @nullable */
   integration?: TileInputIntegration;
@@ -535,7 +545,29 @@ export interface LayoutItem {
 }
 
 export interface LayoutUpdate {
+  /**
+     * The page whose layout is being saved. When provided, the response returns only that page's tiles; omit for all of the user's tiles.
+     * @nullable
+     */
+  pageId?: number | null;
   tiles: LayoutItem[];
+}
+
+export interface Page {
+  id: number;
+  userId: number;
+  name: string;
+  position: number;
+  createdAt?: string;
+}
+
+export interface PageInput {
+  name?: string;
+}
+
+export interface PageReorder {
+  /** Page ids in the desired display order. */
+  order: number[];
 }
 
 export interface UploadResult {
@@ -1176,6 +1208,13 @@ export interface NewsData {
   /** Recent headlines parsed from the feed, newest first. */
   items: NewsItem[];
 }
+
+export type GetTilesParams = {
+/**
+ * When provided, return only the tiles belonging to this page. Omitting it returns every tile the user owns.
+ */
+pageId?: number;
+};
 
 export type GetMediaRecentParams = {
 /**

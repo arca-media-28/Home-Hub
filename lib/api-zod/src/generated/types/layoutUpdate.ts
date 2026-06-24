@@ -8,5 +8,10 @@
 import type { LayoutItem } from './layoutItem';
 
 export interface LayoutUpdate {
+  /**
+     * The page whose layout is being saved. When provided, the response returns only that page's tiles; omit for all of the user's tiles.
+     * @nullable
+     */
+  pageId?: number | null;
   tiles: LayoutItem[];
 }

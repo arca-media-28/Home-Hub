@@ -8,11 +8,18 @@ import {
   useSaveLayout,
   useCreateTile,
   useGetConnectionsStatus,
+  useGetPages,
+  useCreatePage,
+  useUpdatePage,
+  useDeletePage,
+  useReorderPages,
   getGetMeQueryKey,
   getGetTilesQueryKey,
+  getGetPagesQueryKey,
   getGetConnectionsStatusQueryKey,
   TileType,
   type Tile,
+  type Page,
   type ServiceStatus,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -43,7 +50,22 @@ import {
   SeparatorHorizontal,
   Heading,
   Settings as SettingsIcon,
+  ChevronLeft,
+  ChevronRight,
+  X,
+  Trash2,
 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Input } from "@/components/ui/input";
 
 // react-grid-layout's TS types omit some valid props (cols, margin, containerPadding)
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -184,6 +206,19 @@ export default function Dashboard() {
   // never compacted out of bounds on a hard refresh.
   const [gridWidth, setGridWidth] = useState<number | null>(null);
 
+  // The currently-shown page. null until pages load / are reconciled below.
+  // Persisted to localStorage so the active page survives reloads.
+  const [activePageId, setActivePageId] = useState<number | null>(() => {
+    const stored = localStorage.getItem("activePageId");
+    const n = stored ? parseInt(stored, 10) : NaN;
+    return Number.isNaN(n) ? null : n;
+  });
+  // Page id whose name is being edited inline (edit mode only), plus its draft.
+  const [renamingPageId, setRenamingPageId] = useState<number | null>(null);
+  const [renameDraft, setRenameDraft] = useState("");
+  // Page queued for deletion; drives the confirm dialog.
+  const [pagePendingDelete, setPagePendingDelete] = useState<Page | null>(null);
+
   const containerRef = useRef<HTMLDivElement>(null);
   const savedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showSaved, setShowSaved] = useState(false);
@@ -213,9 +248,37 @@ export default function Dashboard() {
     if (meError) setLocation("/login");
   }, [meError, setLocation]);
 
-  const { data: tiles = [], isLoading } = useGetTiles({
-    query: { queryKey: getGetTilesQueryKey(), enabled: Boolean(me) },
+  const { data: pages = [] } = useGetPages({
+    query: { queryKey: getGetPagesQueryKey(), enabled: Boolean(me) },
   });
+
+  // Reconcile the active page against the loaded list: keep the persisted page
+  // when it still exists, otherwise fall back to the first page. Runs whenever
+  // pages change (e.g. after a delete removes the active page).
+  useEffect(() => {
+    if (pages.length === 0) return;
+    setActivePageId((current) => {
+      if (current != null && pages.some((p) => p.id === current)) return current;
+      return pages[0]!.id;
+    });
+  }, [pages]);
+
+  // Persist the active page so a reload reopens it.
+  useEffect(() => {
+    if (activePageId != null) localStorage.setItem("activePageId", String(activePageId));
+  }, [activePageId]);
+
+  const { data: tiles = [], isLoading } = useGetTiles(
+    activePageId != null ? { pageId: activePageId } : undefined,
+    {
+      query: {
+        queryKey: getGetTilesQueryKey(
+          activePageId != null ? { pageId: activePageId } : undefined,
+        ),
+        enabled: Boolean(me) && activePageId != null,
+      },
+    },
+  );
 
   // Poll service reachability so each live-widget tile shows an up/down badge.
   // Refetches on a timer and whenever the dashboard regains focus (e.g. after
@@ -234,11 +297,18 @@ export default function Dashboard() {
   // Surface a toast whenever a previously-healthy service goes unreachable.
   useHealthAlerts(Boolean(me));
 
+  // Query key for the active page's tiles. All cache reads/writes for tiles go
+  // through this so each page keeps its own independently-cached tile list.
+  const tilesQueryKey =
+    activePageId != null
+      ? getGetTilesQueryKey({ pageId: activePageId })
+      : getGetTilesQueryKey();
+
   const saveLayout = useSaveLayout({
     mutation: {
       onSuccess: (data) => {
         // Reconcile with the server's authoritative response
-        queryClient.setQueryData(getGetTilesQueryKey(), data);
+        queryClient.setQueryData(tilesQueryKey, data);
         if (savedTimeoutRef.current) clearTimeout(savedTimeoutRef.current);
         setShowSaved(true);
         savedTimeoutRef.current = setTimeout(() => setShowSaved(false), 2000);
@@ -246,24 +316,76 @@ export default function Dashboard() {
       onError: () => {
         toast({ title: "Failed to save layout", variant: "destructive" });
         // Roll back the optimistic update to the server's true state
-        queryClient.invalidateQueries({ queryKey: getGetTilesQueryKey() });
+        queryClient.invalidateQueries({ queryKey: tilesQueryKey });
       },
     },
   });
 
-  // Quick-add for the layout-only spacer tile. A spacer has no settings, so it
-  // skips the editor entirely and drops straight into the first empty slot.
+  // Quick-add for the layout-only spacer/divider tiles. They carry no settings,
+  // so they skip the editor entirely and drop straight into the first empty slot
+  // on the active page.
   const createTile = useCreateTile({
     mutation: {
       onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getGetTilesQueryKey() });
+        queryClient.invalidateQueries({ queryKey: tilesQueryKey });
       },
       onError: (err) => {
         toast({
-          title: "Failed to add spacer",
+          title: "Failed to add tile",
           description: err.message,
           variant: "destructive",
         });
+      },
+    },
+  });
+
+  // Page CRUD mutations. Each refreshes the page list; create also switches to
+  // the new page, and the tile cache for a deleted page is dropped.
+  const createPage = useCreatePage({
+    mutation: {
+      onSuccess: (page) => {
+        queryClient.invalidateQueries({ queryKey: getGetPagesQueryKey() });
+        setActivePageId(page.id);
+      },
+      onError: (err) => {
+        toast({ title: "Failed to create page", description: err.message, variant: "destructive" });
+      },
+    },
+  });
+
+  const updatePage = useUpdatePage({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getGetPagesQueryKey() });
+      },
+      onError: (err) => {
+        toast({ title: "Failed to rename page", description: err.message, variant: "destructive" });
+      },
+    },
+  });
+
+  const deletePage = useDeletePage({
+    mutation: {
+      onSuccess: (_data, variables) => {
+        queryClient.removeQueries({
+          queryKey: getGetTilesQueryKey({ pageId: variables.id }),
+        });
+        queryClient.invalidateQueries({ queryKey: getGetPagesQueryKey() });
+      },
+      onError: (err) => {
+        toast({ title: "Failed to delete page", description: err.message, variant: "destructive" });
+      },
+    },
+  });
+
+  const reorderPages = useReorderPages({
+    mutation: {
+      onSuccess: (data) => {
+        queryClient.setQueryData(getGetPagesQueryKey(), data);
+      },
+      onError: (err) => {
+        toast({ title: "Failed to reorder pages", description: err.message, variant: "destructive" });
+        queryClient.invalidateQueries({ queryKey: getGetPagesQueryKey() });
       },
     },
   });
@@ -286,7 +408,7 @@ export default function Dashboard() {
       // Optimistically apply the new positions to the cache so a tab close
       // during the in-flight request never loses the change.
       const byId = new Map(mapped.map((m) => [m.id, m]));
-      queryClient.setQueryData<Tile[]>(getGetTilesQueryKey(), (old) =>
+      queryClient.setQueryData<Tile[]>(tilesQueryKey, (old) =>
         old?.map((t) => {
           const m = byId.get(t.id);
           return m
@@ -295,10 +417,11 @@ export default function Dashboard() {
         }),
       );
 
-      // Persist immediately on drag/resize end — no debounce.
-      saveLayout.mutate({ data: { tiles: mapped } });
+      // Persist immediately on drag/resize end — no debounce. Scope the save to
+      // the active page so the response (and reconcile) carries only its tiles.
+      saveLayout.mutate({ data: { tiles: mapped, pageId: activePageId } });
     },
-    [editMode, saveLayout, queryClient],
+    [editMode, saveLayout, queryClient, tilesQueryKey, activePageId],
   );
 
   // Clean up the "saved" indicator timer on unmount
@@ -344,6 +467,7 @@ export default function Dashboard() {
     const pos = findFirstEmptyPosition(tiles, 4, 4, cols);
     createTile.mutate({
       data: {
+        pageId: activePageId,
         type: TileType.app,
         integration: "spacer",
         gridX: pos.x,
@@ -361,6 +485,7 @@ export default function Dashboard() {
     const pos = findFirstEmptyPosition(tiles, 4, 4, cols);
     createTile.mutate({
       data: {
+        pageId: activePageId,
         type: TileType.app,
         integration: "divider",
         name: "Section",
@@ -377,6 +502,54 @@ export default function Dashboard() {
     setSelectedTile(tile);
     setModalMode("edit");
     setModalOpen(true);
+  }
+
+  function handleSelectPage(id: number) {
+    if (id === activePageId) return;
+    setRenamingPageId(null);
+    setActivePageId(id);
+  }
+
+  function handleAddPage() {
+    createPage.mutate({ data: { name: "New Page" } });
+  }
+
+  function startRename(page: Page) {
+    setRenamingPageId(page.id);
+    setRenameDraft(page.name);
+  }
+
+  function commitRename() {
+    const id = renamingPageId;
+    if (id == null) return;
+    const name = renameDraft.trim();
+    const current = pages.find((p) => p.id === id);
+    setRenamingPageId(null);
+    if (!name || (current && current.name === name)) return;
+    updatePage.mutate({ id, data: { name } });
+  }
+
+  // Move a page one slot left/right and persist the new order.
+  function movePage(id: number, direction: -1 | 1) {
+    const index = pages.findIndex((p) => p.id === id);
+    const target = index + direction;
+    if (index === -1 || target < 0 || target >= pages.length) return;
+    const order = pages.map((p) => p.id);
+    const [moved] = order.splice(index, 1);
+    order.splice(target, 0, moved!);
+    // Optimistically reorder the cached list so the tabs reflow immediately.
+    const byId = new Map(pages.map((p) => [p.id, p]));
+    queryClient.setQueryData<Page[]>(
+      getGetPagesQueryKey(),
+      order.map((pid, i) => ({ ...byId.get(pid)!, position: i })),
+    );
+    reorderPages.mutate({ data: { order } });
+  }
+
+  function confirmDeletePage() {
+    const page = pagePendingDelete;
+    setPagePendingDelete(null);
+    if (page) deletePage.mutate({ id: page.id });
   }
 
   if (!me && isLoading) {
@@ -489,6 +662,112 @@ export default function Dashboard() {
             </DropdownMenu>
           </div>
         </div>
+
+        {/* Page switcher */}
+        {pages.length > 0 && (
+          <div className="border-t border-border/60">
+            <div className="max-w-screen-2xl mx-auto px-4 h-11 flex items-center gap-1 overflow-x-auto">
+              {pages.map((page, index) => {
+                const isActive = page.id === activePageId;
+                const isRenaming = renamingPageId === page.id;
+                return (
+                  <div
+                    key={page.id}
+                    className={`group flex items-center shrink-0 h-8 px-1 border-b-2 transition-colors ${
+                      isActive
+                        ? "border-primary"
+                        : "border-transparent hover:border-border"
+                    }`}
+                  >
+                    {editMode && (
+                      <button
+                        type="button"
+                        className="p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:hover:text-muted-foreground"
+                        onClick={() => movePage(page.id, -1)}
+                        disabled={index === 0}
+                        aria-label="Move page left"
+                      >
+                        <ChevronLeft className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+
+                    {isRenaming ? (
+                      <Input
+                        autoFocus
+                        value={renameDraft}
+                        onChange={(e) => setRenameDraft(e.target.value)}
+                        onBlur={commitRename}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") commitRename();
+                          if (e.key === "Escape") setRenamingPageId(null);
+                        }}
+                        className="h-7 w-32 px-2 text-sm"
+                      />
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => handleSelectPage(page.id)}
+                        onDoubleClick={() => editMode && startRename(page)}
+                        className={`px-2 h-7 text-sm whitespace-nowrap transition-colors ${
+                          isActive
+                            ? "text-foreground font-medium"
+                            : "text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        {page.name}
+                      </button>
+                    )}
+
+                    {editMode && !isRenaming && (
+                      <>
+                        <button
+                          type="button"
+                          className="p-0.5 text-muted-foreground hover:text-foreground"
+                          onClick={() => startRename(page)}
+                          aria-label="Rename page"
+                        >
+                          <Pencil className="w-3 h-3" />
+                        </button>
+                        <button
+                          type="button"
+                          className="p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:hover:text-muted-foreground"
+                          onClick={() => movePage(page.id, 1)}
+                          disabled={index === pages.length - 1}
+                          aria-label="Move page right"
+                        >
+                          <ChevronRight className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          className="p-0.5 text-muted-foreground hover:text-destructive disabled:opacity-30 disabled:hover:text-muted-foreground"
+                          onClick={() => setPagePendingDelete(page)}
+                          disabled={pages.length <= 1}
+                          aria-label="Delete page"
+                          title={pages.length <= 1 ? "Can't delete your last page" : "Delete page"}
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </>
+                    )}
+                  </div>
+                );
+              })}
+
+              {editMode && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="gap-1.5 shrink-0 h-7 ml-1"
+                  onClick={handleAddPage}
+                  disabled={createPage.isPending}
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  New page
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
       </header>
 
       {/* Grid */}
@@ -606,7 +885,34 @@ export default function Dashboard() {
         tile={selectedTile}
         mode={modalMode}
         defaultGridPos={createGridPos}
+        pageId={activePageId}
       />
+
+      <AlertDialog
+        open={pagePendingDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) setPagePendingDelete(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete “{pagePendingDelete?.name}”?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This permanently removes the page and all of its tiles. This can't be
+              undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeletePage}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete page
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
-import { db, userStmts, type DbUser } from "../lib/db.js";
+import { db, userStmts, createDefaultPage, type DbUser } from "../lib/db.js";
 import { signToken, requireAuth, type AuthRequest } from "../lib/auth.js";
 
 const router = Router();
@@ -38,6 +38,9 @@ router.post("/register", async (req, res) => {
     );
     const row = createUser.get(username, hashed)!;
     const user = userStmts.findById.get(row.id)!;
+    // Every new user starts with a single default page so the dashboard always
+    // has at least one page to render and drop tiles onto.
+    createDefaultPage(user.id);
     const token = signToken({ userId: user.id, username: user.username });
     res.status(201).json({ token, user: formatUser(user) });
   } catch (err) {

@@ -64,11 +64,16 @@ export const GetMeResponse = zod.object({
 
 
 /**
- * @summary List all tiles for the authenticated user
+ * @summary List tiles for the authenticated user (optionally scoped to a page)
  */
+export const GetTilesQueryParams = zod.object({
+  "pageId": zod.coerce.number().optional().describe('When provided, return only the tiles belonging to this page. Omitting it returns every tile the user owns.')
+})
+
 export const GetTilesResponseItem = zod.object({
   "id": zod.number(),
   "userId": zod.number(),
+  "pageId": zod.number().nullish().describe('The page this tile belongs to. Null only for tiles that predate the multi-page migration and could not be assigned a page.'),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'lidarr', 'qbittorrent']),
   "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
@@ -139,6 +144,7 @@ export const GetTilesResponse = zod.array(GetTilesResponseItem)
  * @summary Create a new tile
  */
 export const CreateTileBody = zod.object({
+  "pageId": zod.number().nullish().describe('The page to create this tile on. Omit to fall back to the user\'s first page.'),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'lidarr', 'qbittorrent']),
   "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
@@ -213,6 +219,7 @@ export const GetTileParams = zod.object({
 export const GetTileResponse = zod.object({
   "id": zod.number(),
   "userId": zod.number(),
+  "pageId": zod.number().nullish().describe('The page this tile belongs to. Null only for tiles that predate the multi-page migration and could not be assigned a page.'),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'lidarr', 'qbittorrent']),
   "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
@@ -351,6 +358,7 @@ export const UpdateTileBody = zod.object({
 export const UpdateTileResponse = zod.object({
   "id": zod.number(),
   "userId": zod.number(),
+  "pageId": zod.number().nullish().describe('The page this tile belongs to. Null only for tiles that predate the multi-page migration and could not be assigned a page.'),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'lidarr', 'qbittorrent']),
   "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
@@ -428,6 +436,7 @@ export const DeleteTileParams = zod.object({
  * @summary Bulk-save tile layout (positions and sizes)
  */
 export const SaveLayoutBody = zod.object({
+  "pageId": zod.number().nullish().describe('The page whose layout is being saved. When provided, the response returns only that page\'s tiles; omit for all of the user\'s tiles.'),
   "tiles": zod.array(zod.object({
   "id": zod.number(),
   "gridX": zod.number(),
@@ -440,6 +449,7 @@ export const SaveLayoutBody = zod.object({
 export const SaveLayoutResponseItem = zod.object({
   "id": zod.number(),
   "userId": zod.number(),
+  "pageId": zod.number().nullish().describe('The page this tile belongs to. Null only for tiles that predate the multi-page migration and could not be assigned a page.'),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'lidarr', 'qbittorrent']),
   "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
@@ -504,6 +514,72 @@ export const SaveLayoutResponseItem = zod.object({
   "createdAt": zod.string().optional()
 })
 export const SaveLayoutResponse = zod.array(SaveLayoutResponseItem)
+
+
+/**
+ * @summary List the authenticated user's dashboard pages
+ */
+export const GetPagesResponseItem = zod.object({
+  "id": zod.number(),
+  "userId": zod.number(),
+  "name": zod.string(),
+  "position": zod.number(),
+  "createdAt": zod.string().optional()
+})
+export const GetPagesResponse = zod.array(GetPagesResponseItem)
+
+
+/**
+ * @summary Create a new dashboard page
+ */
+export const CreatePageBody = zod.object({
+  "name": zod.string().optional()
+})
+
+
+/**
+ * @summary Persist a new page display order
+ */
+export const ReorderPagesBody = zod.object({
+  "order": zod.array(zod.number()).describe('Page ids in the desired display order.')
+})
+
+export const ReorderPagesResponseItem = zod.object({
+  "id": zod.number(),
+  "userId": zod.number(),
+  "name": zod.string(),
+  "position": zod.number(),
+  "createdAt": zod.string().optional()
+})
+export const ReorderPagesResponse = zod.array(ReorderPagesResponseItem)
+
+
+/**
+ * @summary Rename a dashboard page
+ */
+export const UpdatePageParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdatePageBody = zod.object({
+  "name": zod.string().optional()
+})
+
+export const UpdatePageResponse = zod.object({
+  "id": zod.number(),
+  "userId": zod.number(),
+  "name": zod.string(),
+  "position": zod.number(),
+  "createdAt": zod.string().optional()
+})
+
+
+/**
+ * @summary Delete a dashboard page and its tiles
+ */
+export const DeletePageParams = zod.object({
+  "id": zod.coerce.number()
+})
 
 
 /**

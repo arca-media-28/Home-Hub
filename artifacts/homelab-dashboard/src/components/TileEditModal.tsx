@@ -91,6 +91,9 @@ interface TileEditModalProps {
   // Grid slot a brand-new tile should occupy. Computed by the dashboard from the
   // first empty cell that fits the default tile size; only used when creating.
   defaultGridPos?: { x: number; y: number };
+  // The page a brand-new tile should be created on (the active page). Only used
+  // when creating; edits keep the tile on its existing page.
+  pageId?: number | null;
 }
 
 const NONE = "none";
@@ -140,7 +143,7 @@ const INTEGRATION_GROUPS = groupByCategory(INTEGRATIONS, (i) => i.value);
 
 type ImageSource = "upload" | "library" | "url";
 
-export default function TileEditModal({ open, onOpenChange, tile, mode, defaultGridPos }: TileEditModalProps) {
+export default function TileEditModal({ open, onOpenChange, tile, mode, defaultGridPos, pageId }: TileEditModalProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -896,7 +899,7 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
     };
 
     if (mode === "create") {
-      createTile.mutate({ data });
+      createTile.mutate({ data: { ...data, pageId: pageId ?? null } });
     } else if (tile) {
       updateTile.mutate({ id: tile.id, data });
     }

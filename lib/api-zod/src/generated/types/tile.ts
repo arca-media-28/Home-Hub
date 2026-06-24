@@ -13,6 +13,11 @@ import type { TileType } from './tileType';
 export interface Tile {
   id: number;
   userId: number;
+  /**
+     * The page this tile belongs to. Null only for tiles that predate the multi-page migration and could not be assigned a page.
+     * @nullable
+     */
+  pageId?: number | null;
   type: TileType;
   /** @nullable */
   integration?: TileIntegration;

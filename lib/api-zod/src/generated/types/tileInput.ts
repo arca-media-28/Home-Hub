@@ -10,6 +10,11 @@ import type { TileInputType } from './tileInputType';
 import type { TileSettings } from './tileSettings';
 
 export interface TileInput {
+  /**
+     * The page to create this tile on. Omit to fall back to the user's first page.
+     * @nullable
+     */
+  pageId?: number | null;
   type: TileInputType;
   /** @nullable */
   integration?: TileInputIntegration;

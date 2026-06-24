@@ -41,6 +41,14 @@ db.exec(`
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
+  CREATE TABLE IF NOT EXISTS pages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name TEXT NOT NULL DEFAULT 'Home',
+    position INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
   CREATE TABLE IF NOT EXISTS uploaded_files (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -139,6 +147,42 @@ if (gridSchemaVersion < 1) {
   db.pragma("user_version = 1");
 }
 
+// 1h. Multi-page dashboards. Tiles now belong to a `page`; add the nullable
+//     `page_id` column (guarded so it is idempotent). NULL means "not yet
+//     assigned" and is backfilled below.
+if (!tileColumns.some((c) => c.name === "page_id")) {
+  db.exec("ALTER TABLE tiles ADD COLUMN page_id INTEGER REFERENCES pages(id) ON DELETE CASCADE");
+}
+
+// 1i. One-time backfill so every existing user ends up with at least one page
+//     and all their tiles are attached to it. For each user that has no page
+//     yet, create a default "Home" page; then assign every still-unassigned
+//     tile to its owner's first page. Idempotent: re-running creates no new
+//     pages (users already have one) and finds no NULL-page tiles to move.
+const usersWithoutPage = db
+  .prepare("SELECT id FROM users WHERE id NOT IN (SELECT user_id FROM pages)")
+  .all() as { id: number }[];
+const insertDefaultPage = db.prepare(
+  "INSERT INTO pages (user_id, name, position) VALUES (?, 'Home', 0)"
+);
+const backfillPages = db.transaction(() => {
+  for (const u of usersWithoutPage) {
+    insertDefaultPage.run(u.id);
+  }
+  // Attach any tile without a page to its owner's first (lowest position) page.
+  db.exec(`
+    UPDATE tiles
+    SET page_id = (
+      SELECT p.id FROM pages p
+      WHERE p.user_id = tiles.user_id
+      ORDER BY p.position ASC, p.id ASC
+      LIMIT 1
+    )
+    WHERE page_id IS NULL
+  `);
+});
+backfillPages();
+
 // 2. One-time data migration: existing integration-typed tiles become app/link
 //    tiles whose `integration` carries the old type. Styling fields are left
 //    untouched. After this runs `type` is 'app' so it never matches again.
@@ -169,9 +213,18 @@ export interface DbUser {
   created_at: string;
 }
 
+export interface DbPage {
+  id: number;
+  user_id: number;
+  name: string;
+  position: number;
+  created_at: string;
+}
+
 export interface DbTile {
   id: number;
   user_id: number;
+  page_id: number | null;
   type: string;
   integration: string | null;
   grid_x: number;
@@ -235,6 +288,9 @@ export const tileStmts = {
   findAllByUser: db.prepare<[number], DbTile>(
     "SELECT * FROM tiles WHERE user_id = ? ORDER BY created_at ASC"
   ),
+  findAllByPage: db.prepare<[number, number], DbTile>(
+    "SELECT * FROM tiles WHERE user_id = ? AND page_id = ? ORDER BY created_at ASC"
+  ),
   findById: db.prepare<[number, number], DbTile>(
     "SELECT * FROM tiles WHERE id = ? AND user_id = ?"
   ),
@@ -249,6 +305,40 @@ export const tileStmts = {
     "DELETE FROM tiles WHERE id = ? AND user_id = ?"
   ),
 };
+
+export const pageStmts = {
+  findAllByUser: db.prepare<[number], DbPage>(
+    "SELECT * FROM pages WHERE user_id = ? ORDER BY position ASC, id ASC"
+  ),
+  findById: db.prepare<[number, number], DbPage>(
+    "SELECT * FROM pages WHERE id = ? AND user_id = ?"
+  ),
+  countByUser: db.prepare<[number], { count: number }>(
+    "SELECT COUNT(*) AS count FROM pages WHERE user_id = ?"
+  ),
+  maxPosition: db.prepare<[number], { maxPos: number | null }>(
+    "SELECT MAX(position) AS maxPos FROM pages WHERE user_id = ?"
+  ),
+  create: db.prepare<[number, string, number], { id: number }>(
+    "INSERT INTO pages (user_id, name, position) VALUES (?, ?, ?) RETURNING id"
+  ),
+  rename: db.prepare<[string, number, number], void>(
+    "UPDATE pages SET name = ? WHERE id = ? AND user_id = ?"
+  ),
+  updatePosition: db.prepare<[number, number, number], void>(
+    "UPDATE pages SET position = ? WHERE id = ? AND user_id = ?"
+  ),
+  delete: db.prepare<[number, number], void>(
+    "DELETE FROM pages WHERE id = ? AND user_id = ?"
+  ),
+};
+
+// Create a user's default "Home" page. Used on signup so every new user always
+// has at least one page to drop tiles onto.
+export function createDefaultPage(userId: number): number {
+  const row = pageStmts.create.get(userId, "Home", 0)!;
+  return row.id;
+}
 
 export interface DbServiceConnection {
   service: string;
