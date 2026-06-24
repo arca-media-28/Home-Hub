@@ -1216,7 +1216,7 @@ components:
           enum: [app, truenas, media, sonarr, radarr, lidarr, qbittorrent]
         integration:
           type: ["string", "null"]
-          enum: [truenas, media, jellyfin, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, audioplayer, clock, timer, weather, sports, news, stocks, sleeper, note, spacer, divider, eightball, dice, coinflip, fortune, null]
+          enum: [truenas, media, jellyfin, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, audioplayer, clock, timer, weather, sports, news, stocks, sleeper, note, spacer, divider, eightball, dice, coinflip, fortune, tamagotchi, null]
         gridX:
           type: integer
         gridY:
@@ -1300,7 +1300,7 @@ components:
           enum: [app, truenas, media, sonarr, radarr, lidarr, qbittorrent]
         integration:
           type: ["string", "null"]
-          enum: [truenas, media, jellyfin, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, audioplayer, clock, timer, weather, sports, news, stocks, sleeper, note, spacer, divider, eightball, dice, coinflip, fortune, null]
+          enum: [truenas, media, jellyfin, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, audioplayer, clock, timer, weather, sports, news, stocks, sleeper, note, spacer, divider, eightball, dice, coinflip, fortune, tamagotchi, null]
         gridX:
           type: integer
         gridY:
@@ -1343,7 +1343,7 @@ components:
       properties:
         integration:
           type: ["string", "null"]
-          enum: [truenas, media, jellyfin, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, audioplayer, clock, timer, weather, sports, news, stocks, sleeper, note, spacer, divider, eightball, dice, coinflip, fortune, null]
+          enum: [truenas, media, jellyfin, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, audioplayer, clock, timer, weather, sports, news, stocks, sleeper, note, spacer, divider, eightball, dice, coinflip, fortune, tamagotchi, null]
         gridX:
           type: integer
         gridY:
@@ -1673,6 +1673,52 @@ components:
             How many dice a Dice Roller tile rolls at once (1-6). Null or absent
             defaults to 2.
           type: ["integer", "null"]
+        petHunger:
+          description: >-
+            A Tamagotchi pet tile's hunger satisfaction, 0 (starving) to 100
+            (full). Decays over real elapsed time and rises when the pet is fed.
+            Null or absent starts at a healthy default.
+          type: ["number", "null"]
+        petHappiness:
+          description: >-
+            A Tamagotchi pet tile's happiness, 0 (sad) to 100 (delighted).
+            Decays over real elapsed time and rises when the pet is played with.
+            Null or absent starts at a healthy default.
+          type: ["number", "null"]
+        petEnergy:
+          description: >-
+            A Tamagotchi pet tile's energy, 0 (exhausted) to 100 (rested).
+            Decays over real elapsed time and rises when the pet rests. Null or
+            absent starts at a healthy default.
+          type: ["number", "null"]
+        petUpdatedAt:
+          description: >-
+            Epoch milliseconds when a Tamagotchi pet tile's stats were last
+            computed. On mount the client recomputes decay from the elapsed
+            wall-clock time since this anchor so the pet keeps living across
+            reloads and sessions. Null or absent means "just now".
+          type: ["integer", "null"]
+        petBodyColor:
+          description: >-
+            A Tamagotchi pet tile's body color: a preset key (e.g. "green",
+            "blue", "pink") or a custom #hex value. Null or absent uses the
+            default preset.
+          type: ["string", "null"]
+        petEyes:
+          description: >-
+            A Tamagotchi pet tile's eye style (e.g. "round", "dot", "happy",
+            "sleepy", "star", "wink"). Null or absent uses the default.
+          type: ["string", "null"]
+        petNose:
+          description: >-
+            A Tamagotchi pet tile's nose style (e.g. "none", "dot", "round",
+            "triangle", "heart"). Null or absent uses the default.
+          type: ["string", "null"]
+        petMouth:
+          description: >-
+            A Tamagotchi pet tile's mouth style (e.g. "smile", "neutral",
+            "open", "cat", "frown"). Null or absent uses the default.
+          type: ["string", "null"]
 
     NoteChecklistItem:
       type: object

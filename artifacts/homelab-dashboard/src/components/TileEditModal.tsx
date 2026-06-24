@@ -67,6 +67,20 @@ import {
   MAX_DICE_COUNT,
   type DiceType,
 } from "@/components/tiles/DiceTile";
+import {
+  PET_BODY_COLORS,
+  PET_EYES_OPTIONS,
+  PET_NOSE_OPTIONS,
+  PET_MOUTH_OPTIONS,
+  DEFAULT_BODY_COLOR,
+  DEFAULT_EYES,
+  DEFAULT_NOSE,
+  DEFAULT_MOUTH,
+  PetFace,
+  type EyeStyle,
+  type NoseStyle,
+  type MouthStyle,
+} from "@/components/tiles/TamagotchiTile";
 import { SPORTS_LEAGUES, getLeagueTeams } from "@/lib/sports";
 import {
   fetchSleeperUser,
@@ -152,6 +166,7 @@ const INTEGRATIONS = [
   { value: TileIntegration.dice, label: "Dice Roller" },
   { value: TileIntegration.coinflip, label: "Coin Flip" },
   { value: TileIntegration.fortune, label: "Fortune" },
+  { value: TileIntegration.tamagotchi, label: "Tamagotchi" },
   { value: TileIntegration.note, label: "Note" },
   { value: TileIntegration.spacer, label: "Spacer" },
   { value: TileIntegration.divider, label: "Section Label" },
@@ -371,6 +386,23 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
     tile?.tileSettings?.noteTextColor ?? DEFAULT_NOTE_TEXT_COLOR,
   );
   const [showNoteColorPicker, setShowNoteColorPicker] = useState(false);
+
+  // Tamagotchi appearance options. The pet's stats (hunger/happiness/energy)
+  // live on the tile itself and are preserved on save; only the look is edited
+  // here.
+  const [petBodyColor, setPetBodyColor] = useState<string>(
+    tile?.tileSettings?.petBodyColor ?? DEFAULT_BODY_COLOR,
+  );
+  const [petEyes, setPetEyes] = useState<EyeStyle>(
+    (tile?.tileSettings?.petEyes as EyeStyle) ?? DEFAULT_EYES,
+  );
+  const [petNose, setPetNose] = useState<NoseStyle>(
+    (tile?.tileSettings?.petNose as NoseStyle) ?? DEFAULT_NOSE,
+  );
+  const [petMouth, setPetMouth] = useState<MouthStyle>(
+    (tile?.tileSettings?.petMouth as MouthStyle) ?? DEFAULT_MOUTH,
+  );
+  const [showPetColorPicker, setShowPetColorPicker] = useState(false);
   const [showNoteTextColorPicker, setShowNoteTextColorPicker] = useState(false);
 
   useEffect(() => {
@@ -459,6 +491,11 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
       setNoteColor(tile?.tileSettings?.noteColor ?? DEFAULT_NOTE_COLOR);
       setNoteFontSize((tile?.tileSettings?.noteFontSize as NoteFontSize) ?? "md");
       setNoteTextColor(tile?.tileSettings?.noteTextColor ?? DEFAULT_NOTE_TEXT_COLOR);
+      setPetBodyColor(tile?.tileSettings?.petBodyColor ?? DEFAULT_BODY_COLOR);
+      setPetEyes((tile?.tileSettings?.petEyes as EyeStyle) ?? DEFAULT_EYES);
+      setPetNose((tile?.tileSettings?.petNose as NoseStyle) ?? DEFAULT_NOSE);
+      setPetMouth((tile?.tileSettings?.petMouth as MouthStyle) ?? DEFAULT_MOUTH);
+      setShowPetColorPicker(false);
       setShowNoteColorPicker(false);
       setShowNoteTextColorPicker(false);
       setShowColorPicker(false);
@@ -514,6 +551,11 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
   // a timer. No link, image, background, metrics, or settings — only a name and
   // size matter.
   const isFortune = integration === TileIntegration.fortune;
+  // The Tamagotchi is a self-contained virtual-pet toy. Like the note/timer it
+  // paints its own surface (pet + stats + care buttons) with no header, and its
+  // living state is operated in-place on the tile, so the editor strips
+  // name/URL/image/background/metrics — only its size/position matter.
+  const isTamagotchi = integration === TileIntegration.tamagotchi;
   // The spacer is a layout-only tile: an invisible gap with no name, URL,
   // image, background, or live data. Only its size/position matter, so the
   // editor strips every content field and shows a short description instead.
@@ -537,7 +579,7 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
   // Tiles that carry no link/image/background content: layout helpers plus the
   // note and timer, which paint their own surface.
   const isContentless =
-    isLayoutTile || isNote || isTimer || isEightball || isDice || isCoinFlip || isFortune;
+    isLayoutTile || isNote || isTimer || isEightball || isDice || isCoinFlip || isFortune || isTamagotchi;
 
   // Teams for the chosen leagues, for the dependent team multi-select. Sourced
   // from the baked-in catalog (ESPN's /teams endpoint isn't CORS-enabled), so
@@ -912,7 +954,7 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
       // A spacer carries no content at all; a divider keeps only its label
       // (name). Both clear url/background/image so converting an existing tile
       // into a layout tile leaves nothing behind.
-      name: isSpacer || isNote || isTimer ? "" : name || undefined,
+      name: isSpacer || isNote || isTimer || isTamagotchi ? "" : name || undefined,
       url: isContentless ? "" : url || undefined,
       // Send the raw value so clearing (null) reaches the body and the server
       // writes NULL; otherwise an undefined field is dropped and the old color
@@ -1026,7 +1068,21 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
                             }
                           : isDice
                             ? { diceType, diceCount }
-                            : null;
+                            : isTamagotchi
+                              ? {
+                                  // Appearance is edited here; the pet's live
+                                  // stats are persisted by the tile itself, so
+                                  // preserve whatever is already stored.
+                                  petBodyColor,
+                                  petEyes,
+                                  petNose,
+                                  petMouth,
+                                  petHunger: tile?.tileSettings?.petHunger ?? null,
+                                  petHappiness: tile?.tileSettings?.petHappiness ?? null,
+                                  petEnergy: tile?.tileSettings?.petEnergy ?? null,
+                                  petUpdatedAt: tile?.tileSettings?.petUpdatedAt ?? null,
+                                }
+                              : null;
         // Only emit a settings object when there is something to store; an
         // un-scrolled plain tile keeps tileSettings null as before.
         if (!widget && !scrollable) return null;
@@ -1189,6 +1245,149 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
               Fully self-contained — no connection or settings needed. Give it a
               name and resize it to taste.
             </p>
+          )}
+
+          {isTamagotchi && (
+            <div className="space-y-4 border-t border-border pt-4">
+              <p className="text-sm text-muted-foreground">
+                A virtual pet. Feed it, play with it, and let it rest right on
+                the tile — its hunger, happiness, and energy slowly drift over
+                real time. Customize how it looks below; its mood still tweaks
+                the expression when it needs care.
+              </p>
+
+              {/* Live preview of the chosen look. */}
+              <div className="flex justify-center">
+                <PetFace
+                  appearance={{
+                    bodyColor: petBodyColor,
+                    eyes: petEyes,
+                    nose: petNose,
+                    mouth: petMouth,
+                  }}
+                  mood="content"
+                  style={{ width: 96, height: 96 }}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>Body color</Label>
+                <div className="flex flex-wrap items-center gap-2">
+                  {PET_BODY_COLORS.map((preset) => (
+                    <button
+                      key={preset.value}
+                      type="button"
+                      onClick={() => setPetBodyColor(preset.value)}
+                      title={preset.label}
+                      aria-label={preset.label}
+                      aria-pressed={petBodyColor === preset.value}
+                      className={`h-8 w-8 rounded-full border shadow-sm transition-transform hover:scale-105 ${
+                        petBodyColor === preset.value
+                          ? "ring-2 ring-ring ring-offset-2 ring-offset-background"
+                          : "border-border"
+                      }`}
+                      style={{ background: preset.gradient }}
+                    />
+                  ))}
+                </div>
+                <div className="flex items-center gap-2 pt-1">
+                  <button
+                    type="button"
+                    className="w-8 h-8 rounded-md border border-border flex-shrink-0 shadow-sm"
+                    style={{ background: petBodyColor }}
+                    onClick={() => setShowPetColorPicker((v) => !v)}
+                    aria-label="Pick custom body color"
+                  />
+                  <Input
+                    value={petBodyColor}
+                    onChange={(e) => setPetBodyColor(e.target.value)}
+                    placeholder="#7fd45a or preset name"
+                    className="font-mono text-sm"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="flex-shrink-0"
+                    onClick={() => setPetBodyColor(DEFAULT_BODY_COLOR)}
+                    disabled={petBodyColor === DEFAULT_BODY_COLOR}
+                    title="Reset to default body color"
+                    aria-label="Reset to default body color"
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                  </Button>
+                </div>
+                {showPetColorPicker && (
+                  <div className="mt-2">
+                    <HexColorPicker
+                      color={
+                        petBodyColor.startsWith("#") ? petBodyColor : "#7fd45a"
+                      }
+                      onChange={setPetBodyColor}
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <div className="space-y-1.5">
+                  <Label>Eyes</Label>
+                  <Select
+                    value={petEyes}
+                    onValueChange={(v) => setPetEyes(v as EyeStyle)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PET_EYES_OPTIONS.map((o) => (
+                        <SelectItem key={o.value} value={o.value}>
+                          {o.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label>Nose</Label>
+                  <Select
+                    value={petNose}
+                    onValueChange={(v) => setPetNose(v as NoseStyle)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PET_NOSE_OPTIONS.map((o) => (
+                        <SelectItem key={o.value} value={o.value}>
+                          {o.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label>Mouth</Label>
+                  <Select
+                    value={petMouth}
+                    onValueChange={(v) => setPetMouth(v as MouthStyle)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PET_MOUTH_OPTIONS.map((o) => (
+                        <SelectItem key={o.value} value={o.value}>
+                          {o.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
           )}
 
           {isNote && (

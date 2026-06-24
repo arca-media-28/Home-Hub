@@ -29,6 +29,7 @@ import AppTile from "@/components/tiles/AppTile";
 import IntegrationTile from "@/components/tiles/IntegrationTile";
 import NoteTile from "@/components/tiles/NoteTile";
 import TimerTile from "@/components/tiles/TimerTile";
+import TamagotchiTile from "@/components/tiles/TamagotchiTile";
 import TileEditModal, { type EditMode } from "@/components/TileEditModal";
 import { Button } from "@/components/ui/button";
 import {
@@ -182,6 +183,13 @@ function renderTileContent(tile: Tile, status: ServiceStatus | undefined, editMo
   // the tile-update flow, so it manages its own surface like the note.
   if (tile.integration === "timer") {
     return <TimerTile tile={tile} editMode={editMode} />;
+  }
+  // The Tamagotchi is a self-contained virtual-pet toy. Its living state
+  // (hunger/happiness/energy) decays over real time and is cared for in-place on
+  // the tile, so it paints its own surface and persists like the note/timer,
+  // bypassing the standard integration header.
+  if (tile.integration === "tamagotchi") {
+    return <TamagotchiTile tile={tile} editMode={editMode} />;
   }
   // Every tile renders as a styled app/link card. When an integration is
   // attached it also shows a compact live-status section from that service.

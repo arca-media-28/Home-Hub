@@ -31,3 +31,4 @@
 - [Multi-page dashboards](multi-page-dashboards.md) — tiles belong to a page; pageId scoping is fallback-safe (omit→findAllByUser so old tests pass); last-page delete guard; /pages/reorder before /:id; active page in localStorage.
 - [Note (post-it) tile](note-tile.md) — content (noteBody/noteItems) edited in-place in LOCKED mode via debounced tile-update; appearance (noteColor/noteFontSize/noteTextColor) in modal; modal save must preserve existing noteBody/noteItems or it clobbers content.
 - [Timer tile pomodoro mode](timer-pomodoro.md) — pomodoro = 3rd timerMode (not a new tile); per-phase anchor countdown; auto-advance carries overflow across phases in one pass; new tileSettings keys need pickTileSettings whitelist.
+- [Tamagotchi pet tile](tamagotchi-tile.md) — virtual-pet Fun tile; wall-clock decay anchored to persisted petUpdatedAt; must persist on add + tab-hide/unmount, not only on care actions.

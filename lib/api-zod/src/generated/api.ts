@@ -75,7 +75,7 @@ export const GetTilesResponseItem = zod.object({
   "userId": zod.number(),
   "pageId": zod.number().nullish().describe('The page this tile belongs to. Null only for tiles that predate the multi-page migration and could not be assigned a page.'),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'lidarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -147,7 +147,15 @@ export const GetTilesResponseItem = zod.object({
   "pomodoroCompletedSessions": zod.number().nullish().describe('Number of focus sessions completed in the current pomodoro cycle for a Timer tile (resets to zero after a long break). Null or absent means zero.'),
   "timerAlertEnabled": zod.boolean().nullish().describe('Whether a countdown Timer tile plays a chime and fires a browser notification when it reaches zero. Null or absent means disabled.'),
   "diceType": zod.union([zod.literal('d3'),zod.literal('d4'),zod.literal('d6'),zod.literal('d8'),zod.literal('d10'),zod.literal('d12'),zod.literal('d20'),zod.literal('d100'),zod.literal(null)]).nullish().describe('Die type for a Dice Roller tile, e.g. \"d4\", \"d6\", \"d20\". The number after the \"d\" is the number of sides each die has. Null or absent defaults to \"d6\".'),
-  "diceCount": zod.number().nullish().describe('How many dice a Dice Roller tile rolls at once (1-6). Null or absent defaults to 2.')
+  "diceCount": zod.number().nullish().describe('How many dice a Dice Roller tile rolls at once (1-6). Null or absent defaults to 2.'),
+  "petHunger": zod.number().nullish().describe('A Tamagotchi pet tile\'s hunger satisfaction, 0 (starving) to 100 (full). Decays over real elapsed time and rises when the pet is fed. Null or absent starts at a healthy default.'),
+  "petHappiness": zod.number().nullish().describe('A Tamagotchi pet tile\'s happiness, 0 (sad) to 100 (delighted). Decays over real elapsed time and rises when the pet is played with. Null or absent starts at a healthy default.'),
+  "petEnergy": zod.number().nullish().describe('A Tamagotchi pet tile\'s energy, 0 (exhausted) to 100 (rested). Decays over real elapsed time and rises when the pet rests. Null or absent starts at a healthy default.'),
+  "petUpdatedAt": zod.number().nullish().describe('Epoch milliseconds when a Tamagotchi pet tile\'s stats were last computed. On mount the client recomputes decay from the elapsed wall-clock time since this anchor so the pet keeps living across reloads and sessions. Null or absent means \"just now\".'),
+  "petBodyColor": zod.string().nullish().describe('A Tamagotchi pet tile\'s body color: a preset key (e.g. \"green\", \"blue\", \"pink\") or a custom #hex value. Null or absent uses the default preset.'),
+  "petEyes": zod.string().nullish().describe('A Tamagotchi pet tile\'s eye style (e.g. \"round\", \"dot\", \"happy\", \"sleepy\", \"star\", \"wink\"). Null or absent uses the default.'),
+  "petNose": zod.string().nullish().describe('A Tamagotchi pet tile\'s nose style (e.g. \"none\", \"dot\", \"round\", \"triangle\", \"heart\"). Null or absent uses the default.'),
+  "petMouth": zod.string().nullish().describe('A Tamagotchi pet tile\'s mouth style (e.g. \"smile\", \"neutral\", \"open\", \"cat\", \"frown\"). Null or absent uses the default.')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.'),
   "createdAt": zod.string().optional()
 })
@@ -160,7 +168,7 @@ export const GetTilesResponse = zod.array(GetTilesResponseItem)
 export const CreateTileBody = zod.object({
   "pageId": zod.number().nullish().describe('The page to create this tile on. Omit to fall back to the user\'s first page.'),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'lidarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -232,7 +240,15 @@ export const CreateTileBody = zod.object({
   "pomodoroCompletedSessions": zod.number().nullish().describe('Number of focus sessions completed in the current pomodoro cycle for a Timer tile (resets to zero after a long break). Null or absent means zero.'),
   "timerAlertEnabled": zod.boolean().nullish().describe('Whether a countdown Timer tile plays a chime and fires a browser notification when it reaches zero. Null or absent means disabled.'),
   "diceType": zod.union([zod.literal('d3'),zod.literal('d4'),zod.literal('d6'),zod.literal('d8'),zod.literal('d10'),zod.literal('d12'),zod.literal('d20'),zod.literal('d100'),zod.literal(null)]).nullish().describe('Die type for a Dice Roller tile, e.g. \"d4\", \"d6\", \"d20\". The number after the \"d\" is the number of sides each die has. Null or absent defaults to \"d6\".'),
-  "diceCount": zod.number().nullish().describe('How many dice a Dice Roller tile rolls at once (1-6). Null or absent defaults to 2.')
+  "diceCount": zod.number().nullish().describe('How many dice a Dice Roller tile rolls at once (1-6). Null or absent defaults to 2.'),
+  "petHunger": zod.number().nullish().describe('A Tamagotchi pet tile\'s hunger satisfaction, 0 (starving) to 100 (full). Decays over real elapsed time and rises when the pet is fed. Null or absent starts at a healthy default.'),
+  "petHappiness": zod.number().nullish().describe('A Tamagotchi pet tile\'s happiness, 0 (sad) to 100 (delighted). Decays over real elapsed time and rises when the pet is played with. Null or absent starts at a healthy default.'),
+  "petEnergy": zod.number().nullish().describe('A Tamagotchi pet tile\'s energy, 0 (exhausted) to 100 (rested). Decays over real elapsed time and rises when the pet rests. Null or absent starts at a healthy default.'),
+  "petUpdatedAt": zod.number().nullish().describe('Epoch milliseconds when a Tamagotchi pet tile\'s stats were last computed. On mount the client recomputes decay from the elapsed wall-clock time since this anchor so the pet keeps living across reloads and sessions. Null or absent means \"just now\".'),
+  "petBodyColor": zod.string().nullish().describe('A Tamagotchi pet tile\'s body color: a preset key (e.g. \"green\", \"blue\", \"pink\") or a custom #hex value. Null or absent uses the default preset.'),
+  "petEyes": zod.string().nullish().describe('A Tamagotchi pet tile\'s eye style (e.g. \"round\", \"dot\", \"happy\", \"sleepy\", \"star\", \"wink\"). Null or absent uses the default.'),
+  "petNose": zod.string().nullish().describe('A Tamagotchi pet tile\'s nose style (e.g. \"none\", \"dot\", \"round\", \"triangle\", \"heart\"). Null or absent uses the default.'),
+  "petMouth": zod.string().nullish().describe('A Tamagotchi pet tile\'s mouth style (e.g. \"smile\", \"neutral\", \"open\", \"cat\", \"frown\"). Null or absent uses the default.')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.')
 })
 
@@ -249,7 +265,7 @@ export const GetTileResponse = zod.object({
   "userId": zod.number(),
   "pageId": zod.number().nullish().describe('The page this tile belongs to. Null only for tiles that predate the multi-page migration and could not be assigned a page.'),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'lidarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -321,7 +337,15 @@ export const GetTileResponse = zod.object({
   "pomodoroCompletedSessions": zod.number().nullish().describe('Number of focus sessions completed in the current pomodoro cycle for a Timer tile (resets to zero after a long break). Null or absent means zero.'),
   "timerAlertEnabled": zod.boolean().nullish().describe('Whether a countdown Timer tile plays a chime and fires a browser notification when it reaches zero. Null or absent means disabled.'),
   "diceType": zod.union([zod.literal('d3'),zod.literal('d4'),zod.literal('d6'),zod.literal('d8'),zod.literal('d10'),zod.literal('d12'),zod.literal('d20'),zod.literal('d100'),zod.literal(null)]).nullish().describe('Die type for a Dice Roller tile, e.g. \"d4\", \"d6\", \"d20\". The number after the \"d\" is the number of sides each die has. Null or absent defaults to \"d6\".'),
-  "diceCount": zod.number().nullish().describe('How many dice a Dice Roller tile rolls at once (1-6). Null or absent defaults to 2.')
+  "diceCount": zod.number().nullish().describe('How many dice a Dice Roller tile rolls at once (1-6). Null or absent defaults to 2.'),
+  "petHunger": zod.number().nullish().describe('A Tamagotchi pet tile\'s hunger satisfaction, 0 (starving) to 100 (full). Decays over real elapsed time and rises when the pet is fed. Null or absent starts at a healthy default.'),
+  "petHappiness": zod.number().nullish().describe('A Tamagotchi pet tile\'s happiness, 0 (sad) to 100 (delighted). Decays over real elapsed time and rises when the pet is played with. Null or absent starts at a healthy default.'),
+  "petEnergy": zod.number().nullish().describe('A Tamagotchi pet tile\'s energy, 0 (exhausted) to 100 (rested). Decays over real elapsed time and rises when the pet rests. Null or absent starts at a healthy default.'),
+  "petUpdatedAt": zod.number().nullish().describe('Epoch milliseconds when a Tamagotchi pet tile\'s stats were last computed. On mount the client recomputes decay from the elapsed wall-clock time since this anchor so the pet keeps living across reloads and sessions. Null or absent means \"just now\".'),
+  "petBodyColor": zod.string().nullish().describe('A Tamagotchi pet tile\'s body color: a preset key (e.g. \"green\", \"blue\", \"pink\") or a custom #hex value. Null or absent uses the default preset.'),
+  "petEyes": zod.string().nullish().describe('A Tamagotchi pet tile\'s eye style (e.g. \"round\", \"dot\", \"happy\", \"sleepy\", \"star\", \"wink\"). Null or absent uses the default.'),
+  "petNose": zod.string().nullish().describe('A Tamagotchi pet tile\'s nose style (e.g. \"none\", \"dot\", \"round\", \"triangle\", \"heart\"). Null or absent uses the default.'),
+  "petMouth": zod.string().nullish().describe('A Tamagotchi pet tile\'s mouth style (e.g. \"smile\", \"neutral\", \"open\", \"cat\", \"frown\"). Null or absent uses the default.')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.'),
   "createdAt": zod.string().optional()
 })
@@ -335,7 +359,7 @@ export const UpdateTileParams = zod.object({
 })
 
 export const UpdateTileBody = zod.object({
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal(null)]).nullish(),
   "gridX": zod.number().optional(),
   "gridY": zod.number().optional(),
   "gridW": zod.number().optional(),
@@ -407,7 +431,15 @@ export const UpdateTileBody = zod.object({
   "pomodoroCompletedSessions": zod.number().nullish().describe('Number of focus sessions completed in the current pomodoro cycle for a Timer tile (resets to zero after a long break). Null or absent means zero.'),
   "timerAlertEnabled": zod.boolean().nullish().describe('Whether a countdown Timer tile plays a chime and fires a browser notification when it reaches zero. Null or absent means disabled.'),
   "diceType": zod.union([zod.literal('d3'),zod.literal('d4'),zod.literal('d6'),zod.literal('d8'),zod.literal('d10'),zod.literal('d12'),zod.literal('d20'),zod.literal('d100'),zod.literal(null)]).nullish().describe('Die type for a Dice Roller tile, e.g. \"d4\", \"d6\", \"d20\". The number after the \"d\" is the number of sides each die has. Null or absent defaults to \"d6\".'),
-  "diceCount": zod.number().nullish().describe('How many dice a Dice Roller tile rolls at once (1-6). Null or absent defaults to 2.')
+  "diceCount": zod.number().nullish().describe('How many dice a Dice Roller tile rolls at once (1-6). Null or absent defaults to 2.'),
+  "petHunger": zod.number().nullish().describe('A Tamagotchi pet tile\'s hunger satisfaction, 0 (starving) to 100 (full). Decays over real elapsed time and rises when the pet is fed. Null or absent starts at a healthy default.'),
+  "petHappiness": zod.number().nullish().describe('A Tamagotchi pet tile\'s happiness, 0 (sad) to 100 (delighted). Decays over real elapsed time and rises when the pet is played with. Null or absent starts at a healthy default.'),
+  "petEnergy": zod.number().nullish().describe('A Tamagotchi pet tile\'s energy, 0 (exhausted) to 100 (rested). Decays over real elapsed time and rises when the pet rests. Null or absent starts at a healthy default.'),
+  "petUpdatedAt": zod.number().nullish().describe('Epoch milliseconds when a Tamagotchi pet tile\'s stats were last computed. On mount the client recomputes decay from the elapsed wall-clock time since this anchor so the pet keeps living across reloads and sessions. Null or absent means \"just now\".'),
+  "petBodyColor": zod.string().nullish().describe('A Tamagotchi pet tile\'s body color: a preset key (e.g. \"green\", \"blue\", \"pink\") or a custom #hex value. Null or absent uses the default preset.'),
+  "petEyes": zod.string().nullish().describe('A Tamagotchi pet tile\'s eye style (e.g. \"round\", \"dot\", \"happy\", \"sleepy\", \"star\", \"wink\"). Null or absent uses the default.'),
+  "petNose": zod.string().nullish().describe('A Tamagotchi pet tile\'s nose style (e.g. \"none\", \"dot\", \"round\", \"triangle\", \"heart\"). Null or absent uses the default.'),
+  "petMouth": zod.string().nullish().describe('A Tamagotchi pet tile\'s mouth style (e.g. \"smile\", \"neutral\", \"open\", \"cat\", \"frown\"). Null or absent uses the default.')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.')
 })
 
@@ -416,7 +448,7 @@ export const UpdateTileResponse = zod.object({
   "userId": zod.number(),
   "pageId": zod.number().nullish().describe('The page this tile belongs to. Null only for tiles that predate the multi-page migration and could not be assigned a page.'),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'lidarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -488,7 +520,15 @@ export const UpdateTileResponse = zod.object({
   "pomodoroCompletedSessions": zod.number().nullish().describe('Number of focus sessions completed in the current pomodoro cycle for a Timer tile (resets to zero after a long break). Null or absent means zero.'),
   "timerAlertEnabled": zod.boolean().nullish().describe('Whether a countdown Timer tile plays a chime and fires a browser notification when it reaches zero. Null or absent means disabled.'),
   "diceType": zod.union([zod.literal('d3'),zod.literal('d4'),zod.literal('d6'),zod.literal('d8'),zod.literal('d10'),zod.literal('d12'),zod.literal('d20'),zod.literal('d100'),zod.literal(null)]).nullish().describe('Die type for a Dice Roller tile, e.g. \"d4\", \"d6\", \"d20\". The number after the \"d\" is the number of sides each die has. Null or absent defaults to \"d6\".'),
-  "diceCount": zod.number().nullish().describe('How many dice a Dice Roller tile rolls at once (1-6). Null or absent defaults to 2.')
+  "diceCount": zod.number().nullish().describe('How many dice a Dice Roller tile rolls at once (1-6). Null or absent defaults to 2.'),
+  "petHunger": zod.number().nullish().describe('A Tamagotchi pet tile\'s hunger satisfaction, 0 (starving) to 100 (full). Decays over real elapsed time and rises when the pet is fed. Null or absent starts at a healthy default.'),
+  "petHappiness": zod.number().nullish().describe('A Tamagotchi pet tile\'s happiness, 0 (sad) to 100 (delighted). Decays over real elapsed time and rises when the pet is played with. Null or absent starts at a healthy default.'),
+  "petEnergy": zod.number().nullish().describe('A Tamagotchi pet tile\'s energy, 0 (exhausted) to 100 (rested). Decays over real elapsed time and rises when the pet rests. Null or absent starts at a healthy default.'),
+  "petUpdatedAt": zod.number().nullish().describe('Epoch milliseconds when a Tamagotchi pet tile\'s stats were last computed. On mount the client recomputes decay from the elapsed wall-clock time since this anchor so the pet keeps living across reloads and sessions. Null or absent means \"just now\".'),
+  "petBodyColor": zod.string().nullish().describe('A Tamagotchi pet tile\'s body color: a preset key (e.g. \"green\", \"blue\", \"pink\") or a custom #hex value. Null or absent uses the default preset.'),
+  "petEyes": zod.string().nullish().describe('A Tamagotchi pet tile\'s eye style (e.g. \"round\", \"dot\", \"happy\", \"sleepy\", \"star\", \"wink\"). Null or absent uses the default.'),
+  "petNose": zod.string().nullish().describe('A Tamagotchi pet tile\'s nose style (e.g. \"none\", \"dot\", \"round\", \"triangle\", \"heart\"). Null or absent uses the default.'),
+  "petMouth": zod.string().nullish().describe('A Tamagotchi pet tile\'s mouth style (e.g. \"smile\", \"neutral\", \"open\", \"cat\", \"frown\"). Null or absent uses the default.')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.'),
   "createdAt": zod.string().optional()
 })
@@ -521,7 +561,7 @@ export const SaveLayoutResponseItem = zod.object({
   "userId": zod.number(),
   "pageId": zod.number().nullish().describe('The page this tile belongs to. Null only for tiles that predate the multi-page migration and could not be assigned a page.'),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'lidarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -593,7 +633,15 @@ export const SaveLayoutResponseItem = zod.object({
   "pomodoroCompletedSessions": zod.number().nullish().describe('Number of focus sessions completed in the current pomodoro cycle for a Timer tile (resets to zero after a long break). Null or absent means zero.'),
   "timerAlertEnabled": zod.boolean().nullish().describe('Whether a countdown Timer tile plays a chime and fires a browser notification when it reaches zero. Null or absent means disabled.'),
   "diceType": zod.union([zod.literal('d3'),zod.literal('d4'),zod.literal('d6'),zod.literal('d8'),zod.literal('d10'),zod.literal('d12'),zod.literal('d20'),zod.literal('d100'),zod.literal(null)]).nullish().describe('Die type for a Dice Roller tile, e.g. \"d4\", \"d6\", \"d20\". The number after the \"d\" is the number of sides each die has. Null or absent defaults to \"d6\".'),
-  "diceCount": zod.number().nullish().describe('How many dice a Dice Roller tile rolls at once (1-6). Null or absent defaults to 2.')
+  "diceCount": zod.number().nullish().describe('How many dice a Dice Roller tile rolls at once (1-6). Null or absent defaults to 2.'),
+  "petHunger": zod.number().nullish().describe('A Tamagotchi pet tile\'s hunger satisfaction, 0 (starving) to 100 (full). Decays over real elapsed time and rises when the pet is fed. Null or absent starts at a healthy default.'),
+  "petHappiness": zod.number().nullish().describe('A Tamagotchi pet tile\'s happiness, 0 (sad) to 100 (delighted). Decays over real elapsed time and rises when the pet is played with. Null or absent starts at a healthy default.'),
+  "petEnergy": zod.number().nullish().describe('A Tamagotchi pet tile\'s energy, 0 (exhausted) to 100 (rested). Decays over real elapsed time and rises when the pet rests. Null or absent starts at a healthy default.'),
+  "petUpdatedAt": zod.number().nullish().describe('Epoch milliseconds when a Tamagotchi pet tile\'s stats were last computed. On mount the client recomputes decay from the elapsed wall-clock time since this anchor so the pet keeps living across reloads and sessions. Null or absent means \"just now\".'),
+  "petBodyColor": zod.string().nullish().describe('A Tamagotchi pet tile\'s body color: a preset key (e.g. \"green\", \"blue\", \"pink\") or a custom #hex value. Null or absent uses the default preset.'),
+  "petEyes": zod.string().nullish().describe('A Tamagotchi pet tile\'s eye style (e.g. \"round\", \"dot\", \"happy\", \"sleepy\", \"star\", \"wink\"). Null or absent uses the default.'),
+  "petNose": zod.string().nullish().describe('A Tamagotchi pet tile\'s nose style (e.g. \"none\", \"dot\", \"round\", \"triangle\", \"heart\"). Null or absent uses the default.'),
+  "petMouth": zod.string().nullish().describe('A Tamagotchi pet tile\'s mouth style (e.g. \"smile\", \"neutral\", \"open\", \"cat\", \"frown\"). Null or absent uses the default.')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.'),
   "createdAt": zod.string().optional()
 })

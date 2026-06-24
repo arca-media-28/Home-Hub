@@ -77,6 +77,14 @@ interface TileSettings {
   timerAlertEnabled?: boolean | null;
   diceType?: string | null;
   diceCount?: number | null;
+  petHunger?: number | null;
+  petHappiness?: number | null;
+  petEnergy?: number | null;
+  petUpdatedAt?: number | null;
+  petBodyColor?: string | null;
+  petEyes?: string | null;
+  petNose?: string | null;
+  petMouth?: string | null;
 }
 
 // A single checklist/to-do item on a Note (post-it) tile: its label text and
@@ -387,6 +395,46 @@ function pickTileSettings(obj: Record<string, unknown>): TileSettings {
     result.diceCount = obj["diceCount"];
   } else if (obj["diceCount"] === null) {
     result.diceCount = null;
+  }
+  if (typeof obj["petHunger"] === "number") {
+    result.petHunger = obj["petHunger"];
+  } else if (obj["petHunger"] === null) {
+    result.petHunger = null;
+  }
+  if (typeof obj["petHappiness"] === "number") {
+    result.petHappiness = obj["petHappiness"];
+  } else if (obj["petHappiness"] === null) {
+    result.petHappiness = null;
+  }
+  if (typeof obj["petEnergy"] === "number") {
+    result.petEnergy = obj["petEnergy"];
+  } else if (obj["petEnergy"] === null) {
+    result.petEnergy = null;
+  }
+  if (typeof obj["petUpdatedAt"] === "number") {
+    result.petUpdatedAt = obj["petUpdatedAt"];
+  } else if (obj["petUpdatedAt"] === null) {
+    result.petUpdatedAt = null;
+  }
+  if (typeof obj["petBodyColor"] === "string") {
+    result.petBodyColor = obj["petBodyColor"];
+  } else if (obj["petBodyColor"] === null) {
+    result.petBodyColor = null;
+  }
+  if (typeof obj["petEyes"] === "string") {
+    result.petEyes = obj["petEyes"];
+  } else if (obj["petEyes"] === null) {
+    result.petEyes = null;
+  }
+  if (typeof obj["petNose"] === "string") {
+    result.petNose = obj["petNose"];
+  } else if (obj["petNose"] === null) {
+    result.petNose = null;
+  }
+  if (typeof obj["petMouth"] === "string") {
+    result.petMouth = obj["petMouth"];
+  } else if (obj["petMouth"] === null) {
+    result.petMouth = null;
   }
   return result;
 }

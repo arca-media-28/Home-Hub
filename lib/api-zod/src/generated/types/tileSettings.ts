@@ -253,4 +253,44 @@ export type TileSettings = {
      * @nullable
      */
   diceCount?: number | null;
+  /**
+     * A Tamagotchi pet tile's hunger satisfaction, 0 (starving) to 100 (full). Decays over real elapsed time and rises when the pet is fed. Null or absent starts at a healthy default.
+     * @nullable
+     */
+  petHunger?: number | null;
+  /**
+     * A Tamagotchi pet tile's happiness, 0 (sad) to 100 (delighted). Decays over real elapsed time and rises when the pet is played with. Null or absent starts at a healthy default.
+     * @nullable
+     */
+  petHappiness?: number | null;
+  /**
+     * A Tamagotchi pet tile's energy, 0 (exhausted) to 100 (rested). Decays over real elapsed time and rises when the pet rests. Null or absent starts at a healthy default.
+     * @nullable
+     */
+  petEnergy?: number | null;
+  /**
+     * Epoch milliseconds when a Tamagotchi pet tile's stats were last computed. On mount the client recomputes decay from the elapsed wall-clock time since this anchor so the pet keeps living across reloads and sessions. Null or absent means "just now".
+     * @nullable
+     */
+  petUpdatedAt?: number | null;
+  /**
+     * A Tamagotchi pet tile's body color: a preset key (e.g. "green", "blue", "pink") or a custom #hex value. Null or absent uses the default preset.
+     * @nullable
+     */
+  petBodyColor?: string | null;
+  /**
+     * A Tamagotchi pet tile's eye style (e.g. "round", "dot", "happy", "sleepy", "star", "wink"). Null or absent uses the default.
+     * @nullable
+     */
+  petEyes?: string | null;
+  /**
+     * A Tamagotchi pet tile's nose style (e.g. "none", "dot", "round", "triangle", "heart"). Null or absent uses the default.
+     * @nullable
+     */
+  petNose?: string | null;
+  /**
+     * A Tamagotchi pet tile's mouth style (e.g. "smile", "neutral", "open", "cat", "frown"). Null or absent uses the default.
+     * @nullable
+     */
+  petMouth?: string | null;
 } | null | null;
