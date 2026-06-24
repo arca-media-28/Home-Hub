@@ -23,6 +23,7 @@ import AudioPlayerTile from "./AudioPlayerTile";
 import EightBallTile from "./EightBallTile";
 import DiceTile from "./DiceTile";
 import CoinFlipTile from "./CoinFlipTile";
+import FortuneTile from "./FortuneTile";
 import { resolveEnabledMetrics, tileDensity, type TileDensity } from "./metrics";
 import { resolveImageStyle } from "./imageStyle";
 import { openTileUrl } from "@/lib/utils";
@@ -51,6 +52,7 @@ export const INTEGRATION_LABELS: Record<string, string> = {
   [TileIntegration.eightball]: "Magic Eight Ball",
   [TileIntegration.dice]: "Dice Roller",
   [TileIntegration.coinflip]: "Coin Flip",
+  [TileIntegration.fortune]: "Fortune",
 };
 
 // Props every integration widget receives: the resolved set of enabled metric
@@ -111,6 +113,8 @@ function renderStatusView(integration: string, props: WidgetProps) {
       return <DiceTile tileSettings={props.tileSettings} />;
     case TileIntegration.coinflip:
       return <CoinFlipTile />;
+    case TileIntegration.fortune:
+      return <FortuneTile />;
     default:
       return null;
   }

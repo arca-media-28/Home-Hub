@@ -151,6 +151,7 @@ const INTEGRATIONS = [
   { value: TileIntegration.eightball, label: "Magic Eight Ball" },
   { value: TileIntegration.dice, label: "Dice Roller" },
   { value: TileIntegration.coinflip, label: "Coin Flip" },
+  { value: TileIntegration.fortune, label: "Fortune" },
   { value: TileIntegration.note, label: "Note" },
   { value: TileIntegration.spacer, label: "Spacer" },
   { value: TileIntegration.divider, label: "Section Label" },
@@ -508,6 +509,11 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
   // name and size matter.
   const isDice = integration === TileIntegration.dice;
   const isCoinFlip = integration === TileIntegration.coinflip;
+  // The Fortune tile is the same kind of self-contained client-side toy: it
+  // shows a random quote/fortune from a baked-in list, refreshed on click or on
+  // a timer. No link, image, background, metrics, or settings — only a name and
+  // size matter.
+  const isFortune = integration === TileIntegration.fortune;
   // The spacer is a layout-only tile: an invisible gap with no name, URL,
   // image, background, or live data. Only its size/position matter, so the
   // editor strips every content field and shows a short description instead.
@@ -531,7 +537,7 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
   // Tiles that carry no link/image/background content: layout helpers plus the
   // note and timer, which paint their own surface.
   const isContentless =
-    isLayoutTile || isNote || isTimer || isEightball || isDice || isCoinFlip;
+    isLayoutTile || isNote || isTimer || isEightball || isDice || isCoinFlip || isFortune;
 
   // Teams for the chosen leagues, for the dependent team multi-select. Sourced
   // from the baked-in catalog (ESPN's /teams endpoint isn't CORS-enabled), so
@@ -1173,6 +1179,15 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
               A flippable coin. Click the tile to spin it and land on Heads or
               Tails. Fully self-contained — no connection or settings needed.
               Give it a name and resize it to taste.
+            </p>
+          )}
+
+          {isFortune && (
+            <p className="text-sm text-muted-foreground border-t border-border pt-4">
+              A daily fortune. The tile shows a random quote from a curated list,
+              refreshing on its own every so often — or click it for a new one.
+              Fully self-contained — no connection or settings needed. Give it a
+              name and resize it to taste.
             </p>
           )}
 

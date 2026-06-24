@@ -76,6 +76,7 @@ export const TileIntegration = {
   eightball: 'eightball',
   dice: 'dice',
   coinflip: 'coinflip',
+  fortune: 'fortune',
 } as const;
 
 /**
@@ -468,6 +469,7 @@ export const TileInputIntegration = {
   eightball: 'eightball',
   dice: 'dice',
   coinflip: 'coinflip',
+  fortune: 'fortune',
 } as const;
 
 export interface TileInput {
@@ -536,6 +538,7 @@ export const TileUpdateIntegration = {
   eightball: 'eightball',
   dice: 'dice',
   coinflip: 'coinflip',
+  fortune: 'fortune',
 } as const;
 
 export interface TileUpdate {

@@ -39,4 +39,5 @@ export const TileUpdateIntegration = {
   eightball: 'eightball',
   dice: 'dice',
   coinflip: 'coinflip',
+  fortune: 'fortune',
 } as const;

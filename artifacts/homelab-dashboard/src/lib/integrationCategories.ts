@@ -53,6 +53,7 @@ const CATEGORY_BY_KEY: Record<string, Category> = {
   eightball: "Fun",
   dice: "Fun",
   coinflip: "Fun",
+  fortune: "Fun",
 };
 
 // The category for a given integration / service key. Unmapped keys land in
