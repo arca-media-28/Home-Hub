@@ -52,6 +52,7 @@ import {
   DEFAULT_NOTE_TEXT_COLOR,
   type NoteFontSize,
 } from "@/components/tiles/NoteTile";
+import { DEFAULT_TIMER_DURATION_SECONDS } from "@/components/tiles/TimerTile";
 import { SPORTS_LEAGUES, getLeagueTeams } from "@/lib/sports";
 import {
   fetchSleeperUser,
@@ -127,6 +128,7 @@ const INTEGRATIONS = [
   { value: TileIntegration.ersatztv, label: "ErsatzTV" },
   { value: TileIntegration.audioplayer, label: "Audio Player" },
   { value: TileIntegration.clock, label: "Local Time" },
+  { value: TileIntegration.timer, label: "Timer" },
   { value: TileIntegration.weather, label: "Weather" },
   { value: TileIntegration.sports, label: "Sports" },
   { value: TileIntegration.sleeper, label: "Fantasy" },
@@ -194,6 +196,22 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
   );
   const [clockShowDate, setClockShowDate] = useState<boolean>(
     tile?.tileSettings?.clockShowDate ?? false,
+  );
+  // Timer widget options. The countdown starting duration is edited as
+  // hours/minutes/seconds and combined into timerDuration (seconds) on save.
+  const initialTimerDuration =
+    tile?.tileSettings?.timerDuration ?? DEFAULT_TIMER_DURATION_SECONDS;
+  const [timerMode, setTimerMode] = useState<"countup" | "countdown">(
+    tile?.tileSettings?.timerMode ?? "countup",
+  );
+  const [timerHours, setTimerHours] = useState<number>(
+    Math.floor(initialTimerDuration / 3600),
+  );
+  const [timerMinutes, setTimerMinutes] = useState<number>(
+    Math.floor((initialTimerDuration % 3600) / 60),
+  );
+  const [timerSeconds, setTimerSeconds] = useState<number>(
+    initialTimerDuration % 60,
   );
   // Weather widget options.
   const [weatherAutoLocate, setWeatherAutoLocate] = useState<boolean>(
@@ -334,6 +352,13 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
       setClockFormat(tile?.tileSettings?.clockFormat ?? "24");
       setClockShowSeconds(tile?.tileSettings?.clockShowSeconds ?? false);
       setClockShowDate(tile?.tileSettings?.clockShowDate ?? false);
+      {
+        const d = tile?.tileSettings?.timerDuration ?? DEFAULT_TIMER_DURATION_SECONDS;
+        setTimerMode(tile?.tileSettings?.timerMode ?? "countup");
+        setTimerHours(Math.floor(d / 3600));
+        setTimerMinutes(Math.floor((d % 3600) / 60));
+        setTimerSeconds(d % 60);
+      }
       setWeatherAutoLocate(tile?.tileSettings?.weatherAutoLocate ?? true);
       setWeatherLocation(tile?.tileSettings?.weatherLocation ?? "");
       setWeatherUnits(tile?.tileSettings?.weatherUnits ?? "c");
@@ -427,12 +452,17 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
   // place on the tile, so the editor strips name/URL/image/background/metrics
   // and instead exposes the post-it's appearance (color, font size, text color).
   const isNote = integration === TileIntegration.note;
+  // The timer is a client-side stopwatch/countdown tile. Like the note it paints
+  // its own surface (big readout + controls) with no header, so the editor
+  // strips name/URL/image/background/metrics and instead exposes the mode and
+  // countdown duration.
+  const isTimer = integration === TileIntegration.timer;
   // Layout-only tiles (spacer + divider) share the same stripped editor: no
   // URL, image, background, or metric sections.
   const isLayoutTile = isSpacer || isDivider;
   // Tiles that carry no link/image/background content: layout helpers plus the
-  // note, which paints its own post-it surface.
-  const isContentless = isLayoutTile || isNote;
+  // note and timer, which paint their own surface.
+  const isContentless = isLayoutTile || isNote || isTimer;
 
   // Teams for the chosen leagues, for the dependent team multi-select. Sourced
   // from the baked-in catalog (ESPN's /teams endpoint isn't CORS-enabled), so
@@ -807,7 +837,7 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
       // A spacer carries no content at all; a divider keeps only its label
       // (name). Both clear url/background/image so converting an existing tile
       // into a layout tile leaves nothing behind.
-      name: isSpacer || isNote ? "" : name || undefined,
+      name: isSpacer || isNote || isTimer ? "" : name || undefined,
       url: isContentless ? "" : url || undefined,
       // Send the raw value so clearing (null) reaches the body and the server
       // writes NULL; otherwise an undefined field is dropped and the old color
@@ -826,8 +856,9 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
       titleColor: integration === NONE ? titleColor : null,
       // Applies to both plain and integration tiles.
       hideTitle,
-      // Plain app/link tiles carry no metric selection; neither does the note.
-      metrics: integration === NONE || isNote ? null : metrics,
+      // Plain app/link tiles carry no metric selection; neither does the note
+      // or timer.
+      metrics: integration === NONE || isNote || isTimer ? null : metrics,
       // tileSettings carries per-widget config: the qBittorrent category
       // filter, the clock format options, the weather options, or the sports
       // options. The generic "scrollable" option applies to every tile, so it
@@ -837,6 +868,23 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
           ? { categoryFilter, groupByCategory }
           : isClock
             ? { clockFormat, clockShowSeconds, clockShowDate }
+            : isTimer
+            ? {
+                // Editing a timer's config resets its run state so the new mode
+                // / duration starts cleanly. Run state is otherwise owned and
+                // persisted by the tile itself (Start/Pause/Reset).
+                timerMode,
+                timerDuration:
+                  timerMode === "countdown"
+                    ? Math.max(
+                        1,
+                        timerHours * 3600 + timerMinutes * 60 + timerSeconds,
+                      )
+                    : null,
+                timerRunning: false,
+                timerStartedAt: null,
+                timerAccumulatedMs: 0,
+              }
             : isWeather
               ? {
                   weatherAutoLocate,
@@ -1311,6 +1359,88 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
               </label>
               <p className="text-xs text-muted-foreground">
                 The clock uses your browser's local time zone.
+              </p>
+            </div>
+          )}
+
+          {isTimer && (
+            <div className="space-y-3 border-t border-border pt-4">
+              <div className="space-y-1.5">
+                <Label>Mode</Label>
+                <Select
+                  value={timerMode}
+                  onValueChange={(v) => setTimerMode(v as "countup" | "countdown")}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="countup">Count up (stopwatch)</SelectItem>
+                    <SelectItem value="countdown">Count down</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {timerMode === "countdown" && (
+                <div className="space-y-1.5">
+                  <Label>Starting duration</Label>
+                  <div className="flex items-end gap-2">
+                    <div className="flex-1 space-y-1">
+                      <Input
+                        type="number"
+                        min={0}
+                        max={99}
+                        value={timerHours}
+                        onChange={(e) =>
+                          setTimerHours(
+                            Math.max(0, Math.min(99, Math.floor(Number(e.target.value) || 0))),
+                          )
+                        }
+                        aria-label="Hours"
+                      />
+                      <span className="block text-center text-[11px] text-muted-foreground">
+                        hours
+                      </span>
+                    </div>
+                    <div className="flex-1 space-y-1">
+                      <Input
+                        type="number"
+                        min={0}
+                        max={59}
+                        value={timerMinutes}
+                        onChange={(e) =>
+                          setTimerMinutes(
+                            Math.max(0, Math.min(59, Math.floor(Number(e.target.value) || 0))),
+                          )
+                        }
+                        aria-label="Minutes"
+                      />
+                      <span className="block text-center text-[11px] text-muted-foreground">
+                        min
+                      </span>
+                    </div>
+                    <div className="flex-1 space-y-1">
+                      <Input
+                        type="number"
+                        min={0}
+                        max={59}
+                        value={timerSeconds}
+                        onChange={(e) =>
+                          setTimerSeconds(
+                            Math.max(0, Math.min(59, Math.floor(Number(e.target.value) || 0))),
+                          )
+                        }
+                        aria-label="Seconds"
+                      />
+                      <span className="block text-center text-[11px] text-muted-foreground">
+                        sec
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+              <p className="text-xs text-muted-foreground">
+                Start, pause, and reset the timer on the tile itself. Saving these
+                settings resets a running timer.
               </p>
             </div>
           )}

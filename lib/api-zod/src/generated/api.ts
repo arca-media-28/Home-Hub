@@ -75,7 +75,7 @@ export const GetTilesResponseItem = zod.object({
   "userId": zod.number(),
   "pageId": zod.number().nullish().describe('The page this tile belongs to. Null only for tiles that predate the multi-page migration and could not be assigned a page.'),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'lidarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -133,7 +133,12 @@ export const GetTilesResponseItem = zod.object({
 })).nullish().describe('Checklist \/ to-do items for a Note tile. Each item has text and a done flag (rendered with a strike-through when done). Null or absent means no checklist.'),
   "noteColor": zod.string().nullish().describe('Background color of a Note (post-it) tile as a CSS color string (e.g. a preset note color or a custom hex). Null or absent uses the default post-it yellow.'),
   "noteFontSize": zod.union([zod.literal('sm'),zod.literal('md'),zod.literal('lg'),zod.literal(null)]).nullish().describe('Font size for a Note tile\'s text: \"sm\", \"md\", or \"lg\". Absent or null defaults to \"md\".'),
-  "noteTextColor": zod.string().nullish().describe('CSS color for a Note tile\'s text (note body and checklist). Null or absent uses a sensible dark default that reads on light post-it colors.')
+  "noteTextColor": zod.string().nullish().describe('CSS color for a Note tile\'s text (note body and checklist). Null or absent uses a sensible dark default that reads on light post-it colors.'),
+  "timerMode": zod.union([zod.literal('countup'),zod.literal('countdown'),zod.literal(null)]).nullish().describe('Mode for a Timer tile: \"countup\" for a stopwatch counting elapsed time from zero, \"countdown\" for counting down from timerDuration to zero. Absent or null defaults to \"countup\".'),
+  "timerDuration": zod.number().nullish().describe('Starting duration in seconds for a countdown Timer tile. Ignored in count-up mode. Null or absent defaults to a sensible value.'),
+  "timerRunning": zod.boolean().nullish().describe('Whether a Timer tile is currently running. When true the live display advances from timerStartedAt; when false it is paused at timerAccumulatedMs. Absent or false means paused (the default).'),
+  "timerStartedAt": zod.number().nullish().describe('Epoch milliseconds when the Timer tile\'s current run segment began. Combined with timerAccumulatedMs this lets the live display resume accurately after a refresh or page navigation. Null or absent when the timer is paused.'),
+  "timerAccumulatedMs": zod.number().nullish().describe('Elapsed milliseconds accumulated across previous run segments of a Timer tile (i.e. before timerStartedAt). Null or absent means zero.')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.'),
   "createdAt": zod.string().optional()
 })
@@ -146,7 +151,7 @@ export const GetTilesResponse = zod.array(GetTilesResponseItem)
 export const CreateTileBody = zod.object({
   "pageId": zod.number().nullish().describe('The page to create this tile on. Omit to fall back to the user\'s first page.'),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'lidarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -204,7 +209,12 @@ export const CreateTileBody = zod.object({
 })).nullish().describe('Checklist \/ to-do items for a Note tile. Each item has text and a done flag (rendered with a strike-through when done). Null or absent means no checklist.'),
   "noteColor": zod.string().nullish().describe('Background color of a Note (post-it) tile as a CSS color string (e.g. a preset note color or a custom hex). Null or absent uses the default post-it yellow.'),
   "noteFontSize": zod.union([zod.literal('sm'),zod.literal('md'),zod.literal('lg'),zod.literal(null)]).nullish().describe('Font size for a Note tile\'s text: \"sm\", \"md\", or \"lg\". Absent or null defaults to \"md\".'),
-  "noteTextColor": zod.string().nullish().describe('CSS color for a Note tile\'s text (note body and checklist). Null or absent uses a sensible dark default that reads on light post-it colors.')
+  "noteTextColor": zod.string().nullish().describe('CSS color for a Note tile\'s text (note body and checklist). Null or absent uses a sensible dark default that reads on light post-it colors.'),
+  "timerMode": zod.union([zod.literal('countup'),zod.literal('countdown'),zod.literal(null)]).nullish().describe('Mode for a Timer tile: \"countup\" for a stopwatch counting elapsed time from zero, \"countdown\" for counting down from timerDuration to zero. Absent or null defaults to \"countup\".'),
+  "timerDuration": zod.number().nullish().describe('Starting duration in seconds for a countdown Timer tile. Ignored in count-up mode. Null or absent defaults to a sensible value.'),
+  "timerRunning": zod.boolean().nullish().describe('Whether a Timer tile is currently running. When true the live display advances from timerStartedAt; when false it is paused at timerAccumulatedMs. Absent or false means paused (the default).'),
+  "timerStartedAt": zod.number().nullish().describe('Epoch milliseconds when the Timer tile\'s current run segment began. Combined with timerAccumulatedMs this lets the live display resume accurately after a refresh or page navigation. Null or absent when the timer is paused.'),
+  "timerAccumulatedMs": zod.number().nullish().describe('Elapsed milliseconds accumulated across previous run segments of a Timer tile (i.e. before timerStartedAt). Null or absent means zero.')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.')
 })
 
@@ -221,7 +231,7 @@ export const GetTileResponse = zod.object({
   "userId": zod.number(),
   "pageId": zod.number().nullish().describe('The page this tile belongs to. Null only for tiles that predate the multi-page migration and could not be assigned a page.'),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'lidarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -279,7 +289,12 @@ export const GetTileResponse = zod.object({
 })).nullish().describe('Checklist \/ to-do items for a Note tile. Each item has text and a done flag (rendered with a strike-through when done). Null or absent means no checklist.'),
   "noteColor": zod.string().nullish().describe('Background color of a Note (post-it) tile as a CSS color string (e.g. a preset note color or a custom hex). Null or absent uses the default post-it yellow.'),
   "noteFontSize": zod.union([zod.literal('sm'),zod.literal('md'),zod.literal('lg'),zod.literal(null)]).nullish().describe('Font size for a Note tile\'s text: \"sm\", \"md\", or \"lg\". Absent or null defaults to \"md\".'),
-  "noteTextColor": zod.string().nullish().describe('CSS color for a Note tile\'s text (note body and checklist). Null or absent uses a sensible dark default that reads on light post-it colors.')
+  "noteTextColor": zod.string().nullish().describe('CSS color for a Note tile\'s text (note body and checklist). Null or absent uses a sensible dark default that reads on light post-it colors.'),
+  "timerMode": zod.union([zod.literal('countup'),zod.literal('countdown'),zod.literal(null)]).nullish().describe('Mode for a Timer tile: \"countup\" for a stopwatch counting elapsed time from zero, \"countdown\" for counting down from timerDuration to zero. Absent or null defaults to \"countup\".'),
+  "timerDuration": zod.number().nullish().describe('Starting duration in seconds for a countdown Timer tile. Ignored in count-up mode. Null or absent defaults to a sensible value.'),
+  "timerRunning": zod.boolean().nullish().describe('Whether a Timer tile is currently running. When true the live display advances from timerStartedAt; when false it is paused at timerAccumulatedMs. Absent or false means paused (the default).'),
+  "timerStartedAt": zod.number().nullish().describe('Epoch milliseconds when the Timer tile\'s current run segment began. Combined with timerAccumulatedMs this lets the live display resume accurately after a refresh or page navigation. Null or absent when the timer is paused.'),
+  "timerAccumulatedMs": zod.number().nullish().describe('Elapsed milliseconds accumulated across previous run segments of a Timer tile (i.e. before timerStartedAt). Null or absent means zero.')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.'),
   "createdAt": zod.string().optional()
 })
@@ -293,7 +308,7 @@ export const UpdateTileParams = zod.object({
 })
 
 export const UpdateTileBody = zod.object({
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal(null)]).nullish(),
   "gridX": zod.number().optional(),
   "gridY": zod.number().optional(),
   "gridW": zod.number().optional(),
@@ -351,7 +366,12 @@ export const UpdateTileBody = zod.object({
 })).nullish().describe('Checklist \/ to-do items for a Note tile. Each item has text and a done flag (rendered with a strike-through when done). Null or absent means no checklist.'),
   "noteColor": zod.string().nullish().describe('Background color of a Note (post-it) tile as a CSS color string (e.g. a preset note color or a custom hex). Null or absent uses the default post-it yellow.'),
   "noteFontSize": zod.union([zod.literal('sm'),zod.literal('md'),zod.literal('lg'),zod.literal(null)]).nullish().describe('Font size for a Note tile\'s text: \"sm\", \"md\", or \"lg\". Absent or null defaults to \"md\".'),
-  "noteTextColor": zod.string().nullish().describe('CSS color for a Note tile\'s text (note body and checklist). Null or absent uses a sensible dark default that reads on light post-it colors.')
+  "noteTextColor": zod.string().nullish().describe('CSS color for a Note tile\'s text (note body and checklist). Null or absent uses a sensible dark default that reads on light post-it colors.'),
+  "timerMode": zod.union([zod.literal('countup'),zod.literal('countdown'),zod.literal(null)]).nullish().describe('Mode for a Timer tile: \"countup\" for a stopwatch counting elapsed time from zero, \"countdown\" for counting down from timerDuration to zero. Absent or null defaults to \"countup\".'),
+  "timerDuration": zod.number().nullish().describe('Starting duration in seconds for a countdown Timer tile. Ignored in count-up mode. Null or absent defaults to a sensible value.'),
+  "timerRunning": zod.boolean().nullish().describe('Whether a Timer tile is currently running. When true the live display advances from timerStartedAt; when false it is paused at timerAccumulatedMs. Absent or false means paused (the default).'),
+  "timerStartedAt": zod.number().nullish().describe('Epoch milliseconds when the Timer tile\'s current run segment began. Combined with timerAccumulatedMs this lets the live display resume accurately after a refresh or page navigation. Null or absent when the timer is paused.'),
+  "timerAccumulatedMs": zod.number().nullish().describe('Elapsed milliseconds accumulated across previous run segments of a Timer tile (i.e. before timerStartedAt). Null or absent means zero.')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.')
 })
 
@@ -360,7 +380,7 @@ export const UpdateTileResponse = zod.object({
   "userId": zod.number(),
   "pageId": zod.number().nullish().describe('The page this tile belongs to. Null only for tiles that predate the multi-page migration and could not be assigned a page.'),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'lidarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -418,7 +438,12 @@ export const UpdateTileResponse = zod.object({
 })).nullish().describe('Checklist \/ to-do items for a Note tile. Each item has text and a done flag (rendered with a strike-through when done). Null or absent means no checklist.'),
   "noteColor": zod.string().nullish().describe('Background color of a Note (post-it) tile as a CSS color string (e.g. a preset note color or a custom hex). Null or absent uses the default post-it yellow.'),
   "noteFontSize": zod.union([zod.literal('sm'),zod.literal('md'),zod.literal('lg'),zod.literal(null)]).nullish().describe('Font size for a Note tile\'s text: \"sm\", \"md\", or \"lg\". Absent or null defaults to \"md\".'),
-  "noteTextColor": zod.string().nullish().describe('CSS color for a Note tile\'s text (note body and checklist). Null or absent uses a sensible dark default that reads on light post-it colors.')
+  "noteTextColor": zod.string().nullish().describe('CSS color for a Note tile\'s text (note body and checklist). Null or absent uses a sensible dark default that reads on light post-it colors.'),
+  "timerMode": zod.union([zod.literal('countup'),zod.literal('countdown'),zod.literal(null)]).nullish().describe('Mode for a Timer tile: \"countup\" for a stopwatch counting elapsed time from zero, \"countdown\" for counting down from timerDuration to zero. Absent or null defaults to \"countup\".'),
+  "timerDuration": zod.number().nullish().describe('Starting duration in seconds for a countdown Timer tile. Ignored in count-up mode. Null or absent defaults to a sensible value.'),
+  "timerRunning": zod.boolean().nullish().describe('Whether a Timer tile is currently running. When true the live display advances from timerStartedAt; when false it is paused at timerAccumulatedMs. Absent or false means paused (the default).'),
+  "timerStartedAt": zod.number().nullish().describe('Epoch milliseconds when the Timer tile\'s current run segment began. Combined with timerAccumulatedMs this lets the live display resume accurately after a refresh or page navigation. Null or absent when the timer is paused.'),
+  "timerAccumulatedMs": zod.number().nullish().describe('Elapsed milliseconds accumulated across previous run segments of a Timer tile (i.e. before timerStartedAt). Null or absent means zero.')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.'),
   "createdAt": zod.string().optional()
 })
@@ -451,7 +476,7 @@ export const SaveLayoutResponseItem = zod.object({
   "userId": zod.number(),
   "pageId": zod.number().nullish().describe('The page this tile belongs to. Null only for tiles that predate the multi-page migration and could not be assigned a page.'),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'lidarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -509,7 +534,12 @@ export const SaveLayoutResponseItem = zod.object({
 })).nullish().describe('Checklist \/ to-do items for a Note tile. Each item has text and a done flag (rendered with a strike-through when done). Null or absent means no checklist.'),
   "noteColor": zod.string().nullish().describe('Background color of a Note (post-it) tile as a CSS color string (e.g. a preset note color or a custom hex). Null or absent uses the default post-it yellow.'),
   "noteFontSize": zod.union([zod.literal('sm'),zod.literal('md'),zod.literal('lg'),zod.literal(null)]).nullish().describe('Font size for a Note tile\'s text: \"sm\", \"md\", or \"lg\". Absent or null defaults to \"md\".'),
-  "noteTextColor": zod.string().nullish().describe('CSS color for a Note tile\'s text (note body and checklist). Null or absent uses a sensible dark default that reads on light post-it colors.')
+  "noteTextColor": zod.string().nullish().describe('CSS color for a Note tile\'s text (note body and checklist). Null or absent uses a sensible dark default that reads on light post-it colors.'),
+  "timerMode": zod.union([zod.literal('countup'),zod.literal('countdown'),zod.literal(null)]).nullish().describe('Mode for a Timer tile: \"countup\" for a stopwatch counting elapsed time from zero, \"countdown\" for counting down from timerDuration to zero. Absent or null defaults to \"countup\".'),
+  "timerDuration": zod.number().nullish().describe('Starting duration in seconds for a countdown Timer tile. Ignored in count-up mode. Null or absent defaults to a sensible value.'),
+  "timerRunning": zod.boolean().nullish().describe('Whether a Timer tile is currently running. When true the live display advances from timerStartedAt; when false it is paused at timerAccumulatedMs. Absent or false means paused (the default).'),
+  "timerStartedAt": zod.number().nullish().describe('Epoch milliseconds when the Timer tile\'s current run segment began. Combined with timerAccumulatedMs this lets the live display resume accurately after a refresh or page navigation. Null or absent when the timer is paused.'),
+  "timerAccumulatedMs": zod.number().nullish().describe('Elapsed milliseconds accumulated across previous run segments of a Timer tile (i.e. before timerStartedAt). Null or absent means zero.')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.'),
   "createdAt": zod.string().optional()
 })

@@ -64,6 +64,7 @@ export const TileIntegration = {
   ersatztv: 'ersatztv',
   audioplayer: 'audioplayer',
   clock: 'clock',
+  timer: 'timer',
   weather: 'weather',
   sports: 'sports',
   news: 'news',
@@ -285,7 +286,32 @@ export type TileSettings = {
      * @nullable
      */
   noteTextColor?: string | null;
-} | null;
+  /**
+     * Mode for a Timer tile: "countup" for a stopwatch counting elapsed time from zero, "countdown" for counting down from timerDuration to zero. Absent or null defaults to "countup".
+     * @nullable
+     */
+  timerMode?: 'countup' | 'countdown' | null;
+  /**
+     * Starting duration in seconds for a countdown Timer tile. Ignored in count-up mode. Null or absent defaults to a sensible value.
+     * @nullable
+     */
+  timerDuration?: number | null;
+  /**
+     * Whether a Timer tile is currently running. When true the live display advances from timerStartedAt; when false it is paused at timerAccumulatedMs. Absent or false means paused (the default).
+     * @nullable
+     */
+  timerRunning?: boolean | null;
+  /**
+     * Epoch milliseconds when the Timer tile's current run segment began. Combined with timerAccumulatedMs this lets the live display resume accurately after a refresh or page navigation. Null or absent when the timer is paused.
+     * @nullable
+     */
+  timerStartedAt?: number | null;
+  /**
+     * Elapsed milliseconds accumulated across previous run segments of a Timer tile (i.e. before timerStartedAt). Null or absent means zero.
+     * @nullable
+     */
+  timerAccumulatedMs?: number | null;
+} | null | null;
 
 export interface Tile {
   id: number;
@@ -382,6 +408,7 @@ export const TileInputIntegration = {
   ersatztv: 'ersatztv',
   audioplayer: 'audioplayer',
   clock: 'clock',
+  timer: 'timer',
   weather: 'weather',
   sports: 'sports',
   news: 'news',
@@ -446,6 +473,7 @@ export const TileUpdateIntegration = {
   ersatztv: 'ersatztv',
   audioplayer: 'audioplayer',
   clock: 'clock',
+  timer: 'timer',
   weather: 'weather',
   sports: 'sports',
   news: 'news',

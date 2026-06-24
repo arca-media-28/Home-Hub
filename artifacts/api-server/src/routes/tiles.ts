@@ -63,6 +63,11 @@ interface TileSettings {
   noteColor?: string | null;
   noteFontSize?: "sm" | "md" | "lg" | null;
   noteTextColor?: string | null;
+  timerMode?: "countup" | "countdown" | null;
+  timerDuration?: number | null;
+  timerRunning?: boolean | null;
+  timerStartedAt?: number | null;
+  timerAccumulatedMs?: number | null;
 }
 
 // A single checklist/to-do item on a Note (post-it) tile: its label text and
@@ -295,6 +300,31 @@ function pickTileSettings(obj: Record<string, unknown>): TileSettings {
     result.noteTextColor = obj["noteTextColor"];
   } else if (obj["noteTextColor"] === null) {
     result.noteTextColor = null;
+  }
+  if (obj["timerMode"] === "countup" || obj["timerMode"] === "countdown") {
+    result.timerMode = obj["timerMode"];
+  } else if (obj["timerMode"] === null) {
+    result.timerMode = null;
+  }
+  if (typeof obj["timerDuration"] === "number") {
+    result.timerDuration = obj["timerDuration"];
+  } else if (obj["timerDuration"] === null) {
+    result.timerDuration = null;
+  }
+  if (typeof obj["timerRunning"] === "boolean") {
+    result.timerRunning = obj["timerRunning"];
+  } else if (obj["timerRunning"] === null) {
+    result.timerRunning = null;
+  }
+  if (typeof obj["timerStartedAt"] === "number") {
+    result.timerStartedAt = obj["timerStartedAt"];
+  } else if (obj["timerStartedAt"] === null) {
+    result.timerStartedAt = null;
+  }
+  if (typeof obj["timerAccumulatedMs"] === "number") {
+    result.timerAccumulatedMs = obj["timerAccumulatedMs"];
+  } else if (obj["timerAccumulatedMs"] === null) {
+    result.timerAccumulatedMs = null;
   }
   return result;
 }

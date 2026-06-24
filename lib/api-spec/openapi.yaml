@@ -1216,7 +1216,7 @@ components:
           enum: [app, truenas, media, sonarr, radarr, lidarr, qbittorrent]
         integration:
           type: ["string", "null"]
-          enum: [truenas, media, jellyfin, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, audioplayer, clock, weather, sports, news, stocks, sleeper, note, spacer, divider, null]
+          enum: [truenas, media, jellyfin, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, audioplayer, clock, timer, weather, sports, news, stocks, sleeper, note, spacer, divider, null]
         gridX:
           type: integer
         gridY:
@@ -1300,7 +1300,7 @@ components:
           enum: [app, truenas, media, sonarr, radarr, lidarr, qbittorrent]
         integration:
           type: ["string", "null"]
-          enum: [truenas, media, jellyfin, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, audioplayer, clock, weather, sports, news, stocks, sleeper, note, spacer, divider, null]
+          enum: [truenas, media, jellyfin, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, audioplayer, clock, timer, weather, sports, news, stocks, sleeper, note, spacer, divider, null]
         gridX:
           type: integer
         gridY:
@@ -1343,7 +1343,7 @@ components:
       properties:
         integration:
           type: ["string", "null"]
-          enum: [truenas, media, jellyfin, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, audioplayer, clock, weather, sports, news, stocks, sleeper, note, spacer, divider, null]
+          enum: [truenas, media, jellyfin, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, audioplayer, clock, timer, weather, sports, news, stocks, sleeper, note, spacer, divider, null]
         gridX:
           type: integer
         gridY:
@@ -1591,6 +1591,36 @@ components:
             absent uses a sensible dark default that reads on light post-it
             colors.
           type: ["string", "null"]
+        timerMode:
+          description: >-
+            Mode for a Timer tile: "countup" for a stopwatch counting elapsed
+            time from zero, "countdown" for counting down from timerDuration to
+            zero. Absent or null defaults to "countup".
+          type: ["string", "null"]
+          enum: ["countup", "countdown", null]
+        timerDuration:
+          description: >-
+            Starting duration in seconds for a countdown Timer tile. Ignored in
+            count-up mode. Null or absent defaults to a sensible value.
+          type: ["integer", "null"]
+        timerRunning:
+          description: >-
+            Whether a Timer tile is currently running. When true the live
+            display advances from timerStartedAt; when false it is paused at
+            timerAccumulatedMs. Absent or false means paused (the default).
+          type: ["boolean", "null"]
+        timerStartedAt:
+          description: >-
+            Epoch milliseconds when the Timer tile's current run segment began.
+            Combined with timerAccumulatedMs this lets the live display resume
+            accurately after a refresh or page navigation. Null or absent when
+            the timer is paused.
+          type: ["integer", "null"]
+        timerAccumulatedMs:
+          description: >-
+            Elapsed milliseconds accumulated across previous run segments of a
+            Timer tile (i.e. before timerStartedAt). Null or absent means zero.
+          type: ["integer", "null"]
 
     NoteChecklistItem:
       type: object

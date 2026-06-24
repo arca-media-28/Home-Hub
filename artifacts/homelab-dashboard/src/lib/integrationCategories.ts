@@ -47,6 +47,7 @@ const CATEGORY_BY_KEY: Record<string, Category> = {
   note: "Organization",
   spacer: "Organization",
   divider: "Organization",
+  timer: "Organization",
 };
 
 // The category for a given integration / service key. Unmapped keys land in

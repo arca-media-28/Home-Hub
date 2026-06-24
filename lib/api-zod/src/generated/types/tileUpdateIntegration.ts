@@ -27,6 +27,7 @@ export const TileUpdateIntegration = {
   ersatztv: 'ersatztv',
   audioplayer: 'audioplayer',
   clock: 'clock',
+  timer: 'timer',
   weather: 'weather',
   sports: 'sports',
   news: 'news',

@@ -28,6 +28,7 @@ import { useHealthAlerts } from "@/hooks/use-health-alerts";
 import AppTile from "@/components/tiles/AppTile";
 import IntegrationTile from "@/components/tiles/IntegrationTile";
 import NoteTile from "@/components/tiles/NoteTile";
+import TimerTile from "@/components/tiles/TimerTile";
 import TileEditModal, { type EditMode } from "@/components/TileEditModal";
 import { Button } from "@/components/ui/button";
 import {
@@ -175,6 +176,12 @@ function renderTileContent(tile: Tile, status: ServiceStatus | undefined, editMo
   // the standard integration header.
   if (tile.integration === "note") {
     return <NoteTile tile={tile} editMode={editMode} />;
+  }
+  // The timer is a client-side stopwatch/countdown tile. Its run state is
+  // operated in-place on the tile (Start/Pause/Reset) and persisted back via
+  // the tile-update flow, so it manages its own surface like the note.
+  if (tile.integration === "timer") {
+    return <TimerTile tile={tile} editMode={editMode} />;
   }
   // Every tile renders as a styled app/link card. When an integration is
   // attached it also shows a compact live-status section from that service.

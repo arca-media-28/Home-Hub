@@ -38,6 +38,7 @@ export const INTEGRATION_LABELS: Record<string, string> = {
   [TileIntegration.tailscale]: "Tailscale",
   [TileIntegration.ersatztv]: "ErsatzTV",
   [TileIntegration.clock]: "Local Time",
+  [TileIntegration.timer]: "Timer",
   [TileIntegration.weather]: "Weather",
   [TileIntegration.sports]: "Sports",
   [TileIntegration.news]: "News",
