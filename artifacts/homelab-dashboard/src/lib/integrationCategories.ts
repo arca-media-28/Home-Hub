@@ -11,6 +11,7 @@ export const CATEGORY_ORDER = [
   "Downloads",
   "Server",
   "Organization",
+  "Fun",
   "Other",
 ] as const;
 
@@ -24,7 +25,6 @@ const CATEGORY_BY_KEY: Record<string, Category> = {
   sports: "News",
   sleeper: "News",
   stocks: "News",
-  eightball: "Other",
   // Media
   media: "Media",
   plex: "Media",
@@ -49,6 +49,8 @@ const CATEGORY_BY_KEY: Record<string, Category> = {
   spacer: "Organization",
   divider: "Organization",
   timer: "Organization",
+  // Fun
+  eightball: "Fun",
 };
 
 // The category for a given integration / service key. Unmapped keys land in
