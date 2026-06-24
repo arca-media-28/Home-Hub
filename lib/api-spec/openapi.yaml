@@ -1595,9 +1595,10 @@ components:
           description: >-
             Mode for a Timer tile: "countup" for a stopwatch counting elapsed
             time from zero, "countdown" for counting down from timerDuration to
-            zero. Absent or null defaults to "countup".
+            zero, "pomodoro" for an auto-cycling focus/break timer. Absent or
+            null defaults to "countup".
           type: ["string", "null"]
-          enum: ["countup", "countdown", null]
+          enum: ["countup", "countdown", "pomodoro", null]
         timerDuration:
           description: >-
             Starting duration in seconds for a countdown Timer tile. Ignored in
@@ -1620,6 +1621,40 @@ components:
           description: >-
             Elapsed milliseconds accumulated across previous run segments of a
             Timer tile (i.e. before timerStartedAt). Null or absent means zero.
+          type: ["integer", "null"]
+        pomodoroFocusMinutes:
+          description: >-
+            Length in minutes of a focus interval for a Timer tile in pomodoro
+            mode. Null or absent defaults to 25.
+          type: ["integer", "null"]
+        pomodoroShortBreakMinutes:
+          description: >-
+            Length in minutes of a short break for a Timer tile in pomodoro
+            mode. Null or absent defaults to 5.
+          type: ["integer", "null"]
+        pomodoroLongBreakMinutes:
+          description: >-
+            Length in minutes of the long break for a Timer tile in pomodoro
+            mode. Null or absent defaults to 15.
+          type: ["integer", "null"]
+        pomodoroSessionsBeforeLongBreak:
+          description: >-
+            How many focus sessions complete before a Timer tile in pomodoro
+            mode runs a long break. Null or absent defaults to 4.
+          type: ["integer", "null"]
+        pomodoroPhase:
+          description: >-
+            Current phase of a Timer tile in pomodoro mode: "focus", a
+            "shortBreak", or the "longBreak". Combined with the anchor timestamp
+            this lets the live display resume the correct phase after a refresh
+            or page navigation. Null or absent defaults to "focus".
+          type: ["string", "null"]
+          enum: ["focus", "shortBreak", "longBreak", null]
+        pomodoroCompletedSessions:
+          description: >-
+            Number of focus sessions completed in the current pomodoro cycle for
+            a Timer tile (resets to zero after a long break). Null or absent
+            means zero.
           type: ["integer", "null"]
 
     NoteChecklistItem:

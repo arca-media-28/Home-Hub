@@ -63,11 +63,17 @@ interface TileSettings {
   noteColor?: string | null;
   noteFontSize?: "sm" | "md" | "lg" | null;
   noteTextColor?: string | null;
-  timerMode?: "countup" | "countdown" | null;
+  timerMode?: "countup" | "countdown" | "pomodoro" | null;
   timerDuration?: number | null;
   timerRunning?: boolean | null;
   timerStartedAt?: number | null;
   timerAccumulatedMs?: number | null;
+  pomodoroFocusMinutes?: number | null;
+  pomodoroShortBreakMinutes?: number | null;
+  pomodoroLongBreakMinutes?: number | null;
+  pomodoroSessionsBeforeLongBreak?: number | null;
+  pomodoroPhase?: "focus" | "shortBreak" | "longBreak" | null;
+  pomodoroCompletedSessions?: number | null;
 }
 
 // A single checklist/to-do item on a Note (post-it) tile: its label text and
@@ -301,7 +307,11 @@ function pickTileSettings(obj: Record<string, unknown>): TileSettings {
   } else if (obj["noteTextColor"] === null) {
     result.noteTextColor = null;
   }
-  if (obj["timerMode"] === "countup" || obj["timerMode"] === "countdown") {
+  if (
+    obj["timerMode"] === "countup" ||
+    obj["timerMode"] === "countdown" ||
+    obj["timerMode"] === "pomodoro"
+  ) {
     result.timerMode = obj["timerMode"];
   } else if (obj["timerMode"] === null) {
     result.timerMode = null;
@@ -325,6 +335,40 @@ function pickTileSettings(obj: Record<string, unknown>): TileSettings {
     result.timerAccumulatedMs = obj["timerAccumulatedMs"];
   } else if (obj["timerAccumulatedMs"] === null) {
     result.timerAccumulatedMs = null;
+  }
+  if (typeof obj["pomodoroFocusMinutes"] === "number") {
+    result.pomodoroFocusMinutes = obj["pomodoroFocusMinutes"];
+  } else if (obj["pomodoroFocusMinutes"] === null) {
+    result.pomodoroFocusMinutes = null;
+  }
+  if (typeof obj["pomodoroShortBreakMinutes"] === "number") {
+    result.pomodoroShortBreakMinutes = obj["pomodoroShortBreakMinutes"];
+  } else if (obj["pomodoroShortBreakMinutes"] === null) {
+    result.pomodoroShortBreakMinutes = null;
+  }
+  if (typeof obj["pomodoroLongBreakMinutes"] === "number") {
+    result.pomodoroLongBreakMinutes = obj["pomodoroLongBreakMinutes"];
+  } else if (obj["pomodoroLongBreakMinutes"] === null) {
+    result.pomodoroLongBreakMinutes = null;
+  }
+  if (typeof obj["pomodoroSessionsBeforeLongBreak"] === "number") {
+    result.pomodoroSessionsBeforeLongBreak = obj["pomodoroSessionsBeforeLongBreak"];
+  } else if (obj["pomodoroSessionsBeforeLongBreak"] === null) {
+    result.pomodoroSessionsBeforeLongBreak = null;
+  }
+  if (
+    obj["pomodoroPhase"] === "focus" ||
+    obj["pomodoroPhase"] === "shortBreak" ||
+    obj["pomodoroPhase"] === "longBreak"
+  ) {
+    result.pomodoroPhase = obj["pomodoroPhase"];
+  } else if (obj["pomodoroPhase"] === null) {
+    result.pomodoroPhase = null;
+  }
+  if (typeof obj["pomodoroCompletedSessions"] === "number") {
+    result.pomodoroCompletedSessions = obj["pomodoroCompletedSessions"];
+  } else if (obj["pomodoroCompletedSessions"] === null) {
+    result.pomodoroCompletedSessions = null;
   }
   return result;
 }

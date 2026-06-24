@@ -52,7 +52,13 @@ import {
   DEFAULT_NOTE_TEXT_COLOR,
   type NoteFontSize,
 } from "@/components/tiles/NoteTile";
-import { DEFAULT_TIMER_DURATION_SECONDS } from "@/components/tiles/TimerTile";
+import {
+  DEFAULT_TIMER_DURATION_SECONDS,
+  DEFAULT_POMODORO_FOCUS_MIN,
+  DEFAULT_POMODORO_SHORT_BREAK_MIN,
+  DEFAULT_POMODORO_LONG_BREAK_MIN,
+  DEFAULT_POMODORO_SESSIONS,
+} from "@/components/tiles/TimerTile";
 import { SPORTS_LEAGUES, getLeagueTeams } from "@/lib/sports";
 import {
   fetchSleeperUser,
@@ -201,7 +207,7 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
   // hours/minutes/seconds and combined into timerDuration (seconds) on save.
   const initialTimerDuration =
     tile?.tileSettings?.timerDuration ?? DEFAULT_TIMER_DURATION_SECONDS;
-  const [timerMode, setTimerMode] = useState<"countup" | "countdown">(
+  const [timerMode, setTimerMode] = useState<"countup" | "countdown" | "pomodoro">(
     tile?.tileSettings?.timerMode ?? "countup",
   );
   const [timerHours, setTimerHours] = useState<number>(
@@ -213,6 +219,20 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
   const [timerSeconds, setTimerSeconds] = useState<number>(
     initialTimerDuration % 60,
   );
+  // Pomodoro options (lengths in minutes + sessions before a long break).
+  const [pomodoroFocusMinutes, setPomodoroFocusMinutes] = useState<number>(
+    tile?.tileSettings?.pomodoroFocusMinutes ?? DEFAULT_POMODORO_FOCUS_MIN,
+  );
+  const [pomodoroShortBreakMinutes, setPomodoroShortBreakMinutes] = useState<number>(
+    tile?.tileSettings?.pomodoroShortBreakMinutes ?? DEFAULT_POMODORO_SHORT_BREAK_MIN,
+  );
+  const [pomodoroLongBreakMinutes, setPomodoroLongBreakMinutes] = useState<number>(
+    tile?.tileSettings?.pomodoroLongBreakMinutes ?? DEFAULT_POMODORO_LONG_BREAK_MIN,
+  );
+  const [pomodoroSessionsBeforeLongBreak, setPomodoroSessionsBeforeLongBreak] =
+    useState<number>(
+      tile?.tileSettings?.pomodoroSessionsBeforeLongBreak ?? DEFAULT_POMODORO_SESSIONS,
+    );
   // Weather widget options.
   const [weatherAutoLocate, setWeatherAutoLocate] = useState<boolean>(
     tile?.tileSettings?.weatherAutoLocate ?? true,
@@ -358,6 +378,21 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
         setTimerHours(Math.floor(d / 3600));
         setTimerMinutes(Math.floor((d % 3600) / 60));
         setTimerSeconds(d % 60);
+        setPomodoroFocusMinutes(
+          tile?.tileSettings?.pomodoroFocusMinutes ?? DEFAULT_POMODORO_FOCUS_MIN,
+        );
+        setPomodoroShortBreakMinutes(
+          tile?.tileSettings?.pomodoroShortBreakMinutes ??
+            DEFAULT_POMODORO_SHORT_BREAK_MIN,
+        );
+        setPomodoroLongBreakMinutes(
+          tile?.tileSettings?.pomodoroLongBreakMinutes ??
+            DEFAULT_POMODORO_LONG_BREAK_MIN,
+        );
+        setPomodoroSessionsBeforeLongBreak(
+          tile?.tileSettings?.pomodoroSessionsBeforeLongBreak ??
+            DEFAULT_POMODORO_SESSIONS,
+        );
       }
       setWeatherAutoLocate(tile?.tileSettings?.weatherAutoLocate ?? true);
       setWeatherLocation(tile?.tileSettings?.weatherLocation ?? "");
@@ -884,6 +919,18 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
                 timerRunning: false,
                 timerStartedAt: null,
                 timerAccumulatedMs: 0,
+                // Pomodoro lengths/cycle config (always persisted so switching
+                // modes back to pomodoro keeps the user's choices). Run-state
+                // for the cycle resets to a fresh focus phase.
+                pomodoroFocusMinutes: Math.max(1, pomodoroFocusMinutes),
+                pomodoroShortBreakMinutes: Math.max(1, pomodoroShortBreakMinutes),
+                pomodoroLongBreakMinutes: Math.max(1, pomodoroLongBreakMinutes),
+                pomodoroSessionsBeforeLongBreak: Math.max(
+                  1,
+                  pomodoroSessionsBeforeLongBreak,
+                ),
+                pomodoroPhase: "focus" as const,
+                pomodoroCompletedSessions: 0,
               }
             : isWeather
               ? {
@@ -1369,7 +1416,9 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
                 <Label>Mode</Label>
                 <Select
                   value={timerMode}
-                  onValueChange={(v) => setTimerMode(v as "countup" | "countdown")}
+                  onValueChange={(v) =>
+                    setTimerMode(v as "countup" | "countdown" | "pomodoro")
+                  }
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -1377,6 +1426,7 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
                   <SelectContent>
                     <SelectItem value="countup">Count up (stopwatch)</SelectItem>
                     <SelectItem value="countdown">Count down</SelectItem>
+                    <SelectItem value="pomodoro">Pomodoro</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -1435,6 +1485,82 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
                         sec
                       </span>
                     </div>
+                  </div>
+                </div>
+              )}
+              {timerMode === "pomodoro" && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label>Focus length</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={180}
+                      value={pomodoroFocusMinutes}
+                      onChange={(e) =>
+                        setPomodoroFocusMinutes(
+                          Math.max(1, Math.min(180, Math.floor(Number(e.target.value) || 1))),
+                        )
+                      }
+                      aria-label="Focus length in minutes"
+                    />
+                    <span className="block text-[11px] text-muted-foreground">
+                      minutes
+                    </span>
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Short break</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={180}
+                      value={pomodoroShortBreakMinutes}
+                      onChange={(e) =>
+                        setPomodoroShortBreakMinutes(
+                          Math.max(1, Math.min(180, Math.floor(Number(e.target.value) || 1))),
+                        )
+                      }
+                      aria-label="Short break length in minutes"
+                    />
+                    <span className="block text-[11px] text-muted-foreground">
+                      minutes
+                    </span>
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Long break</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={180}
+                      value={pomodoroLongBreakMinutes}
+                      onChange={(e) =>
+                        setPomodoroLongBreakMinutes(
+                          Math.max(1, Math.min(180, Math.floor(Number(e.target.value) || 1))),
+                        )
+                      }
+                      aria-label="Long break length in minutes"
+                    />
+                    <span className="block text-[11px] text-muted-foreground">
+                      minutes
+                    </span>
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Sessions / long break</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={12}
+                      value={pomodoroSessionsBeforeLongBreak}
+                      onChange={(e) =>
+                        setPomodoroSessionsBeforeLongBreak(
+                          Math.max(1, Math.min(12, Math.floor(Number(e.target.value) || 1))),
+                        )
+                      }
+                      aria-label="Focus sessions before a long break"
+                    />
+                    <span className="block text-[11px] text-muted-foreground">
+                      focus sessions
+                    </span>
                   </div>
                 </div>
               )}

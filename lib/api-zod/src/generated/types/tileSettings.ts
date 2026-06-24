@@ -184,10 +184,10 @@ export type TileSettings = {
      */
   noteTextColor?: string | null;
   /**
-     * Mode for a Timer tile: "countup" for a stopwatch counting elapsed time from zero, "countdown" for counting down from timerDuration to zero. Absent or null defaults to "countup".
+     * Mode for a Timer tile: "countup" for a stopwatch counting elapsed time from zero, "countdown" for counting down from timerDuration to zero, "pomodoro" for an auto-cycling focus/break timer. Absent or null defaults to "countup".
      * @nullable
      */
-  timerMode?: 'countup' | 'countdown' | null;
+  timerMode?: 'countup' | 'countdown' | 'pomodoro' | null;
   /**
      * Starting duration in seconds for a countdown Timer tile. Ignored in count-up mode. Null or absent defaults to a sensible value.
      * @nullable
@@ -208,4 +208,34 @@ export type TileSettings = {
      * @nullable
      */
   timerAccumulatedMs?: number | null;
+  /**
+     * Length in minutes of a focus interval for a Timer tile in pomodoro mode. Null or absent defaults to 25.
+     * @nullable
+     */
+  pomodoroFocusMinutes?: number | null;
+  /**
+     * Length in minutes of a short break for a Timer tile in pomodoro mode. Null or absent defaults to 5.
+     * @nullable
+     */
+  pomodoroShortBreakMinutes?: number | null;
+  /**
+     * Length in minutes of the long break for a Timer tile in pomodoro mode. Null or absent defaults to 15.
+     * @nullable
+     */
+  pomodoroLongBreakMinutes?: number | null;
+  /**
+     * How many focus sessions complete before a Timer tile in pomodoro mode runs a long break. Null or absent defaults to 4.
+     * @nullable
+     */
+  pomodoroSessionsBeforeLongBreak?: number | null;
+  /**
+     * Current phase of a Timer tile in pomodoro mode: "focus", a "shortBreak", or the "longBreak". Combined with the anchor timestamp this lets the live display resume the correct phase after a refresh or page navigation. Null or absent defaults to "focus".
+     * @nullable
+     */
+  pomodoroPhase?: 'focus' | 'shortBreak' | 'longBreak' | null;
+  /**
+     * Number of focus sessions completed in the current pomodoro cycle for a Timer tile (resets to zero after a long break). Null or absent means zero.
+     * @nullable
+     */
+  pomodoroCompletedSessions?: number | null;
 } | null | null;
