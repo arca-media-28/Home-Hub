@@ -144,7 +144,8 @@ export const GetTilesResponseItem = zod.object({
   "pomodoroLongBreakMinutes": zod.number().nullish().describe('Length in minutes of the long break for a Timer tile in pomodoro mode. Null or absent defaults to 15.'),
   "pomodoroSessionsBeforeLongBreak": zod.number().nullish().describe('How many focus sessions complete before a Timer tile in pomodoro mode runs a long break. Null or absent defaults to 4.'),
   "pomodoroPhase": zod.union([zod.literal('focus'),zod.literal('shortBreak'),zod.literal('longBreak'),zod.literal(null)]).nullish().describe('Current phase of a Timer tile in pomodoro mode: \"focus\", a \"shortBreak\", or the \"longBreak\". Combined with the anchor timestamp this lets the live display resume the correct phase after a refresh or page navigation. Null or absent defaults to \"focus\".'),
-  "pomodoroCompletedSessions": zod.number().nullish().describe('Number of focus sessions completed in the current pomodoro cycle for a Timer tile (resets to zero after a long break). Null or absent means zero.')
+  "pomodoroCompletedSessions": zod.number().nullish().describe('Number of focus sessions completed in the current pomodoro cycle for a Timer tile (resets to zero after a long break). Null or absent means zero.'),
+  "timerAlertEnabled": zod.boolean().nullish().describe('Whether a countdown Timer tile plays a chime and fires a browser notification when it reaches zero. Null or absent means disabled.')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.'),
   "createdAt": zod.string().optional()
 })
@@ -226,7 +227,8 @@ export const CreateTileBody = zod.object({
   "pomodoroLongBreakMinutes": zod.number().nullish().describe('Length in minutes of the long break for a Timer tile in pomodoro mode. Null or absent defaults to 15.'),
   "pomodoroSessionsBeforeLongBreak": zod.number().nullish().describe('How many focus sessions complete before a Timer tile in pomodoro mode runs a long break. Null or absent defaults to 4.'),
   "pomodoroPhase": zod.union([zod.literal('focus'),zod.literal('shortBreak'),zod.literal('longBreak'),zod.literal(null)]).nullish().describe('Current phase of a Timer tile in pomodoro mode: \"focus\", a \"shortBreak\", or the \"longBreak\". Combined with the anchor timestamp this lets the live display resume the correct phase after a refresh or page navigation. Null or absent defaults to \"focus\".'),
-  "pomodoroCompletedSessions": zod.number().nullish().describe('Number of focus sessions completed in the current pomodoro cycle for a Timer tile (resets to zero after a long break). Null or absent means zero.')
+  "pomodoroCompletedSessions": zod.number().nullish().describe('Number of focus sessions completed in the current pomodoro cycle for a Timer tile (resets to zero after a long break). Null or absent means zero.'),
+  "timerAlertEnabled": zod.boolean().nullish().describe('Whether a countdown Timer tile plays a chime and fires a browser notification when it reaches zero. Null or absent means disabled.')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.')
 })
 
@@ -312,7 +314,8 @@ export const GetTileResponse = zod.object({
   "pomodoroLongBreakMinutes": zod.number().nullish().describe('Length in minutes of the long break for a Timer tile in pomodoro mode. Null or absent defaults to 15.'),
   "pomodoroSessionsBeforeLongBreak": zod.number().nullish().describe('How many focus sessions complete before a Timer tile in pomodoro mode runs a long break. Null or absent defaults to 4.'),
   "pomodoroPhase": zod.union([zod.literal('focus'),zod.literal('shortBreak'),zod.literal('longBreak'),zod.literal(null)]).nullish().describe('Current phase of a Timer tile in pomodoro mode: \"focus\", a \"shortBreak\", or the \"longBreak\". Combined with the anchor timestamp this lets the live display resume the correct phase after a refresh or page navigation. Null or absent defaults to \"focus\".'),
-  "pomodoroCompletedSessions": zod.number().nullish().describe('Number of focus sessions completed in the current pomodoro cycle for a Timer tile (resets to zero after a long break). Null or absent means zero.')
+  "pomodoroCompletedSessions": zod.number().nullish().describe('Number of focus sessions completed in the current pomodoro cycle for a Timer tile (resets to zero after a long break). Null or absent means zero.'),
+  "timerAlertEnabled": zod.boolean().nullish().describe('Whether a countdown Timer tile plays a chime and fires a browser notification when it reaches zero. Null or absent means disabled.')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.'),
   "createdAt": zod.string().optional()
 })
@@ -395,7 +398,8 @@ export const UpdateTileBody = zod.object({
   "pomodoroLongBreakMinutes": zod.number().nullish().describe('Length in minutes of the long break for a Timer tile in pomodoro mode. Null or absent defaults to 15.'),
   "pomodoroSessionsBeforeLongBreak": zod.number().nullish().describe('How many focus sessions complete before a Timer tile in pomodoro mode runs a long break. Null or absent defaults to 4.'),
   "pomodoroPhase": zod.union([zod.literal('focus'),zod.literal('shortBreak'),zod.literal('longBreak'),zod.literal(null)]).nullish().describe('Current phase of a Timer tile in pomodoro mode: \"focus\", a \"shortBreak\", or the \"longBreak\". Combined with the anchor timestamp this lets the live display resume the correct phase after a refresh or page navigation. Null or absent defaults to \"focus\".'),
-  "pomodoroCompletedSessions": zod.number().nullish().describe('Number of focus sessions completed in the current pomodoro cycle for a Timer tile (resets to zero after a long break). Null or absent means zero.')
+  "pomodoroCompletedSessions": zod.number().nullish().describe('Number of focus sessions completed in the current pomodoro cycle for a Timer tile (resets to zero after a long break). Null or absent means zero.'),
+  "timerAlertEnabled": zod.boolean().nullish().describe('Whether a countdown Timer tile plays a chime and fires a browser notification when it reaches zero. Null or absent means disabled.')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.')
 })
 
@@ -473,7 +477,8 @@ export const UpdateTileResponse = zod.object({
   "pomodoroLongBreakMinutes": zod.number().nullish().describe('Length in minutes of the long break for a Timer tile in pomodoro mode. Null or absent defaults to 15.'),
   "pomodoroSessionsBeforeLongBreak": zod.number().nullish().describe('How many focus sessions complete before a Timer tile in pomodoro mode runs a long break. Null or absent defaults to 4.'),
   "pomodoroPhase": zod.union([zod.literal('focus'),zod.literal('shortBreak'),zod.literal('longBreak'),zod.literal(null)]).nullish().describe('Current phase of a Timer tile in pomodoro mode: \"focus\", a \"shortBreak\", or the \"longBreak\". Combined with the anchor timestamp this lets the live display resume the correct phase after a refresh or page navigation. Null or absent defaults to \"focus\".'),
-  "pomodoroCompletedSessions": zod.number().nullish().describe('Number of focus sessions completed in the current pomodoro cycle for a Timer tile (resets to zero after a long break). Null or absent means zero.')
+  "pomodoroCompletedSessions": zod.number().nullish().describe('Number of focus sessions completed in the current pomodoro cycle for a Timer tile (resets to zero after a long break). Null or absent means zero.'),
+  "timerAlertEnabled": zod.boolean().nullish().describe('Whether a countdown Timer tile plays a chime and fires a browser notification when it reaches zero. Null or absent means disabled.')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.'),
   "createdAt": zod.string().optional()
 })
@@ -575,7 +580,8 @@ export const SaveLayoutResponseItem = zod.object({
   "pomodoroLongBreakMinutes": zod.number().nullish().describe('Length in minutes of the long break for a Timer tile in pomodoro mode. Null or absent defaults to 15.'),
   "pomodoroSessionsBeforeLongBreak": zod.number().nullish().describe('How many focus sessions complete before a Timer tile in pomodoro mode runs a long break. Null or absent defaults to 4.'),
   "pomodoroPhase": zod.union([zod.literal('focus'),zod.literal('shortBreak'),zod.literal('longBreak'),zod.literal(null)]).nullish().describe('Current phase of a Timer tile in pomodoro mode: \"focus\", a \"shortBreak\", or the \"longBreak\". Combined with the anchor timestamp this lets the live display resume the correct phase after a refresh or page navigation. Null or absent defaults to \"focus\".'),
-  "pomodoroCompletedSessions": zod.number().nullish().describe('Number of focus sessions completed in the current pomodoro cycle for a Timer tile (resets to zero after a long break). Null or absent means zero.')
+  "pomodoroCompletedSessions": zod.number().nullish().describe('Number of focus sessions completed in the current pomodoro cycle for a Timer tile (resets to zero after a long break). Null or absent means zero.'),
+  "timerAlertEnabled": zod.boolean().nullish().describe('Whether a countdown Timer tile plays a chime and fires a browser notification when it reaches zero. Null or absent means disabled.')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.'),
   "createdAt": zod.string().optional()
 })

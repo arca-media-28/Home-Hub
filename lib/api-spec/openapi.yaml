@@ -1656,6 +1656,11 @@ components:
             a Timer tile (resets to zero after a long break). Null or absent
             means zero.
           type: ["integer", "null"]
+        timerAlertEnabled:
+          description: >-
+            Whether a countdown Timer tile plays a chime and fires a browser
+            notification when it reaches zero. Null or absent means disabled.
+          type: ["boolean", "null"]
 
     NoteChecklistItem:
       type: object

@@ -341,6 +341,11 @@ export type TileSettings = {
      * @nullable
      */
   pomodoroCompletedSessions?: number | null;
+  /**
+     * Whether a countdown Timer tile plays a chime and fires a browser notification when it reaches zero. Null or absent means disabled.
+     * @nullable
+     */
+  timerAlertEnabled?: boolean | null;
 } | null | null;
 
 export interface Tile {

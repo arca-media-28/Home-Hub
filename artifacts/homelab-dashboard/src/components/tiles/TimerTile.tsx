@@ -3,6 +3,7 @@ import type { Tile, TileSettings } from "@workspace/api-client-react";
 import { useUpdateTile, getGetTilesQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Play, Pause, RotateCcw } from "lucide-react";
+import { playTimerChime, showTimerNotification } from "@/lib/timerAlert";
 
 // Default countdown duration (5 minutes) when a countdown tile has none set.
 export const DEFAULT_TIMER_DURATION_SECONDS = 5 * 60;
@@ -112,6 +113,7 @@ export default function TimerTile({ tile, editMode }: TimerTileProps) {
   const isPomodoro = mode === "pomodoro";
   const durationMs =
     (tile.tileSettings?.timerDuration ?? DEFAULT_TIMER_DURATION_SECONDS) * 1000;
+  const alertEnabled = tile.tileSettings?.timerAlertEnabled ?? false;
 
   // Pomodoro configuration (minutes -> ms), with classic-technique defaults.
   const focusMs =
@@ -224,6 +226,17 @@ export default function TimerTile({ tile, editMode }: TimerTileProps) {
     if (finished && run.running) {
       if (finishHandled.current) return;
       finishHandled.current = true;
+      // Alert the user (chime + browser notification) if enabled. This fires
+      // for the running -> finished transition only, including when a refresh
+      // resumes a timer that has already elapsed (it loads as running, then
+      // this effect settles it to finished).
+      if (alertEnabled) {
+        playTimerChime();
+        showTimerNotification(
+          tile.name?.trim() ? tile.name : "Timer",
+          "Your countdown has finished.",
+        );
+      }
       applyRun({
         running: false,
         startedAt: null,

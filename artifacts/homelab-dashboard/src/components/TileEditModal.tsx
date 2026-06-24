@@ -233,6 +233,10 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
     useState<number>(
       tile?.tileSettings?.pomodoroSessionsBeforeLongBreak ?? DEFAULT_POMODORO_SESSIONS,
     );
+  // Whether a finished countdown plays a chime + fires a browser notification.
+  const [timerAlertEnabled, setTimerAlertEnabled] = useState<boolean>(
+    tile?.tileSettings?.timerAlertEnabled ?? false,
+  );
   // Weather widget options.
   const [weatherAutoLocate, setWeatherAutoLocate] = useState<boolean>(
     tile?.tileSettings?.weatherAutoLocate ?? true,
@@ -393,6 +397,7 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
           tile?.tileSettings?.pomodoroSessionsBeforeLongBreak ??
             DEFAULT_POMODORO_SESSIONS,
         );
+        setTimerAlertEnabled(tile?.tileSettings?.timerAlertEnabled ?? false);
       }
       setWeatherAutoLocate(tile?.tileSettings?.weatherAutoLocate ?? true);
       setWeatherLocation(tile?.tileSettings?.weatherLocation ?? "");
@@ -931,6 +936,9 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
                 ),
                 pomodoroPhase: "focus" as const,
                 pomodoroCompletedSessions: 0,
+                // Only countdown timers can finish; persist the alert choice
+                // regardless of mode so it sticks when switching back.
+                timerAlertEnabled,
               }
             : isWeather
               ? {
@@ -1562,6 +1570,37 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
                       focus sessions
                     </span>
                   </div>
+                </div>
+              )}
+              {timerMode === "countdown" && (
+                <div className="space-y-1.5">
+                  <label
+                    htmlFor="timer-alert"
+                    className="flex items-center gap-2 cursor-pointer select-none"
+                  >
+                    <Checkbox
+                      id="timer-alert"
+                      checked={timerAlertEnabled}
+                      onCheckedChange={(c) => {
+                        const on = c === true;
+                        setTimerAlertEnabled(on);
+                        // Request notification permission up front so the alert
+                        // can fire later without a user gesture.
+                        if (
+                          on &&
+                          typeof Notification !== "undefined" &&
+                          Notification.permission === "default"
+                        ) {
+                          void Notification.requestPermission();
+                        }
+                      }}
+                    />
+                    <span className="text-sm">Alert when finished</span>
+                  </label>
+                  <p className="text-[11px] text-muted-foreground">
+                    Plays a chime and shows a browser notification when the
+                    countdown reaches zero.
+                  </p>
                 </div>
               )}
               <p className="text-xs text-muted-foreground">
