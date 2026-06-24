@@ -243,4 +243,14 @@ export type TileSettings = {
      * @nullable
      */
   timerAlertEnabled?: boolean | null;
+  /**
+     * Die type for a Dice Roller tile, e.g. "d4", "d6", "d20". The number after the "d" is the number of sides each die has. Null or absent defaults to "d6".
+     * @nullable
+     */
+  diceType?: 'd3' | 'd4' | 'd6' | 'd8' | 'd10' | 'd12' | 'd20' | 'd100' | null;
+  /**
+     * How many dice a Dice Roller tile rolls at once (1-6). Null or absent defaults to 2.
+     * @nullable
+     */
+  diceCount?: number | null;
 } | null | null;

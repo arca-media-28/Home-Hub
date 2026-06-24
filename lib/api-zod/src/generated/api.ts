@@ -75,7 +75,7 @@ export const GetTilesResponseItem = zod.object({
   "userId": zod.number(),
   "pageId": zod.number().nullish().describe('The page this tile belongs to. Null only for tiles that predate the multi-page migration and could not be assigned a page.'),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'lidarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -145,7 +145,9 @@ export const GetTilesResponseItem = zod.object({
   "pomodoroSessionsBeforeLongBreak": zod.number().nullish().describe('How many focus sessions complete before a Timer tile in pomodoro mode runs a long break. Null or absent defaults to 4.'),
   "pomodoroPhase": zod.union([zod.literal('focus'),zod.literal('shortBreak'),zod.literal('longBreak'),zod.literal(null)]).nullish().describe('Current phase of a Timer tile in pomodoro mode: \"focus\", a \"shortBreak\", or the \"longBreak\". Combined with the anchor timestamp this lets the live display resume the correct phase after a refresh or page navigation. Null or absent defaults to \"focus\".'),
   "pomodoroCompletedSessions": zod.number().nullish().describe('Number of focus sessions completed in the current pomodoro cycle for a Timer tile (resets to zero after a long break). Null or absent means zero.'),
-  "timerAlertEnabled": zod.boolean().nullish().describe('Whether a countdown Timer tile plays a chime and fires a browser notification when it reaches zero. Null or absent means disabled.')
+  "timerAlertEnabled": zod.boolean().nullish().describe('Whether a countdown Timer tile plays a chime and fires a browser notification when it reaches zero. Null or absent means disabled.'),
+  "diceType": zod.union([zod.literal('d3'),zod.literal('d4'),zod.literal('d6'),zod.literal('d8'),zod.literal('d10'),zod.literal('d12'),zod.literal('d20'),zod.literal('d100'),zod.literal(null)]).nullish().describe('Die type for a Dice Roller tile, e.g. \"d4\", \"d6\", \"d20\". The number after the \"d\" is the number of sides each die has. Null or absent defaults to \"d6\".'),
+  "diceCount": zod.number().nullish().describe('How many dice a Dice Roller tile rolls at once (1-6). Null or absent defaults to 2.')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.'),
   "createdAt": zod.string().optional()
 })
@@ -158,7 +160,7 @@ export const GetTilesResponse = zod.array(GetTilesResponseItem)
 export const CreateTileBody = zod.object({
   "pageId": zod.number().nullish().describe('The page to create this tile on. Omit to fall back to the user\'s first page.'),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'lidarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -228,7 +230,9 @@ export const CreateTileBody = zod.object({
   "pomodoroSessionsBeforeLongBreak": zod.number().nullish().describe('How many focus sessions complete before a Timer tile in pomodoro mode runs a long break. Null or absent defaults to 4.'),
   "pomodoroPhase": zod.union([zod.literal('focus'),zod.literal('shortBreak'),zod.literal('longBreak'),zod.literal(null)]).nullish().describe('Current phase of a Timer tile in pomodoro mode: \"focus\", a \"shortBreak\", or the \"longBreak\". Combined with the anchor timestamp this lets the live display resume the correct phase after a refresh or page navigation. Null or absent defaults to \"focus\".'),
   "pomodoroCompletedSessions": zod.number().nullish().describe('Number of focus sessions completed in the current pomodoro cycle for a Timer tile (resets to zero after a long break). Null or absent means zero.'),
-  "timerAlertEnabled": zod.boolean().nullish().describe('Whether a countdown Timer tile plays a chime and fires a browser notification when it reaches zero. Null or absent means disabled.')
+  "timerAlertEnabled": zod.boolean().nullish().describe('Whether a countdown Timer tile plays a chime and fires a browser notification when it reaches zero. Null or absent means disabled.'),
+  "diceType": zod.union([zod.literal('d3'),zod.literal('d4'),zod.literal('d6'),zod.literal('d8'),zod.literal('d10'),zod.literal('d12'),zod.literal('d20'),zod.literal('d100'),zod.literal(null)]).nullish().describe('Die type for a Dice Roller tile, e.g. \"d4\", \"d6\", \"d20\". The number after the \"d\" is the number of sides each die has. Null or absent defaults to \"d6\".'),
+  "diceCount": zod.number().nullish().describe('How many dice a Dice Roller tile rolls at once (1-6). Null or absent defaults to 2.')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.')
 })
 
@@ -245,7 +249,7 @@ export const GetTileResponse = zod.object({
   "userId": zod.number(),
   "pageId": zod.number().nullish().describe('The page this tile belongs to. Null only for tiles that predate the multi-page migration and could not be assigned a page.'),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'lidarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -315,7 +319,9 @@ export const GetTileResponse = zod.object({
   "pomodoroSessionsBeforeLongBreak": zod.number().nullish().describe('How many focus sessions complete before a Timer tile in pomodoro mode runs a long break. Null or absent defaults to 4.'),
   "pomodoroPhase": zod.union([zod.literal('focus'),zod.literal('shortBreak'),zod.literal('longBreak'),zod.literal(null)]).nullish().describe('Current phase of a Timer tile in pomodoro mode: \"focus\", a \"shortBreak\", or the \"longBreak\". Combined with the anchor timestamp this lets the live display resume the correct phase after a refresh or page navigation. Null or absent defaults to \"focus\".'),
   "pomodoroCompletedSessions": zod.number().nullish().describe('Number of focus sessions completed in the current pomodoro cycle for a Timer tile (resets to zero after a long break). Null or absent means zero.'),
-  "timerAlertEnabled": zod.boolean().nullish().describe('Whether a countdown Timer tile plays a chime and fires a browser notification when it reaches zero. Null or absent means disabled.')
+  "timerAlertEnabled": zod.boolean().nullish().describe('Whether a countdown Timer tile plays a chime and fires a browser notification when it reaches zero. Null or absent means disabled.'),
+  "diceType": zod.union([zod.literal('d3'),zod.literal('d4'),zod.literal('d6'),zod.literal('d8'),zod.literal('d10'),zod.literal('d12'),zod.literal('d20'),zod.literal('d100'),zod.literal(null)]).nullish().describe('Die type for a Dice Roller tile, e.g. \"d4\", \"d6\", \"d20\". The number after the \"d\" is the number of sides each die has. Null or absent defaults to \"d6\".'),
+  "diceCount": zod.number().nullish().describe('How many dice a Dice Roller tile rolls at once (1-6). Null or absent defaults to 2.')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.'),
   "createdAt": zod.string().optional()
 })
@@ -329,7 +335,7 @@ export const UpdateTileParams = zod.object({
 })
 
 export const UpdateTileBody = zod.object({
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal(null)]).nullish(),
   "gridX": zod.number().optional(),
   "gridY": zod.number().optional(),
   "gridW": zod.number().optional(),
@@ -399,7 +405,9 @@ export const UpdateTileBody = zod.object({
   "pomodoroSessionsBeforeLongBreak": zod.number().nullish().describe('How many focus sessions complete before a Timer tile in pomodoro mode runs a long break. Null or absent defaults to 4.'),
   "pomodoroPhase": zod.union([zod.literal('focus'),zod.literal('shortBreak'),zod.literal('longBreak'),zod.literal(null)]).nullish().describe('Current phase of a Timer tile in pomodoro mode: \"focus\", a \"shortBreak\", or the \"longBreak\". Combined with the anchor timestamp this lets the live display resume the correct phase after a refresh or page navigation. Null or absent defaults to \"focus\".'),
   "pomodoroCompletedSessions": zod.number().nullish().describe('Number of focus sessions completed in the current pomodoro cycle for a Timer tile (resets to zero after a long break). Null or absent means zero.'),
-  "timerAlertEnabled": zod.boolean().nullish().describe('Whether a countdown Timer tile plays a chime and fires a browser notification when it reaches zero. Null or absent means disabled.')
+  "timerAlertEnabled": zod.boolean().nullish().describe('Whether a countdown Timer tile plays a chime and fires a browser notification when it reaches zero. Null or absent means disabled.'),
+  "diceType": zod.union([zod.literal('d3'),zod.literal('d4'),zod.literal('d6'),zod.literal('d8'),zod.literal('d10'),zod.literal('d12'),zod.literal('d20'),zod.literal('d100'),zod.literal(null)]).nullish().describe('Die type for a Dice Roller tile, e.g. \"d4\", \"d6\", \"d20\". The number after the \"d\" is the number of sides each die has. Null or absent defaults to \"d6\".'),
+  "diceCount": zod.number().nullish().describe('How many dice a Dice Roller tile rolls at once (1-6). Null or absent defaults to 2.')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.')
 })
 
@@ -408,7 +416,7 @@ export const UpdateTileResponse = zod.object({
   "userId": zod.number(),
   "pageId": zod.number().nullish().describe('The page this tile belongs to. Null only for tiles that predate the multi-page migration and could not be assigned a page.'),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'lidarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -478,7 +486,9 @@ export const UpdateTileResponse = zod.object({
   "pomodoroSessionsBeforeLongBreak": zod.number().nullish().describe('How many focus sessions complete before a Timer tile in pomodoro mode runs a long break. Null or absent defaults to 4.'),
   "pomodoroPhase": zod.union([zod.literal('focus'),zod.literal('shortBreak'),zod.literal('longBreak'),zod.literal(null)]).nullish().describe('Current phase of a Timer tile in pomodoro mode: \"focus\", a \"shortBreak\", or the \"longBreak\". Combined with the anchor timestamp this lets the live display resume the correct phase after a refresh or page navigation. Null or absent defaults to \"focus\".'),
   "pomodoroCompletedSessions": zod.number().nullish().describe('Number of focus sessions completed in the current pomodoro cycle for a Timer tile (resets to zero after a long break). Null or absent means zero.'),
-  "timerAlertEnabled": zod.boolean().nullish().describe('Whether a countdown Timer tile plays a chime and fires a browser notification when it reaches zero. Null or absent means disabled.')
+  "timerAlertEnabled": zod.boolean().nullish().describe('Whether a countdown Timer tile plays a chime and fires a browser notification when it reaches zero. Null or absent means disabled.'),
+  "diceType": zod.union([zod.literal('d3'),zod.literal('d4'),zod.literal('d6'),zod.literal('d8'),zod.literal('d10'),zod.literal('d12'),zod.literal('d20'),zod.literal('d100'),zod.literal(null)]).nullish().describe('Die type for a Dice Roller tile, e.g. \"d4\", \"d6\", \"d20\". The number after the \"d\" is the number of sides each die has. Null or absent defaults to \"d6\".'),
+  "diceCount": zod.number().nullish().describe('How many dice a Dice Roller tile rolls at once (1-6). Null or absent defaults to 2.')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.'),
   "createdAt": zod.string().optional()
 })
@@ -511,7 +521,7 @@ export const SaveLayoutResponseItem = zod.object({
   "userId": zod.number(),
   "pageId": zod.number().nullish().describe('The page this tile belongs to. Null only for tiles that predate the multi-page migration and could not be assigned a page.'),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'lidarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -581,7 +591,9 @@ export const SaveLayoutResponseItem = zod.object({
   "pomodoroSessionsBeforeLongBreak": zod.number().nullish().describe('How many focus sessions complete before a Timer tile in pomodoro mode runs a long break. Null or absent defaults to 4.'),
   "pomodoroPhase": zod.union([zod.literal('focus'),zod.literal('shortBreak'),zod.literal('longBreak'),zod.literal(null)]).nullish().describe('Current phase of a Timer tile in pomodoro mode: \"focus\", a \"shortBreak\", or the \"longBreak\". Combined with the anchor timestamp this lets the live display resume the correct phase after a refresh or page navigation. Null or absent defaults to \"focus\".'),
   "pomodoroCompletedSessions": zod.number().nullish().describe('Number of focus sessions completed in the current pomodoro cycle for a Timer tile (resets to zero after a long break). Null or absent means zero.'),
-  "timerAlertEnabled": zod.boolean().nullish().describe('Whether a countdown Timer tile plays a chime and fires a browser notification when it reaches zero. Null or absent means disabled.')
+  "timerAlertEnabled": zod.boolean().nullish().describe('Whether a countdown Timer tile plays a chime and fires a browser notification when it reaches zero. Null or absent means disabled.'),
+  "diceType": zod.union([zod.literal('d3'),zod.literal('d4'),zod.literal('d6'),zod.literal('d8'),zod.literal('d10'),zod.literal('d12'),zod.literal('d20'),zod.literal('d100'),zod.literal(null)]).nullish().describe('Die type for a Dice Roller tile, e.g. \"d4\", \"d6\", \"d20\". The number after the \"d\" is the number of sides each die has. Null or absent defaults to \"d6\".'),
+  "diceCount": zod.number().nullish().describe('How many dice a Dice Roller tile rolls at once (1-6). Null or absent defaults to 2.')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.'),
   "createdAt": zod.string().optional()
 })

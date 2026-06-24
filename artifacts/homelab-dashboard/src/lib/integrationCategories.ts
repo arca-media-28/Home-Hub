@@ -51,6 +51,8 @@ const CATEGORY_BY_KEY: Record<string, Category> = {
   timer: "Organization",
   // Fun
   eightball: "Fun",
+  dice: "Fun",
+  coinflip: "Fun",
 };
 
 // The category for a given integration / service key. Unmapped keys land in

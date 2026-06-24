@@ -1216,7 +1216,7 @@ components:
           enum: [app, truenas, media, sonarr, radarr, lidarr, qbittorrent]
         integration:
           type: ["string", "null"]
-          enum: [truenas, media, jellyfin, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, audioplayer, clock, timer, weather, sports, news, stocks, sleeper, note, spacer, divider, eightball, null]
+          enum: [truenas, media, jellyfin, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, audioplayer, clock, timer, weather, sports, news, stocks, sleeper, note, spacer, divider, eightball, dice, coinflip, null]
         gridX:
           type: integer
         gridY:
@@ -1300,7 +1300,7 @@ components:
           enum: [app, truenas, media, sonarr, radarr, lidarr, qbittorrent]
         integration:
           type: ["string", "null"]
-          enum: [truenas, media, jellyfin, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, audioplayer, clock, timer, weather, sports, news, stocks, sleeper, note, spacer, divider, eightball, null]
+          enum: [truenas, media, jellyfin, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, audioplayer, clock, timer, weather, sports, news, stocks, sleeper, note, spacer, divider, eightball, dice, coinflip, null]
         gridX:
           type: integer
         gridY:
@@ -1343,7 +1343,7 @@ components:
       properties:
         integration:
           type: ["string", "null"]
-          enum: [truenas, media, jellyfin, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, audioplayer, clock, timer, weather, sports, news, stocks, sleeper, note, spacer, divider, eightball, null]
+          enum: [truenas, media, jellyfin, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, audioplayer, clock, timer, weather, sports, news, stocks, sleeper, note, spacer, divider, eightball, dice, coinflip, null]
         gridX:
           type: integer
         gridY:
@@ -1661,6 +1661,18 @@ components:
             Whether a countdown Timer tile plays a chime and fires a browser
             notification when it reaches zero. Null or absent means disabled.
           type: ["boolean", "null"]
+        diceType:
+          description: >-
+            Die type for a Dice Roller tile, e.g. "d4", "d6", "d20". The number
+            after the "d" is the number of sides each die has. Null or absent
+            defaults to "d6".
+          type: ["string", "null"]
+          enum: ["d3", "d4", "d6", "d8", "d10", "d12", "d20", "d100", null]
+        diceCount:
+          description: >-
+            How many dice a Dice Roller tile rolls at once (1-6). Null or absent
+            defaults to 2.
+          type: ["integer", "null"]
 
     NoteChecklistItem:
       type: object

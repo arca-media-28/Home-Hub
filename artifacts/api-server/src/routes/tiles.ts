@@ -75,6 +75,8 @@ interface TileSettings {
   pomodoroPhase?: "focus" | "shortBreak" | "longBreak" | null;
   pomodoroCompletedSessions?: number | null;
   timerAlertEnabled?: boolean | null;
+  diceType?: string | null;
+  diceCount?: number | null;
 }
 
 // A single checklist/to-do item on a Note (post-it) tile: its label text and
@@ -375,6 +377,16 @@ function pickTileSettings(obj: Record<string, unknown>): TileSettings {
     result.timerAlertEnabled = obj["timerAlertEnabled"];
   } else if (obj["timerAlertEnabled"] === null) {
     result.timerAlertEnabled = null;
+  }
+  if (typeof obj["diceType"] === "string") {
+    result.diceType = obj["diceType"];
+  } else if (obj["diceType"] === null) {
+    result.diceType = null;
+  }
+  if (typeof obj["diceCount"] === "number") {
+    result.diceCount = obj["diceCount"];
+  } else if (obj["diceCount"] === null) {
+    result.diceCount = null;
   }
   return result;
 }

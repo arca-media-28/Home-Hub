@@ -59,6 +59,14 @@ import {
   DEFAULT_POMODORO_LONG_BREAK_MIN,
   DEFAULT_POMODORO_SESSIONS,
 } from "@/components/tiles/TimerTile";
+import {
+  DICE_TYPES,
+  DEFAULT_DICE_TYPE,
+  DEFAULT_DICE_COUNT,
+  MIN_DICE_COUNT,
+  MAX_DICE_COUNT,
+  type DiceType,
+} from "@/components/tiles/DiceTile";
 import { SPORTS_LEAGUES, getLeagueTeams } from "@/lib/sports";
 import {
   fetchSleeperUser,
@@ -141,6 +149,8 @@ const INTEGRATIONS = [
   { value: TileIntegration.news, label: "News" },
   { value: TileIntegration.stocks, label: "Stocks" },
   { value: TileIntegration.eightball, label: "Magic Eight Ball" },
+  { value: TileIntegration.dice, label: "Dice Roller" },
+  { value: TileIntegration.coinflip, label: "Coin Flip" },
   { value: TileIntegration.note, label: "Note" },
   { value: TileIntegration.spacer, label: "Spacer" },
   { value: TileIntegration.divider, label: "Section Label" },
@@ -237,6 +247,13 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
   // Whether a finished countdown plays a chime + fires a browser notification.
   const [timerAlertEnabled, setTimerAlertEnabled] = useState<boolean>(
     tile?.tileSettings?.timerAlertEnabled ?? false,
+  );
+  // Dice Roller options: which die type to roll and how many.
+  const [diceType, setDiceType] = useState<DiceType>(
+    tile?.tileSettings?.diceType ?? DEFAULT_DICE_TYPE,
+  );
+  const [diceCount, setDiceCount] = useState<number>(
+    tile?.tileSettings?.diceCount ?? DEFAULT_DICE_COUNT,
   );
   // Weather widget options.
   const [weatherAutoLocate, setWeatherAutoLocate] = useState<boolean>(
@@ -400,6 +417,8 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
         );
         setTimerAlertEnabled(tile?.tileSettings?.timerAlertEnabled ?? false);
       }
+      setDiceType((tile?.tileSettings?.diceType as DiceType) ?? DEFAULT_DICE_TYPE);
+      setDiceCount(tile?.tileSettings?.diceCount ?? DEFAULT_DICE_COUNT);
       setWeatherAutoLocate(tile?.tileSettings?.weatherAutoLocate ?? true);
       setWeatherLocation(tile?.tileSettings?.weatherLocation ?? "");
       setWeatherUnits(tile?.tileSettings?.weatherUnits ?? "c");
@@ -484,6 +503,11 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
   // The Magic Eight Ball is a self-contained client-side toy with no link,
   // image, background, metrics, or settings — only a name and size matter.
   const isEightball = integration === TileIntegration.eightball;
+  // The Dice Roller and Coin Flip are the same kind of self-contained
+  // client-side toy: no link, image, background, metrics, or settings — only a
+  // name and size matter.
+  const isDice = integration === TileIntegration.dice;
+  const isCoinFlip = integration === TileIntegration.coinflip;
   // The spacer is a layout-only tile: an invisible gap with no name, URL,
   // image, background, or live data. Only its size/position matter, so the
   // editor strips every content field and shows a short description instead.
@@ -506,7 +530,8 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
   const isLayoutTile = isSpacer || isDivider;
   // Tiles that carry no link/image/background content: layout helpers plus the
   // note and timer, which paint their own surface.
-  const isContentless = isLayoutTile || isNote || isTimer || isEightball;
+  const isContentless =
+    isLayoutTile || isNote || isTimer || isEightball || isDice || isCoinFlip;
 
   // Teams for the chosen leagues, for the dependent team multi-select. Sourced
   // from the baked-in catalog (ESPN's /teams endpoint isn't CORS-enabled), so
@@ -993,7 +1018,9 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
                               noteBody: tile?.tileSettings?.noteBody ?? null,
                               noteItems: tile?.tileSettings?.noteItems ?? null,
                             }
-                          : null;
+                          : isDice
+                            ? { diceType, diceCount }
+                            : null;
         // Only emit a settings object when there is something to store; an
         // un-scrolled plain tile keeps tileSettings null as before.
         if (!widget && !scrollable) return null;
@@ -1086,6 +1113,66 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
               A Magic Eight Ball toy. Click the tile to "shake" it and reveal one
               of the 20 classic answers. Fully self-contained — no connection or
               settings needed. Give it a name and resize it to taste.
+            </p>
+          )}
+
+          {isDice && (
+            <div className="space-y-3 border-t border-border pt-4">
+              <p className="text-sm text-muted-foreground">
+                A set of dice. Click the tile to roll them and see the result
+                (plus the total when rolling more than one). Pick the die type
+                and how many to roll.
+              </p>
+              <div className="space-y-1.5">
+                <Label>Die type</Label>
+                <Select
+                  value={diceType}
+                  onValueChange={(v) => setDiceType(v as DiceType)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {DICE_TYPES.map((d) => (
+                      <SelectItem key={d.value} value={d.value}>
+                        {d.value} ({d.sides}-sided)
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Number of dice</Label>
+                <Input
+                  type="number"
+                  min={MIN_DICE_COUNT}
+                  max={MAX_DICE_COUNT}
+                  value={diceCount}
+                  onChange={(e) =>
+                    setDiceCount(
+                      Math.max(
+                        MIN_DICE_COUNT,
+                        Math.min(
+                          MAX_DICE_COUNT,
+                          Math.floor(Number(e.target.value) || MIN_DICE_COUNT),
+                        ),
+                      ),
+                    )
+                  }
+                  aria-label="Number of dice"
+                />
+                <span className="block text-[11px] text-muted-foreground">
+                  Roll between {MIN_DICE_COUNT} and {MAX_DICE_COUNT} dice at once.
+                </span>
+              </div>
+            </div>
+          )}
+
+          {isCoinFlip && (
+            <p className="text-sm text-muted-foreground border-t border-border pt-4">
+              A flippable coin. Click the tile to spin it and land on Heads or
+              Tails. Fully self-contained — no connection or settings needed.
+              Give it a name and resize it to taste.
             </p>
           )}
 
