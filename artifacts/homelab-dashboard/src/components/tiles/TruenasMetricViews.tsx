@@ -1,6 +1,7 @@
 import { ArrowDown, ArrowUp, HardDrive } from "lucide-react";
 import type { TruenasMetrics } from "@workspace/api-client-react";
 import type { TileDensity } from "./metrics";
+import { filterTruenasPools } from "./metrics";
 
 // Bespoke per-metric TrueNAS "live tile" views. Each TrueNAS metric variant
 // (chosen via the integration picker's second pop-out and stored on the tile as
@@ -323,12 +324,29 @@ export function ArcView({
   );
 }
 
-export function PoolsView({ data }: { data: TruenasMetrics }) {
-  const pools = data.pools ?? [];
-  if (pools.length === 0) {
+export function PoolsView({
+  data,
+  selectedPools,
+}: {
+  data: TruenasMetrics;
+  selectedPools?: string[] | null;
+}) {
+  const allPools = data.pools ?? [];
+  if (allPools.length === 0) {
     return (
       <div className="flex h-full w-full items-center justify-center text-sm text-muted-foreground">
         No ZFS pools reported
+      </div>
+    );
+  }
+  const pools = filterTruenasPools(allPools, selectedPools);
+  // The tile filters to specific volumes, but none of them are currently
+  // reported (e.g. a chosen pool was renamed/removed) — say so rather than
+  // showing an empty body.
+  if (pools.length === 0) {
+    return (
+      <div className="flex h-full w-full items-center justify-center px-3 text-center text-sm text-muted-foreground">
+        None of the selected volumes are currently reported
       </div>
     );
   }

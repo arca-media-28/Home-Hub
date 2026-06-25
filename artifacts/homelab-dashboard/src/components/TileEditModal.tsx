@@ -107,6 +107,8 @@ import {
   getNewsWidget,
   useGetConnectionsStatus,
   getGetConnectionsStatusQueryKey,
+  useGetTruenasMetrics,
+  getGetTruenasMetricsQueryKey,
   TileType,
   TileIntegration,
   type Tile,
@@ -229,6 +231,12 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
   const [truenasMetric, setTruenasMetric] = useState<
     NonNullable<TileSettings>["truenasMetric"]
   >(tile?.tileSettings?.truenasMetric ?? null);
+  // TrueNAS volume (ZFS pool) allow-list. null/empty = "show all volumes"; an
+  // explicit array narrows both the dedicated ZFS Pools view and the pools
+  // section of the combined view to those volumes.
+  const [truenasPools, setTruenasPools] = useState<string[] | null>(
+    tile?.tileSettings?.truenasPools ?? null,
+  );
   // qBittorrent category allow-list. null = "show all categories"; an explicit
   // array narrows the tile's torrent list to those categories.
   const [categoryFilter, setCategoryFilter] = useState<string[] | null>(
@@ -442,6 +450,7 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
       setHideTitle(tile?.hideTitle ?? false);
       setMetrics(tile?.metrics ?? null);
       setTruenasMetric(tile?.tileSettings?.truenasMetric ?? null);
+      setTruenasPools(tile?.tileSettings?.truenasPools ?? null);
       setCategoryFilter(tile?.tileSettings?.categoryFilter ?? null);
       setGroupByCategory(tile?.tileSettings?.groupByCategory ?? false);
       setClockFormat(tile?.tileSettings?.clockFormat ?? "24");
@@ -728,6 +737,53 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
   const checkedCategories = new Set(categoryFilter ?? availableCategories);
   const torrentsMetricOn = enabledKeys.has("torrents");
 
+  // TrueNAS pool (volume) discovery — only fetch live metrics while the editor
+  // is open and TrueNAS is the selected integration. The available volume names
+  // come from the live metrics' `pools` list.
+  const truenasMetricsQuery = useGetTruenasMetrics({
+    query: {
+      queryKey: getGetTruenasMetricsQueryKey(),
+      enabled: open && isTruenas,
+    },
+  });
+  const availablePools = Array.from(
+    new Set(
+      (truenasMetricsQuery.data?.pools ?? [])
+        .map((p) => p.name)
+        .filter((n): n is string => typeof n === "string" && n.length > 0),
+    ),
+  ).sort((a, b) => a.localeCompare(b));
+  // The set of volumes the saved filter currently covers. A null/empty filter
+  // means "all volumes" — reflect every reported volume as checked. An explicit
+  // array is honored as-is so a saved selection survives even when the live
+  // metrics fetch transiently fails.
+  const checkedPools = new Set(
+    truenasPools == null || truenasPools.length === 0
+      ? availablePools
+      : truenasPools,
+  );
+
+  function toggleTruenasPool(pool: string, checked: boolean) {
+    // Start from the saved selection when present; otherwise (null/empty =
+    // "all") start from the full reported list so unchecking one leaves the
+    // rest selected.
+    const base =
+      truenasPools == null || truenasPools.length === 0
+        ? availablePools
+        : truenasPools;
+    const set = new Set(base);
+    if (checked) set.add(pool);
+    else set.delete(pool);
+    const next = Array.from(set).sort((a, b) => a.localeCompare(b));
+    // Collapse back to null ("show all") when every reported volume is
+    // selected, so a newly-appearing volume shows automatically. Computed
+    // against the full reported list — never an empty one — so a transiently
+    // empty metrics fetch can't silently wipe an explicit selection.
+    const coversAll =
+      availablePools.length > 0 && availablePools.every((p) => set.has(p));
+    setTruenasPools(coversAll ? null : next);
+  }
+
   function toggleCategory(category: string, checked: boolean) {
     // Start from the saved selection when present; otherwise (null = "all")
     // start from the full catalog so unchecking one leaves the rest selected.
@@ -760,6 +816,8 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
       setMetrics(variant ? variant.metricKeys : null);
     } else {
       setTruenasMetric(null);
+      // Switching away from TrueNAS invalidates the old volume filter.
+      if (next !== TileIntegration.truenas) setTruenasPools(null);
       // Switching integrations invalidates the old metric keys; reset to "show
       // all" for the newly chosen service.
       setMetrics(null);
@@ -1018,7 +1076,7 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
       // is merged in below regardless of integration.
       tileSettings: (() => {
         const widget = isTruenas
-          ? { truenasMetric }
+          ? { truenasMetric, truenasPools }
           : isQbittorrent
           ? { categoryFilter, groupByCategory }
           : isClock
@@ -1687,6 +1745,59 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
               )}
             </div>
           )}
+
+          {isTruenas &&
+            (truenasMetric == null || truenasMetric === "pools") && (
+              <div className="space-y-2 border-t border-border pt-4">
+                <Label>Filter volumes</Label>
+                <p className="text-xs text-muted-foreground">
+                  Show only the selected ZFS pools (volumes). Leave all checked
+                  to show every volume.
+                </p>
+                {truenasMetricsQuery.isLoading ? (
+                  <p className="text-xs text-muted-foreground pt-1">
+                    Loading volumes…
+                  </p>
+                ) : availablePools.length === 0 ? (
+                  <p className="text-xs text-muted-foreground pt-1">
+                    No ZFS pools were reported by this TrueNAS.
+                  </p>
+                ) : (
+                  <div className="space-y-2 pt-1">
+                    <label
+                      htmlFor="truenas-pool-all"
+                      className="flex items-center gap-2 cursor-pointer select-none"
+                    >
+                      <Checkbox
+                        id="truenas-pool-all"
+                        checked={truenasPools == null || truenasPools.length === 0}
+                        onCheckedChange={(c) => {
+                          if (c === true) setTruenasPools(null);
+                          else setTruenasPools([]);
+                        }}
+                      />
+                      <span className="text-sm font-medium">All volumes</span>
+                    </label>
+                    {availablePools.map((pool) => (
+                      <label
+                        key={pool}
+                        htmlFor={`truenas-pool-${pool}`}
+                        className="flex items-center gap-2 cursor-pointer select-none pl-5"
+                      >
+                        <Checkbox
+                          id={`truenas-pool-${pool}`}
+                          checked={checkedPools.has(pool)}
+                          onCheckedChange={(c) =>
+                            toggleTruenasPool(pool, c === true)
+                          }
+                        />
+                        <span className="text-sm">{pool}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
 
           {isQbittorrent && torrentsMetricOn && (
             <div className="space-y-2 border-t border-border pt-4">

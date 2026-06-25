@@ -1,7 +1,7 @@
 import { useGetTruenasMetrics, getGetTruenasMetricsQueryKey } from "@workspace/api-client-react";
 import { HardDrive, ArrowDown, ArrowUp } from "lucide-react";
 import type { WidgetProps } from "./IntegrationTile";
-import { tileBudget, BAR_PX, ROW_PX, SECTION_PX, listColumnClass, listColumnStyle } from "./metrics";
+import { tileBudget, BAR_PX, ROW_PX, SECTION_PX, listColumnClass, listColumnStyle, filterTruenasPools } from "./metrics";
 import {
   CpuRamView,
   NetworkView,
@@ -115,7 +115,7 @@ export default function TruenasTile({ enabled, density, tileSettings }: WidgetPr
     case "arc":
       return <ArcView data={data} density={density} />;
     case "pools":
-      return <PoolsView data={data} />;
+      return <PoolsView data={data} selectedPools={tileSettings?.truenasPools} />;
     case "disks":
       return <DisksView data={data} />;
   }
@@ -147,12 +147,15 @@ export default function TruenasTile({ enabled, density, tileSettings }: WidgetPr
   const arcHitSeries = data.arcHitSeries ?? [];
   const showArcSpark = wide && arcHitSeries.length >= 2;
 
+  // Narrow the pool list to the tile's selected volumes (empty/unset = all)
+  // before measuring how many fit, so the reveal budget reflects what's shown.
+  const visiblePools = filterTruenasPools(data.pools, tileSettings?.truenasPools);
   const poolCount =
-    enabled.has("pools") && data.pools.length > 0
-      ? budget.list(SECTION_PX, ROW_PX, data.pools.length)
+    enabled.has("pools") && visiblePools.length > 0
+      ? budget.list(SECTION_PX, ROW_PX, visiblePools.length)
       : 0;
   const showPools = poolCount > 0;
-  const pools = data.pools.slice(0, poolCount);
+  const pools = visiblePools.slice(0, poolCount);
 
   const allDisks = data.disks ?? [];
   const diskCount =

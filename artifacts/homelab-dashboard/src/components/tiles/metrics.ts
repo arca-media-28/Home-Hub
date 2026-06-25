@@ -164,6 +164,19 @@ export function resolveEnabledMetrics(
   return new Set(selected.filter((k) => valid.has(k)));
 }
 
+// Filter a list of TrueNAS pools by a selected-volume allow-list. A
+// null/undefined/empty selection means "show all" (backward-compatible
+// default); otherwise only pools whose name is in the selection are kept. The
+// generic shape keeps it usable from both the combined and dedicated views.
+export function filterTruenasPools<T extends { name: string }>(
+  pools: T[],
+  selected: string[] | null | undefined,
+): T[] {
+  if (!selected || selected.length === 0) return pools;
+  const set = new Set(selected);
+  return pools.filter((p) => set.has(p.name));
+}
+
 // ── Size-aware density ────────────────────────────────────────────────────────
 // Density is driven by the *measured* pixel size of a tile's live-status body
 // (via a ResizeObserver in IntegrationTile), not by coarse grid units. Widgets

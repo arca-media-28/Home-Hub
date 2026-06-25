@@ -127,6 +127,7 @@ export const GetTilesResponseItem = zod.object({
   "audioPlaylists": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Playlists tab (Plex \/ Subsonic only). Absent or null defaults to true.'),
   "scrollable": zod.boolean().nullish().describe('When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).'),
   "truenasMetric": zod.union([zod.literal('cpuram'),zod.literal('network'),zod.literal('arc'),zod.literal('pools'),zod.literal('disks'),zod.literal(null)]).nullish().describe('Which single TrueNAS metric a dedicated TrueNAS tile renders with its bespoke visual: \"cpuram\", \"network\", \"arc\", \"pools\", or \"disks\". Null or absent means the tile shows the combined multi-section view (the default, backward-compatible behavior).'),
+  "truenasPools": zod.array(zod.string()).nullish().describe('Allow-list of TrueNAS ZFS pool (volume) names to show on the tile. Applies to both the dedicated ZFS Pools view and the pools section of the combined view. Null, absent, or empty means show all pools (the default, backward-compatible behavior).'),
   "noteBody": zod.string().nullish().describe('Free-form note text for a Note (post-it) tile. Null or absent means an empty note.'),
   "noteItems": zod.array(zod.object({
   "text": zod.string().describe('The checklist item\'s label text.'),
@@ -225,6 +226,7 @@ export const CreateTileBody = zod.object({
   "audioPlaylists": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Playlists tab (Plex \/ Subsonic only). Absent or null defaults to true.'),
   "scrollable": zod.boolean().nullish().describe('When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).'),
   "truenasMetric": zod.union([zod.literal('cpuram'),zod.literal('network'),zod.literal('arc'),zod.literal('pools'),zod.literal('disks'),zod.literal(null)]).nullish().describe('Which single TrueNAS metric a dedicated TrueNAS tile renders with its bespoke visual: \"cpuram\", \"network\", \"arc\", \"pools\", or \"disks\". Null or absent means the tile shows the combined multi-section view (the default, backward-compatible behavior).'),
+  "truenasPools": zod.array(zod.string()).nullish().describe('Allow-list of TrueNAS ZFS pool (volume) names to show on the tile. Applies to both the dedicated ZFS Pools view and the pools section of the combined view. Null, absent, or empty means show all pools (the default, backward-compatible behavior).'),
   "noteBody": zod.string().nullish().describe('Free-form note text for a Note (post-it) tile. Null or absent means an empty note.'),
   "noteItems": zod.array(zod.object({
   "text": zod.string().describe('The checklist item\'s label text.'),
@@ -327,6 +329,7 @@ export const GetTileResponse = zod.object({
   "audioPlaylists": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Playlists tab (Plex \/ Subsonic only). Absent or null defaults to true.'),
   "scrollable": zod.boolean().nullish().describe('When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).'),
   "truenasMetric": zod.union([zod.literal('cpuram'),zod.literal('network'),zod.literal('arc'),zod.literal('pools'),zod.literal('disks'),zod.literal(null)]).nullish().describe('Which single TrueNAS metric a dedicated TrueNAS tile renders with its bespoke visual: \"cpuram\", \"network\", \"arc\", \"pools\", or \"disks\". Null or absent means the tile shows the combined multi-section view (the default, backward-compatible behavior).'),
+  "truenasPools": zod.array(zod.string()).nullish().describe('Allow-list of TrueNAS ZFS pool (volume) names to show on the tile. Applies to both the dedicated ZFS Pools view and the pools section of the combined view. Null, absent, or empty means show all pools (the default, backward-compatible behavior).'),
   "noteBody": zod.string().nullish().describe('Free-form note text for a Note (post-it) tile. Null or absent means an empty note.'),
   "noteItems": zod.array(zod.object({
   "text": zod.string().describe('The checklist item\'s label text.'),
@@ -426,6 +429,7 @@ export const UpdateTileBody = zod.object({
   "audioPlaylists": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Playlists tab (Plex \/ Subsonic only). Absent or null defaults to true.'),
   "scrollable": zod.boolean().nullish().describe('When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).'),
   "truenasMetric": zod.union([zod.literal('cpuram'),zod.literal('network'),zod.literal('arc'),zod.literal('pools'),zod.literal('disks'),zod.literal(null)]).nullish().describe('Which single TrueNAS metric a dedicated TrueNAS tile renders with its bespoke visual: \"cpuram\", \"network\", \"arc\", \"pools\", or \"disks\". Null or absent means the tile shows the combined multi-section view (the default, backward-compatible behavior).'),
+  "truenasPools": zod.array(zod.string()).nullish().describe('Allow-list of TrueNAS ZFS pool (volume) names to show on the tile. Applies to both the dedicated ZFS Pools view and the pools section of the combined view. Null, absent, or empty means show all pools (the default, backward-compatible behavior).'),
   "noteBody": zod.string().nullish().describe('Free-form note text for a Note (post-it) tile. Null or absent means an empty note.'),
   "noteItems": zod.array(zod.object({
   "text": zod.string().describe('The checklist item\'s label text.'),
@@ -520,6 +524,7 @@ export const UpdateTileResponse = zod.object({
   "audioPlaylists": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Playlists tab (Plex \/ Subsonic only). Absent or null defaults to true.'),
   "scrollable": zod.boolean().nullish().describe('When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).'),
   "truenasMetric": zod.union([zod.literal('cpuram'),zod.literal('network'),zod.literal('arc'),zod.literal('pools'),zod.literal('disks'),zod.literal(null)]).nullish().describe('Which single TrueNAS metric a dedicated TrueNAS tile renders with its bespoke visual: \"cpuram\", \"network\", \"arc\", \"pools\", or \"disks\". Null or absent means the tile shows the combined multi-section view (the default, backward-compatible behavior).'),
+  "truenasPools": zod.array(zod.string()).nullish().describe('Allow-list of TrueNAS ZFS pool (volume) names to show on the tile. Applies to both the dedicated ZFS Pools view and the pools section of the combined view. Null, absent, or empty means show all pools (the default, backward-compatible behavior).'),
   "noteBody": zod.string().nullish().describe('Free-form note text for a Note (post-it) tile. Null or absent means an empty note.'),
   "noteItems": zod.array(zod.object({
   "text": zod.string().describe('The checklist item\'s label text.'),
@@ -638,6 +643,7 @@ export const SaveLayoutResponseItem = zod.object({
   "audioPlaylists": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Playlists tab (Plex \/ Subsonic only). Absent or null defaults to true.'),
   "scrollable": zod.boolean().nullish().describe('When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).'),
   "truenasMetric": zod.union([zod.literal('cpuram'),zod.literal('network'),zod.literal('arc'),zod.literal('pools'),zod.literal('disks'),zod.literal(null)]).nullish().describe('Which single TrueNAS metric a dedicated TrueNAS tile renders with its bespoke visual: \"cpuram\", \"network\", \"arc\", \"pools\", or \"disks\". Null or absent means the tile shows the combined multi-section view (the default, backward-compatible behavior).'),
+  "truenasPools": zod.array(zod.string()).nullish().describe('Allow-list of TrueNAS ZFS pool (volume) names to show on the tile. Applies to both the dedicated ZFS Pools view and the pools section of the combined view. Null, absent, or empty means show all pools (the default, backward-compatible behavior).'),
   "noteBody": zod.string().nullish().describe('Free-form note text for a Note (post-it) tile. Null or absent means an empty note.'),
   "noteItems": zod.array(zod.object({
   "text": zod.string().describe('The checklist item\'s label text.'),
@@ -807,6 +813,7 @@ export const ExportAllPagesResponse = zod.object({
   "audioPlaylists": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Playlists tab (Plex \/ Subsonic only). Absent or null defaults to true.'),
   "scrollable": zod.boolean().nullish().describe('When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).'),
   "truenasMetric": zod.union([zod.literal('cpuram'),zod.literal('network'),zod.literal('arc'),zod.literal('pools'),zod.literal('disks'),zod.literal(null)]).nullish().describe('Which single TrueNAS metric a dedicated TrueNAS tile renders with its bespoke visual: \"cpuram\", \"network\", \"arc\", \"pools\", or \"disks\". Null or absent means the tile shows the combined multi-section view (the default, backward-compatible behavior).'),
+  "truenasPools": zod.array(zod.string()).nullish().describe('Allow-list of TrueNAS ZFS pool (volume) names to show on the tile. Applies to both the dedicated ZFS Pools view and the pools section of the combined view. Null, absent, or empty means show all pools (the default, backward-compatible behavior).'),
   "noteBody": zod.string().nullish().describe('Free-form note text for a Note (post-it) tile. Null or absent means an empty note.'),
   "noteItems": zod.array(zod.object({
   "text": zod.string().describe('The checklist item\'s label text.'),
@@ -914,6 +921,7 @@ export const ExportPageResponse = zod.object({
   "audioPlaylists": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Playlists tab (Plex \/ Subsonic only). Absent or null defaults to true.'),
   "scrollable": zod.boolean().nullish().describe('When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).'),
   "truenasMetric": zod.union([zod.literal('cpuram'),zod.literal('network'),zod.literal('arc'),zod.literal('pools'),zod.literal('disks'),zod.literal(null)]).nullish().describe('Which single TrueNAS metric a dedicated TrueNAS tile renders with its bespoke visual: \"cpuram\", \"network\", \"arc\", \"pools\", or \"disks\". Null or absent means the tile shows the combined multi-section view (the default, backward-compatible behavior).'),
+  "truenasPools": zod.array(zod.string()).nullish().describe('Allow-list of TrueNAS ZFS pool (volume) names to show on the tile. Applies to both the dedicated ZFS Pools view and the pools section of the combined view. Null, absent, or empty means show all pools (the default, backward-compatible behavior).'),
   "noteBody": zod.string().nullish().describe('Free-form note text for a Note (post-it) tile. Null or absent means an empty note.'),
   "noteItems": zod.array(zod.object({
   "text": zod.string().describe('The checklist item\'s label text.'),
@@ -1017,6 +1025,7 @@ export const ImportPagesBody = zod.object({
   "audioPlaylists": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Playlists tab (Plex \/ Subsonic only). Absent or null defaults to true.'),
   "scrollable": zod.boolean().nullish().describe('When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).'),
   "truenasMetric": zod.union([zod.literal('cpuram'),zod.literal('network'),zod.literal('arc'),zod.literal('pools'),zod.literal('disks'),zod.literal(null)]).nullish().describe('Which single TrueNAS metric a dedicated TrueNAS tile renders with its bespoke visual: \"cpuram\", \"network\", \"arc\", \"pools\", or \"disks\". Null or absent means the tile shows the combined multi-section view (the default, backward-compatible behavior).'),
+  "truenasPools": zod.array(zod.string()).nullish().describe('Allow-list of TrueNAS ZFS pool (volume) names to show on the tile. Applies to both the dedicated ZFS Pools view and the pools section of the combined view. Null, absent, or empty means show all pools (the default, backward-compatible behavior).'),
   "noteBody": zod.string().nullish().describe('Free-form note text for a Note (post-it) tile. Null or absent means an empty note.'),
   "noteItems": zod.array(zod.object({
   "text": zod.string().describe('The checklist item\'s label text.'),

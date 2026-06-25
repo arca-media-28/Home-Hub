@@ -1666,6 +1666,15 @@ components:
             (the default, backward-compatible behavior).
           type: ["string", "null"]
           enum: ["cpuram", "network", "arc", "pools", "disks", null]
+        truenasPools:
+          description: >-
+            Allow-list of TrueNAS ZFS pool (volume) names to show on the tile.
+            Applies to both the dedicated ZFS Pools view and the pools section
+            of the combined view. Null, absent, or empty means show all pools
+            (the default, backward-compatible behavior).
+          type: ["array", "null"]
+          items:
+            type: string
         noteBody:
           description: >-
             Free-form note text for a Note (post-it) tile. Null or absent means

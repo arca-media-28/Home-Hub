@@ -3,6 +3,7 @@ import { TileIntegration } from "@workspace/api-client-react";
 import {
   allMetricKeys,
   resolveEnabledMetrics,
+  filterTruenasPools,
   tileDensity,
   tileBudget,
   tileColumns,
@@ -60,6 +61,36 @@ describe("resolveEnabledMetrics", () => {
   it("returns an empty set for a tile with no integration", () => {
     expect(resolveEnabledMetrics(null, null).size).toBe(0);
     expect(resolveEnabledMetrics(null, ["cpu"]).size).toBe(0);
+  });
+});
+
+describe("filterTruenasPools", () => {
+  const pools = [{ name: "tank" }, { name: "backup" }, { name: "scratch" }];
+
+  it("shows all pools when the selection is null (backward-compatible default)", () => {
+    expect(filterTruenasPools(pools, null)).toEqual(pools);
+  });
+
+  it("shows all pools when the selection is undefined", () => {
+    expect(filterTruenasPools(pools, undefined)).toEqual(pools);
+  });
+
+  it("shows all pools when the selection is empty", () => {
+    expect(filterTruenasPools(pools, [])).toEqual(pools);
+  });
+
+  it("keeps only the selected pools (preserving source order)", () => {
+    expect(filterTruenasPools(pools, ["scratch", "tank"])).toEqual([
+      { name: "tank" },
+      { name: "scratch" },
+    ]);
+  });
+
+  it("drops selected names that are no longer reported", () => {
+    expect(filterTruenasPools(pools, ["tank", "gone"])).toEqual([
+      { name: "tank" },
+    ]);
+    expect(filterTruenasPools(pools, ["gone"])).toEqual([]);
   });
 });
 

@@ -273,6 +273,11 @@ export type TileSettings = {
      */
   truenasMetric?: 'cpuram' | 'network' | 'arc' | 'pools' | 'disks' | null;
   /**
+     * Allow-list of TrueNAS ZFS pool (volume) names to show on the tile. Applies to both the dedicated ZFS Pools view and the pools section of the combined view. Null, absent, or empty means show all pools (the default, backward-compatible behavior).
+     * @nullable
+     */
+  truenasPools?: string[] | null;
+  /**
      * Free-form note text for a Note (post-it) tile. Null or absent means an empty note.
      * @nullable
      */
