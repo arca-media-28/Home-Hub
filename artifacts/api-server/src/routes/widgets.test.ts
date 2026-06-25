@@ -355,6 +355,69 @@ describe("GET /widgets/truenas", () => {
     ]);
   });
 
+  it("reads live temperatures from the dedicated /disk/temperatures endpoint", async () => {
+    findByService.mockReturnValue(
+      connRow({ service: "truenas", url: "https://nas.local", api_key: "key" }),
+    );
+    // The inventory carries NO temperature; live temps come from the POST endpoint.
+    httpPost.mockImplementation((url: string) => {
+      if (url.endsWith("/api/v2.0/disk/temperatures")) {
+        return Promise.resolve({ data: { sda: 34, nvme0n1: 41, sdb: null } });
+      }
+      // reporting/get_data (core + extras) and anything else → reporting shape.
+      return Promise.resolve({
+        data: [{ name: "cpu", legend: ["time", "idle"], data: [[1000, 80]] }],
+      });
+    });
+    mockTruenasGets({
+      pool: [],
+      disk: [{ name: "sda" }, { name: "nvme0n1" }, { name: "sdb" }],
+      smart: [{ disk: "sda", tests: [{ status: "SUCCESS" }] }],
+    });
+
+    const res = await request(app).get("/widgets/truenas");
+    expect(res.status).toBe(200);
+    expect(res.body.disks).toEqual([
+      { name: "sda", temperatureC: 34, smartPassed: true },
+      { name: "nvme0n1", temperatureC: 41, smartPassed: null },
+      // null temperature from the endpoint → unknown ("--").
+      { name: "sdb", temperatureC: null, smartPassed: null },
+    ]);
+    // The temperatures endpoint was queried with the resolved disk names.
+    const tempCall = httpPost.mock.calls.find((c) =>
+      String(c[0]).endsWith("/api/v2.0/disk/temperatures"),
+    );
+    expect(tempCall).toBeDefined();
+    expect((tempCall![1] as { names: string[] }).names).toEqual(["sda", "nvme0n1", "sdb"]);
+  });
+
+  it("leaves temperature null when /disk/temperatures fails (additive, no 502)", async () => {
+    findByService.mockReturnValue(
+      connRow({ service: "truenas", url: "https://nas.local", api_key: "key" }),
+    );
+    httpPost.mockImplementation((url: string) => {
+      if (url.endsWith("/api/v2.0/disk/temperatures")) {
+        return Promise.reject(httpError(500)); // temperatures endpoint unavailable
+      }
+      return Promise.resolve({
+        data: [{ name: "cpu", legend: ["time", "idle"], data: [[1000, 60]] }],
+      });
+    });
+    // Inventory has names but no temperature fields → temp is fully unknown.
+    mockTruenasGets({
+      pool: [],
+      disk: [{ name: "sda" }, { name: "sdb" }],
+      smart: [{ disk: "sda", tests: [{ status: "SUCCESS" }] }],
+    });
+
+    const res = await request(app).get("/widgets/truenas");
+    expect(res.status).toBe(200); // disk-health failure never blanks the tile
+    expect(res.body.disks).toEqual([
+      { name: "sda", temperatureC: null, smartPassed: true },
+      { name: "sdb", temperatureC: null, smartPassed: null },
+    ]);
+  });
+
   it("reports unknown SMART/temperature as null without dropping the disk", async () => {
     findByService.mockReturnValue(
       connRow({ service: "truenas", url: "https://nas.local", api_key: "key" }),
@@ -629,10 +692,12 @@ describe("GET /widgets/truenas/diagnostics", () => {
       { name: "memory", identifiers: null },
     ]);
 
-    // Every POST probe records the EXACT request body it sent and the raw error
-    // (status + the server's response body), so the user can copy the real reason.
+    // Every get_data POST probe records the EXACT request body it sent and the
+    // raw error (status + the server's response body), so the user can copy the
+    // real reason. (Disk-health POST probes have a different body shape.)
     const postProbes = res.body.probes.filter(
-      (p: { request: { method: string } }) => p.request.method === "POST",
+      (p: { request: { method: string; url: string } }) =>
+        p.request.method === "POST" && p.request.url.endsWith("/reporting/get_data"),
     );
     expect(postProbes.length).toBeGreaterThan(1);
     for (const p of postProbes) {
@@ -642,6 +707,21 @@ describe("GET /widgets/truenas/diagnostics", () => {
       expect(p.request.body.graphs).toBeDefined();
       expect(p.request.body.query).toBeDefined();
     }
+
+    // The disk-health probes are present so a "--" cell on the tile is explainable.
+    const labels = res.body.probes.map((p: { label: string }) => p.label);
+    expect(labels.some((l: string) => l.includes("/disk"))).toBe(true);
+    expect(labels.some((l: string) => l.includes("/disk/temperatures"))).toBe(true);
+    expect(labels.some((l: string) => l.includes("/smart/test/results"))).toBe(true);
+
+    // The temperatures probe sends the powermode the widget uses, with the disk
+    // names resolved from the inventory probe.
+    const tempProbe = res.body.probes.find(
+      (p: { request: { method: string; url: string } }) =>
+        p.request.method === "POST" && p.request.url.endsWith("/disk/temperatures"),
+    );
+    expect(tempProbe.request.body.powermode).toBe("NEVER");
+    expect(Array.isArray(tempProbe.request.body.names)).toBe(true);
   });
 
   it("captures a successful probe's response body when a form is accepted", async () => {

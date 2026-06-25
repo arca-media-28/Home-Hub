@@ -481,11 +481,31 @@ function parseTruenasPools(poolData: unknown) {
   });
 }
 
-// Merge a TrueNAS `GET /api/v2.0/disk` inventory (names + temperatures) with the
+// Build a `name → temperature(°C)` map from a TrueNAS `POST /api/v2.0/disk/
+// temperatures` response. That endpoint returns a flat object keyed by disk name
+// (e.g. `{ "sda": 34, "nvme0n1": 41, "sdb": null }`); the live `GET /disk`
+// inventory does NOT carry a temperature, which is why temps showed as "--".
+// Best-effort: a missing/non-numeric value stays out of the map (→ unknown).
+function parseTruenasTemperatures(tempData: unknown): Map<string, number> {
+  const byDisk = new Map<string, number>();
+  if (tempData && typeof tempData === "object" && !Array.isArray(tempData)) {
+    for (const [name, value] of Object.entries(tempData as Record<string, unknown>)) {
+      if (typeof value === "number" && Number.isFinite(value)) byDisk.set(name, value);
+    }
+  }
+  return byDisk;
+}
+
+// Merge a TrueNAS `GET /api/v2.0/disk` inventory (disk names), the live
+// `POST /api/v2.0/disk/temperatures` map (name → °C) and the
 // `GET /api/v2.0/smart/test/results` SMART history into a per-disk health row:
-// `{ name, temperatureC, smartPassed }`. Both inputs are best-effort — either may
-// be missing/empty — so each field defaults to null ("unknown") when absent.
-function parseTruenasDisks(diskData: unknown, smartData: unknown) {
+// `{ name, temperatureC, smartPassed }`. All three inputs are best-effort — any
+// may be missing/empty — so each field defaults to null ("unknown") when absent.
+function parseTruenasDisks(
+  diskData: unknown,
+  smartData: unknown,
+  tempByDisk: Map<string, number> = new Map(),
+) {
   // Latest SMART verdict per disk. A disk's most recent test result decides the
   // pass/fail: SUCCESS → passed, anything else with a known status → failed,
   // an unrecognized/empty status → unknown (null).
@@ -512,12 +532,23 @@ function parseTruenasDisks(diskData: unknown, smartData: unknown) {
   }>)
     .map((d) => {
       const name = d.name ?? d.devname ?? "";
-      const rawTemp = d.temperature ?? d.temp;
+      // Prefer the live temperatures map; fall back to any temp the inventory
+      // happens to carry (older versions) before giving up (null = unknown).
+      const liveTemp = tempByDisk.get(name);
+      const rawTemp = typeof liveTemp === "number" ? liveTemp : d.temperature ?? d.temp;
       const temperatureC = typeof rawTemp === "number" ? rawTemp : null;
       const smartPassed = smartByDisk.has(name) ? smartByDisk.get(name)! : null;
       return { name, temperatureC, smartPassed };
     })
     .filter((d) => d.name);
+}
+
+// Extract the disk device names from a `GET /api/v2.0/disk` inventory so the
+// temperatures endpoint (which requires an explicit name list) can be queried.
+function diskNamesFrom(diskData: unknown): string[] {
+  return ((diskData ?? []) as Array<{ name?: string; devname?: string }>)
+    .map((d) => d.name ?? d.devname ?? "")
+    .filter((n): n is string => Boolean(n));
 }
 
 router.get("/truenas", requireAuth, async (_req, res) => {
@@ -658,7 +689,27 @@ router.get("/truenas", requireAuth, async (_req, res) => {
       "TrueNAS widget: SMART call failed (drive health unavailable)",
     );
   }
-  const disks = parseTruenasDisks(diskData, smartData);
+  // Live disk temperatures come from a SEPARATE endpoint that must be given the
+  // disk names (the inventory carries none) — so it can only run once /disk has
+  // resolved. Additive: a failure just leaves temperatures unknown ("--").
+  let tempByDisk = new Map<string, number>();
+  const diskNames = diskNamesFrom(diskData);
+  if (diskNames.length > 0) {
+    try {
+      const tempRes = await httpClient.post(
+        `${baseUrl}/api/v2.0/disk/temperatures`,
+        { names: diskNames, powermode: "NEVER" },
+        { headers },
+      );
+      tempByDisk = parseTruenasTemperatures(tempRes.data);
+    } catch (err) {
+      logger.error(
+        { reason: normalizeHttpError(err), detail: describeHttpError(err) },
+        "TrueNAS widget: disk/temperatures call failed (temperatures unavailable)",
+      );
+    }
+  }
+  const disks = parseTruenasDisks(diskData, smartData, tempByDisk);
 
   // Network + ARC extras: additive. They ride a SEPARATE reporting call so a
   // rejection only drops these (never a 502). The "interface" graph needs a
@@ -892,11 +943,73 @@ router.get("/truenas/diagnostics", requireAuth, async (_req, res) => {
     "/",
   )}), non-aggregated series — the form the widget uses`;
 
+  // Disk-health probes. The TrueNAS tile's per-disk temperature + SMART grid is
+  // built from three calls; probe each so a "--" (unknown) cell is explainable:
+  //   • GET /disk            → disk inventory (names; note it carries NO temperature)
+  //   • POST /disk/temperatures → live name→°C map (the real temperature source)
+  //   • GET /smart/test/results → SMART test history (empty when no tests have run)
+  async function probeGetUrl(label: string, url: string) {
+    try {
+      const r = await httpClient.get(url, { headers });
+      return {
+        label,
+        request: { method: "GET", url },
+        ok: true as const,
+        status: r.status,
+        response: capDiagnosticBody(r.data),
+      };
+    } catch (err) {
+      return {
+        label,
+        request: { method: "GET", url },
+        ok: false as const,
+        ...describeHttpError(err),
+        body: capDiagnosticBody(describeHttpError(err).body),
+      };
+    }
+  }
+  async function probePostUrl(label: string, url: string, body: unknown) {
+    try {
+      const r = await httpClient.post(url, body, { headers });
+      return {
+        label,
+        request: { method: "POST", url, body },
+        ok: true as const,
+        status: r.status,
+        response: capDiagnosticBody(r.data),
+      };
+    } catch (err) {
+      return {
+        label,
+        request: { method: "POST", url, body },
+        ok: false as const,
+        ...describeHttpError(err),
+        body: capDiagnosticBody(describeHttpError(err).body),
+      };
+    }
+  }
+  const diskUrl = `${baseUrl}/api/v2.0/disk`;
+  const tempUrl = `${baseUrl}/api/v2.0/disk/temperatures`;
+  const smartUrl = `${baseUrl}/api/v2.0/smart/test/results`;
+  // The inventory must run first so the temperatures probe can send real names.
+  const diskProbe = await probeGetUrl("disk inventory (GET /disk)", diskUrl);
+  const probedDiskNames = diskProbe.ok ? diskNamesFrom(diskProbe.response).slice(0, 50) : [];
+  const tempLabel = `disk temperatures (POST /disk/temperatures) for ${
+    probedDiskNames.length
+  } disk(s)${probedDiskNames.length ? "" : " — none resolved from inventory"}`;
+  const tempProbe = await probePostUrl(tempLabel, tempUrl, {
+    names: probedDiskNames,
+    powermode: "NEVER",
+  });
+
   const probes = await Promise.all([
     Promise.resolve(graphsProbe),
     ...candidates.map((c) => probePost(c.label, c.body)),
     probePost(coreExtrasLabel, coreExtrasBody),
     probePost(arcHitLabel, arcHitBody),
+    Promise.resolve(diskProbe),
+    Promise.resolve(tempProbe),
+    probeGetUrl("disk SMART test results (GET /smart/test/results)", smartUrl),
   ]);
 
   res.json({ configured: true, baseUrl, serverTimeUnixSec: nowSec, probes });
