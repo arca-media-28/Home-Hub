@@ -77,9 +77,11 @@ function StreamAudioPlayer({ enabled, density, tileSettings }: WidgetProps) {
         kind: "random",
       });
       const tracks = (result.tracks ?? []).filter((t) => Boolean(t.streamUrl));
-      // Demo / unconfigured payloads carry no streamUrl — nothing to enqueue, but
+      // Demo / unconfigured payloads carry no streamUrl — nothing to play, but
       // the interaction still completes without error (button just re-enables).
-      if (tracks.length > 0) player.enqueue(tracks, ownerId);
+      // Each dice click replaces the current queue with a fresh random session
+      // starting from track 1, so repeated clicks always produce a visible change.
+      if (tracks.length > 0) player.playQueue(tracks, 0, ownerId);
     } catch {
       // Unreachable source: swallow so the tile never breaks; button re-enables.
     } finally {
@@ -196,8 +198,10 @@ function StreamAudioPlayer({ enabled, density, tileSettings }: WidgetProps) {
   const restQueue = isOurs
     ? player.queue.slice(player.index + 1)
     : backendQueue.filter((t) => t.id !== displayTrack.id);
+  // Cap the queue at 20 rows so a huge queue never renders hundreds of items
+  // (which slows the page) and the "Up Next" list stays a manageable preview.
   const queueRows = enabled.has("queue")
-    ? budget.list(SECTION_PX, MEDIA_ROW_PX, restQueue.length)
+    ? Math.min(budget.list(SECTION_PX, MEDIA_ROW_PX, restQueue.length), 20)
     : 0;
 
   const startPlayback = (startId: string) => {
@@ -379,7 +383,10 @@ function StreamAudioPlayer({ enabled, density, tileSettings }: WidgetProps) {
           <div className="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
             Up Next
           </div>
-          <div className="space-y-1">
+          <div
+            className="space-y-1 overflow-y-auto"
+            style={{ maxHeight: queueRows * (MEDIA_ROW_PX + 4) }}
+          >
             {restQueue.slice(0, queueRows).map((t) => (
               <button
                 key={t.id}
