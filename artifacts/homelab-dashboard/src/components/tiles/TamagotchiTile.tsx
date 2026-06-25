@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Tile, TileSettings } from "@workspace/api-client-react";
 import { useUpdateTile, getGetTilesQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Drumstick, Gamepad2, Moon } from "lucide-react";
+import { AlertTriangle, Drumstick, Gamepad2, Moon } from "lucide-react";
 
 // All three pet stats live on the same 0-100 scale: 0 is the worst (starving /
 // miserable / exhausted) and 100 is the best (full / delighted / rested). New
@@ -10,6 +10,12 @@ import { Drumstick, Gamepad2, Moon } from "lucide-react";
 const STAT_MAX = 100;
 const STAT_MIN = 0;
 const DEFAULT_STAT = 80;
+
+// At or below this a stat is "critically low" and the pet visibly asks for help.
+// Shared by the mood picker and the "needs attention" badge so the cue and the
+// face always agree. The badge clears automatically once a care action lifts the
+// offending stat back above this line.
+const CRITICAL_STAT = 25;
 
 // Per-hour decay rates (points/hour). Hunger drops fastest so feeding is the
 // most frequent chore, energy slowest. Tuned so a pet left overnight (~8h)
@@ -93,7 +99,7 @@ type Mood = "happy" | "hungry" | "sad" | "sleepy" | "content";
 // everything is high, outright happy.
 function moodOf(state: PetState): Mood {
   const lowest = Math.min(state.hunger, state.happiness, state.energy);
-  if (lowest <= 25) {
+  if (lowest <= CRITICAL_STAT) {
     if (state.hunger === lowest) return "hungry";
     if (state.energy === lowest) return "sleepy";
     return "sad";
@@ -103,6 +109,26 @@ function moodOf(state: PetState): Mood {
   }
   return "content";
 }
+
+// The single most urgent unmet need (lowest stat), but only when it is
+// critically low — otherwise null and no attention cue is shown. Drives the
+// "needs attention" badge; it disappears the moment the offending stat recovers.
+type NeedKind = "feed" | "play" | "rest";
+
+function urgentNeed(state: PetState): NeedKind | null {
+  const lowest = Math.min(state.hunger, state.happiness, state.energy);
+  if (lowest > CRITICAL_STAT) return null;
+  if (state.hunger === lowest) return "feed";
+  if (state.energy === lowest) return "rest";
+  return "play";
+}
+
+// Short call-to-action shown in the attention badge for each unmet need.
+const NEED_BADGE: Record<NeedKind, { label: string; icon: typeof Drumstick }> = {
+  feed: { label: "Feed me", icon: Drumstick },
+  play: { label: "Play with me", icon: Gamepad2 },
+  rest: { label: "Let me rest", icon: Moon },
+};
 
 const MOOD_LABEL: Record<Mood, string> = {
   happy: "Happy!",
@@ -555,6 +581,10 @@ export default function TamagotchiTile({ tile, editMode }: TamagotchiTileProps) 
 
   const mood = moodOf(pet);
   const isSleepy = mood === "sleepy";
+  // When a stat is critically low the pet shows a pulsing "needs attention"
+  // badge so users notice without opening the tile. It clears on its own as soon
+  // as a care action lifts the offending stat back above CRITICAL_STAT.
+  const need = urgentNeed(pet);
   const readOnly = editMode;
   // Derived each render from the tile, so editor changes show up immediately.
   const appearance = appearanceFromTile(tile);
@@ -593,12 +623,53 @@ export default function TamagotchiTile({ tile, editMode }: TamagotchiTileProps) 
           15% { opacity: 1; }
           100% { opacity: 0; transform: translate(-50%, -150%) scale(1.15); }
         }
+        @keyframes tamagotchi-attention {
+          0%, 100% { transform: scale(1); }
+          50% { transform: scale(1.07); }
+        }
+        @keyframes tamagotchi-attention-ring {
+          0% { opacity: 0.55; transform: scale(1); }
+          70%, 100% { opacity: 0; transform: scale(1.6); }
+        }
       `}</style>
 
       {/* The pet itself, centered and filling the available space above the
           stats + actions. The look (body color + eyes/nose/mouth) is whatever
           the user picked in the editor; mood only nudges the expression. */}
       <div className="relative flex flex-1 min-h-0 items-center justify-center px-[4cqmin] pt-[4cqmin]">
+        {/* "Needs attention" cue: a pulsing badge naming the most urgent unmet
+            need whenever a stat is critically low. It is purely derived from the
+            current stats, so caring for the pet (which lifts the stat above
+            CRITICAL_STAT) makes it disappear on the next render. */}
+        {need && (
+          <div
+            className="absolute z-20 flex items-center rounded-full bg-destructive text-destructive-foreground shadow-md"
+            style={{
+              top: "3cqmin",
+              right: "3cqmin",
+              gap: "1.4cqmin",
+              paddingInline: "2.6cqmin",
+              paddingBlock: "1.2cqmin",
+              fontSize: "3.6cqmin",
+              animation: "tamagotchi-attention 1.4s ease-in-out infinite",
+            }}
+            role="status"
+            aria-label={`Needs attention: ${NEED_BADGE[need].label}`}
+            title={NEED_BADGE[need].label}
+          >
+            <span
+              className="pointer-events-none absolute inset-0 rounded-full bg-destructive"
+              style={{ animation: "tamagotchi-attention-ring 1.4s ease-out infinite" }}
+              aria-hidden="true"
+            />
+            <AlertTriangle
+              style={{ width: "4cqmin", height: "4cqmin", minWidth: "10px", minHeight: "10px" }}
+            />
+            <span className="font-semibold leading-none whitespace-nowrap">
+              {NEED_BADGE[need].label}
+            </span>
+          </div>
+        )}
         <PetFace
           appearance={appearance}
           mood={mood}

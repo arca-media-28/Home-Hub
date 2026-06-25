@@ -25,6 +25,11 @@ A self-contained client-side virtual-pet tile in the "Fun" category (integration
 - Appearance is edited in the modal (`isTamagotchi` branch in the settings closure); that branch MUST preserve `petHunger/petHappiness/petEnergy/petUpdatedAt` (read from `tile.tileSettings`) or saving the look resets the pet — same pattern as Note preserving noteBody/noteItems.
 - New string keys need the pickTileSettings() allow-list in api-server `routes/tiles.ts` (string handling) AND the openapi `petBodyColor/petEyes/petNose/petMouth` defs + codegen, or they get stripped on save.
 
+## Needs-attention cue
+
+- The "needs attention" badge is purely DERIVED from the current decayed stats (`urgentNeed()` returns the lowest stat only when it's `<= CRITICAL_STAT`), so it needs no extra state and clears on the next render once a care action lifts the stat back above the threshold.
+- `CRITICAL_STAT` (25) is the single shared threshold for both `moodOf()` and the badge, so the face and the cue always agree. Change one place only.
+
 **Why:** the task required the pet to survive reloads and reflect hours of elapsed time with no server-side tick; code review rejected the first pass because passive decay wasn't persisted until first interaction.
 
 **How to apply:** any new "living"/stateful toy tile must persist its time anchor at add-time and on hide/unmount, not just on user actions; reuse the contentless-editor + own-surface wiring rather than IntegrationTile.
