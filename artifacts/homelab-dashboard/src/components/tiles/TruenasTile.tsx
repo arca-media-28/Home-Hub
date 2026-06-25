@@ -2,6 +2,13 @@ import { useGetTruenasMetrics, getGetTruenasMetricsQueryKey } from "@workspace/a
 import { HardDrive, ArrowDown, ArrowUp } from "lucide-react";
 import type { WidgetProps } from "./IntegrationTile";
 import { tileBudget, BAR_PX, ROW_PX, SECTION_PX, listColumnClass, listColumnStyle } from "./metrics";
+import {
+  CpuRamView,
+  NetworkView,
+  ArcView,
+  PoolsView,
+  DisksView,
+} from "./TruenasMetricViews";
 
 // Compact inline sparkline. Draws one polyline per series sharing a single
 // min/max scale so multiple lines (e.g. network in/out) are comparable. Purely
@@ -76,7 +83,7 @@ function Bar({ value, label }: { value: number; label: string }) {
   );
 }
 
-export default function TruenasTile({ enabled, density }: WidgetProps) {
+export default function TruenasTile({ enabled, density, tileSettings }: WidgetProps) {
   const { data, isLoading, isError } = useGetTruenasMetrics({
     query: { queryKey: getGetTruenasMetricsQueryKey(), refetchInterval: 30_000 },
   });
@@ -95,6 +102,22 @@ export default function TruenasTile({ enabled, density }: WidgetProps) {
         <span>TrueNAS unavailable</span>
       </div>
     );
+  }
+
+  // When this tile is one of the bespoke per-metric variants (chosen via the
+  // integration picker's second pop-out), render its dedicated richer view.
+  // Otherwise fall through to the combined multi-section view below.
+  switch (tileSettings?.truenasMetric) {
+    case "cpuram":
+      return <CpuRamView data={data} density={density} />;
+    case "network":
+      return <NetworkView data={data} density={density} />;
+    case "arc":
+      return <ArcView data={data} density={density} />;
+    case "pools":
+      return <PoolsView data={data} />;
+    case "disks":
+      return <DisksView data={data} />;
   }
 
   const memPct = data.memTotalGb > 0 ? (data.memUsedGb / data.memTotalGb) * 100 : 0;

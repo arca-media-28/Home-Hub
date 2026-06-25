@@ -1587,6 +1587,14 @@ components:
             overflows instead of clipping it at the tile edge. Absent or false
             clips overflowing content (the default).
           type: ["boolean", "null"]
+        truenasMetric:
+          description: >-
+            Which single TrueNAS metric a dedicated TrueNAS tile renders with
+            its bespoke visual: "cpuram", "network", "arc", "pools", or "disks".
+            Null or absent means the tile shows the combined multi-section view
+            (the default, backward-compatible behavior).
+          type: ["string", "null"]
+          enum: ["cpuram", "network", "arc", "pools", "disks", null]
         noteBody:
           description: >-
             Free-form note text for a Note (post-it) tile. Null or absent means

@@ -89,6 +89,7 @@ interface TileSettings {
   bonsaiOvergrowth?: number | null;
   bonsaiGrowth?: number | null;
   bonsaiUpdatedAt?: number | null;
+  truenasMetric?: "cpuram" | "network" | "arc" | "pools" | "disks" | null;
 }
 
 // A single checklist/to-do item on a Note (post-it) tile: its label text and
@@ -294,6 +295,17 @@ function pickTileSettings(obj: Record<string, unknown>): TileSettings {
     result.scrollable = obj["scrollable"];
   } else if (obj["scrollable"] === null) {
     result.scrollable = null;
+  }
+  if (
+    obj["truenasMetric"] === "cpuram" ||
+    obj["truenasMetric"] === "network" ||
+    obj["truenasMetric"] === "arc" ||
+    obj["truenasMetric"] === "pools" ||
+    obj["truenasMetric"] === "disks"
+  ) {
+    result.truenasMetric = obj["truenasMetric"];
+  } else if (obj["truenasMetric"] === null) {
+    result.truenasMetric = null;
   }
   if (typeof obj["noteBody"] === "string") {
     result.noteBody = obj["noteBody"];

@@ -180,4 +180,31 @@ describe("PUT /tiles/layout", () => {
       weatherUnits: "f",
     });
   });
+
+  it("preserves truenasMetric tileSettings through a layout save", async () => {
+    const created = await request(app)
+      .post("/tiles")
+      .send({
+        type: "app",
+        integration: "truenas",
+        name: "ZFS Pools",
+        tileSettings: { truenasMetric: "pools" },
+        gridW: 2,
+        gridH: 2,
+      });
+    expect(created.status).toBe(201);
+    expect(created.body.tileSettings).toEqual({ truenasMetric: "pools" });
+
+    const id = created.body.id as number;
+    const saved = await request(app)
+      .put("/tiles/layout")
+      .send({ tiles: [{ id, gridX: 0, gridY: 0, gridW: 3, gridH: 3 }] });
+
+    const tile = (saved.body as Array<{ id: number }>).find((t) => t.id === id) as Record<
+      string,
+      unknown
+    >;
+    expect(tile.integration).toBe("truenas");
+    expect(tile.tileSettings).toEqual({ truenasMetric: "pools" });
+  });
 });

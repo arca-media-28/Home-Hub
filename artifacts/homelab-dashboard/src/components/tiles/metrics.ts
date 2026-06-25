@@ -86,6 +86,64 @@ export const METRIC_CATALOG: Record<string, MetricDef[]> = {
   ],
 };
 
+// ── TrueNAS per-metric tile variants ─────────────────────────────────────────
+// TrueNAS is listed once in the integration picker, but clicking it opens a
+// second pop-out offering a dedicated single-metric "live tile" for each metric.
+// The chosen variant is stored on the tile as `tileSettings.truenasMetric` and
+// drives a bespoke richer rendering in TruenasTile. `metricKeys` maps the
+// variant back to the underlying METRIC_CATALOG keys so the tile's `metrics`
+// selection (and any combined-view fallback) stays consistent.
+export interface TruenasMetricVariant {
+  key: string;
+  label: string;
+  description: string;
+  metricKeys: string[];
+}
+
+export const TRUENAS_METRIC_VARIANTS: TruenasMetricVariant[] = [
+  {
+    key: "cpuram",
+    label: "CPU & RAM",
+    description: "Processor load and memory usage gauges",
+    metricKeys: ["cpu", "ram"],
+  },
+  {
+    key: "network",
+    label: "Network I/O",
+    description: "Live in/out throughput with a large graph",
+    metricKeys: ["network"],
+  },
+  {
+    key: "arc",
+    label: "ZFS ARC",
+    description: "Cache hit-ratio gauge and size trend",
+    metricKeys: ["arc"],
+  },
+  {
+    key: "pools",
+    label: "ZFS Pools",
+    description: "Capacity and status of each pool",
+    metricKeys: ["pools"],
+  },
+  {
+    key: "disks",
+    label: "Disk Health",
+    description: "Temperature and SMART status per drive",
+    metricKeys: ["disks"],
+  },
+];
+
+export const TRUENAS_METRIC_VARIANT_KEYS = TRUENAS_METRIC_VARIANTS.map(
+  (v) => v.key,
+);
+
+export function truenasMetricVariant(
+  key: string | null | undefined,
+): TruenasMetricVariant | undefined {
+  if (!key) return undefined;
+  return TRUENAS_METRIC_VARIANTS.find((v) => v.key === key);
+}
+
 // All metric keys for an integration (used as the default "show all" set).
 export function allMetricKeys(integration: string | null | undefined): string[] {
   if (!integration) return [];

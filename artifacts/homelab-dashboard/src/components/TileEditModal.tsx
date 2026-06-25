@@ -22,7 +22,12 @@ import {
 } from "@/components/ui/select";
 import IntegrationPicker from "@/components/IntegrationPicker";
 import { integrationMeta } from "@/lib/integrationMeta";
-import { METRIC_CATALOG, allMetricKeys } from "@/components/tiles/metrics";
+import {
+  METRIC_CATALOG,
+  allMetricKeys,
+  TRUENAS_METRIC_VARIANTS,
+  truenasMetricVariant,
+} from "@/components/tiles/metrics";
 import {
   resolveImageStyle,
   resolveTitleStyle,
@@ -105,6 +110,7 @@ import {
   TileType,
   TileIntegration,
   type Tile,
+  type TileSettings,
   type StockWatchEntry,
   type NewsItem,
 } from "@workspace/api-client-react";
@@ -218,6 +224,11 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
   // Selected metric keys for the active integration. null = "show all"
   // (backward-compatible default); an explicit array (incl. empty) is honored.
   const [metrics, setMetrics] = useState<string[] | null>(tile?.metrics ?? null);
+  // Which single TrueNAS metric this tile renders (its bespoke "live tile"
+  // variant). null = the combined multi-section TrueNAS view (legacy default).
+  const [truenasMetric, setTruenasMetric] = useState<
+    NonNullable<TileSettings>["truenasMetric"]
+  >(tile?.tileSettings?.truenasMetric ?? null);
   // qBittorrent category allow-list. null = "show all categories"; an explicit
   // array narrows the tile's torrent list to those categories.
   const [categoryFilter, setCategoryFilter] = useState<string[] | null>(
@@ -430,6 +441,7 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
       setTitleColor(tile?.titleColor ?? null);
       setHideTitle(tile?.hideTitle ?? false);
       setMetrics(tile?.metrics ?? null);
+      setTruenasMetric(tile?.tileSettings?.truenasMetric ?? null);
       setCategoryFilter(tile?.tileSettings?.categoryFilter ?? null);
       setGroupByCategory(tile?.tileSettings?.groupByCategory ?? false);
       setClockFormat(tile?.tileSettings?.clockFormat ?? "24");
@@ -537,6 +549,11 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
   // qBittorrent's full category catalog (every defined category, even ones with
   // no active torrents) rather than being derived from the live torrent list.
   const isQbittorrent = integration === TileIntegration.qbittorrent;
+  // TrueNAS is special: it's picked via the integration picker's second pop-out,
+  // which selects one of its bespoke per-metric "live tile" variants. When a
+  // variant is chosen (truenasMetric set), the generic metric-checkbox section
+  // is hidden — the variant already fixes which metrics the tile renders.
+  const isTruenas = integration === TileIntegration.truenas;
   // The no-connection built-in widgets (clock/weather) have their own config UI
   // and no metric catalog or backing service.
   const isClock = integration === TileIntegration.clock;
@@ -729,13 +746,24 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
     setCategoryFilter(coversFullCatalog ? null : next);
   }
 
-  function handleIntegrationChange(next: string) {
+  function handleIntegrationChange(next: string, subKey?: string) {
     setIntegration(next);
     // Switching integrations invalidates the old category filter too.
     setCategoryFilter(null);
-    // Switching integrations invalidates the old metric keys; reset to "show
-    // all" for the newly chosen service.
-    setMetrics(null);
+    // TrueNAS is chosen via its second pop-out, which passes the picked metric
+    // variant. Store it and narrow the tile's metric selection to that variant's
+    // underlying keys so the data path stays consistent; any other integration
+    // clears the variant and resets to "show all".
+    if (next === TileIntegration.truenas && subKey) {
+      const variant = truenasMetricVariant(subKey);
+      setTruenasMetric(subKey as NonNullable<TileSettings>["truenasMetric"]);
+      setMetrics(variant ? variant.metricKeys : null);
+    } else {
+      setTruenasMetric(null);
+      // Switching integrations invalidates the old metric keys; reset to "show
+      // all" for the newly chosen service.
+      setMetrics(null);
+    }
     // Switching away from Sports clears its selections so a stale league/team
     // filter never rides along to a different widget.
     if (next !== TileIntegration.sports) {
@@ -989,7 +1017,9 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
       // options. The generic "scrollable" option applies to every tile, so it
       // is merged in below regardless of integration.
       tileSettings: (() => {
-        const widget = isQbittorrent
+        const widget = isTruenas
+          ? { truenasMetric }
+          : isQbittorrent
           ? { categoryFilter, groupByCategory }
           : isClock
             ? { clockFormat, clockShowSeconds, clockShowDate }
@@ -1115,6 +1145,16 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
 
   const isPending = createTile.isPending || updateTile.isPending;
 
+  // TrueNAS's per-metric variants, keyed for the integration picker's second
+  // pop-out. Each becomes its own bespoke "live tile".
+  const truenasSubOptions = {
+    [TileIntegration.truenas]: TRUENAS_METRIC_VARIANTS.map((v) => ({
+      key: v.key,
+      label: v.label,
+      description: v.description,
+    })),
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -1178,6 +1218,8 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
             onSelect={handleIntegrationChange}
             integrations={INTEGRATIONS}
             statuses={connectionStatuses}
+            subOptions={truenasSubOptions}
+            subValue={truenasMetric ?? undefined}
           />
 
           {isSpacer && (
@@ -1539,7 +1581,7 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
             </div>
           )}
 
-          {catalog.length > 0 && (
+          {catalog.length > 0 && !isTruenas && (
             <div className="space-y-2 border-t border-border pt-4">
               <Label>Metrics shown</Label>
               <p className="text-xs text-muted-foreground">

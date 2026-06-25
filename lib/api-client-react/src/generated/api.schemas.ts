@@ -268,6 +268,11 @@ export type TileSettings = {
      */
   scrollable?: boolean | null;
   /**
+     * Which single TrueNAS metric a dedicated TrueNAS tile renders with its bespoke visual: "cpuram", "network", "arc", "pools", or "disks". Null or absent means the tile shows the combined multi-section view (the default, backward-compatible behavior).
+     * @nullable
+     */
+  truenasMetric?: 'cpuram' | 'network' | 'arc' | 'pools' | 'disks' | null;
+  /**
      * Free-form note text for a Note (post-it) tile. Null or absent means an empty note.
      * @nullable
      */
