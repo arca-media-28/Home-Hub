@@ -459,18 +459,21 @@ router.get("/truenas", requireAuth, async (_req, res) => {
   const headers = { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" };
 
   // The reporting endpoint must be a POST with the query as the JSON body.
-  // (Issuing a GET with a body does not reliably send the payload.) The modern
-  // Netdata-based backend (SCALE 24.04+, incl. 25.10 "Goldeye") rejects the old
-  // relative time strings ("now-30s"/"now") — `start`/`end` must be integer unix
-  // timestamps (seconds). It also rejects a window whose `end` is "now": the
-  // most recent samples aren't collected yet, so the query must end slightly in
-  // the past. Request a short trailing window ending a few seconds ago and
-  // aggregate it (documented working form: now-90s … now-30s).
+  // (Issuing a GET with a body does not reliably send the payload.) The window
+  // and aggregation options go under the `query` attribute — NOT `reporting_query`.
+  // A live SCALE 25.10 diagnostic confirmed the old `reporting_query` name is
+  // rejected with HTTP 400 ("The following attributes are not expected:
+  // reporting_query"), which is why CPU/RAM read 0 while pools still loaded.
+  // The modern Netdata-based backend (SCALE 24.04+) also needs integer unix
+  // `start`/`end` (seconds), not relative "now-30s" strings, and rejects a window
+  // whose `end` is "now" (the most recent samples aren't collected yet) — so the
+  // window must end slightly in the past. Request a short trailing window ending
+  // a few seconds ago and aggregate it (working form: now-90s … now-30s).
   const nowSec = Math.floor(Date.now() / 1000);
   const reportingQuery = { start: nowSec - 90, end: nowSec - 30, aggregate: true };
   const reportingBody = {
     graphs: [{ name: "cpu" }, { name: "memory" }],
-    reporting_query: reportingQuery,
+    query: reportingQuery,
   };
   // Network throughput + ZFS ARC stats live in the same reporting backend but are
   // requested as a SEPARATE call. The "interface" graph can require an identifier
@@ -484,7 +487,7 @@ router.get("/truenas", requireAuth, async (_req, res) => {
   const extraReportingQuery = { start: nowSec - 1800, end: nowSec - 30, aggregate: false };
   const extraReportingBody = {
     graphs: [{ name: "interface" }, { name: "arcactualrate" }, { name: "arcsize" }],
-    reporting_query: extraReportingQuery,
+    query: extraReportingQuery,
   };
 
   // The reporting (CPU/RAM), pool (storage) and disk-health (temperature +
@@ -639,32 +642,35 @@ router.get("/truenas/diagnostics", requireAuth, async (_req, res) => {
   const getDataUrl = `${baseUrl}/api/v2.0/reporting/get_data`;
   const nowSec = Math.floor(Date.now() / 1000);
 
-  // Candidate reporting_query forms to try for the core cpu/memory call. The one
-  // the server accepts (HTTP 200 with graph data) is the form the widget should
-  // use; the rest will surface the server's own rejection reason in their body.
+  // Candidate query forms to try for the core cpu/memory call. The time window
+  // and aggregation options ride the `query` attribute (this SCALE version
+  // rejects the old `reporting_query` name with HTTP 400). The form the server
+  // accepts (HTTP 200 with graph data) is the one the widget uses; the rest
+  // surface the server's own rejection reason in their body. The probes also
+  // reveal the real response shape (legend names) so the parser can be verified.
   const coreGraphs = [{ name: "cpu" }, { name: "memory" }];
   const candidates: Array<{ label: string; body: unknown }> = [
     {
-      label: "unix window ending in the past (now-90s … now-30s), aggregated",
-      body: { graphs: coreGraphs, reporting_query: { start: nowSec - 90, end: nowSec - 30, aggregate: true } },
+      label: "cpu+memory, aggregated, unix window ending in the past (now-90s … now-30s) — the form the widget uses",
+      body: { graphs: coreGraphs, query: { start: nowSec - 90, end: nowSec - 30, aggregate: true } },
     },
     {
-      label: "unix window ending at now (now-90s … now), aggregated",
-      body: { graphs: coreGraphs, reporting_query: { start: nowSec - 90, end: nowSec, aggregate: true } },
+      label: "cpu+memory, aggregated, unix window ending at now (now-90s … now)",
+      body: { graphs: coreGraphs, query: { start: nowSec - 90, end: nowSec, aggregate: true } },
     },
     {
-      label: "unit/page form (unit=HOUR, page=1), aggregated",
-      body: { graphs: coreGraphs, reporting_query: { unit: "HOUR", page: 1, aggregate: true } },
+      label: "cpu+memory, unit/page form (unit=HOUR, page=1), aggregated",
+      body: { graphs: coreGraphs, query: { unit: "HOUR", page: 1, aggregate: true } },
     },
     {
-      label: "unix window, non-aggregated series (now-1800s … now-30s)",
-      body: { graphs: coreGraphs, reporting_query: { start: nowSec - 1800, end: nowSec - 30, aggregate: false } },
+      label: "cpu+memory, non-aggregated series (now-1800s … now-30s)",
+      body: { graphs: coreGraphs, query: { start: nowSec - 1800, end: nowSec - 30, aggregate: false } },
     },
     {
-      label: "extras (interface, arcactualrate, arcsize), non-aggregated series",
+      label: "extras (interface, arcsize), non-aggregated series — interface may need an identifier",
       body: {
-        graphs: [{ name: "interface" }, { name: "arcactualrate" }, { name: "arcsize" }],
-        reporting_query: { start: nowSec - 1800, end: nowSec - 30, aggregate: false },
+        graphs: [{ name: "interface" }, { name: "arcsize" }],
+        query: { start: nowSec - 1800, end: nowSec - 30, aggregate: false },
       },
     },
   ];

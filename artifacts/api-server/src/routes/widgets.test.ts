@@ -172,11 +172,11 @@ describe("GET /widgets/truenas", () => {
     // aren't collected yet), so `end` is strictly before the current second.
     const [, postBody] = httpPost.mock.calls[0]!;
     expect(postBody.graphs).toEqual([{ name: "cpu" }, { name: "memory" }]);
-    expect(Number.isInteger(postBody.reporting_query.start)).toBe(true);
-    expect(Number.isInteger(postBody.reporting_query.end)).toBe(true);
-    expect(postBody.reporting_query.end).toBeGreaterThan(postBody.reporting_query.start);
-    expect(postBody.reporting_query.end).toBeLessThan(Math.floor(Date.now() / 1000));
-    expect(postBody.reporting_query.aggregate).toBe(true);
+    expect(Number.isInteger(postBody.query.start)).toBe(true);
+    expect(Number.isInteger(postBody.query.end)).toBe(true);
+    expect(postBody.query.end).toBeGreaterThan(postBody.query.start);
+    expect(postBody.query.end).toBeLessThan(Math.floor(Date.now() / 1000));
+    expect(postBody.query.aggregate).toBe(true);
   });
 
   it("renders pool data when only reporting fails (partial)", async () => {
@@ -411,10 +411,10 @@ describe("GET /widgets/truenas", () => {
     // The extras call must request a longer, NON-aggregated window so the data
     // rows form a series (aggregate:true collapses them to a single mean).
     const extraReportingCall = httpPost.mock.calls.find(
-      ([, body]: [string, { graphs: Array<{ name?: string }>; reporting_query?: { aggregate?: boolean } }]) =>
+      ([, body]: [string, { graphs: Array<{ name?: string }>; query?: { aggregate?: boolean } }]) =>
         body.graphs.some((g) => g.name === "interface"),
     );
-    expect(extraReportingCall![1].reporting_query?.aggregate).toBe(false);
+    expect(extraReportingCall![1].query?.aggregate).toBe(false);
     // CPU still parsed from the core call.
     expect(res.body.cpuPercent).toBe(20);
 
@@ -534,7 +534,7 @@ describe("GET /widgets/truenas/diagnostics", () => {
       expect(p.status).toBe(422);
       expect(p.body).toEqual({ message: "Invalid reporting_query: end must be in the past" });
       expect(p.request.body.graphs).toBeDefined();
-      expect(p.request.body.reporting_query).toBeDefined();
+      expect(p.request.body.query).toBeDefined();
     }
   });
 

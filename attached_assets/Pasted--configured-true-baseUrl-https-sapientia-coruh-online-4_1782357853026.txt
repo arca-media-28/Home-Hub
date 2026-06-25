@@ -1,0 +1,443 @@
+{
+  "configured": true,
+  "baseUrl": "https://sapientia.coruh.online:4443",
+  "serverTimeUnixSec": 1782357833,
+  "probes": [
+    {
+      "label": "available reporting graphs (GET /reporting/graphs)",
+      "request": {
+        "method": "GET",
+        "url": "https://sapientia.coruh.online:4443/api/v2.0/reporting/graphs"
+      },
+      "ok": true,
+      "status": 200,
+      "response": [
+        {
+          "name": "cpu",
+          "title": "CPU Usage",
+          "vertical_label": "%CPU",
+          "identifiers": null
+        },
+        {
+          "name": "cputemp",
+          "title": "CPU Temperature",
+          "vertical_label": "Celsius",
+          "identifiers": null
+        },
+        {
+          "name": "memory",
+          "title": "Physical memory available",
+          "vertical_label": "Bytes",
+          "identifiers": null
+        },
+        {
+          "name": "disk",
+          "title": "Disk I/O ({identifier})",
+          "vertical_label": "Kibibytes/s",
+          "identifiers": [
+            "sdk | Type: HDD | Model: ST20000NM004E-3H | Serial: ZX213D0Z",
+            "sdf | Type: HDD | Model: ST22000NM000C-3W | Serial: ZXA0FZQ0",
+            "sdi | Type: HDD | Model: ST20000NM004E-3H | Serial: ZX20HZFE",
+            "sdc | Type: SSD | Model: KINGSTON SA400S3 | Serial: 50026B7283C9977A",
+            "sdd | Type: HDD | Model: ST22000NM000C-3W | Serial: ZXA0KDS8",
+            "sdh | Type: HDD | Model: ST22000NM000C-3W | Serial: ZXA0KRHZ",
+            "sdj | Type: HDD | Model: ST20000NM004E-3H | Serial: ZX21162T",
+            "sdg | Type: HDD | Model: ST20000NM002C-3X | Serial: ZXA0RXD1",
+            "sde | Type: HDD | Model: ST8000DM004-2CX1 | Serial: WCT02PDJ",
+            "sdb | Type: HDD | Model: ST22000NM000C-3W | Serial: ZXA22CZK",
+            "sda | Type: SSD | Model: KINGSTON SA400S3 | Serial: 50026B7283C9A0D8",
+            "nvme1n1 | Type: SSD | Model: CT1000T705SSD3 | Serial: 2532E9C84351",
+            "nvme0n1 | Type: SSD | Model: Samsung SSD 980 PRO 2TB | Serial: S6B0NU0TC07322K",
+            "nvme2n1 | Type: SSD | Model: Samsung SSD 980 PRO 2TB | Serial: S6B0NL0TC33650T"
+          ]
+        },
+        {
+          "name": "interface",
+          "title": "Interface Traffic ({identifier})",
+          "vertical_label": "Kilobits/s",
+          "identifiers": [
+            "enp14s0",
+            "pterodactyl0"
+          ]
+        },
+        {
+          "name": "load",
+          "title": "System Load Average",
+          "vertical_label": "Load",
+          "identifiers": null
+        },
+        {
+          "name": "uptime",
+          "title": "System Uptime",
+          "vertical_label": "Seconds",
+          "identifiers": null
+        },
+        {
+          "name": "arcfreememory",
+          "title": "ARC Free Memory",
+          "vertical_label": "bytes",
+          "identifiers": null
+        },
+        {
+          "name": "arcavailablememory",
+          "title": "ARC Available Memory",
+          "vertical_label": "bytes",
+          "identifiers": null
+        },
+        {
+          "name": "arcsize",
+          "title": "ARC Size",
+          "vertical_label": "bytes",
+          "identifiers": null
+        },
+        {
+          "name": "demandaccessespersecond",
+          "title": "Demand Accesses per Second",
+          "vertical_label": "accesses/s",
+          "identifiers": null
+        },
+        {
+          "name": "demanddataaccessespersecond",
+          "title": "Demand Data Accesses per Second",
+          "vertical_label": "accesses/s",
+          "identifiers": null
+        },
+        {
+          "name": "demandmetadataaccessespersecond",
+          "title": "Demand Metadata Accesses per Second",
+          "vertical_label": "accesses/s",
+          "identifiers": null
+        },
+        {
+          "name": "demanddatahitspersecond",
+          "title": "Demand Data Hits per Second",
+          "vertical_label": "hits/s",
+          "identifiers": null
+        },
+        {
+          "name": "demanddataiohitspersecond",
+          "title": "Demand Data I/O Hits per Second",
+          "vertical_label": "hits/s",
+          "identifiers": null
+        },
+        {
+          "name": "demanddatamissespersecond",
+          "title": "Demand Data Misses per Second",
+          "vertical_label": "misses/s",
+          "identifiers": null
+        },
+        {
+          "name": "demanddatahitpercentage",
+          "title": "Demand Data Hit Percentage",
+          "vertical_label": "hit%",
+          "identifiers": null
+        },
+        {
+          "name": "demanddataiohitpercentage",
+          "title": "Demand Data I/O Hit Percentage",
+          "vertical_label": "hit%",
+          "identifiers": null
+        },
+        {
+          "name": "demanddatamisspercentage",
+          "title": "Demand Data Miss Percentage",
+          "vertical_label": "misses%",
+          "identifiers": null
+        },
+        {
+          "name": "demandmetadatahitspersecond",
+          "title": "Demand Metadata Hits per Second",
+          "vertical_label": "hits/s",
+          "identifiers": null
+        },
+        {
+          "name": "demandmetadataiohitspersecond",
+          "title": "Demand Metadata I/O Hits per Second",
+          "vertical_label": "hits/s",
+          "identifiers": null
+        },
+        {
+          "name": "demandmetadatamissespersecond",
+          "title": "Demand Metadata Misses per Second",
+          "vertical_label": "misses/s",
+          "identifiers": null
+        },
+        {
+          "name": "demandmetadatahitpercentage",
+          "title": "Demand Metadata Hit Percentage",
+          "vertical_label": "hit%",
+          "identifiers": null
+        },
+        {
+          "name": "demandmetadataiohitpercentage",
+          "title": "Demand Metadata I/O Hit Percentage",
+          "vertical_label": "hit%",
+          "identifiers": null
+        },
+        {
+          "name": "demandmetadatamisspercentage",
+          "title": "Demand Metadata Miss Percentage",
+          "vertical_label": "misses%",
+          "identifiers": null
+        },
+        {
+          "name": "l2archhitspersecond",
+          "title": "L2ARC Hits per Second",
+          "vertical_label": "hits/s",
+          "identifiers": null
+        },
+        {
+          "name": "l2arcmissespersecond",
+          "title": "L2ARC Misses per Second",
+          "vertical_label": "misses/s",
+          "identifiers": null
+        },
+        {
+          "name": "totall2arcaccessespersecond",
+          "title": "Total L2ARC Accesses per Second",
+          "vertical_label": "accesses/s",
+          "identifiers": null
+        },
+        {
+          "name": "l2architpercentage",
+          "title": "L2ARC Hit Percentage",
+          "vertical_label": "hit%",
+          "identifiers": null
+        },
+        {
+          "name": "l2arcmisspercentage",
+          "title": "L2ARC Miss Percentage",
+          "vertical_label": "misses%",
+          "identifiers": null
+        },
+        {
+          "name": "l2arcbytesreadpersecond",
+          "title": "L2ARC Bytes Read per Second",
+          "vertical_label": "bytes/s",
+          "identifiers": null
+        },
+        {
+          "name": "l2arcbyteswrittenpersecond",
+          "title": "L2ARC Bytes Written per Second",
+          "vertical_label": "bytes/s",
+          "identifiers": null
+        },
+        {
+          "name": "disktemp",
+          "title": "Disk Temperature {identifier}",
+          "vertical_label": "Celsius",
+          "identifiers": [
+            "sdk | Type: HDD | Model: ST20000NM004E-3H | Serial: ZX213D0Z",
+            "sdf | Type: HDD | Model: ST22000NM000C-3W | Serial: ZXA0FZQ0",
+            "sdi | Type: HDD | Model: ST20000NM004E-3H | Serial: ZX20HZFE",
+            "sdc | Type: SSD | Model: KINGSTON SA400S3 | Serial: 50026B7283C9977A",
+            "sdd | Type: HDD | Model: ST22000NM000C-3W | Serial: ZXA0KDS8",
+            "sdh | Type: HDD | Model: ST22000NM000C-3W | Serial: ZXA0KRHZ",
+            "sdj | Type: HDD | Model: ST20000NM004E-3H | Serial: ZX21162T",
+            "sdg | Type: HDD | Model: ST20000NM002C-3X | Serial: ZXA0RXD1",
+            "sde | Type: HDD | Model: ST8000DM004-2CX1 | Serial: WCT02PDJ",
+            "sdb | Type: HDD | Model: ST22000NM000C-3W | Serial: ZXA22CZK",
+            "sda | Type: SSD | Model: KINGSTON SA400S3 | Serial: 50026B7283C9A0D8",
+            "nvme1n1 | Type: SSD | Model: CT1000T705SSD3 | Serial: 2532E9C84351",
+            "nvme0n1 | Type: SSD | Model: Samsung SSD 980 PRO 2TB | Serial: S6B0NU0TC07322K",
+            "nvme2n1 | Type: SSD | Model: Samsung SSD 980 PRO 2TB | Serial: S6B0NL0TC33650T"
+          ]
+        },
+        {
+          "name": "upscharge",
+          "title": "UPS Charging",
+          "vertical_label": "Percentage",
+          "identifiers": null
+        },
+        {
+          "name": "upsruntime",
+          "title": "UPS Runtime",
+          "vertical_label": "Seconds",
+          "identifiers": null
+        },
+        {
+          "name": "upsvoltage",
+          "title": "UPS Voltage",
+          "vertical_label": "Volts",
+          "identifiers": [
+            "battery",
+            "input",
+            "output"
+          ]
+        },
+        {
+          "name": "upscurrent",
+          "title": "UPS Input Current",
+          "vertical_label": "Ampere",
+          "identifiers": null
+        },
+        {
+          "name": "upsfrequency",
+          "title": "UPS Input Frequency",
+          "vertical_label": "Hz",
+          "identifiers": null
+        },
+        {
+          "name": "upsload",
+          "title": "UPS Input Load",
+          "vertical_label": "Percentage",
+          "identifiers": null
+        },
+        {
+          "name": "upstemperature",
+          "title": "UPS Temperature",
+          "vertical_label": "Celsius",
+          "identifiers": null
+        }
+      ]
+    },
+    {
+      "label": "unix window ending in the past (now-90s … now-30s), aggregated",
+      "request": {
+        "method": "POST",
+        "url": "https://sapientia.coruh.online:4443/api/v2.0/reporting/get_data",
+        "body": {
+          "graphs": [
+            {
+              "name": "cpu"
+            },
+            {
+              "name": "memory"
+            }
+          ],
+          "reporting_query": {
+            "start": 1782357743,
+            "end": 1782357803,
+            "aggregate": true
+          }
+        }
+      },
+      "ok": false,
+      "status": 400,
+      "code": "ERR_BAD_REQUEST",
+      "message": "Request failed with status code 400",
+      "body": {
+        "message": "The following attributes are not expected: reporting_query"
+      }
+    },
+    {
+      "label": "unix window ending at now (now-90s … now), aggregated",
+      "request": {
+        "method": "POST",
+        "url": "https://sapientia.coruh.online:4443/api/v2.0/reporting/get_data",
+        "body": {
+          "graphs": [
+            {
+              "name": "cpu"
+            },
+            {
+              "name": "memory"
+            }
+          ],
+          "reporting_query": {
+            "start": 1782357743,
+            "end": 1782357833,
+            "aggregate": true
+          }
+        }
+      },
+      "ok": false,
+      "status": 400,
+      "code": "ERR_BAD_REQUEST",
+      "message": "Request failed with status code 400",
+      "body": {
+        "message": "The following attributes are not expected: reporting_query"
+      }
+    },
+    {
+      "label": "unit/page form (unit=HOUR, page=1), aggregated",
+      "request": {
+        "method": "POST",
+        "url": "https://sapientia.coruh.online:4443/api/v2.0/reporting/get_data",
+        "body": {
+          "graphs": [
+            {
+              "name": "cpu"
+            },
+            {
+              "name": "memory"
+            }
+          ],
+          "reporting_query": {
+            "unit": "HOUR",
+            "page": 1,
+            "aggregate": true
+          }
+        }
+      },
+      "ok": false,
+      "status": 400,
+      "code": "ERR_BAD_REQUEST",
+      "message": "Request failed with status code 400",
+      "body": {
+        "message": "The following attributes are not expected: reporting_query"
+      }
+    },
+    {
+      "label": "unix window, non-aggregated series (now-1800s … now-30s)",
+      "request": {
+        "method": "POST",
+        "url": "https://sapientia.coruh.online:4443/api/v2.0/reporting/get_data",
+        "body": {
+          "graphs": [
+            {
+              "name": "cpu"
+            },
+            {
+              "name": "memory"
+            }
+          ],
+          "reporting_query": {
+            "start": 1782356033,
+            "end": 1782357803,
+            "aggregate": false
+          }
+        }
+      },
+      "ok": false,
+      "status": 400,
+      "code": "ERR_BAD_REQUEST",
+      "message": "Request failed with status code 400",
+      "body": {
+        "message": "The following attributes are not expected: reporting_query"
+      }
+    },
+    {
+      "label": "extras (interface, arcactualrate, arcsize), non-aggregated series",
+      "request": {
+        "method": "POST",
+        "url": "https://sapientia.coruh.online:4443/api/v2.0/reporting/get_data",
+        "body": {
+          "graphs": [
+            {
+              "name": "interface"
+            },
+            {
+              "name": "arcactualrate"
+            },
+            {
+              "name": "arcsize"
+            }
+          ],
+          "reporting_query": {
+            "start": 1782356033,
+            "end": 1782357803,
+            "aggregate": false
+          }
+        }
+      },
+      "ok": false,
+      "status": 400,
+      "code": "ERR_BAD_REQUEST",
+      "message": "Request failed with status code 400",
+      "body": {
+        "message": "The following attributes are not expected: reporting_query"
+      }
+    }
+  ]
+}
