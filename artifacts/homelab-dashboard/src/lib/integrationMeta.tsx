@@ -188,3 +188,32 @@ export const INTEGRATION_SERVICE: Record<string, string> = {
   [TileIntegration.pihole]: "pihole",
   [TileIntegration["nginx-proxy-manager"]]: "nginx-proxy-manager",
 };
+
+// Every integration whose tile depends on a saved service connection, mapped to
+// its connection key and a friendly label. Broader than INTEGRATION_SERVICE
+// (which only covers the integrations that surface a reachability badge): this
+// is the full set that needs credentials before its tiles can load. Used after
+// an import — exports never carry credentials — to tell the user which imported
+// tiles still need their connection configured. Self-contained, ambiguous- and
+// keyless-source integrations (audioplayer) are intentionally omitted.
+export const CONNECTION_BACKED_INTEGRATIONS: Record<
+  string,
+  { service: string; label: string }
+> = {
+  [TileIntegration.truenas]: { service: "truenas", label: "TrueNAS" },
+  [TileIntegration.media]: { service: "plex", label: "Plex" },
+  [TileIntegration.jellyfin]: { service: "jellyfin", label: "Jellyfin" },
+  [TileIntegration.sonarr]: { service: "sonarr", label: "Sonarr" },
+  [TileIntegration.radarr]: { service: "radarr", label: "Radarr" },
+  [TileIntegration.lidarr]: { service: "lidarr", label: "Lidarr" },
+  [TileIntegration.qbittorrent]: { service: "qbittorrent", label: "qBittorrent" },
+  [TileIntegration.pihole]: { service: "pihole", label: "Pi-hole" },
+  [TileIntegration["nginx-proxy-manager"]]: {
+    service: "nginx-proxy-manager",
+    label: "Nginx Proxy Manager",
+  },
+  [TileIntegration.prowlarr]: { service: "prowlarr", label: "Prowlarr" },
+  [TileIntegration.tailscale]: { service: "tailscale", label: "Tailscale" },
+  [TileIntegration.ersatztv]: { service: "ersatztv", label: "ErsatzTV" },
+  [TileIntegration.stocks]: { service: "stocks", label: "Stocks" },
+};

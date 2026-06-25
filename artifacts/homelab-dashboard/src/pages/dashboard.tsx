@@ -36,7 +36,8 @@ import TimerTile from "@/components/tiles/TimerTile";
 import TamagotchiTile from "@/components/tiles/TamagotchiTile";
 import BonsaiTile from "@/components/tiles/BonsaiTile";
 import TileEditModal, { type EditMode } from "@/components/TileEditModal";
-import { INTEGRATION_SERVICE } from "@/lib/integrationMeta";
+import { INTEGRATION_SERVICE, CONNECTION_BACKED_INTEGRATIONS } from "@/lib/integrationMeta";
+import { ToastAction } from "@/components/ui/toast";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -578,7 +579,7 @@ export default function Dashboard() {
   // the page list is refreshed, and we switch to the first imported page.
   const importPages = useImportPages({
     mutation: {
-      onSuccess: (created) => {
+      onSuccess: (created, variables) => {
         queryClient.invalidateQueries({ queryKey: getGetPagesQueryKey() });
         const first = created[0];
         if (first) setActivePageId(first.id);
@@ -588,12 +589,65 @@ export default function Dashboard() {
               ? "Imported 1 page"
               : `Imported ${created.length} pages`,
         });
+
+        // Exports deliberately omit credentials, so an imported integration
+        // tile references a service but has no connection configured. Surface
+        // the distinct integrations whose connection still needs setting up so
+        // the user isn't left wondering why those tiles show errors.
+        const needsReconnect = integrationsNeedingReconnect(variables.data);
+        if (needsReconnect.length > 0) {
+          toast({
+            title:
+              needsReconnect.length === 1
+                ? "1 integration needs reconnecting"
+                : `${needsReconnect.length} integrations need reconnecting`,
+            description: `Imports don't include credentials. Set up ${formatLabelList(needsReconnect)} in Settings so these tiles can load.`,
+            action: (
+              <ToastAction
+                altText="Open settings"
+                onClick={() => setLocation("/settings")}
+              >
+                Open settings
+              </ToastAction>
+            ),
+          });
+        }
       },
       onError: (err) => {
         toast({ title: "Import failed", description: err.message, variant: "destructive" });
       },
     },
   });
+
+  // Inspect a just-imported envelope and return the distinct friendly labels of
+  // the connection-backed integrations that still lack a configured connection.
+  // Uses the live connection status; until that has loaded we stay silent rather
+  // than risk a false "needs reconnecting" warning for an already-set-up service.
+  function integrationsNeedingReconnect(envelope: PageExport): string[] {
+    if (!statuses) return [];
+    const labels: string[] = [];
+    const seen = new Set<string>();
+    for (const page of envelope.pages ?? []) {
+      for (const tile of page.tiles ?? []) {
+        const integration = tile.integration;
+        if (!integration) continue;
+        const backing = CONNECTION_BACKED_INTEGRATIONS[integration];
+        if (!backing) continue;
+        if (statusByService.get(backing.service)?.configured) continue;
+        if (seen.has(backing.label)) continue;
+        seen.add(backing.label);
+        labels.push(backing.label);
+      }
+    }
+    return labels;
+  }
+
+  // Join labels into readable prose: "A", "A and B", "A, B and C".
+  function formatLabelList(labels: string[]): string {
+    if (labels.length <= 1) return labels[0] ?? "";
+    if (labels.length === 2) return `${labels[0]} and ${labels[1]}`;
+    return `${labels.slice(0, -1).join(", ")} and ${labels[labels.length - 1]}`;
+  }
 
   // Turn arbitrary text into a safe download filename fragment.
   function safeFileName(name: string): string {
