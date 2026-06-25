@@ -789,6 +789,12 @@ export const GetTruenasMetricsResponse = zod.object({
 
 
 /**
+ * @summary Run a read-only TrueNAS reporting diagnostic against the live NAS, capturing the exact requests sent and the raw responses (including the upstream error body). Used to discover why reporting/get_data is rejected on a given SCALE version. The API key is never echoed.
+ */
+export const GetTruenasDiagnosticsResponse = zod.record(zod.string(), zod.unknown())
+
+
+/**
  * @summary Get recently added media from Plex or Jellyfin
  */
 export const GetMediaRecentQueryParams = zod.object({

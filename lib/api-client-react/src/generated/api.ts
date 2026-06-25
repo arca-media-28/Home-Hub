@@ -37,6 +37,8 @@ import type {
   GetStockCandlesParams,
   GetStocksWidgetParams,
   GetTilesParams,
+  GetTruenasDiagnostics200,
+  GetTruenasDiagnostics409,
   HealthStatus,
   LayoutUpdate,
   LidarrData,
@@ -1403,6 +1405,83 @@ export function useGetTruenasMetrics<TData = Awaited<ReturnType<typeof getTruena
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetTruenasMetricsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetTruenasDiagnosticsUrl = () => {
+
+
+
+
+  return `/api/widgets/truenas/diagnostics`
+}
+
+/**
+ * @summary Run a read-only TrueNAS reporting diagnostic against the live NAS, capturing the exact requests sent and the raw responses (including the upstream error body). Used to discover why reporting/get_data is rejected on a given SCALE version. The API key is never echoed.
+ */
+export const getTruenasDiagnostics = async ( options?: RequestInit): Promise<GetTruenasDiagnostics200> => {
+
+  return customFetch<GetTruenasDiagnostics200>(getGetTruenasDiagnosticsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetTruenasDiagnosticsQueryKey = () => {
+    return [
+    `/api/widgets/truenas/diagnostics`
+    ] as const;
+    }
+
+
+export const getGetTruenasDiagnosticsQueryOptions = <TData = Awaited<ReturnType<typeof getTruenasDiagnostics>>, TError = ErrorType<GetTruenasDiagnostics409>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTruenasDiagnostics>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetTruenasDiagnosticsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTruenasDiagnostics>>> = ({ signal }) => getTruenasDiagnostics({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTruenasDiagnostics>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetTruenasDiagnosticsQueryResult = NonNullable<Awaited<ReturnType<typeof getTruenasDiagnostics>>>
+export type GetTruenasDiagnosticsQueryError = ErrorType<GetTruenasDiagnostics409>
+
+
+/**
+ * @summary Run a read-only TrueNAS reporting diagnostic against the live NAS, capturing the exact requests sent and the raw responses (including the upstream error body). Used to discover why reporting/get_data is rejected on a given SCALE version. The API key is never echoed.
+ */
+
+export function useGetTruenasDiagnostics<TData = Awaited<ReturnType<typeof getTruenasDiagnostics>>, TError = ErrorType<GetTruenasDiagnostics409>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTruenasDiagnostics>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetTruenasDiagnosticsQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

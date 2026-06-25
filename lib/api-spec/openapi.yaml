@@ -414,6 +414,33 @@ paths:
               schema:
                 $ref: "#/components/schemas/TruenasMetrics"
 
+  /widgets/truenas/diagnostics:
+    get:
+      operationId: getTruenasDiagnostics
+      tags: [widgets]
+      summary: >-
+        Run a read-only TrueNAS reporting diagnostic against the live NAS,
+        capturing the exact requests sent and the raw responses (including the
+        upstream error body). Used to discover why reporting/get_data is
+        rejected on a given SCALE version. The API key is never echoed.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Diagnostic probe results
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        "409":
+          description: TrueNAS is not configured
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
   /widgets/media:
     get:
       operationId: getMediaRecent

@@ -20,6 +20,10 @@ For TrueNAS specifically there is an auth-gated diagnostic route
 `reporting/get_data` request forms (unix-window-in-past, end-at-now, unit/page,
 aggregated vs not) plus `GET /reporting/graphs`, and returns each request + raw
 outcome so the working form / real error is copyable. The API key is never echoed.
+This route is now runnable WITHOUT a shell: Settings → TrueNAS card → "Diagnostics"
+button calls the generated `getTruenasDiagnostics()` and renders the JSON in a
+copyable block (only the LAN-deployed instance can reach the NAS, so the user must
+run it there). The endpoint is in openapi.yaml as a permissive object response.
 
 **Why:** the correct fix to a rejected query/parser cannot be chosen without the
 server's own error text or the live response shape; capture it first, then fix.

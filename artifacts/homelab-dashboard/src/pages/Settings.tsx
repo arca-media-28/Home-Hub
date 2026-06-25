@@ -5,6 +5,8 @@ import {
   useGetConnections,
   useUpdateConnection,
   useTestConnection,
+  getTruenasDiagnostics,
+  ApiError,
   useGetSpotifyStatus,
   useSaveSpotifyCredentials,
   useStartSpotifyAuth,
@@ -43,6 +45,7 @@ import {
   MonitorPlay,
   ChevronDown,
   Plug,
+  Stethoscope,
   X,
   Copy,
   ExternalLink,
@@ -242,6 +245,9 @@ function ServiceCard({
   const [form, setForm] = useState<FormState>(() => connectionToForm(connection));
   const [savedAt, setSavedAt] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const [diagRunning, setDiagRunning] = useState(false);
+  const [diagOutput, setDiagOutput] = useState<string | null>(null);
+  const [diagCopied, setDiagCopied] = useState(false);
 
   // Re-sync the form when server values load/refresh, so saved values pre-fill.
   useEffect(() => {
@@ -302,6 +308,46 @@ function ServiceCard({
           setTestResult({ ok: false, message: "Could not reach service" }),
       },
     );
+  }
+
+  async function handleDiagnostics() {
+    setDiagRunning(true);
+    setDiagCopied(false);
+    setDiagOutput(null);
+    try {
+      const data = await getTruenasDiagnostics();
+      setDiagOutput(JSON.stringify(data, null, 2));
+    } catch (err) {
+      // A 409 (not configured) or upstream failure still carries a useful body.
+      if (err instanceof ApiError && err.data != null) {
+        setDiagOutput(JSON.stringify(err.data, null, 2));
+      } else {
+        setDiagOutput(
+          JSON.stringify(
+            { error: err instanceof Error ? err.message : String(err) },
+            null,
+            2,
+          ),
+        );
+      }
+    } finally {
+      setDiagRunning(false);
+    }
+  }
+
+  async function handleCopyDiagnostics() {
+    if (!diagOutput) return;
+    try {
+      await navigator.clipboard.writeText(diagOutput);
+      setDiagCopied(true);
+      setTimeout(() => setDiagCopied(false), 2000);
+    } catch {
+      toast({
+        title: "Couldn't copy",
+        description: "Select the text and copy it manually.",
+        variant: "destructive",
+      });
+    }
   }
 
   return (
@@ -379,6 +425,23 @@ function ServiceCard({
           ) : null}
         </div>
         <div className="flex items-center gap-2">
+          {def.key === "truenas" && (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={handleDiagnostics}
+              disabled={diagRunning || mutation.isPending}
+              className="gap-1.5"
+            >
+              {diagRunning ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Stethoscope className="w-3.5 h-3.5" />
+              )}
+              Diagnostics
+            </Button>
+          )}
           <Button
             type="button"
             size="sm"
@@ -406,6 +469,35 @@ function ServiceCard({
           </Button>
         </div>
       </div>
+
+      {def.key === "truenas" && diagOutput !== null && (
+        <div className="border-t border-border px-5 py-4 space-y-2">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-xs text-muted-foreground">
+              Reporting diagnostic (runs against your saved TrueNAS settings —
+              click Save first if you just changed them). Copy this and paste it
+              back so the CPU/RAM metrics can be fixed for your TrueNAS version.
+            </p>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={handleCopyDiagnostics}
+              className="gap-1.5 shrink-0"
+            >
+              {diagCopied ? (
+                <Check className="w-3.5 h-3.5" />
+              ) : (
+                <Copy className="w-3.5 h-3.5" />
+              )}
+              {diagCopied ? "Copied" : "Copy"}
+            </Button>
+          </div>
+          <pre className="max-h-80 overflow-auto bg-muted/50 border border-border p-3 text-[11px] leading-relaxed text-foreground whitespace-pre-wrap break-words">
+            {diagOutput}
+          </pre>
+        </div>
+      )}
     </form>
   );
 }

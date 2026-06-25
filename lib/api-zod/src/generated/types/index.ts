@@ -34,6 +34,8 @@ export * from './getNewsWidgetParams';
 export * from './getStockCandlesParams';
 export * from './getStocksWidgetParams';
 export * from './getTilesParams';
+export * from './getTruenasDiagnostics200';
+export * from './getTruenasDiagnostics409';
 export * from './healthStatus';
 export * from './layoutItem';
 export * from './layoutUpdate';

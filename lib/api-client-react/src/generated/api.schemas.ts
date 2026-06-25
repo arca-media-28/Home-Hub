@@ -1367,6 +1367,10 @@ export type GetTilesParams = {
 pageId?: number;
 };
 
+export type GetTruenasDiagnostics200 = { [key: string]: unknown };
+
+export type GetTruenasDiagnostics409 = { [key: string]: unknown };
+
 export type GetMediaRecentParams = {
 /**
  * Which media server the tile is backed by. "plex" resolves the saved Plex connection; "jellyfin" resolves the saved Jellyfin connection. Defaults to "plex" when omitted.
