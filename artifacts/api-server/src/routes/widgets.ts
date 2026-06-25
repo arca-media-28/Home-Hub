@@ -355,8 +355,14 @@ function downsample(series: number[], max = 30): number[] {
 // Unit assumptions (the same Netdata-based backend that serves CPU/RAM):
 //  - interface throughput is in kilobits/sec → megabits/sec is value / 1000.
 //  - arcsize is in bytes → gigabytes is value / 1e9 (matching the memory graph).
-//  - demanddatahitpercentage is an ARC hit ratio already expressed as a percent
-//    (SCALE 25.10 dropped the old arcactualrate hits/misses graph).
+//  - ARC hit ratio comes from one of the legacy aggregate graphs the get_data
+//    endpoint still accepts (arcactualrate / arcrate / arcresult). The per-demand
+//    percentage graphs that /reporting/graphs advertises (demanddatahitpercentage
+//    et al.) are REJECTED by get_data with HTTP 422 — and a single invalid graph
+//    name 422s the whole batch, which previously took the network + ARC size
+//    numbers down with it. The hit graph either exposes a direct percentage
+//    dimension or hits/misses rates we turn into a percentage.
+const ARC_HIT_GRAPHS = ["arcresult", "arcrate", "arcactualrate"];
 function parseTruenasNetArc(reportData: unknown): {
   netInMbps: number | null;
   netOutMbps: number | null;
@@ -368,7 +374,6 @@ function parseTruenasNetArc(reportData: unknown): {
 } {
   const graphs = (reportData ?? []) as Array<{ name?: string }>;
   const ifaceGraph = graphs.find((g) => g.name === "interface");
-  const arcHitGraph = graphs.find((g) => g.name === "demanddatahitpercentage");
   const arcSizeGraph = graphs.find((g) => g.name === "arcsize");
 
   const rxKeys = ["received", "rx", "in", "incoming"];
@@ -390,20 +395,66 @@ function parseTruenasNetArc(reportData: unknown): {
     netOutSeries = downsample(seriesByLegend(ifaceGraph, txKeys).map(toMbps));
   }
 
-  // ARC hit ratio comes straight from the demanddatahitpercentage graph (already
-  // a percent). The single dimension's name is install-dependent, so accept the
-  // common candidates and clamp to 0–100.
-  const hitKeys = ["value", "percentage", "percent", "hit", "hits", "demanddatahitpercentage"];
+  // ARC hit ratio: each candidate graph either exposes a ready-made percentage
+  // dimension, or separate hit/miss rates we convert to hits/(hits+misses)*100.
+  // Dimension names are install-dependent, so match tolerant candidate lists.
+  // Try the candidate graphs in priority order and use the FIRST that actually
+  // yields a value — a graph can be present-but-empty (e.g. arcresult returns no
+  // data while arcrate does), so selecting purely by name would hide valid data.
+  const clampPct = (v: number) => Number(Math.min(100, Math.max(0, v)).toFixed(1));
+  const pctKeys = ["percentage", "percent", "hit%", "ratio", "hitratio", "value"];
+  const hitKeys = ["hits", "hit", "cache_hits", "arc_hits", "demand_data_hits"];
+  const missKeys = ["misses", "miss", "cache_misses", "arc_misses", "demand_data_misses"];
+  const arcHitFrom = (graph: unknown): { ratio: number | null; series: number[] } => {
+    const latest = latestByLegend(graph);
+    const directPct = pickLegendValue(latest, pctKeys);
+    if (directPct != null) {
+      return {
+        ratio: clampPct(directPct),
+        series: downsample(seriesByLegend(graph, pctKeys).map(clampPct)),
+      };
+    }
+    // Derive a percentage from hit/miss rates (latest value and per-sample).
+    let ratio: number | null = null;
+    const hits = pickLegendValue(latest, hitKeys);
+    const misses = pickLegendValue(latest, missKeys);
+    if (hits != null && misses != null && hits + misses > 0) {
+      ratio = clampPct((hits / (hits + misses)) * 100);
+    }
+    const hitSeries = seriesByLegend(graph, hitKeys);
+    const missSeries = seriesByLegend(graph, missKeys);
+    const ratioSeries: number[] = [];
+    for (let i = 0; i < Math.min(hitSeries.length, missSeries.length); i++) {
+      const h = hitSeries[i] ?? 0;
+      const m = missSeries[i] ?? 0;
+      if (h + m > 0) ratioSeries.push(clampPct((h / (h + m)) * 100));
+    }
+    return { ratio, series: downsample(ratioSeries) };
+  };
+  // A graph can be present but carry no samples; latestByLegend would then default
+  // every dimension to 0, making an empty graph look like a real "0%". Only treat
+  // a candidate as usable when it actually has data rows or an aggregate mean.
+  const graphHasData = (graph: unknown): boolean => {
+    const g = graph as { data?: unknown[]; aggregations?: { mean?: unknown } } | undefined;
+    const mean = g?.aggregations?.mean;
+    const meanNonEmpty = Array.isArray(mean)
+      ? mean.length > 0
+      : mean != null && typeof mean === "object"
+        ? Object.keys(mean).length > 0
+        : false;
+    return (Array.isArray(g?.data) && g.data.length > 0) || meanNonEmpty;
+  };
   let arcHitRatio: number | null = null;
   let arcHitSeries: number[] = [];
-  if (arcHitGraph) {
-    const hit = pickLegendValue(latestByLegend(arcHitGraph), hitKeys);
-    if (hit != null) arcHitRatio = Number(Math.min(100, Math.max(0, hit)).toFixed(1));
-    arcHitSeries = downsample(
-      seriesByLegend(arcHitGraph, hitKeys).map((v) =>
-        Number(Math.min(100, Math.max(0, v)).toFixed(1)),
-      ),
-    );
+  for (const name of ARC_HIT_GRAPHS) {
+    const graph = graphs.find((g) => g.name === name);
+    if (!graph || !graphHasData(graph)) continue;
+    const { ratio, series } = arcHitFrom(graph);
+    if (ratio != null || series.length > 0) {
+      arcHitRatio = ratio;
+      arcHitSeries = series;
+      break;
+    }
   }
 
   let arcSizeGb: number | null = null;
@@ -633,27 +684,54 @@ router.get("/truenas", requireAuth, async (_req, res) => {
       "TrueNAS widget: reporting/graphs call failed (interface identifier unavailable)",
     );
   }
-  const extraReportingBody = {
+  const extrasQuery = { start: nowSec - 1800, end: nowSec - 30, aggregate: false };
+  // Core extras (interface + arcsize) ride one call; the ARC hit-ratio graphs ride
+  // a SEPARATE call. get_data 422s an ENTIRE batch when any single graph name is
+  // not in its accepted enum, so keeping the (guaranteed-valid) interface/arcsize
+  // graphs apart from the best-effort ARC-ratio candidates means a problem with
+  // the latter can never take Network throughput + ARC size down with it.
+  const coreExtrasBody = {
     graphs: [
       ...(ifaceId ? [{ name: "interface", identifier: ifaceId }] : []),
       { name: "arcsize" },
-      { name: "demanddatahitpercentage" },
     ],
-    query: { start: nowSec - 1800, end: nowSec - 30, aggregate: false },
+    query: extrasQuery,
   };
-  try {
-    const extra = await httpClient.post(`${baseUrl}/api/v2.0/reporting/get_data`, extraReportingBody, { headers });
-    netArc = parseTruenasNetArc(extra.data);
-  } catch (err) {
+  const arcHitBody = {
+    graphs: ARC_HIT_GRAPHS.map((name) => ({ name })),
+    query: extrasQuery,
+  };
+  const [coreExtras, arcHitExtras] = await Promise.allSettled([
+    httpClient.post(`${baseUrl}/api/v2.0/reporting/get_data`, coreExtrasBody, { headers }),
+    httpClient.post(`${baseUrl}/api/v2.0/reporting/get_data`, arcHitBody, { headers }),
+  ]);
+  // Merge both responses before parsing so a single parser pass sees every graph.
+  const mergedGraphs: unknown[] = [];
+  if (coreExtras.status === "fulfilled") {
+    mergedGraphs.push(...((coreExtras.value.data ?? []) as unknown[]));
+  } else {
     logger.error(
       {
-        reason: normalizeHttpError(err),
-        detail: describeHttpError(err),
-        request: extraReportingBody,
+        reason: normalizeHttpError(coreExtras.reason),
+        detail: describeHttpError(coreExtras.reason),
+        request: coreExtrasBody,
       },
-      "TrueNAS widget: network/ARC reporting call failed (extras unavailable)",
+      "TrueNAS widget: network/ARC-size reporting call failed (interface + arcsize unavailable)",
     );
   }
+  if (arcHitExtras.status === "fulfilled") {
+    mergedGraphs.push(...((arcHitExtras.value.data ?? []) as unknown[]));
+  } else {
+    logger.error(
+      {
+        reason: normalizeHttpError(arcHitExtras.reason),
+        detail: describeHttpError(arcHitExtras.reason),
+        request: arcHitBody,
+      },
+      "TrueNAS widget: ARC hit-ratio reporting call failed (hit ratio unavailable)",
+    );
+  }
+  netArc = parseTruenasNetArc(mergedGraphs);
 
   res.json({ ...reporting, ...netArc, pools, disks });
 });
@@ -791,22 +869,34 @@ router.get("/truenas/diagnostics", requireAuth, async (_req, res) => {
     graphsProbe.ok && Array.isArray(graphsProbe.response)
       ? resolvePhysicalInterface(graphsProbe.response)
       : null;
-  const extrasBody = {
+  const extrasQuery = { start: nowSec - 1800, end: nowSec - 30, aggregate: false };
+  // Core extras (interface + arcsize) and the ARC hit-ratio candidates are probed
+  // SEPARATELY — get_data 422s a whole batch on any one invalid graph name, so a
+  // combined probe would hide the interface/arcsize legends whenever an ARC name
+  // is rejected. The widget itself issues these as two calls for the same reason.
+  const coreExtrasBody = {
     graphs: [
       ...(ifaceId ? [{ name: "interface", identifier: ifaceId }] : [{ name: "interface" }]),
       { name: "arcsize" },
-      { name: "demanddatahitpercentage" },
     ],
-    query: { start: nowSec - 1800, end: nowSec - 30, aggregate: false },
+    query: extrasQuery,
   };
-  const extrasLabel = `extras (interface ${
+  const coreExtrasLabel = `extras core (interface ${
     ifaceId ? `[${ifaceId}]` : "— no physical NIC resolved, sent without identifier"
-  }, arcsize, demanddatahitpercentage), non-aggregated series — the form the widget uses`;
+  }, arcsize), non-aggregated series — the form the widget uses`;
+  const arcHitBody = {
+    graphs: ARC_HIT_GRAPHS.map((name) => ({ name })),
+    query: extrasQuery,
+  };
+  const arcHitLabel = `extras ARC hit ratio (${ARC_HIT_GRAPHS.join(
+    "/",
+  )}), non-aggregated series — the form the widget uses`;
 
   const probes = await Promise.all([
     Promise.resolve(graphsProbe),
     ...candidates.map((c) => probePost(c.label, c.body)),
-    probePost(extrasLabel, extrasBody),
+    probePost(coreExtrasLabel, coreExtrasBody),
+    probePost(arcHitLabel, arcHitBody),
   ]);
 
   res.json({ configured: true, baseUrl, serverTimeUnixSec: nowSec, probes });

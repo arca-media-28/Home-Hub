@@ -398,9 +398,23 @@ describe("GET /widgets/truenas", () => {
 
   // Route the two reporting POSTs by their requested graph names: the core call
   // asks for cpu/memory, the extras call asks for interface/arcsize/ARC hit %.
-  function mockTruenasReporting(opts: { core?: unknown; coreError?: Error; extras?: unknown; extrasError?: Error }) {
+  // Three POST shapes hit get_data: the core cpu/memory call, the core extras
+  // (interface + arcsize), and the ARC hit-ratio call (arcresult/arcrate/...).
+  // The latter two ride SEPARATE calls so one cannot 422 the other.
+  const ARC_HIT_NAMES = ["arcresult", "arcrate", "arcactualrate"];
+  function mockTruenasReporting(opts: {
+    core?: unknown;
+    coreError?: Error;
+    extras?: unknown;
+    extrasError?: Error;
+    arcHit?: unknown;
+    arcHitError?: Error;
+  }) {
     httpPost.mockImplementation((_url: string, body: { graphs: Array<{ name?: string }> }) => {
       const names = body.graphs.map((g) => g.name);
+      if (names.some((n) => ARC_HIT_NAMES.includes(n ?? ""))) {
+        return opts.arcHitError ? Promise.reject(opts.arcHitError) : Promise.resolve({ data: opts.arcHit ?? [] });
+      }
       if (names.includes("arcsize")) {
         return opts.extrasError ? Promise.reject(opts.extrasError) : Promise.resolve({ data: opts.extras ?? [] });
       }
@@ -414,9 +428,9 @@ describe("GET /widgets/truenas", () => {
     );
     mockTruenasReporting({
       core: [{ name: "cpu", legend: ["time", "idle"], data: [[1000, 80]] }],
-      // interface throughput is kilobits/s (→ Mbps is /1000); demanddatahitpercentage
-      // is already an ARC hit percent; arcsize is bytes. Two data rows per graph so
-      // the route can build a per-sample series. The current value is the LAST row.
+      // interface throughput is kilobits/s (→ Mbps is /1000); arcsize is bytes.
+      // Two data rows per graph so the route can build a per-sample series. The
+      // current value is the LAST row.
       extras: [
         {
           name: "interface",
@@ -428,9 +442,12 @@ describe("GET /widgets/truenas", () => {
           ],
         },
         { name: "arcsize", legend: ["time", "size"], data: [[1000, 31.4e9]] },
+      ],
+      // ARC hit ratio rides its own call. arcresult exposes a direct percentage.
+      arcHit: [
         {
-          name: "demanddatahitpercentage",
-          legend: ["time", "value"],
+          name: "arcresult",
+          legend: ["time", "percentage"],
           data: [
             [1000, 80],
             [1060, 90],
@@ -466,10 +483,23 @@ describe("GET /widgets/truenas", () => {
     );
     expect(extraCall).toBeDefined();
     expect(extraCall![1].query?.aggregate).toBe(false);
+    // Core extras carry ONLY interface + arcsize (guaranteed-valid graph names).
     expect(extraCall![1].graphs).toEqual([
       { name: "interface", identifier: "enp14s0" },
       { name: "arcsize" },
-      { name: "demanddatahitpercentage" },
+    ]);
+    // The ARC hit-ratio graphs ride a SEPARATE call so an invalid name can't 422
+    // the interface/arcsize batch.
+    const arcHitCall = httpPost.mock.calls.find(
+      ([, body]: [string, { graphs: Array<{ name?: string }> }]) =>
+        body.graphs.some((g) => ARC_HIT_NAMES.includes(g.name ?? "")),
+    );
+    expect(arcHitCall).toBeDefined();
+    expect(arcHitCall![1].query?.aggregate).toBe(false);
+    expect(arcHitCall![1].graphs).toEqual([
+      { name: "arcresult" },
+      { name: "arcrate" },
+      { name: "arcactualrate" },
     ]);
   });
 
@@ -498,6 +528,40 @@ describe("GET /widgets/truenas", () => {
     expect(res.body.netInSeries).toEqual([]);
     expect(res.body.netOutSeries).toEqual([]);
     expect(res.body.arcHitSeries).toEqual([]);
+  });
+
+  it("falls back to a later ARC graph when the first candidate is empty", async () => {
+    findByService.mockReturnValue(
+      connRow({ service: "truenas", url: "https://nas.local", api_key: "key" }),
+    );
+    mockTruenasReporting({
+      core: [{ name: "cpu", legend: ["time", "idle"], data: [[1000, 80]] }],
+      extras: [{ name: "arcsize", legend: ["time", "size"], data: [[1000, 31.4e9]] }],
+      // The first candidate (arcresult) is present but EMPTY; the route must skip
+      // it and read the next populated candidate (arcrate, here as hits/misses).
+      arcHit: [
+        { name: "arcresult", legend: ["time", "percentage"], data: [] },
+        {
+          name: "arcrate",
+          legend: ["time", "hits", "misses"],
+          data: [
+            [1000, 90, 10],
+            [1060, 75, 25],
+          ],
+        },
+      ],
+    });
+    mockTruenasGets({
+      graphs: [{ name: "interface", identifiers: ["enp14s0"] }],
+    });
+
+    const res = await request(app).get("/widgets/truenas");
+    expect(res.status).toBe(200);
+    // hits/misses → ratio: latest row 75/(75+25) = 75%.
+    expect(res.body.arcHitRatio).toBe(75);
+    expect(res.body.arcHitSeries).toEqual([90, 75]);
+    // ARC size from the core extras call is unaffected.
+    expect(res.body.arcSizeGb).toBeCloseTo(31.4, 1);
   });
 
   it("includes network and ARC sample values when unconfigured", async () => {
