@@ -102,6 +102,9 @@ vi.mock("@workspace/api-client-react", () => ({
   useUpdatePage: () => ({ mutate: vi.fn(), isPending: false, isError: false }),
   useDeletePage: () => ({ mutate: vi.fn(), isPending: false, isError: false }),
   useReorderPages: () => ({ mutate: vi.fn(), isPending: false, isError: false }),
+  useImportPages: () => ({ mutate: vi.fn(), isPending: false, isError: false }),
+  exportPage: vi.fn(),
+  exportAllPages: vi.fn(),
   useSaveLayout: () => ({
     mutate: saveLayoutMutate,
     isPending: false,

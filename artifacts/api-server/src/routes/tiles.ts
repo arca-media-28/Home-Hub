@@ -525,6 +525,70 @@ export function formatTile(t: DbTile) {
   };
 }
 
+// Serialize a tile for inclusion in a page export. This is `formatTile` minus
+// every identity/ownership field (id, userId, pageId, createdAt) so the result
+// is safe to share and to re-import under a different user/page. No credential
+// data lives on tiles — integrations are referenced by type only — so the
+// allow-listed visual/settings fields are all that travel.
+export function exportTile(t: DbTile) {
+  const { id, userId, pageId, createdAt, ...rest } = formatTile(t);
+  void id;
+  void userId;
+  void pageId;
+  void createdAt;
+  return rest;
+}
+
+// Shared INSERT for new tiles, reused by the create route and the page-import
+// flow so both honor exactly the same columns and the same settings allow-list.
+const insertTileStmt = db.prepare<
+  [number, number | null, string, string | null, number, number, number, number, string | null, string | null, string | null, string | null, string | null, string | null, number | null, string | null, string | null, string | null, number, string | null, string | null],
+  { id: number }
+>(
+  `INSERT INTO tiles (user_id, page_id, type, integration, grid_x, grid_y, grid_w, grid_h, name, url, bg_color, image_url, image_fit, image_position, image_scale, title_size, title_position, title_color, hide_title, metrics, tile_settings)
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`
+);
+
+// Helpers that coerce an untrusted import value to the right column type,
+// falling back to a default when the value is missing or the wrong shape.
+function importString(v: unknown): string | null {
+  return typeof v === "string" ? v : null;
+}
+function importNumber(v: unknown, fallback: number | null): number | null {
+  return typeof v === "number" && Number.isFinite(v) ? v : fallback;
+}
+
+// Create a single tile from an (untrusted) exported-tile object on the given
+// page. Unknown/garbage fields are dropped, tileSettings is run through the
+// pickTileSettings allow-list, and any credential-like field simply has no
+// column to land in — so nothing unexpected can be imported.
+export function createImportedTile(userId: number, pageId: number, raw: unknown): void {
+  const obj = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+  insertTileStmt.run(
+    userId,
+    pageId,
+    importString(obj["type"]) ?? "app",
+    importString(obj["integration"]),
+    importNumber(obj["gridX"], 0)!,
+    importNumber(obj["gridY"], 0)!,
+    importNumber(obj["gridW"], 4)!,
+    importNumber(obj["gridH"], 4)!,
+    importString(obj["name"]),
+    importString(obj["url"]),
+    importString(obj["bgColor"]),
+    importString(obj["imageUrl"]),
+    importString(obj["imageFit"]),
+    importString(obj["imagePosition"]),
+    importNumber(obj["imageScale"], null),
+    importString(obj["titleSize"]),
+    importString(obj["titlePosition"]),
+    importString(obj["titleColor"]),
+    obj["hideTitle"] === true ? 1 : 0,
+    serializeMetrics(obj["metrics"]),
+    serializeTileSettings(obj["tileSettings"]),
+  );
+}
+
 // GET /api/tiles?pageId= — when a pageId is supplied, return only that page's
 // tiles (after verifying the page belongs to the caller). Omitting pageId
 // returns every tile the user owns, preserving the pre-multi-page behavior.
@@ -586,15 +650,7 @@ router.post("/", requireAuth, (req: AuthRequest, res) => {
     pageId = pages[0]?.id ?? null;
   }
 
-  const createTile = db.prepare<
-    [number, number | null, string, string | null, number, number, number, number, string | null, string | null, string | null, string | null, string | null, string | null, number | null, string | null, string | null, string | null, number, string | null, string | null],
-    { id: number }
-  >(
-    `INSERT INTO tiles (user_id, page_id, type, integration, grid_x, grid_y, grid_w, grid_h, name, url, bg_color, image_url, image_fit, image_position, image_scale, title_size, title_position, title_color, hide_title, metrics, tile_settings)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`
-  );
-
-  const row = createTile.get(
+  const row = insertTileStmt.get(
     req.user!.userId,
     pageId,
     body.type ?? "app",

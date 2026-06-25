@@ -359,6 +359,77 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /pages/export:
+    get:
+      operationId: exportAllPages
+      tags: [pages]
+      summary: Export all of the user's pages as a downloadable envelope
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Export envelope
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageExport"
+
+  /pages/{id}/export:
+    get:
+      operationId: exportPage
+      tags: [pages]
+      summary: Export a single page as a downloadable envelope
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Export envelope
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageExport"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /pages/import:
+    post:
+      operationId: importPages
+      tags: [pages]
+      summary: Recreate one or more pages from a previously exported envelope
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PageExport"
+      responses:
+        "201":
+          description: The newly created pages, in display order
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Page"
+        "400":
+          description: Malformed or incompatible export file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /uploads:
     get:
       operationId: listUploads
@@ -1963,6 +2034,91 @@ components:
           type: array
           items:
             type: integer
+
+    ExportedTile:
+      description: >-
+        A tile inside an export envelope. Mirrors Tile but omits every identity
+        field (id, userId, pageId, createdAt) so it can be re-imported under any
+        user/page. Carries no credential data — integrations are referenced by
+        type only.
+      type: object
+      required: [type, gridX, gridY, gridW, gridH]
+      properties:
+        type:
+          type: string
+        integration:
+          type: ["string", "null"]
+        gridX:
+          type: integer
+        gridY:
+          type: integer
+        gridW:
+          type: integer
+        gridH:
+          type: integer
+        name:
+          type: ["string", "null"]
+        url:
+          type: ["string", "null"]
+        bgColor:
+          type: ["string", "null"]
+        imageUrl:
+          type: ["string", "null"]
+        imageFit:
+          type: ["string", "null"]
+        imagePosition:
+          type: ["string", "null"]
+        imageScale:
+          type: ["integer", "null"]
+        titleSize:
+          type: ["string", "null"]
+        titlePosition:
+          type: ["string", "null"]
+        titleColor:
+          type: ["string", "null"]
+        hideTitle:
+          type: boolean
+        metrics:
+          type: ["array", "null"]
+          items:
+            type: string
+        tileSettings:
+          $ref: "#/components/schemas/TileSettings"
+
+    ExportedPage:
+      description: A single page within an export envelope.
+      type: object
+      required: [name, tiles]
+      properties:
+        name:
+          type: string
+        tiles:
+          type: array
+          items:
+            $ref: "#/components/schemas/ExportedTile"
+
+    PageExport:
+      description: >-
+        A versioned envelope holding one or more dashboard pages and their
+        tiles. Used both as the export download and the import upload body. The
+        format/version fields let importers reject incompatible files. Never
+        contains service connection credentials.
+      type: object
+      required: [format, version, pages]
+      properties:
+        format:
+          description: Constant identifier for this file type.
+          type: string
+        version:
+          description: Schema version, bumped on incompatible format changes.
+          type: integer
+        exportedAt:
+          description: ISO timestamp of when the file was produced.
+          type: string
+        pages:
+          type: array
+          items:
+            $ref: "#/components/schemas/ExportedPage"
 
     UploadResult:
       type: object

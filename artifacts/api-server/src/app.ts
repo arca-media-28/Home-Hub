@@ -30,7 +30,9 @@ app.use(
   }),
 );
 app.use(cors());
-app.use(express.json());
+// Allow a generous JSON body so page-import uploads (which can contain many
+// tiles and their settings) aren't rejected by the default 100kb limit.
+app.use(express.json({ limit: "5mb" }));
 app.use(express.urlencoded({ extended: true }));
 
 // Serve uploaded files

@@ -726,6 +726,64 @@ export interface PageReorder {
   order: number[];
 }
 
+/**
+ * A tile inside an export envelope. Mirrors Tile but omits every identity field (id, userId, pageId, createdAt) so it can be re-imported under any user/page. Carries no credential data — integrations are referenced by type only.
+ */
+export interface ExportedTile {
+  type: string;
+  /** @nullable */
+  integration?: string | null;
+  gridX: number;
+  gridY: number;
+  gridW: number;
+  gridH: number;
+  /** @nullable */
+  name?: string | null;
+  /** @nullable */
+  url?: string | null;
+  /** @nullable */
+  bgColor?: string | null;
+  /** @nullable */
+  imageUrl?: string | null;
+  /** @nullable */
+  imageFit?: string | null;
+  /** @nullable */
+  imagePosition?: string | null;
+  /** @nullable */
+  imageScale?: number | null;
+  /** @nullable */
+  titleSize?: string | null;
+  /** @nullable */
+  titlePosition?: string | null;
+  /** @nullable */
+  titleColor?: string | null;
+  hideTitle?: boolean;
+  /** @nullable */
+  metrics?: string[] | null;
+  tileSettings?: TileSettings | null;
+}
+
+/**
+ * A single page within an export envelope.
+ */
+export interface ExportedPage {
+  name: string;
+  tiles: ExportedTile[];
+}
+
+/**
+ * A versioned envelope holding one or more dashboard pages and their tiles. Used both as the export download and the import upload body. The format/version fields let importers reject incompatible files. Never contains service connection credentials.
+ */
+export interface PageExport {
+  /** Constant identifier for this file type. */
+  format: string;
+  /** Schema version, bumped on incompatible format changes. */
+  version: number;
+  /** ISO timestamp of when the file was produced. */
+  exportedAt?: string;
+  pages: ExportedPage[];
+}
+
 export interface UploadResult {
   url: string;
 }

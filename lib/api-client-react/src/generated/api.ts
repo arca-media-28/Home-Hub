@@ -46,6 +46,7 @@ import type {
   NewsData,
   NginxProxyManagerData,
   Page,
+  PageExport,
   PageInput,
   PageReorder,
   PiholeData,
@@ -1191,6 +1192,231 @@ export const useDeletePage = <TError = ErrorType<ErrorResponse>,
         TContext
       > => {
       return useMutation(getDeletePageMutationOptions(options));
+    }
+
+export const getExportAllPagesUrl = () => {
+
+
+
+
+  return `/api/pages/export`
+}
+
+/**
+ * @summary Export all of the user's pages as a downloadable envelope
+ */
+export const exportAllPages = async ( options?: RequestInit): Promise<PageExport> => {
+
+  return customFetch<PageExport>(getExportAllPagesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getExportAllPagesQueryKey = () => {
+    return [
+    `/api/pages/export`
+    ] as const;
+    }
+
+
+export const getExportAllPagesQueryOptions = <TData = Awaited<ReturnType<typeof exportAllPages>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportAllPages>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getExportAllPagesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof exportAllPages>>> = ({ signal }) => exportAllPages({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof exportAllPages>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ExportAllPagesQueryResult = NonNullable<Awaited<ReturnType<typeof exportAllPages>>>
+export type ExportAllPagesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Export all of the user's pages as a downloadable envelope
+ */
+
+export function useExportAllPages<TData = Awaited<ReturnType<typeof exportAllPages>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportAllPages>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getExportAllPagesQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getExportPageUrl = (id: number,) => {
+
+
+
+
+  return `/api/pages/${id}/export`
+}
+
+/**
+ * @summary Export a single page as a downloadable envelope
+ */
+export const exportPage = async (id: number, options?: RequestInit): Promise<PageExport> => {
+
+  return customFetch<PageExport>(getExportPageUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getExportPageQueryKey = (id: number,) => {
+    return [
+    `/api/pages/${id}/export`
+    ] as const;
+    }
+
+
+export const getExportPageQueryOptions = <TData = Awaited<ReturnType<typeof exportPage>>, TError = ErrorType<ErrorResponse>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportPage>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getExportPageQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof exportPage>>> = ({ signal }) => exportPage(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof exportPage>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ExportPageQueryResult = NonNullable<Awaited<ReturnType<typeof exportPage>>>
+export type ExportPageQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Export a single page as a downloadable envelope
+ */
+
+export function useExportPage<TData = Awaited<ReturnType<typeof exportPage>>, TError = ErrorType<ErrorResponse>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportPage>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getExportPageQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getImportPagesUrl = () => {
+
+
+
+
+  return `/api/pages/import`
+}
+
+/**
+ * @summary Recreate one or more pages from a previously exported envelope
+ */
+export const importPages = async (pageExport: PageExport, options?: RequestInit): Promise<Page[]> => {
+
+  return customFetch<Page[]>(getImportPagesUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      pageExport,)
+  }
+);}
+
+
+
+
+export const getImportPagesMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof importPages>>, TError,{data: BodyType<PageExport>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof importPages>>, TError,{data: BodyType<PageExport>}, TContext> => {
+
+const mutationKey = ['importPages'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof importPages>>, {data: BodyType<PageExport>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  importPages(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ImportPagesMutationResult = NonNullable<Awaited<ReturnType<typeof importPages>>>
+    export type ImportPagesMutationBody = BodyType<PageExport>
+    export type ImportPagesMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Recreate one or more pages from a previously exported envelope
+ */
+export const useImportPages = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof importPages>>, TError,{data: BodyType<PageExport>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof importPages>>,
+        TError,
+        {data: BodyType<PageExport>},
+        TContext
+      > => {
+      return useMutation(getImportPagesMutationOptions(options));
     }
 
 export const getListUploadsUrl = () => {

@@ -13,6 +13,9 @@ import {
   useUpdatePage,
   useDeletePage,
   useReorderPages,
+  useImportPages,
+  exportPage,
+  exportAllPages,
   getGetMeQueryKey,
   getGetTilesQueryKey,
   getGetPagesQueryKey,
@@ -20,6 +23,7 @@ import {
   TileType,
   type Tile,
   type Page,
+  type PageExport,
   type ServiceStatus,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -58,6 +62,8 @@ import {
   ChevronRight,
   X,
   Trash2,
+  Download,
+  Upload,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -236,6 +242,8 @@ export default function Dashboard() {
   const containerRef = useRef<HTMLDivElement>(null);
   const savedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showSaved, setShowSaved] = useState(false);
+  // Hidden file input that backs the "Import page" action.
+  const importInputRef = useRef<HTMLInputElement>(null);
 
   // Measure container width for the non-responsive GridLayout. useLayoutEffect
   // measures synchronously before the browser paints, so the grid's first paint
@@ -566,6 +574,91 @@ export default function Dashboard() {
     if (page) deletePage.mutate({ id: page.id });
   }
 
+  // Import a previously exported file. On success the new pages are appended,
+  // the page list is refreshed, and we switch to the first imported page.
+  const importPages = useImportPages({
+    mutation: {
+      onSuccess: (created) => {
+        queryClient.invalidateQueries({ queryKey: getGetPagesQueryKey() });
+        const first = created[0];
+        if (first) setActivePageId(first.id);
+        toast({
+          title:
+            created.length === 1
+              ? "Imported 1 page"
+              : `Imported ${created.length} pages`,
+        });
+      },
+      onError: (err) => {
+        toast({ title: "Import failed", description: err.message, variant: "destructive" });
+      },
+    },
+  });
+
+  // Turn arbitrary text into a safe download filename fragment.
+  function safeFileName(name: string): string {
+    const cleaned = name.trim().replace(/[^a-z0-9-_]+/gi, "-").replace(/^-+|-+$/g, "");
+    return cleaned || "dashboard";
+  }
+
+  // Trigger a browser download of an export envelope as a pretty-printed JSON.
+  function downloadExport(data: PageExport, filename: string) {
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const href = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = href;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(href);
+  }
+
+  async function handleExportPage(page: Page) {
+    try {
+      const data = await exportPage(page.id);
+      downloadExport(data, `${safeFileName(page.name)}.dashboard.json`);
+    } catch (err) {
+      toast({
+        title: "Export failed",
+        description: err instanceof Error ? err.message : "Could not export page",
+        variant: "destructive",
+      });
+    }
+  }
+
+  async function handleExportAll() {
+    try {
+      const data = await exportAllPages();
+      downloadExport(data, "all-pages.dashboard.json");
+    } catch (err) {
+      toast({
+        title: "Export failed",
+        description: err instanceof Error ? err.message : "Could not export pages",
+        variant: "destructive",
+      });
+    }
+  }
+
+  async function handleImportFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    // Reset the input so selecting the same file again re-fires the change event.
+    e.target.value = "";
+    if (!file) return;
+    let parsed: PageExport;
+    try {
+      parsed = JSON.parse(await file.text()) as PageExport;
+    } catch {
+      toast({
+        title: "Import failed",
+        description: "That file isn't valid JSON.",
+        variant: "destructive",
+      });
+      return;
+    }
+    importPages.mutate({ data: parsed });
+  }
+
   if (!me && isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background bg-dot-pattern">
@@ -744,6 +837,15 @@ export default function Dashboard() {
                         </button>
                         <button
                           type="button"
+                          className="p-0.5 text-muted-foreground hover:text-foreground"
+                          onClick={() => handleExportPage(page)}
+                          aria-label="Export page"
+                          title="Export this page"
+                        >
+                          <Download className="w-3 h-3" />
+                        </button>
+                        <button
+                          type="button"
                           className="p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:hover:text-muted-foreground"
                           onClick={() => movePage(page.id, 1)}
                           disabled={index === pages.length - 1}
@@ -768,16 +870,49 @@ export default function Dashboard() {
               })}
 
               {editMode && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="gap-1.5 shrink-0 h-7 ml-1"
-                  onClick={handleAddPage}
-                  disabled={createPage.isPending}
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  New page
-                </Button>
+                <>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="gap-1.5 shrink-0 h-7 ml-1"
+                    onClick={handleAddPage}
+                    disabled={createPage.isPending}
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    New page
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="gap-1.5 shrink-0 h-7"
+                    onClick={() => importInputRef.current?.click()}
+                    disabled={importPages.isPending}
+                  >
+                    {importPages.isPending ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Upload className="w-3.5 h-3.5" />
+                    )}
+                    Import page
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="gap-1.5 shrink-0 h-7"
+                    onClick={handleExportAll}
+                    disabled={pages.length === 0}
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    Export all
+                  </Button>
+                  <input
+                    ref={importInputRef}
+                    type="file"
+                    accept="application/json,.json"
+                    className="hidden"
+                    onChange={handleImportFile}
+                  />
+                </>
               )}
             </div>
           </div>
