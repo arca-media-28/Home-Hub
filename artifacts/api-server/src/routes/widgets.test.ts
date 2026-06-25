@@ -179,6 +179,28 @@ describe("GET /widgets/truenas", () => {
     expect(postBody.query.aggregate).toBe(true);
   });
 
+  it("parses SCALE 25.10 shapes: aggregate cpu column + available-only memory", async () => {
+    findByService.mockReturnValue(
+      connRow({ service: "truenas", url: "https://nas.local", api_key: "key" }),
+    );
+    // 25.10's cpu graph reports an aggregate "cpu" usage column (+ per-core cpuN),
+    // and the memory graph reports ONLY available bytes — so total RAM must come
+    // from system/info (physmem) and used = total - available.
+    mockTruenasReporting({
+      core: [
+        { name: "cpu", legend: ["time", "cpu", "cpu0", "cpu1"], data: [[1000, 3.5, 4, 1]] },
+        { name: "memory", legend: ["time", "available"], data: [[1000, 9e9]] },
+      ],
+    });
+    mockTruenasGets({ pool: [], systemInfo: { physmem: 32e9 } });
+
+    const res = await request(app).get("/widgets/truenas");
+    expect(res.status).toBe(200);
+    expect(res.body.cpuPercent).toBe(3.5); // aggregate "cpu" column, not 100 - idle
+    expect(res.body.memTotalGb).toBe(32); // physmem from system/info
+    expect(res.body.memUsedGb).toBe(23); // (32e9 - 9e9) / 1e9
+  });
+
   it("renders pool data when only reporting fails (partial)", async () => {
     findByService.mockReturnValue(
       connRow({ service: "truenas", url: "https://nas.local", api_key: "key" }),
@@ -268,6 +290,8 @@ describe("GET /widgets/truenas", () => {
     diskError?: Error;
     smart?: unknown;
     smartError?: Error;
+    graphs?: unknown;
+    systemInfo?: unknown;
   }) {
     httpGet.mockImplementation((url: string) => {
       if (url.endsWith("/api/v2.0/pool")) {
@@ -278,6 +302,12 @@ describe("GET /widgets/truenas", () => {
       }
       if (url.endsWith("/api/v2.0/smart/test/results")) {
         return opts.smartError ? Promise.reject(opts.smartError) : Promise.resolve({ data: opts.smart ?? [] });
+      }
+      if (url.endsWith("/api/v2.0/reporting/graphs")) {
+        return Promise.resolve({ data: opts.graphs ?? [] });
+      }
+      if (url.endsWith("/api/v2.0/system/info")) {
+        return Promise.resolve({ data: opts.systemInfo ?? {} });
       }
       return Promise.resolve({ data: [] });
     });
@@ -355,11 +385,11 @@ describe("GET /widgets/truenas", () => {
   });
 
   // Route the two reporting POSTs by their requested graph names: the core call
-  // asks for cpu/memory, the extras call asks for interface/arcactualrate/arcsize.
+  // asks for cpu/memory, the extras call asks for interface/arcsize/ARC hit %.
   function mockTruenasReporting(opts: { core?: unknown; coreError?: Error; extras?: unknown; extrasError?: Error }) {
     httpPost.mockImplementation((_url: string, body: { graphs: Array<{ name?: string }> }) => {
       const names = body.graphs.map((g) => g.name);
-      if (names.includes("interface")) {
+      if (names.includes("arcsize")) {
         return opts.extrasError ? Promise.reject(opts.extrasError) : Promise.resolve({ data: opts.extras ?? [] });
       }
       return opts.coreError ? Promise.reject(opts.coreError) : Promise.resolve({ data: opts.core ?? [] });
@@ -372,31 +402,35 @@ describe("GET /widgets/truenas", () => {
     );
     mockTruenasReporting({
       core: [{ name: "cpu", legend: ["time", "idle"], data: [[1000, 80]] }],
-      // interface throughput is kilobits/s (→ Mbps is /1000); arcactualrate is
-      // hits/misses per second (→ 9000/(9000+1000) = 90% hit); arcsize is bytes.
-      // Two data rows per graph so the route can build a per-sample series. The
-      // current value is taken from the LAST row.
+      // interface throughput is kilobits/s (→ Mbps is /1000); demanddatahitpercentage
+      // is already an ARC hit percent; arcsize is bytes. Two data rows per graph so
+      // the route can build a per-sample series. The current value is the LAST row.
       extras: [
         {
           name: "interface",
+          identifier: "enp14s0",
           legend: ["time", "received", "sent"],
           data: [
             [1000, 120000, 30000],
             [1060, 184600, 42300],
           ],
         },
+        { name: "arcsize", legend: ["time", "size"], data: [[1000, 31.4e9]] },
         {
-          name: "arcactualrate",
-          legend: ["time", "hits", "misses"],
+          name: "demanddatahitpercentage",
+          legend: ["time", "value"],
           data: [
-            [1000, 8000, 2000],
-            [1060, 9000, 1000],
+            [1000, 80],
+            [1060, 90],
           ],
         },
-        { name: "arcsize", legend: ["time", "arc_size"], data: [[1000, 31.4e9]] },
       ],
     });
-    httpGet.mockResolvedValue({ data: [] });
+    // reporting/graphs must expose the interface identifier so the route can ask
+    // for the physical NIC (the virtual pterodactyl0 bridge is skipped).
+    mockTruenasGets({
+      graphs: [{ name: "interface", identifiers: ["pterodactyl0", "enp14s0"] }],
+    });
 
     const res = await request(app).get("/widgets/truenas");
     expect(res.status).toBe(200);
@@ -404,30 +438,26 @@ describe("GET /widgets/truenas", () => {
     expect(res.body.netOutMbps).toBe(42.3);
     expect(res.body.arcHitRatio).toBe(90);
     expect(res.body.arcSizeGb).toBeCloseTo(31.4, 1);
-    // Per-sample series (kilobits/s → Mbps; ARC hit ratio per row).
+    // Per-sample series (kilobits/s → Mbps; ARC hit % per row).
     expect(res.body.netInSeries).toEqual([120, 184.6]);
     expect(res.body.netOutSeries).toEqual([30, 42.3]);
     expect(res.body.arcHitSeries).toEqual([80, 90]);
-    // The extras call must request a longer, NON-aggregated window so the data
-    // rows form a series (aggregate:true collapses them to a single mean).
-    const extraReportingCall = httpPost.mock.calls.find(
-      ([, body]: [string, { graphs: Array<{ name?: string }>; query?: { aggregate?: boolean } }]) =>
-        body.graphs.some((g) => g.name === "interface"),
-    );
-    expect(extraReportingCall![1].query?.aggregate).toBe(false);
     // CPU still parsed from the core call.
     expect(res.body.cpuPercent).toBe(20);
 
-    // The extras must ride a SEPARATE reporting POST, not be bundled with cpu/memory.
+    // The extras must ride a SEPARATE reporting POST (not bundled with cpu/memory),
+    // request the resolved physical interface, and use a longer NON-aggregated
+    // window so the data rows form a series (aggregate:true collapses to a mean).
     const extraCall = httpPost.mock.calls.find(
       ([, body]: [string, { graphs: Array<{ name?: string }> }]) =>
-        body.graphs.some((g) => g.name === "interface"),
+        body.graphs.some((g) => g.name === "arcsize"),
     );
     expect(extraCall).toBeDefined();
+    expect(extraCall![1].query?.aggregate).toBe(false);
     expect(extraCall![1].graphs).toEqual([
-      { name: "interface" },
-      { name: "arcactualrate" },
+      { name: "interface", identifier: "enp14s0" },
       { name: "arcsize" },
+      { name: "demanddatahitpercentage" },
     ]);
   });
 

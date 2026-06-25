@@ -34,6 +34,10 @@ data source (raw rows vs mean). Keep fixtures realistic (include `"time"`).
   `demanddatahitpercentage` etc.); `interface` REQUIRES an identifier (e.g.
   `enp14s0` physical NIC vs `pterodactyl0`/docker bridge — exclude virtual);
   `cpu`/`memory`/`arcsize` have identifiers:null (no id needed).
+- 25.10 cpu legend = `["time","cpu","cpu0"…"cpuN"]` — `cpu` is AGGREGATE usage %
+  (NO idle column); parse `cpu["cpu"]` directly, fall back to `100-idle` only for
+  older versions. memory legend = `["time","available"]` ONLY (no used/free) →
+  total RAM must come from system/info physmem; used = physmem - available.
 
 ## 2. The reporting window must end in the PAST, not "now"
 - `start`/`end` must be integer unix seconds (modern Netdata backend, SCALE
@@ -49,19 +53,23 @@ work) is the partial-failure fallback — i.e. reporting/get_data was rejected.
 ## 3. Network + ARC extras ride a SEPARATE reporting/get_data POST
 - Net throughput + ZFS ARC come from reporting graphs `interface` and `arcsize`
   — requested in their OWN POST, settled independently from the cpu/memory call.
-- NOTE (see §1b): the runtime extras call still requests the legacy
-  `arcactualrate` graph, which does NOT exist on SCALE 25.10, and `interface`
-  without an identifier — so on 25.10 the extras call is rejected and net/ARC
-  stay null (additive, no 502). Finishing net/ARC needs: a resolved physical
-  `interface` identifier + ARC hit-ratio remapped onto `demand*hitpercentage`,
-  verified against one successful get_data response (don't guess legends).
+- 25.10 extras call now resolves a physical `interface` identifier first (via
+  `resolvePhysicalInterface` over GET reporting/graphs, excluding lo/docker/veth/
+  br-/pterodactyl/etc) and requests `[interface(id), arcsize,
+  demanddatahitpercentage]`. The extras POST is built AFTER the identifier is
+  resolved, then awaited in its own try/catch (additive, never 502). The
+  diagnostic does the same identifier resolution so net/ARC can be confirmed live.
+- ARC hit ratio now maps onto `demanddatahitpercentage` (direct hit %, clamped
+  0–100, tolerant keys value/percentage/percent/hit/hits/demanddatahitpercentage)
+  — NOT the legacy `arcactualrate` hits/misses computation.
 - **Why:** the `interface` graph can require an `identifier` on some installs and
   may be rejected (422). Bundling it with cpu/memory would regress CPU/RAM to 0
   on rejection. Isolating it keeps the failure additive (net/ARC → null, no 502).
-- Unit assumptions (untested against live, documented in code): interface values
-  are kilobits/s → Mbps `/1000`; `arcsize` is bytes → GB `/1e9`; `arcactualrate`
-  is hits/misses per sec → ratio `hits/(hits+misses)*100`. Parser tolerates
-  legend key aliases (received/rx, sent/tx, arc_size/size/arcsz).
+- Unit assumptions (documented in code): interface values are kilobits/s → Mbps
+  `/1000`; `arcsize` is bytes → GB `/1e9`; ARC hit comes from
+  `demanddatahitpercentage` as a direct % (clamped 0–100), NOT computed from
+  hits/misses. Parser tolerates legend key aliases (received/rx, sent/tx,
+  arc_size/size/arcsz, value/percentage/percent/hit/hits/demanddatahitpercentage).
 
 ## 4. Sparkline series need a longer, NON-aggregated extras window
 - The core CPU/RAM call stays aggregated (short now-90s…now-30s, `aggregate:true`
@@ -73,5 +81,5 @@ work) is the partial-failure fallback — i.e. reporting/get_data was rejected.
   (`seriesByLegend`), then downsample to ≤30 evenly-spaced points to bound payload.
 - Current value still works: with no mean present, `latestByLegend` falls back to
   the LAST data row, so the headline number is just the most recent sample.
-- ARC hit-ratio series is computed per-row from the hits & misses series
-  (`hits/(hits+misses)*100`), not from an aggregate.
+- ARC hit-ratio series is read per-row directly from the
+  `demanddatahitpercentage` series (already a %), not computed from hits/misses.

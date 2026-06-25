@@ -205,7 +205,10 @@ interface TruenasPool {
 // Reduce a TrueNAS reporting response (array of graphs) into CPU% and memory
 // bytes. Kept separate so the route can call it only when the reporting request
 // actually succeeded.
-function parseTruenasReporting(reportData: unknown): {
+function parseTruenasReporting(
+  reportData: unknown,
+  totalMemBytes?: number,
+): {
   cpuPercent: number;
   memUsedGb: number;
   memTotalGb: number;
@@ -214,26 +217,61 @@ function parseTruenasReporting(reportData: unknown): {
   const cpuGraph = graphs.find((g) => g.name === "cpu") ?? graphs[0];
   const memGraph = graphs.find((g) => g.name === "memory") ?? graphs[1];
 
-  // CPU is reported per-state in percent; usage is everything that isn't idle.
+  // CPU: SCALE 25.10's "cpu" graph reports an aggregate usage % in a "cpu"
+  // column (plus per-core cpu0…cpuN), so usage is that value directly. Older
+  // versions instead report per-state percentages where usage = 100 - idle.
   const cpu = latestByLegend(cpuGraph);
-  const idle = cpu["idle"] ?? 0;
-  const cpuPercent = Math.min(100, Math.max(0, 100 - idle));
+  const cpuPercent =
+    "cpu" in cpu ? (cpu["cpu"] ?? 0) : 100 - (cpu["idle"] ?? 0);
 
-  // Memory legend values are in bytes. "used" is real usage; total is the sum
-  // of the physical-memory buckets that are present.
+  // Memory legend values are in bytes. SCALE 25.10's "memory" graph reports a
+  // single "available" column (free + reclaimable), so used = total - available
+  // with the total taken from system/info (physmem). Older versions expose
+  // explicit used/free/cached/buffers buckets, which we still honour.
   const mem = latestByLegend(memGraph);
-  const memUsedBytes = mem["used"] ?? 0;
-  const memTotalBytes =
-    (mem["used"] ?? 0) +
-    (mem["free"] ?? 0) +
-    (mem["cached"] ?? 0) +
-    (mem["buffers"] ?? 0);
+  let memUsedBytes = 0;
+  let memTotalBytes = 0;
+  if ("used" in mem) {
+    memUsedBytes = mem["used"] ?? 0;
+    memTotalBytes =
+      (mem["used"] ?? 0) +
+      (mem["free"] ?? 0) +
+      (mem["cached"] ?? 0) +
+      (mem["buffers"] ?? 0);
+  } else if ("available" in mem && totalMemBytes) {
+    memTotalBytes = totalMemBytes;
+    memUsedBytes = Math.max(0, totalMemBytes - (mem["available"] ?? 0));
+  } else {
+    memTotalBytes = totalMemBytes ?? 0;
+  }
 
   return {
-    cpuPercent: Number(cpuPercent.toFixed(1)),
+    cpuPercent: Number(Math.min(100, Math.max(0, cpuPercent)).toFixed(1)),
     memUsedGb: memUsedBytes / 1e9,
     memTotalGb: memTotalBytes / 1e9,
   };
+}
+
+// Total physical memory in bytes from `GET /api/v2.0/system/info`. SCALE's
+// "memory" reporting graph only yields available bytes, so the total used to
+// derive usage must come from here. Returns undefined when absent/unusable.
+function readTotalMemBytes(sysInfo: unknown): number | undefined {
+  const s = sysInfo as { physmem?: number; physical_memory?: number } | undefined;
+  const v = s?.physmem ?? s?.physical_memory;
+  return typeof v === "number" && v > 0 ? v : undefined;
+}
+
+// Resolve the primary PHYSICAL network interface identifier from a
+// `GET /api/v2.0/reporting/graphs` response. The "interface" reporting graph
+// requires an identifier — without one it returns an empty data set — and we
+// want the real NIC, not docker/bridge/virtual adapters. Returns null when no
+// physical interface can be identified (network is then simply omitted).
+function resolvePhysicalInterface(graphsData: unknown): string | null {
+  const graphs = (graphsData ?? []) as Array<{ name?: string; identifiers?: string[] | null }>;
+  const ids = graphs.find((g) => g.name === "interface")?.identifiers ?? [];
+  const VIRTUAL =
+    /^(lo$|docker|veth|br-|virbr|tap|tun|cni|flannel|kube|vmbr|wg|zt|tailscale|pterodactyl|vlan|ovs|dummy|bond)/i;
+  return ids.find((id) => id && !VIRTUAL.test(id)) ?? null;
 }
 
 // First matching legend key from a list of candidates, or null when none of the
@@ -306,7 +344,8 @@ function downsample(series: number[], max = 30): number[] {
 // Unit assumptions (the same Netdata-based backend that serves CPU/RAM):
 //  - interface throughput is in kilobits/sec → megabits/sec is value / 1000.
 //  - arcsize is in bytes → gigabytes is value / 1e9 (matching the memory graph).
-//  - arcactualrate reports hits/misses per second → ratio = hits/(hits+misses).
+//  - demanddatahitpercentage is an ARC hit ratio already expressed as a percent
+//    (SCALE 25.10 dropped the old arcactualrate hits/misses graph).
 function parseTruenasNetArc(reportData: unknown): {
   netInMbps: number | null;
   netOutMbps: number | null;
@@ -318,7 +357,7 @@ function parseTruenasNetArc(reportData: unknown): {
 } {
   const graphs = (reportData ?? []) as Array<{ name?: string }>;
   const ifaceGraph = graphs.find((g) => g.name === "interface");
-  const arcRateGraph = graphs.find((g) => g.name === "arcactualrate");
+  const arcHitGraph = graphs.find((g) => g.name === "demanddatahitpercentage");
   const arcSizeGraph = graphs.find((g) => g.name === "arcsize");
 
   const rxKeys = ["received", "rx", "in", "incoming"];
@@ -340,26 +379,20 @@ function parseTruenasNetArc(reportData: unknown): {
     netOutSeries = downsample(seriesByLegend(ifaceGraph, txKeys).map(toMbps));
   }
 
+  // ARC hit ratio comes straight from the demanddatahitpercentage graph (already
+  // a percent). The single dimension's name is install-dependent, so accept the
+  // common candidates and clamp to 0–100.
+  const hitKeys = ["value", "percentage", "percent", "hit", "hits", "demanddatahitpercentage"];
   let arcHitRatio: number | null = null;
   let arcHitSeries: number[] = [];
-  if (arcRateGraph) {
-    const rate = latestByLegend(arcRateGraph);
-    const hits = pickLegendValue(rate, ["hits", "hit"]);
-    const misses = pickLegendValue(rate, ["misses", "miss"]);
-    if (hits != null && misses != null) {
-      const total = hits + misses;
-      arcHitRatio = total > 0 ? Number(((hits / total) * 100).toFixed(1)) : 0;
-    }
-    // Per-sample hit ratio: combine the hits and misses series step by step.
-    const hitsSeries = seriesByLegend(arcRateGraph, ["hits", "hit"]);
-    const missSeries = seriesByLegend(arcRateGraph, ["misses", "miss"]);
-    const n = Math.min(hitsSeries.length, missSeries.length);
-    const ratios: number[] = [];
-    for (let i = 0; i < n; i++) {
-      const total = hitsSeries[i]! + missSeries[i]!;
-      ratios.push(total > 0 ? Number(((hitsSeries[i]! / total) * 100).toFixed(1)) : 0);
-    }
-    arcHitSeries = downsample(ratios);
+  if (arcHitGraph) {
+    const hit = pickLegendValue(latestByLegend(arcHitGraph), hitKeys);
+    if (hit != null) arcHitRatio = Number(Math.min(100, Math.max(0, hit)).toFixed(1));
+    arcHitSeries = downsample(
+      seriesByLegend(arcHitGraph, hitKeys).map((v) =>
+        Number(Math.min(100, Math.max(0, v)).toFixed(1)),
+      ),
+    );
   }
 
   let arcSizeGb: number | null = null;
@@ -475,34 +508,22 @@ router.get("/truenas", requireAuth, async (_req, res) => {
     graphs: [{ name: "cpu" }, { name: "memory" }],
     query: reportingQuery,
   };
-  // Network throughput + ZFS ARC stats live in the same reporting backend but are
-  // requested as a SEPARATE call. The "interface" graph can require an identifier
-  // on some installs and may be rejected; isolating it means a rejection only
-  // drops the net/ARC extras instead of regressing the core CPU/RAM numbers.
-  // The net/ARC extras want a short *series* over time (to draw sparklines), not
-  // just a single aggregate, so they ride a longer trailing window with
-  // aggregation OFF — each returned data row is then one time step. The same
-  // "end in the past" rule applies (the most recent samples aren't collected
-  // yet). The current value is taken from the last sample of the series.
-  const extraReportingQuery = { start: nowSec - 1800, end: nowSec - 30, aggregate: false };
-  const extraReportingBody = {
-    graphs: [{ name: "interface" }, { name: "arcactualrate" }, { name: "arcsize" }],
-    query: extraReportingQuery,
-  };
-
-  // The reporting (CPU/RAM), pool (storage) and disk-health (temperature +
-  // SMART) calls are all independent. Settle them separately so one failing
-  // source no longer blanks the whole tile — whatever data is available still
-  // renders. The disk, SMART and net/ARC calls are purely additive: they never
-  // count toward the 502 "unavailable" decision, which is reserved for a fully
+  // The reporting (CPU/RAM), pool (storage), disk-health (temperature + SMART),
+  // system-info (total RAM) and reporting/graphs (interface identifiers) calls
+  // are all independent. Settle them separately so one failing source no longer
+  // blanks the whole tile — whatever data is available still renders. The disk,
+  // SMART, system-info and graphs calls are purely additive: they never count
+  // toward the 502 "unavailable" decision, which is reserved for a fully
   // unreachable server (both the reporting and pool calls failing).
-  const [reportResult, poolResult, diskResult, smartResult, extraResult] = await Promise.allSettled([
-    httpClient.post(`${baseUrl}/api/v2.0/reporting/get_data`, reportingBody, { headers }),
-    httpClient.get(`${baseUrl}/api/v2.0/pool`, { headers }),
-    httpClient.get(`${baseUrl}/api/v2.0/disk`, { headers }),
-    httpClient.get(`${baseUrl}/api/v2.0/smart/test/results`, { headers }),
-    httpClient.post(`${baseUrl}/api/v2.0/reporting/get_data`, extraReportingBody, { headers }),
-  ]);
+  const [reportResult, poolResult, diskResult, smartResult, sysInfoResult, graphsResult] =
+    await Promise.allSettled([
+      httpClient.post(`${baseUrl}/api/v2.0/reporting/get_data`, reportingBody, { headers }),
+      httpClient.get(`${baseUrl}/api/v2.0/pool`, { headers }),
+      httpClient.get(`${baseUrl}/api/v2.0/disk`, { headers }),
+      httpClient.get(`${baseUrl}/api/v2.0/smart/test/results`, { headers }),
+      httpClient.get(`${baseUrl}/api/v2.0/system/info`, { headers }),
+      httpClient.get(`${baseUrl}/api/v2.0/reporting/graphs`, { headers }),
+    ]);
 
   if (reportResult.status === "rejected" && poolResult.status === "rejected") {
     logger.error(
@@ -519,8 +540,20 @@ router.get("/truenas", requireAuth, async (_req, res) => {
   // Partial data is fine: fall back to empty/zero values for whichever source
   // failed, and log a one-line reason naming the failed call.
   let reporting = { cpuPercent: 0, memUsedGb: 0, memTotalGb: 0 };
+  // Total RAM (for the memory "used / total") comes from system/info because the
+  // SCALE 25.10 "memory" reporting graph only reports available bytes. Additive:
+  // a missing total just means memory falls back to whatever the graph provides.
+  const totalMemBytes =
+    sysInfoResult.status === "fulfilled" ? readTotalMemBytes(sysInfoResult.value.data) : undefined;
+  if (sysInfoResult.status === "rejected") {
+    logger.error(
+      { reason: normalizeHttpError(sysInfoResult.reason) },
+      "TrueNAS widget: system/info call failed (total RAM unavailable)",
+    );
+  }
+
   if (reportResult.status === "fulfilled") {
-    reporting = parseTruenasReporting(reportResult.value.data);
+    reporting = parseTruenasReporting(reportResult.value.data, totalMemBytes);
   } else {
     // Log the structured failure (incl. the upstream response body) so the
     // server's actual rejection reason is visible in the container logs, not
@@ -565,8 +598,14 @@ router.get("/truenas", requireAuth, async (_req, res) => {
   }
   const disks = parseTruenasDisks(diskData, smartData);
 
-  // Network + ARC extras: additive. A rejected (or partial) extra reporting call
-  // simply leaves these as null so the tile omits them — never a 502.
+  // Network + ARC extras: additive. They ride a SEPARATE reporting call so a
+  // rejection only drops these (never a 502). The "interface" graph needs a
+  // physical-NIC identifier (resolved from reporting/graphs above) — without one
+  // it returns no data — so it's only requested when one is found. The net/ARC
+  // extras want a short *series* over time (for sparklines), so they use a longer
+  // trailing window with aggregation OFF; the same "end in the past" rule applies
+  // (the most recent samples aren't collected yet). The current value is the last
+  // sample of the series.
   let netArc = {
     netInMbps: null as number | null,
     netOutMbps: null as number | null,
@@ -576,13 +615,29 @@ router.get("/truenas", requireAuth, async (_req, res) => {
     netOutSeries: [] as number[],
     arcHitSeries: [] as number[],
   };
-  if (extraResult.status === "fulfilled") {
-    netArc = parseTruenasNetArc(extraResult.value.data);
-  } else {
+  const ifaceId = graphsResult.status === "fulfilled" ? resolvePhysicalInterface(graphsResult.value.data) : null;
+  if (graphsResult.status === "rejected") {
+    logger.error(
+      { reason: normalizeHttpError(graphsResult.reason) },
+      "TrueNAS widget: reporting/graphs call failed (interface identifier unavailable)",
+    );
+  }
+  const extraReportingBody = {
+    graphs: [
+      ...(ifaceId ? [{ name: "interface", identifier: ifaceId }] : []),
+      { name: "arcsize" },
+      { name: "demanddatahitpercentage" },
+    ],
+    query: { start: nowSec - 1800, end: nowSec - 30, aggregate: false },
+  };
+  try {
+    const extra = await httpClient.post(`${baseUrl}/api/v2.0/reporting/get_data`, extraReportingBody, { headers });
+    netArc = parseTruenasNetArc(extra.data);
+  } catch (err) {
     logger.error(
       {
-        reason: normalizeHttpError(extraResult.reason),
-        detail: describeHttpError(extraResult.reason),
+        reason: normalizeHttpError(err),
+        detail: describeHttpError(err),
         request: extraReportingBody,
       },
       "TrueNAS widget: network/ARC reporting call failed (extras unavailable)",
@@ -666,13 +721,6 @@ router.get("/truenas/diagnostics", requireAuth, async (_req, res) => {
       label: "cpu+memory, non-aggregated series (now-1800s … now-30s)",
       body: { graphs: coreGraphs, query: { start: nowSec - 1800, end: nowSec - 30, aggregate: false } },
     },
-    {
-      label: "extras (interface, arcsize), non-aggregated series — interface may need an identifier",
-      body: {
-        graphs: [{ name: "interface" }, { name: "arcsize" }],
-        query: { start: nowSec - 1800, end: nowSec - 30, aggregate: false },
-      },
-    },
   ];
 
   // Run a single POST probe, capturing the request and the raw outcome. Both the
@@ -724,9 +772,30 @@ router.get("/truenas/diagnostics", requireAuth, async (_req, res) => {
     }
   }
 
+  // Fetch the graph list first so the extras probe can request the real physical
+  // NIC (the interface graph returns no data without an identifier) and confirm
+  // the ARC hit % graph that replaced arcactualrate.
+  const graphsProbe = await probeGraphsList();
+  const ifaceId =
+    graphsProbe.ok && Array.isArray(graphsProbe.response)
+      ? resolvePhysicalInterface(graphsProbe.response)
+      : null;
+  const extrasBody = {
+    graphs: [
+      ...(ifaceId ? [{ name: "interface", identifier: ifaceId }] : [{ name: "interface" }]),
+      { name: "arcsize" },
+      { name: "demanddatahitpercentage" },
+    ],
+    query: { start: nowSec - 1800, end: nowSec - 30, aggregate: false },
+  };
+  const extrasLabel = `extras (interface ${
+    ifaceId ? `[${ifaceId}]` : "— no physical NIC resolved, sent without identifier"
+  }, arcsize, demanddatahitpercentage), non-aggregated series — the form the widget uses`;
+
   const probes = await Promise.all([
-    probeGraphsList(),
+    Promise.resolve(graphsProbe),
     ...candidates.map((c) => probePost(c.label, c.body)),
+    probePost(extrasLabel, extrasBody),
   ]);
 
   res.json({ configured: true, baseUrl, serverTimeUnixSec: nowSec, probes });
