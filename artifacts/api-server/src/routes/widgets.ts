@@ -163,12 +163,18 @@ async function fetchJellyfinServerId(
 // each graph as { legend: string[], data: number[][], aggregations? }. The real
 // response includes "time" as the FIRST legend entry, and each data row is
 // aligned to that full legend (the unix timestamp sits in the "time" column).
-// The `aggregations.mean` array, however, holds one value per legend column
-// EXCLUDING "time". The two sources must therefore be zipped differently.
-// Prefer the aggregated mean when present.
+// `aggregations.mean` holds one value per legend column EXCLUDING "time", and on
+// SCALE 25.10 it is an OBJECT keyed by legend name ({ cpu: 2.7, cpu0: 3.5, … } or
+// { available: 8.8e9 }); older versions used a positional ARRAY. The three
+// sources are therefore zipped differently. Prefer the aggregated mean when
+// present, otherwise fall back to the latest data row.
 function latestByLegend(graph: unknown): Record<string, number> {
   const g = graph as
-    | { legend?: string[]; data?: number[][]; aggregations?: { mean?: number[] } }
+    | {
+        legend?: string[];
+        data?: number[][];
+        aggregations?: { mean?: number[] | Record<string, number> | null };
+      }
     | undefined;
   const legend = g?.legend ?? [];
 
@@ -181,6 +187,11 @@ function latestByLegend(graph: unknown): Record<string, number> {
     valueLegend.forEach((name, i) => {
       map[name] = values[i] ?? 0;
     });
+  } else if (mean && typeof mean === "object") {
+    // SCALE 25.10 object form: already keyed by legend name (excl. "time").
+    for (const [name, v] of Object.entries(mean)) {
+      map[name] = Number(v) || 0;
+    }
   } else {
     // Data rows are aligned to the FULL legend (timestamp in the "time" column),
     // so zip the row directly against the legend without dropping a column.

@@ -12,8 +12,12 @@ Two real-world quirks that fixtures can hide:
 - Each `data` row is aligned to the FULL legend — the unix timestamp sits in the
   `"time"` column. Zip the row directly against the legend (do NOT slice off the
   first element).
-- `aggregations.mean` holds one value per legend column EXCLUDING `"time"`. Zip it
-  against `legend` with `"time"` removed.
+- `aggregations.mean` holds one value per legend column EXCLUDING `"time"`. On
+  SCALE 25.10 `mean` is an OBJECT keyed by legend name (`{cpu:2.7, cpu0:3.5, …}`
+  or `{available:8.8e9}`); older versions used a positional ARRAY. `latestByLegend`
+  must handle BOTH (object → use as-is; array → zip against legend minus "time").
+  Do NOT assume the object form "falls through to data rows" — read it directly so
+  the headline number is the aggregate, not a single last sample.
 
 **Why:** zipping mean against the full legend (or slicing the timestamp off the
 data row while keeping the full legend) is off-by-one and silently maps `idle`,

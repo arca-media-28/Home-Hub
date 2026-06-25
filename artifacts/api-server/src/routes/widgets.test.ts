@@ -186,10 +186,22 @@ describe("GET /widgets/truenas", () => {
     // 25.10's cpu graph reports an aggregate "cpu" usage column (+ per-core cpuN),
     // and the memory graph reports ONLY available bytes — so total RAM must come
     // from system/info (physmem) and used = total - available.
+    // SCALE 25.10 returns aggregations.mean as an OBJECT keyed by legend name
+    // (not a positional array), so the parser must read the aggregate from there.
     mockTruenasReporting({
       core: [
-        { name: "cpu", legend: ["time", "cpu", "cpu0", "cpu1"], data: [[1000, 3.5, 4, 1]] },
-        { name: "memory", legend: ["time", "available"], data: [[1000, 9e9]] },
+        {
+          name: "cpu",
+          legend: ["time", "cpu", "cpu0", "cpu1"],
+          data: [[1000, 3.5, 4, 1]],
+          aggregations: { mean: { cpu: 3.5, cpu0: 4, cpu1: 1 } },
+        },
+        {
+          name: "memory",
+          legend: ["time", "available"],
+          data: [[1000, 9e9]],
+          aggregations: { mean: { available: 9e9 } },
+        },
       ],
     });
     mockTruenasGets({ pool: [], systemInfo: { physmem: 32e9 } });
