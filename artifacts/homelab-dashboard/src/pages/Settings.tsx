@@ -58,6 +58,36 @@ import {
 } from "@/components/ui/collapsible";
 import { groupByCategory } from "@/lib/integrationCategories";
 
+// Copy text to the clipboard, returning whether it succeeded. The async
+// Clipboard API only exists in secure contexts (HTTPS or localhost); a
+// self-hosted dashboard reached over plain HTTP on the LAN has no
+// `navigator.clipboard`, so fall back to a hidden textarea + execCommand.
+async function copyText(text: string): Promise<boolean> {
+  if (navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      // Fall through to the legacy path (e.g. permission denied).
+    }
+  }
+  try {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.setAttribute("readonly", "");
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    ta.style.pointerEvents = "none";
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand("copy");
+    document.body.removeChild(ta);
+    return ok;
+  } catch {
+    return false;
+  }
+}
+
 type ServiceKey =
   | "truenas"
   | "plex"
@@ -337,11 +367,10 @@ function ServiceCard({
 
   async function handleCopyDiagnostics() {
     if (!diagOutput) return;
-    try {
-      await navigator.clipboard.writeText(diagOutput);
+    if (await copyText(diagOutput)) {
       setDiagCopied(true);
       setTimeout(() => setDiagCopied(false), 2000);
-    } catch {
+    } else {
       toast({
         title: "Couldn't copy",
         description: "Select the text and copy it manually.",
@@ -614,13 +643,8 @@ function SpotifyCard() {
     );
   }
 
-  function copyRedirect() {
-    navigator.clipboard
-      ?.writeText(redirectUri)
-      .then(() => toast({ title: "Redirect URI copied" }))
-      .catch(() => {
-        /* clipboard blocked — user can still select the text manually */
-      });
+  async function copyRedirect() {
+    if (await copyText(redirectUri)) toast({ title: "Redirect URI copied" });
   }
 
   return (
