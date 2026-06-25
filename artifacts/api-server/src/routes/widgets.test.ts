@@ -41,6 +41,19 @@ vi.mock("../lib/http.js", () => ({
     return withScheme.replace(/\/+$/, "");
   },
   normalizeHttpError: (err: unknown) => (err instanceof Error ? err.message : String(err)),
+  describeHttpError: (err: unknown) => {
+    const e = err as { isAxiosError?: boolean; code?: string; message?: string; response?: { status?: number; data?: unknown } };
+    if (e?.isAxiosError) {
+      return {
+        status: e.response?.status ?? null,
+        code: e.code ?? null,
+        message: e.message ?? "",
+        body: e.response?.data ?? null,
+      };
+    }
+    if (err instanceof Error) return { status: null, code: null, message: err.message, body: null };
+    return { status: null, code: null, message: String(err), body: null };
+  },
 }));
 
 // Keep the logger quiet during tests.
@@ -457,6 +470,105 @@ describe("GET /widgets/truenas", () => {
     expect(res.body.arcHitSeries.length).toBeGreaterThan(2);
     // ARC hit ratio is a percentage, so the sample stays within 0-100.
     expect(Math.max(...res.body.arcHitSeries)).toBeLessThanOrEqual(100);
+  });
+});
+
+// ── TrueNAS reporting diagnostic ───────────────────────────────────────────────
+describe("GET /widgets/truenas/diagnostics", () => {
+  // An axios-style error that also carries a response BODY, so we can assert the
+  // diagnostic surfaces the server's actual rejection message (not just status).
+  function httpErrorWithBody(status: number, body: unknown): Error {
+    return Object.assign(new Error(`status ${status}`), {
+      isAxiosError: true,
+      code: "ERR_BAD_REQUEST",
+      response: { status, data: body },
+    });
+  }
+
+  it("returns 409 (not configured) and makes no upstream calls when unconfigured", async () => {
+    const res = await request(app).get("/widgets/truenas/diagnostics");
+    expect(res.status).toBe(409);
+    expect(res.body.configured).toBe(false);
+    expect(res.body.message).toMatch(/not configured/i);
+    expect(httpGet).not.toHaveBeenCalled();
+    expect(httpPost).not.toHaveBeenCalled();
+  });
+
+  it("probes multiple request forms and surfaces each raw outcome", async () => {
+    findByService.mockReturnValue(
+      connRow({ service: "truenas", url: "https://nas.local", api_key: "key" }),
+    );
+    // The graphs-list GET succeeds; the get_data POSTs are rejected by the
+    // backend with a body explaining why (the whole point of the diagnostic).
+    httpGet.mockResolvedValue({
+      status: 200,
+      data: [{ name: "cpu", identifiers: null }, { name: "memory", identifiers: null }],
+    });
+    httpPost.mockRejectedValue(
+      httpErrorWithBody(422, { message: "Invalid reporting_query: end must be in the past" }),
+    );
+
+    const res = await request(app).get("/widgets/truenas/diagnostics");
+    expect(res.status).toBe(200);
+    expect(res.body.configured).toBe(true);
+    // One graphs-list probe + several get_data candidate probes.
+    expect(Array.isArray(res.body.probes)).toBe(true);
+    expect(res.body.probes.length).toBeGreaterThan(2);
+
+    const graphsProbe = res.body.probes[0];
+    expect(graphsProbe.ok).toBe(true);
+    expect(graphsProbe.request.method).toBe("GET");
+    expect(graphsProbe.response).toEqual([
+      { name: "cpu", identifiers: null },
+      { name: "memory", identifiers: null },
+    ]);
+
+    // Every POST probe records the EXACT request body it sent and the raw error
+    // (status + the server's response body), so the user can copy the real reason.
+    const postProbes = res.body.probes.filter(
+      (p: { request: { method: string } }) => p.request.method === "POST",
+    );
+    expect(postProbes.length).toBeGreaterThan(1);
+    for (const p of postProbes) {
+      expect(p.ok).toBe(false);
+      expect(p.status).toBe(422);
+      expect(p.body).toEqual({ message: "Invalid reporting_query: end must be in the past" });
+      expect(p.request.body.graphs).toBeDefined();
+      expect(p.request.body.reporting_query).toBeDefined();
+    }
+  });
+
+  it("captures a successful probe's response body when a form is accepted", async () => {
+    findByService.mockReturnValue(
+      connRow({ service: "truenas", url: "https://nas.local", api_key: "key" }),
+    );
+    httpGet.mockResolvedValue({ status: 200, data: [] });
+    httpPost.mockResolvedValue({
+      status: 200,
+      data: [{ name: "cpu", legend: ["time", "idle"], data: [[1000, 80]] }],
+    });
+
+    const res = await request(app).get("/widgets/truenas/diagnostics");
+    expect(res.status).toBe(200);
+    const postProbes = res.body.probes.filter(
+      (p: { request: { method: string } }) => p.request.method === "POST",
+    );
+    expect(postProbes.every((p: { ok: boolean; status: number }) => p.ok && p.status === 200)).toBe(true);
+    expect(postProbes[0].response).toEqual([
+      { name: "cpu", legend: ["time", "idle"], data: [[1000, 80]] },
+    ]);
+  });
+
+  it("never leaks the API key in the diagnostic payload", async () => {
+    findByService.mockReturnValue(
+      connRow({ service: "truenas", url: "https://nas.local", api_key: "super-secret-key" }),
+    );
+    httpGet.mockResolvedValue({ status: 200, data: [] });
+    httpPost.mockRejectedValue(httpErrorWithBody(422, { message: "nope" }));
+
+    const res = await request(app).get("/widgets/truenas/diagnostics");
+    expect(res.status).toBe(200);
+    expect(JSON.stringify(res.body)).not.toContain("super-secret-key");
   });
 });
 

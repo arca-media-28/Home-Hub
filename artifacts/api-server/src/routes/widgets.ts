@@ -2,7 +2,7 @@ import { Router } from "express";
 import Parser from "rss-parser";
 import { requireAuth } from "../lib/auth.js";
 import { connectionStmts } from "../lib/db.js";
-import { httpClient, cloudHttpClient, normalizeBaseUrl, normalizeHttpError } from "../lib/http.js";
+import { httpClient, cloudHttpClient, normalizeBaseUrl, normalizeHttpError, describeHttpError } from "../lib/http.js";
 import { fetchPiholeData } from "../lib/pihole.js";
 import { subsonicAuthParams, subsonicGet, subsonicMediaQuery, type SubsonicSong } from "../lib/subsonic.js";
 import { logger } from "../lib/logger.js";
@@ -519,8 +519,16 @@ router.get("/truenas", requireAuth, async (_req, res) => {
   if (reportResult.status === "fulfilled") {
     reporting = parseTruenasReporting(reportResult.value.data);
   } else {
+    // Log the structured failure (incl. the upstream response body) so the
+    // server's actual rejection reason is visible in the container logs, not
+    // just a generic "Service responded with an error (422)." The exact request
+    // window sent is logged too so the failure is fully reproducible.
     logger.error(
-      { reason: normalizeHttpError(reportResult.reason) },
+      {
+        reason: normalizeHttpError(reportResult.reason),
+        detail: describeHttpError(reportResult.reason),
+        request: reportingBody,
+      },
       "TrueNAS widget: reporting call failed (CPU/RAM unavailable)",
     );
   }
@@ -569,12 +577,153 @@ router.get("/truenas", requireAuth, async (_req, res) => {
     netArc = parseTruenasNetArc(extraResult.value.data);
   } else {
     logger.error(
-      { reason: normalizeHttpError(extraResult.reason) },
+      {
+        reason: normalizeHttpError(extraResult.reason),
+        detail: describeHttpError(extraResult.reason),
+        request: extraReportingBody,
+      },
       "TrueNAS widget: network/ARC reporting call failed (extras unavailable)",
     );
   }
 
   res.json({ ...reporting, ...netArc, pools, disks });
+});
+
+// ────────────────────────────────────────────────
+// TrueNAS reporting diagnostic
+// ────────────────────────────────────────────────
+// The reporting/get_data endpoint has been rejected on real SCALE installs while
+// pools keep loading, and every prior fix was a blind guess at the request shape
+// because we never captured what the live server actually says. This route makes
+// the failure observable: it runs against the user's real NAS and returns, for
+// each probe, the EXACT request that was sent and the raw outcome (HTTP status +
+// full response body, success or error). The API key is never echoed.
+//
+// It probes several known-good request forms so the user can see, in one shot,
+// which one this version accepts (integer unix window vs. unit/page, window
+// ending in the past vs. at "now", aggregated vs. not), plus a GET of
+// reporting/graphs to reveal the exact graph names + identifier requirements
+// this version exposes. Read-only and auth-gated, so it is safe to leave in.
+
+// Cap a raw upstream payload so a large reporting/graphs list (can be 100+
+// graphs) doesn't bloat the diagnostic response. Arrays are sliced; deep objects
+// are passed through (reporting errors are small). The cap is generous enough to
+// keep every graph name visible.
+function capDiagnosticBody(body: unknown): unknown {
+  if (Array.isArray(body)) {
+    const max = 200;
+    return body.length > max
+      ? [...body.slice(0, max), `…(${body.length - max} more items omitted)`]
+      : body;
+  }
+  return body;
+}
+
+router.get("/truenas/diagnostics", requireAuth, async (_req, res) => {
+  const saved = getSavedConnection("truenas");
+  const baseUrl = saved.url || process.env["TRUENAS_URL"];
+  const apiKey = saved.apiKey || process.env["TRUENAS_API_KEY"];
+
+  if (!baseUrl || !apiKey) {
+    // No sample data here — a diagnostic on an unconfigured service is
+    // meaningless. Tell the caller plainly so they configure TrueNAS first.
+    res.status(409).json({
+      configured: false,
+      message:
+        "TrueNAS is not configured. Save a TrueNAS URL and API key first, then run this diagnostic from the LAN box that can reach the NAS.",
+    });
+    return;
+  }
+
+  const headers = { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" };
+  const getDataUrl = `${baseUrl}/api/v2.0/reporting/get_data`;
+  const nowSec = Math.floor(Date.now() / 1000);
+
+  // Candidate reporting_query forms to try for the core cpu/memory call. The one
+  // the server accepts (HTTP 200 with graph data) is the form the widget should
+  // use; the rest will surface the server's own rejection reason in their body.
+  const coreGraphs = [{ name: "cpu" }, { name: "memory" }];
+  const candidates: Array<{ label: string; body: unknown }> = [
+    {
+      label: "unix window ending in the past (now-90s … now-30s), aggregated",
+      body: { graphs: coreGraphs, reporting_query: { start: nowSec - 90, end: nowSec - 30, aggregate: true } },
+    },
+    {
+      label: "unix window ending at now (now-90s … now), aggregated",
+      body: { graphs: coreGraphs, reporting_query: { start: nowSec - 90, end: nowSec, aggregate: true } },
+    },
+    {
+      label: "unit/page form (unit=HOUR, page=1), aggregated",
+      body: { graphs: coreGraphs, reporting_query: { unit: "HOUR", page: 1, aggregate: true } },
+    },
+    {
+      label: "unix window, non-aggregated series (now-1800s … now-30s)",
+      body: { graphs: coreGraphs, reporting_query: { start: nowSec - 1800, end: nowSec - 30, aggregate: false } },
+    },
+    {
+      label: "extras (interface, arcactualrate, arcsize), non-aggregated series",
+      body: {
+        graphs: [{ name: "interface" }, { name: "arcactualrate" }, { name: "arcsize" }],
+        reporting_query: { start: nowSec - 1800, end: nowSec - 30, aggregate: false },
+      },
+    },
+  ];
+
+  // Run a single POST probe, capturing the request and the raw outcome. Both the
+  // success body and the error body are preserved so the server's actual reason
+  // is copyable. Never includes headers (would leak the API key).
+  async function probePost(label: string, body: unknown) {
+    try {
+      const r = await httpClient.post(getDataUrl, body, { headers });
+      return {
+        label,
+        request: { method: "POST", url: getDataUrl, body },
+        ok: true as const,
+        status: r.status,
+        response: capDiagnosticBody(r.data),
+      };
+    } catch (err) {
+      return {
+        label,
+        request: { method: "POST", url: getDataUrl, body },
+        ok: false as const,
+        ...describeHttpError(err),
+        body: capDiagnosticBody(describeHttpError(err).body),
+      };
+    }
+  }
+
+  // GET reporting/graphs reveals the exact graph names + identifier requirements
+  // this version exposes — invaluable when a graph name we hard-code no longer
+  // exists or now requires an identifier.
+  const graphsUrl = `${baseUrl}/api/v2.0/reporting/graphs`;
+  async function probeGraphsList() {
+    try {
+      const r = await httpClient.get(graphsUrl, { headers });
+      return {
+        label: "available reporting graphs (GET /reporting/graphs)",
+        request: { method: "GET", url: graphsUrl },
+        ok: true as const,
+        status: r.status,
+        response: capDiagnosticBody(r.data),
+      };
+    } catch (err) {
+      return {
+        label: "available reporting graphs (GET /reporting/graphs)",
+        request: { method: "GET", url: graphsUrl },
+        ok: false as const,
+        ...describeHttpError(err),
+        body: capDiagnosticBody(describeHttpError(err).body),
+      };
+    }
+  }
+
+  const probes = await Promise.all([
+    probeGraphsList(),
+    ...candidates.map((c) => probePost(c.label, c.body)),
+  ]);
+
+  res.json({ configured: true, baseUrl, serverTimeUnixSec: nowSec, probes });
 });
 
 // ────────────────────────────────────────────────

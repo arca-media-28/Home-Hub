@@ -67,3 +67,31 @@ export function normalizeHttpError(err: unknown): string {
   }
   return "Could not reach service";
 }
+
+// Structured failure detail for diagnostics. Unlike normalizeHttpError (which
+// collapses everything to a short user-facing string and DISCARDS the response
+// body), this preserves the upstream HTTP status, error code, and — crucially —
+// the full response body. Many services (TrueNAS reporting/get_data among them)
+// explain exactly WHY a request was rejected in that body, so a diagnostic must
+// not throw it away. Never include request headers/credentials here.
+export interface HttpFailureDetail {
+  status: number | null;
+  code: string | null;
+  message: string;
+  body: unknown;
+}
+
+export function describeHttpError(err: unknown): HttpFailureDetail {
+  if (axios.isAxiosError(err)) {
+    return {
+      status: err.response?.status ?? null,
+      code: err.code ?? null,
+      message: err.message,
+      body: err.response?.data ?? null,
+    };
+  }
+  if (err instanceof Error) {
+    return { status: null, code: null, message: err.message, body: null };
+  }
+  return { status: null, code: null, message: String(err), body: null };
+}

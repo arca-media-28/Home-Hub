@@ -5,6 +5,7 @@
 - [Homelab theming](homelab-theming.md) — reskin via index.css tokens; now a 6-theme picker (data-theme attr, before-paint script, per-theme color overrides), NOT :root/.dark; set all --radius-* for sharp corners, verify authed views with runTest.
 - [service_connections is global](service-connections-global.md) — table keyed by service only (no userId); rows shared across all users; PUT clobbers real settings, beware testing on live.
 - [Widget data + HTTP convention](widget-data-convention.md) — mock only when unconfigured, configured-failure→502; shared httpClient (self-signed TLS) in lib/http.ts; TrueNAS/Sonarr/Radarr/qBittorrent API gotchas.
+- [Upstream error body](upstream-error-body.md) — normalizeHttpError DROPS the response body; use describeHttpError (status+body) to see the real reason; /widgets/truenas/diagnostics probes reporting forms; http.js mock must add new exports or route 500s.
 - [TrueNAS reporting legend + window](truenas-reporting-legend.md) — legend has leading "time"; data rows zip full legend, mean zips legend minus "time"; reporting window must end in PAST (now-90s…now-30s), not now.
 - [TrueNAS disk health](truenas-disk-health.md) — disk temp from /disk, SMART from /smart/test/results (latest test status); both additive (never 502); merged {name,temperatureC,smartPassed}, nulls=unknown.
 - [Self-hosted Docker glibc base](docker-glibc-lockfile.md) — lockfile strips non-host native binaries; build with node:*-slim (glibc), NOT alpine/musl, or rollup/lightningcss/better-sqlite3 fail.
