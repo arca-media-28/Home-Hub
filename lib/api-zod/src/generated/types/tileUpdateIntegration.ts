@@ -41,4 +41,5 @@ export const TileUpdateIntegration = {
   coinflip: 'coinflip',
   fortune: 'fortune',
   tamagotchi: 'tamagotchi',
+  bonsai: 'bonsai',
 } as const;

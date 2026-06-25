@@ -30,6 +30,7 @@ import IntegrationTile from "@/components/tiles/IntegrationTile";
 import NoteTile from "@/components/tiles/NoteTile";
 import TimerTile from "@/components/tiles/TimerTile";
 import TamagotchiTile from "@/components/tiles/TamagotchiTile";
+import BonsaiTile from "@/components/tiles/BonsaiTile";
 import TileEditModal, { type EditMode } from "@/components/TileEditModal";
 import { Button } from "@/components/ui/button";
 import {
@@ -190,6 +191,13 @@ function renderTileContent(tile: Tile, status: ServiceStatus | undefined, editMo
   // bypassing the standard integration header.
   if (tile.integration === "tamagotchi") {
     return <TamagotchiTile tile={tile} editMode={editMode} />;
+  }
+  // The Bonsai is a self-contained living-plant toy. Its hydration, overgrowth
+  // and growth-stage state changes over real time and is tended in-place on the
+  // tile (Water/Prune), so it paints its own surface and persists like the
+  // tamagotchi/note/timer, bypassing the standard integration header.
+  if (tile.integration === "bonsai") {
+    return <BonsaiTile tile={tile} editMode={editMode} />;
   }
   // Every tile renders as a styled app/link card. When an integration is
   // attached it also shows a compact live-status section from that service.

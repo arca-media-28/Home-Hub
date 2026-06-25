@@ -78,6 +78,7 @@ export const TileIntegration = {
   coinflip: 'coinflip',
   fortune: 'fortune',
   tamagotchi: 'tamagotchi',
+  bonsai: 'bonsai',
 } as const;
 
 /**
@@ -401,6 +402,26 @@ export type TileSettings = {
      * @nullable
      */
   petMouth?: string | null;
+  /**
+     * A Bonsai tile's soil hydration, 0 (bone dry) to 100 (well watered). Slowly drops over real elapsed time and rises when the tree is watered. Null or absent starts at a healthy default.
+     * @nullable
+     */
+  bonsaiHydration?: number | null;
+  /**
+     * A Bonsai tile's overgrowth, 0 (freshly pruned / tidy) to 100 (wild and untidy). Slowly rises over real elapsed time and is cut back when the tree is pruned. Null or absent starts at a tidy default.
+     * @nullable
+     */
+  bonsaiOvergrowth?: number | null;
+  /**
+     * A Bonsai tile's accumulated growth progress, 0 to 100, which drives its visible growth stage (sapling -> young -> mature). Advances while the tree is kept healthy and stalls or slowly regresses when neglected. Null or absent starts at 0 (a fresh sapling).
+     * @nullable
+     */
+  bonsaiGrowth?: number | null;
+  /**
+     * Epoch milliseconds when a Bonsai tile's state was last computed. On mount the client recomputes hydration/overgrowth/growth from the elapsed wall-clock time since this anchor so the tree keeps living across reloads and sessions. Null or absent means "just now".
+     * @nullable
+     */
+  bonsaiUpdatedAt?: number | null;
 } | null | null;
 
 export interface Tile {
@@ -512,6 +533,7 @@ export const TileInputIntegration = {
   coinflip: 'coinflip',
   fortune: 'fortune',
   tamagotchi: 'tamagotchi',
+  bonsai: 'bonsai',
 } as const;
 
 export interface TileInput {
@@ -582,6 +604,7 @@ export const TileUpdateIntegration = {
   coinflip: 'coinflip',
   fortune: 'fortune',
   tamagotchi: 'tamagotchi',
+  bonsai: 'bonsai',
 } as const;
 
 export interface TileUpdate {

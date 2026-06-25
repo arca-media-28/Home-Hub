@@ -75,7 +75,7 @@ export const GetTilesResponseItem = zod.object({
   "userId": zod.number(),
   "pageId": zod.number().nullish().describe('The page this tile belongs to. Null only for tiles that predate the multi-page migration and could not be assigned a page.'),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'lidarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal('bonsai'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -155,7 +155,11 @@ export const GetTilesResponseItem = zod.object({
   "petBodyColor": zod.string().nullish().describe('A Tamagotchi pet tile\'s body color: a preset key (e.g. \"green\", \"blue\", \"pink\") or a custom #hex value. Null or absent uses the default preset.'),
   "petEyes": zod.string().nullish().describe('A Tamagotchi pet tile\'s eye style (e.g. \"round\", \"dot\", \"happy\", \"sleepy\", \"star\", \"wink\"). Null or absent uses the default.'),
   "petNose": zod.string().nullish().describe('A Tamagotchi pet tile\'s nose style (e.g. \"none\", \"dot\", \"round\", \"triangle\", \"heart\"). Null or absent uses the default.'),
-  "petMouth": zod.string().nullish().describe('A Tamagotchi pet tile\'s mouth style (e.g. \"smile\", \"neutral\", \"open\", \"cat\", \"frown\"). Null or absent uses the default.')
+  "petMouth": zod.string().nullish().describe('A Tamagotchi pet tile\'s mouth style (e.g. \"smile\", \"neutral\", \"open\", \"cat\", \"frown\"). Null or absent uses the default.'),
+  "bonsaiHydration": zod.number().nullish().describe('A Bonsai tile\'s soil hydration, 0 (bone dry) to 100 (well watered). Slowly drops over real elapsed time and rises when the tree is watered. Null or absent starts at a healthy default.'),
+  "bonsaiOvergrowth": zod.number().nullish().describe('A Bonsai tile\'s overgrowth, 0 (freshly pruned \/ tidy) to 100 (wild and untidy). Slowly rises over real elapsed time and is cut back when the tree is pruned. Null or absent starts at a tidy default.'),
+  "bonsaiGrowth": zod.number().nullish().describe('A Bonsai tile\'s accumulated growth progress, 0 to 100, which drives its visible growth stage (sapling -> young -> mature). Advances while the tree is kept healthy and stalls or slowly regresses when neglected. Null or absent starts at 0 (a fresh sapling).'),
+  "bonsaiUpdatedAt": zod.number().nullish().describe('Epoch milliseconds when a Bonsai tile\'s state was last computed. On mount the client recomputes hydration\/overgrowth\/growth from the elapsed wall-clock time since this anchor so the tree keeps living across reloads and sessions. Null or absent means \"just now\".')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.'),
   "createdAt": zod.string().optional()
 })
@@ -168,7 +172,7 @@ export const GetTilesResponse = zod.array(GetTilesResponseItem)
 export const CreateTileBody = zod.object({
   "pageId": zod.number().nullish().describe('The page to create this tile on. Omit to fall back to the user\'s first page.'),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'lidarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal('bonsai'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -248,7 +252,11 @@ export const CreateTileBody = zod.object({
   "petBodyColor": zod.string().nullish().describe('A Tamagotchi pet tile\'s body color: a preset key (e.g. \"green\", \"blue\", \"pink\") or a custom #hex value. Null or absent uses the default preset.'),
   "petEyes": zod.string().nullish().describe('A Tamagotchi pet tile\'s eye style (e.g. \"round\", \"dot\", \"happy\", \"sleepy\", \"star\", \"wink\"). Null or absent uses the default.'),
   "petNose": zod.string().nullish().describe('A Tamagotchi pet tile\'s nose style (e.g. \"none\", \"dot\", \"round\", \"triangle\", \"heart\"). Null or absent uses the default.'),
-  "petMouth": zod.string().nullish().describe('A Tamagotchi pet tile\'s mouth style (e.g. \"smile\", \"neutral\", \"open\", \"cat\", \"frown\"). Null or absent uses the default.')
+  "petMouth": zod.string().nullish().describe('A Tamagotchi pet tile\'s mouth style (e.g. \"smile\", \"neutral\", \"open\", \"cat\", \"frown\"). Null or absent uses the default.'),
+  "bonsaiHydration": zod.number().nullish().describe('A Bonsai tile\'s soil hydration, 0 (bone dry) to 100 (well watered). Slowly drops over real elapsed time and rises when the tree is watered. Null or absent starts at a healthy default.'),
+  "bonsaiOvergrowth": zod.number().nullish().describe('A Bonsai tile\'s overgrowth, 0 (freshly pruned \/ tidy) to 100 (wild and untidy). Slowly rises over real elapsed time and is cut back when the tree is pruned. Null or absent starts at a tidy default.'),
+  "bonsaiGrowth": zod.number().nullish().describe('A Bonsai tile\'s accumulated growth progress, 0 to 100, which drives its visible growth stage (sapling -> young -> mature). Advances while the tree is kept healthy and stalls or slowly regresses when neglected. Null or absent starts at 0 (a fresh sapling).'),
+  "bonsaiUpdatedAt": zod.number().nullish().describe('Epoch milliseconds when a Bonsai tile\'s state was last computed. On mount the client recomputes hydration\/overgrowth\/growth from the elapsed wall-clock time since this anchor so the tree keeps living across reloads and sessions. Null or absent means \"just now\".')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.')
 })
 
@@ -265,7 +273,7 @@ export const GetTileResponse = zod.object({
   "userId": zod.number(),
   "pageId": zod.number().nullish().describe('The page this tile belongs to. Null only for tiles that predate the multi-page migration and could not be assigned a page.'),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'lidarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal('bonsai'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -345,7 +353,11 @@ export const GetTileResponse = zod.object({
   "petBodyColor": zod.string().nullish().describe('A Tamagotchi pet tile\'s body color: a preset key (e.g. \"green\", \"blue\", \"pink\") or a custom #hex value. Null or absent uses the default preset.'),
   "petEyes": zod.string().nullish().describe('A Tamagotchi pet tile\'s eye style (e.g. \"round\", \"dot\", \"happy\", \"sleepy\", \"star\", \"wink\"). Null or absent uses the default.'),
   "petNose": zod.string().nullish().describe('A Tamagotchi pet tile\'s nose style (e.g. \"none\", \"dot\", \"round\", \"triangle\", \"heart\"). Null or absent uses the default.'),
-  "petMouth": zod.string().nullish().describe('A Tamagotchi pet tile\'s mouth style (e.g. \"smile\", \"neutral\", \"open\", \"cat\", \"frown\"). Null or absent uses the default.')
+  "petMouth": zod.string().nullish().describe('A Tamagotchi pet tile\'s mouth style (e.g. \"smile\", \"neutral\", \"open\", \"cat\", \"frown\"). Null or absent uses the default.'),
+  "bonsaiHydration": zod.number().nullish().describe('A Bonsai tile\'s soil hydration, 0 (bone dry) to 100 (well watered). Slowly drops over real elapsed time and rises when the tree is watered. Null or absent starts at a healthy default.'),
+  "bonsaiOvergrowth": zod.number().nullish().describe('A Bonsai tile\'s overgrowth, 0 (freshly pruned \/ tidy) to 100 (wild and untidy). Slowly rises over real elapsed time and is cut back when the tree is pruned. Null or absent starts at a tidy default.'),
+  "bonsaiGrowth": zod.number().nullish().describe('A Bonsai tile\'s accumulated growth progress, 0 to 100, which drives its visible growth stage (sapling -> young -> mature). Advances while the tree is kept healthy and stalls or slowly regresses when neglected. Null or absent starts at 0 (a fresh sapling).'),
+  "bonsaiUpdatedAt": zod.number().nullish().describe('Epoch milliseconds when a Bonsai tile\'s state was last computed. On mount the client recomputes hydration\/overgrowth\/growth from the elapsed wall-clock time since this anchor so the tree keeps living across reloads and sessions. Null or absent means \"just now\".')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.'),
   "createdAt": zod.string().optional()
 })
@@ -359,7 +371,7 @@ export const UpdateTileParams = zod.object({
 })
 
 export const UpdateTileBody = zod.object({
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal('bonsai'),zod.literal(null)]).nullish(),
   "gridX": zod.number().optional(),
   "gridY": zod.number().optional(),
   "gridW": zod.number().optional(),
@@ -439,7 +451,11 @@ export const UpdateTileBody = zod.object({
   "petBodyColor": zod.string().nullish().describe('A Tamagotchi pet tile\'s body color: a preset key (e.g. \"green\", \"blue\", \"pink\") or a custom #hex value. Null or absent uses the default preset.'),
   "petEyes": zod.string().nullish().describe('A Tamagotchi pet tile\'s eye style (e.g. \"round\", \"dot\", \"happy\", \"sleepy\", \"star\", \"wink\"). Null or absent uses the default.'),
   "petNose": zod.string().nullish().describe('A Tamagotchi pet tile\'s nose style (e.g. \"none\", \"dot\", \"round\", \"triangle\", \"heart\"). Null or absent uses the default.'),
-  "petMouth": zod.string().nullish().describe('A Tamagotchi pet tile\'s mouth style (e.g. \"smile\", \"neutral\", \"open\", \"cat\", \"frown\"). Null or absent uses the default.')
+  "petMouth": zod.string().nullish().describe('A Tamagotchi pet tile\'s mouth style (e.g. \"smile\", \"neutral\", \"open\", \"cat\", \"frown\"). Null or absent uses the default.'),
+  "bonsaiHydration": zod.number().nullish().describe('A Bonsai tile\'s soil hydration, 0 (bone dry) to 100 (well watered). Slowly drops over real elapsed time and rises when the tree is watered. Null or absent starts at a healthy default.'),
+  "bonsaiOvergrowth": zod.number().nullish().describe('A Bonsai tile\'s overgrowth, 0 (freshly pruned \/ tidy) to 100 (wild and untidy). Slowly rises over real elapsed time and is cut back when the tree is pruned. Null or absent starts at a tidy default.'),
+  "bonsaiGrowth": zod.number().nullish().describe('A Bonsai tile\'s accumulated growth progress, 0 to 100, which drives its visible growth stage (sapling -> young -> mature). Advances while the tree is kept healthy and stalls or slowly regresses when neglected. Null or absent starts at 0 (a fresh sapling).'),
+  "bonsaiUpdatedAt": zod.number().nullish().describe('Epoch milliseconds when a Bonsai tile\'s state was last computed. On mount the client recomputes hydration\/overgrowth\/growth from the elapsed wall-clock time since this anchor so the tree keeps living across reloads and sessions. Null or absent means \"just now\".')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.')
 })
 
@@ -448,7 +464,7 @@ export const UpdateTileResponse = zod.object({
   "userId": zod.number(),
   "pageId": zod.number().nullish().describe('The page this tile belongs to. Null only for tiles that predate the multi-page migration and could not be assigned a page.'),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'lidarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal('bonsai'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -528,7 +544,11 @@ export const UpdateTileResponse = zod.object({
   "petBodyColor": zod.string().nullish().describe('A Tamagotchi pet tile\'s body color: a preset key (e.g. \"green\", \"blue\", \"pink\") or a custom #hex value. Null or absent uses the default preset.'),
   "petEyes": zod.string().nullish().describe('A Tamagotchi pet tile\'s eye style (e.g. \"round\", \"dot\", \"happy\", \"sleepy\", \"star\", \"wink\"). Null or absent uses the default.'),
   "petNose": zod.string().nullish().describe('A Tamagotchi pet tile\'s nose style (e.g. \"none\", \"dot\", \"round\", \"triangle\", \"heart\"). Null or absent uses the default.'),
-  "petMouth": zod.string().nullish().describe('A Tamagotchi pet tile\'s mouth style (e.g. \"smile\", \"neutral\", \"open\", \"cat\", \"frown\"). Null or absent uses the default.')
+  "petMouth": zod.string().nullish().describe('A Tamagotchi pet tile\'s mouth style (e.g. \"smile\", \"neutral\", \"open\", \"cat\", \"frown\"). Null or absent uses the default.'),
+  "bonsaiHydration": zod.number().nullish().describe('A Bonsai tile\'s soil hydration, 0 (bone dry) to 100 (well watered). Slowly drops over real elapsed time and rises when the tree is watered. Null or absent starts at a healthy default.'),
+  "bonsaiOvergrowth": zod.number().nullish().describe('A Bonsai tile\'s overgrowth, 0 (freshly pruned \/ tidy) to 100 (wild and untidy). Slowly rises over real elapsed time and is cut back when the tree is pruned. Null or absent starts at a tidy default.'),
+  "bonsaiGrowth": zod.number().nullish().describe('A Bonsai tile\'s accumulated growth progress, 0 to 100, which drives its visible growth stage (sapling -> young -> mature). Advances while the tree is kept healthy and stalls or slowly regresses when neglected. Null or absent starts at 0 (a fresh sapling).'),
+  "bonsaiUpdatedAt": zod.number().nullish().describe('Epoch milliseconds when a Bonsai tile\'s state was last computed. On mount the client recomputes hydration\/overgrowth\/growth from the elapsed wall-clock time since this anchor so the tree keeps living across reloads and sessions. Null or absent means \"just now\".')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.'),
   "createdAt": zod.string().optional()
 })
@@ -561,7 +581,7 @@ export const SaveLayoutResponseItem = zod.object({
   "userId": zod.number(),
   "pageId": zod.number().nullish().describe('The page this tile belongs to. Null only for tiles that predate the multi-page migration and could not be assigned a page.'),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'lidarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal('bonsai'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -641,7 +661,11 @@ export const SaveLayoutResponseItem = zod.object({
   "petBodyColor": zod.string().nullish().describe('A Tamagotchi pet tile\'s body color: a preset key (e.g. \"green\", \"blue\", \"pink\") or a custom #hex value. Null or absent uses the default preset.'),
   "petEyes": zod.string().nullish().describe('A Tamagotchi pet tile\'s eye style (e.g. \"round\", \"dot\", \"happy\", \"sleepy\", \"star\", \"wink\"). Null or absent uses the default.'),
   "petNose": zod.string().nullish().describe('A Tamagotchi pet tile\'s nose style (e.g. \"none\", \"dot\", \"round\", \"triangle\", \"heart\"). Null or absent uses the default.'),
-  "petMouth": zod.string().nullish().describe('A Tamagotchi pet tile\'s mouth style (e.g. \"smile\", \"neutral\", \"open\", \"cat\", \"frown\"). Null or absent uses the default.')
+  "petMouth": zod.string().nullish().describe('A Tamagotchi pet tile\'s mouth style (e.g. \"smile\", \"neutral\", \"open\", \"cat\", \"frown\"). Null or absent uses the default.'),
+  "bonsaiHydration": zod.number().nullish().describe('A Bonsai tile\'s soil hydration, 0 (bone dry) to 100 (well watered). Slowly drops over real elapsed time and rises when the tree is watered. Null or absent starts at a healthy default.'),
+  "bonsaiOvergrowth": zod.number().nullish().describe('A Bonsai tile\'s overgrowth, 0 (freshly pruned \/ tidy) to 100 (wild and untidy). Slowly rises over real elapsed time and is cut back when the tree is pruned. Null or absent starts at a tidy default.'),
+  "bonsaiGrowth": zod.number().nullish().describe('A Bonsai tile\'s accumulated growth progress, 0 to 100, which drives its visible growth stage (sapling -> young -> mature). Advances while the tree is kept healthy and stalls or slowly regresses when neglected. Null or absent starts at 0 (a fresh sapling).'),
+  "bonsaiUpdatedAt": zod.number().nullish().describe('Epoch milliseconds when a Bonsai tile\'s state was last computed. On mount the client recomputes hydration\/overgrowth\/growth from the elapsed wall-clock time since this anchor so the tree keeps living across reloads and sessions. Null or absent means \"just now\".')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.'),
   "createdAt": zod.string().optional()
 })

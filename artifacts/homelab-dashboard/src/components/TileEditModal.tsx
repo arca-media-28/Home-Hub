@@ -167,6 +167,7 @@ const INTEGRATIONS = [
   { value: TileIntegration.coinflip, label: "Coin Flip" },
   { value: TileIntegration.fortune, label: "Fortune" },
   { value: TileIntegration.tamagotchi, label: "Tamagotchi" },
+  { value: TileIntegration.bonsai, label: "Bonsai" },
   { value: TileIntegration.note, label: "Note" },
   { value: TileIntegration.spacer, label: "Spacer" },
   { value: TileIntegration.divider, label: "Section Label" },

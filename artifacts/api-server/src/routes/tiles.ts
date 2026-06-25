@@ -85,6 +85,10 @@ interface TileSettings {
   petEyes?: string | null;
   petNose?: string | null;
   petMouth?: string | null;
+  bonsaiHydration?: number | null;
+  bonsaiOvergrowth?: number | null;
+  bonsaiGrowth?: number | null;
+  bonsaiUpdatedAt?: number | null;
 }
 
 // A single checklist/to-do item on a Note (post-it) tile: its label text and
@@ -435,6 +439,26 @@ function pickTileSettings(obj: Record<string, unknown>): TileSettings {
     result.petMouth = obj["petMouth"];
   } else if (obj["petMouth"] === null) {
     result.petMouth = null;
+  }
+  if (typeof obj["bonsaiHydration"] === "number") {
+    result.bonsaiHydration = obj["bonsaiHydration"];
+  } else if (obj["bonsaiHydration"] === null) {
+    result.bonsaiHydration = null;
+  }
+  if (typeof obj["bonsaiOvergrowth"] === "number") {
+    result.bonsaiOvergrowth = obj["bonsaiOvergrowth"];
+  } else if (obj["bonsaiOvergrowth"] === null) {
+    result.bonsaiOvergrowth = null;
+  }
+  if (typeof obj["bonsaiGrowth"] === "number") {
+    result.bonsaiGrowth = obj["bonsaiGrowth"];
+  } else if (obj["bonsaiGrowth"] === null) {
+    result.bonsaiGrowth = null;
+  }
+  if (typeof obj["bonsaiUpdatedAt"] === "number") {
+    result.bonsaiUpdatedAt = obj["bonsaiUpdatedAt"];
+  } else if (obj["bonsaiUpdatedAt"] === null) {
+    result.bonsaiUpdatedAt = null;
   }
   return result;
 }
