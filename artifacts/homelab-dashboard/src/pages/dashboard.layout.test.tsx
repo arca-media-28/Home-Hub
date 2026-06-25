@@ -60,9 +60,48 @@ vi.mock("react-grid-layout", () => ({
 }));
 
 vi.mock("@workspace/api-client-react", () => ({
+  // The dashboard (via integrationMeta) reads TileIntegration values at module
+  // load, so the mock must expose the enum. Values equal their keys.
+  TileIntegration: {
+    truenas: "truenas",
+    media: "media",
+    jellyfin: "jellyfin",
+    sonarr: "sonarr",
+    radarr: "radarr",
+    lidarr: "lidarr",
+    qbittorrent: "qbittorrent",
+    pihole: "pihole",
+    "nginx-proxy-manager": "nginx-proxy-manager",
+    prowlarr: "prowlarr",
+    tailscale: "tailscale",
+    ersatztv: "ersatztv",
+    audioplayer: "audioplayer",
+    clock: "clock",
+    timer: "timer",
+    weather: "weather",
+    sports: "sports",
+    news: "news",
+    stocks: "stocks",
+    sleeper: "sleeper",
+    note: "note",
+    spacer: "spacer",
+    divider: "divider",
+    eightball: "eightball",
+    dice: "dice",
+    coinflip: "coinflip",
+    fortune: "fortune",
+    tamagotchi: "tamagotchi",
+    bonsai: "bonsai",
+  },
+  TileType: { app: "app", integration: "integration" },
   useGetMe: () => ({ data: { id: 1, username: "tester" }, isError: false }),
   useGetTiles: () => ({ data: mockTiles, isLoading: false }),
   useGetConnectionsStatus: () => ({ data: [] }),
+  useGetPages: () => ({ data: [] }),
+  useCreatePage: () => ({ mutate: vi.fn(), isPending: false, isError: false }),
+  useUpdatePage: () => ({ mutate: vi.fn(), isPending: false, isError: false }),
+  useDeletePage: () => ({ mutate: vi.fn(), isPending: false, isError: false }),
+  useReorderPages: () => ({ mutate: vi.fn(), isPending: false, isError: false }),
   useSaveLayout: () => ({
     mutate: saveLayoutMutate,
     isPending: false,
@@ -71,6 +110,7 @@ vi.mock("@workspace/api-client-react", () => ({
   useCreateTile: () => ({ mutate: vi.fn(), isPending: false, isError: false }),
   getGetMeQueryKey: () => ["/api/me"],
   getGetTilesQueryKey: () => ["/api/tiles"],
+  getGetPagesQueryKey: () => ["/api/pages"],
   getGetConnectionsStatusQueryKey: () => ["/api/connections/status"],
 }));
 

@@ -32,6 +32,7 @@ import TimerTile from "@/components/tiles/TimerTile";
 import TamagotchiTile from "@/components/tiles/TamagotchiTile";
 import BonsaiTile from "@/components/tiles/BonsaiTile";
 import TileEditModal, { type EditMode } from "@/components/TileEditModal";
+import { INTEGRATION_SERVICE } from "@/lib/integrationMeta";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -139,16 +140,6 @@ function findFirstEmptyPosition(
 
 // Maps a tile's integration to the saved connection it pings. Plain app/link
 // tiles (no integration) have no backing service and so get no reachability dot.
-const INTEGRATION_SERVICE: Record<string, string> = {
-  truenas: "truenas",
-  media: "plex",
-  sonarr: "sonarr",
-  radarr: "radarr",
-  qbittorrent: "qbittorrent",
-  pihole: "pihole",
-  "nginx-proxy-manager": "nginx-proxy-manager",
-};
-
 function renderTileContent(tile: Tile, status: ServiceStatus | undefined, editMode: boolean) {
   // The spacer is a layout-only tile: an invisible gap. In locked mode it
   // renders nothing at all; in edit mode it shows a dashed ghost so users can

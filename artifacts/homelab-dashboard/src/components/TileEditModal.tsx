@@ -16,13 +16,12 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   Select,
   SelectContent,
-  SelectGroup,
   SelectItem,
-  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { groupByCategory } from "@/lib/integrationCategories";
+import IntegrationPicker from "@/components/IntegrationPicker";
+import { integrationMeta } from "@/lib/integrationMeta";
 import { METRIC_CATALOG, allMetricKeys } from "@/components/tiles/metrics";
 import {
   resolveImageStyle,
@@ -101,6 +100,8 @@ import {
   useSearchStocks,
   getSearchStocksQueryKey,
   getNewsWidget,
+  useGetConnectionsStatus,
+  getGetConnectionsStatusQueryKey,
   TileType,
   TileIntegration,
   type Tile,
@@ -173,10 +174,6 @@ const INTEGRATIONS = [
   { value: TileIntegration.divider, label: "Section Label" },
 ] as const;
 
-// Pre-group the integrations by category (News, Media, Downloads, Server,
-// Other) for the dropdown. "None" is rendered separately at the top.
-const INTEGRATION_GROUPS = groupByCategory(INTEGRATIONS, (i) => i.value);
-
 type ImageSource = "upload" | "library" | "url";
 
 export default function TileEditModal({ open, onOpenChange, tile, mode, defaultGridPos, pageId }: TileEditModalProps) {
@@ -186,6 +183,16 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
   const initialPlacement = normalizePlacement(tile ?? {});
 
   const [integration, setIntegration] = useState<string>(tile?.integration ?? NONE);
+  // Controls the app-store style integration picker pop-out.
+  const [pickerOpen, setPickerOpen] = useState(false);
+  // Service reachability, used to draw a status dot on integration cards in the
+  // picker. Only fetched while the picker is open to avoid background polling.
+  const { data: connectionStatuses } = useGetConnectionsStatus({
+    query: {
+      queryKey: getGetConnectionsStatusQueryKey(),
+      enabled: open && pickerOpen,
+    },
+  });
   const [name, setName] = useState(tile?.name ?? "");
   const [url, setUrl] = useState(tile?.url ?? "");
   // null = follow the active theme's card surface; an explicit value overrides it.
@@ -1129,30 +1136,49 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
 
           <div className={`space-y-1.5 ${isSpacer ? "" : "border-t border-border pt-4"}`}>
             <Label>App integration</Label>
-            <Select value={integration} onValueChange={handleIntegrationChange}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={NONE}>None</SelectItem>
-                {INTEGRATION_GROUPS.map((group) => (
-                  <SelectGroup key={group.category}>
-                    <SelectLabel className="text-xs uppercase tracking-wider text-muted-foreground">
-                      {group.category}
-                    </SelectLabel>
-                    {group.items.map((i) => (
-                      <SelectItem key={i.value} value={i.value} className="pl-8">
-                        {i.label}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                ))}
-              </SelectContent>
-            </Select>
+            {(() => {
+              const selectedLabel =
+                integration === NONE
+                  ? "None"
+                  : INTEGRATIONS.find((i) => i.value === integration)?.label ??
+                    "None";
+              const SelectedIcon = integrationMeta(integration).icon;
+              return (
+                <button
+                  type="button"
+                  onClick={() => setPickerOpen(true)}
+                  className="flex w-full items-center gap-3 rounded-md border border-input bg-background p-2.5 text-left transition-colors hover:border-primary/50 hover:bg-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                >
+                  <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md bg-muted text-foreground">
+                    <SelectedIcon className="h-5 w-5" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium">
+                      {selectedLabel}
+                    </span>
+                    <span className="block truncate text-xs text-muted-foreground">
+                      {integrationMeta(integration).description}
+                    </span>
+                  </span>
+                  <span className="flex-shrink-0 text-xs font-medium text-primary">
+                    {integration === NONE ? "Browse" : "Change"}
+                  </span>
+                </button>
+              );
+            })()}
             <p className="text-xs text-muted-foreground">
               Optional. Attach a service to show its live status on this tile.
             </p>
           </div>
+
+          <IntegrationPicker
+            open={pickerOpen}
+            onOpenChange={setPickerOpen}
+            value={integration}
+            onSelect={handleIntegrationChange}
+            integrations={INTEGRATIONS}
+            statuses={connectionStatuses}
+          />
 
           {isSpacer && (
             <p className="text-sm text-muted-foreground border-t border-border pt-4">
