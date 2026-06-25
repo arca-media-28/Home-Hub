@@ -275,6 +275,19 @@ export default function TimerTile({ tile, editMode }: TimerTileProps) {
         if (overflow < dur) break;
         overflow -= dur;
       }
+      // Alert the user (chime + browser notification) on the phase transition if
+      // enabled. The loop above lands on the single destination phase even when
+      // several intervals elapsed during a refresh/hidden tab, so this fires once
+      // per advance — no double-firing across multiple skipped phases.
+      if (alertEnabled) {
+        playTimerChime();
+        const tileName = tile.name?.trim() ? tile.name : "Pomodoro";
+        const body =
+          phase === "focus"
+            ? "Break's over — back to focus."
+            : `Time for a ${PHASE_LABEL[phase].toLowerCase()}.`;
+        showTimerNotification(tileName, body);
+      }
       applyRun({
         running: true,
         startedAt: Date.now() - overflow,
