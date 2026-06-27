@@ -2025,6 +2025,20 @@ components:
           type: string
         position:
           type: integer
+        layoutPreset:
+          description: >-
+            Fixed scale preset that maps to a locked column count. "auto" (the
+            default) keeps today's responsive behavior (columns derived from
+            window width). Any other value locks the page to a fixed column count
+            that is CSS-scaled to fit the viewport so tiles never reflow.
+          type: string
+          enum: [auto, compact, fhd, qhd, uhd]
+        layoutOrientation:
+          description: >-
+            How a fixed-preset page is scaled to fit. "landscape" fits to width,
+            "portrait" fits to height. Ignored when layoutPreset is "auto".
+          type: string
+          enum: [landscape, portrait]
         createdAt:
           type: string
 
@@ -2033,6 +2047,12 @@ components:
       properties:
         name:
           type: string
+        layoutPreset:
+          type: string
+          enum: [auto, compact, fhd, qhd, uhd]
+        layoutOrientation:
+          type: string
+          enum: [landscape, portrait]
 
     PageReorder:
       type: object
@@ -2101,6 +2121,12 @@ components:
       properties:
         name:
           type: string
+        layoutPreset:
+          type: string
+          enum: [auto, compact, fhd, qhd, uhd]
+        layoutOrientation:
+          type: string
+          enum: [landscape, portrait]
         tiles:
           type: array
           items:

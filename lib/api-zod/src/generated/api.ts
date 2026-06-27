@@ -692,6 +692,8 @@ export const GetPagesResponseItem = zod.object({
   "userId": zod.number(),
   "name": zod.string(),
   "position": zod.number(),
+  "layoutPreset": zod.enum(['auto', 'compact', 'fhd', 'qhd', 'uhd']).optional().describe('Fixed scale preset that maps to a locked column count. \"auto\" (the default) keeps today\'s responsive behavior (columns derived from window width). Any other value locks the page to a fixed column count that is CSS-scaled to fit the viewport so tiles never reflow.'),
+  "layoutOrientation": zod.enum(['landscape', 'portrait']).optional().describe('How a fixed-preset page is scaled to fit. \"landscape\" fits to width, \"portrait\" fits to height. Ignored when layoutPreset is \"auto\".'),
   "createdAt": zod.string().optional()
 })
 export const GetPagesResponse = zod.array(GetPagesResponseItem)
@@ -701,7 +703,9 @@ export const GetPagesResponse = zod.array(GetPagesResponseItem)
  * @summary Create a new dashboard page
  */
 export const CreatePageBody = zod.object({
-  "name": zod.string().optional()
+  "name": zod.string().optional(),
+  "layoutPreset": zod.enum(['auto', 'compact', 'fhd', 'qhd', 'uhd']).optional(),
+  "layoutOrientation": zod.enum(['landscape', 'portrait']).optional()
 })
 
 
@@ -717,6 +721,8 @@ export const ReorderPagesResponseItem = zod.object({
   "userId": zod.number(),
   "name": zod.string(),
   "position": zod.number(),
+  "layoutPreset": zod.enum(['auto', 'compact', 'fhd', 'qhd', 'uhd']).optional().describe('Fixed scale preset that maps to a locked column count. \"auto\" (the default) keeps today\'s responsive behavior (columns derived from window width). Any other value locks the page to a fixed column count that is CSS-scaled to fit the viewport so tiles never reflow.'),
+  "layoutOrientation": zod.enum(['landscape', 'portrait']).optional().describe('How a fixed-preset page is scaled to fit. \"landscape\" fits to width, \"portrait\" fits to height. Ignored when layoutPreset is \"auto\".'),
   "createdAt": zod.string().optional()
 })
 export const ReorderPagesResponse = zod.array(ReorderPagesResponseItem)
@@ -730,7 +736,9 @@ export const UpdatePageParams = zod.object({
 })
 
 export const UpdatePageBody = zod.object({
-  "name": zod.string().optional()
+  "name": zod.string().optional(),
+  "layoutPreset": zod.enum(['auto', 'compact', 'fhd', 'qhd', 'uhd']).optional(),
+  "layoutOrientation": zod.enum(['landscape', 'portrait']).optional()
 })
 
 export const UpdatePageResponse = zod.object({
@@ -738,6 +746,8 @@ export const UpdatePageResponse = zod.object({
   "userId": zod.number(),
   "name": zod.string(),
   "position": zod.number(),
+  "layoutPreset": zod.enum(['auto', 'compact', 'fhd', 'qhd', 'uhd']).optional().describe('Fixed scale preset that maps to a locked column count. \"auto\" (the default) keeps today\'s responsive behavior (columns derived from window width). Any other value locks the page to a fixed column count that is CSS-scaled to fit the viewport so tiles never reflow.'),
+  "layoutOrientation": zod.enum(['landscape', 'portrait']).optional().describe('How a fixed-preset page is scaled to fit. \"landscape\" fits to width, \"portrait\" fits to height. Ignored when layoutPreset is \"auto\".'),
   "createdAt": zod.string().optional()
 })
 
@@ -759,6 +769,8 @@ export const ExportAllPagesResponse = zod.object({
   "exportedAt": zod.string().optional().describe('ISO timestamp of when the file was produced.'),
   "pages": zod.array(zod.object({
   "name": zod.string(),
+  "layoutPreset": zod.enum(['auto', 'compact', 'fhd', 'qhd', 'uhd']).optional(),
+  "layoutOrientation": zod.enum(['landscape', 'portrait']).optional(),
   "tiles": zod.array(zod.object({
   "type": zod.string(),
   "integration": zod.string().nullish(),
@@ -867,6 +879,8 @@ export const ExportPageResponse = zod.object({
   "exportedAt": zod.string().optional().describe('ISO timestamp of when the file was produced.'),
   "pages": zod.array(zod.object({
   "name": zod.string(),
+  "layoutPreset": zod.enum(['auto', 'compact', 'fhd', 'qhd', 'uhd']).optional(),
+  "layoutOrientation": zod.enum(['landscape', 'portrait']).optional(),
   "tiles": zod.array(zod.object({
   "type": zod.string(),
   "integration": zod.string().nullish(),
@@ -971,6 +985,8 @@ export const ImportPagesBody = zod.object({
   "exportedAt": zod.string().optional().describe('ISO timestamp of when the file was produced.'),
   "pages": zod.array(zod.object({
   "name": zod.string(),
+  "layoutPreset": zod.enum(['auto', 'compact', 'fhd', 'qhd', 'uhd']).optional(),
+  "layoutOrientation": zod.enum(['landscape', 'portrait']).optional(),
   "tiles": zod.array(zod.object({
   "type": zod.string(),
   "integration": zod.string().nullish(),

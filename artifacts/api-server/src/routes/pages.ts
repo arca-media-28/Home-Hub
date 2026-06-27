@@ -23,6 +23,8 @@ function buildExport(pages: DbPage[]) {
     exportedAt: new Date().toISOString(),
     pages: pages.map((p) => ({
       name: p.name,
+      layoutPreset: p.layout_preset ?? "auto",
+      layoutOrientation: p.layout_orientation ?? "landscape",
       tiles: tileStmts.findAllByPage.all(p.user_id, p.id).map(exportTile),
     })),
   };
@@ -44,6 +46,10 @@ export function formatPage(p: DbPage) {
     userId: p.user_id,
     name: p.name,
     position: p.position,
+    // Surface a stable default for legacy rows that predate the scale-lock
+    // columns, so the client never has to special-case null.
+    layoutPreset: p.layout_preset ?? "auto",
+    layoutOrientation: p.layout_orientation ?? "landscape",
     createdAt: p.created_at,
   };
 }
@@ -57,6 +63,42 @@ function cleanName(raw: unknown): string {
   return trimmed.slice(0, 60);
 }
 
+// The valid scale presets and orientations. Anything outside these sets is
+// ignored (treated as "not provided") so a bad value can never be stored.
+const LAYOUT_PRESETS = new Set(["auto", "compact", "fhd", "qhd", "uhd"]);
+const LAYOUT_ORIENTATIONS = new Set(["landscape", "portrait"]);
+
+// Normalize an incoming preset/orientation. Returns the validated string, or
+// null when the value is absent or not one of the allowed options.
+function cleanPreset(raw: unknown): string | null {
+  return typeof raw === "string" && LAYOUT_PRESETS.has(raw) ? raw : null;
+}
+function cleanOrientation(raw: unknown): string | null {
+  return typeof raw === "string" && LAYOUT_ORIENTATIONS.has(raw) ? raw : null;
+}
+
+// Persist the layout fields for a page only when the request actually carries a
+// valid value for at least one of them. Unspecified fields keep their current
+// stored value so a partial update (e.g. orientation only) never clobbers the
+// other. Reads the existing row to fill in the side that wasn't provided.
+function applyLayoutUpdate(
+  userId: number,
+  pageId: number,
+  body: { layoutPreset?: unknown; layoutOrientation?: unknown },
+): void {
+  const preset = cleanPreset(body.layoutPreset);
+  const orientation = cleanOrientation(body.layoutOrientation);
+  if (preset === null && orientation === null) return;
+  const existing = pageStmts.findById.get(pageId, userId);
+  if (!existing) return;
+  pageStmts.updateLayout.run(
+    preset ?? existing.layout_preset,
+    orientation ?? existing.layout_orientation,
+    pageId,
+    userId,
+  );
+}
+
 // GET /api/pages — list the user's pages in display order.
 router.get("/", requireAuth, (req: AuthRequest, res) => {
   const pages = pageStmts.findAllByUser.all(req.user!.userId);
@@ -65,10 +107,11 @@ router.get("/", requireAuth, (req: AuthRequest, res) => {
 
 // POST /api/pages — create a new (empty) page, appended after the last one.
 router.post("/", requireAuth, (req: AuthRequest, res) => {
-  const body = req.body as { name?: string };
+  const body = req.body as { name?: string; layoutPreset?: unknown; layoutOrientation?: unknown };
   const { maxPos } = pageStmts.maxPosition.get(req.user!.userId)!;
   const position = (maxPos ?? -1) + 1;
   const row = pageStmts.create.get(req.user!.userId, cleanName(body.name), position)!;
+  applyLayoutUpdate(req.user!.userId, row.id, body);
   const page = pageStmts.findById.get(row.id, req.user!.userId)!;
   res.status(201).json(formatPage(page));
 });
@@ -133,6 +176,7 @@ router.post("/import", requireAuth, (req: AuthRequest, res) => {
       const name = uniquePageName(cleanName(incoming.name), taken);
       taken.add(name);
       const pageRow = pageStmts.create.get(req.user!.userId, name, position)!;
+      applyLayoutUpdate(req.user!.userId, pageRow.id, incoming);
       position++;
       createdIds.push(pageRow.id);
       for (const tile of incoming.tiles) {
@@ -183,10 +227,11 @@ router.put("/:id", requireAuth, (req: AuthRequest, res) => {
     res.status(404).json({ error: "Page not found" });
     return;
   }
-  const body = req.body as { name?: string };
+  const body = req.body as { name?: string; layoutPreset?: unknown; layoutOrientation?: unknown };
   if (body.name !== undefined) {
     pageStmts.rename.run(cleanName(body.name), id, req.user!.userId);
   }
+  applyLayoutUpdate(req.user!.userId, id, body);
   const page = pageStmts.findById.get(id, req.user!.userId)!;
   res.json(formatPage(page));
 });

@@ -46,6 +46,8 @@ db.exec(`
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     name TEXT NOT NULL DEFAULT 'Home',
     position INTEGER NOT NULL DEFAULT 0,
+    layout_preset TEXT,
+    layout_orientation TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
@@ -183,6 +185,18 @@ const backfillPages = db.transaction(() => {
 });
 backfillPages();
 
+// 1j. Per-page fixed scale lock. Pages can be pinned to a fixed column count
+//     (a resolution-style preset) and an orientation so tiles never reflow when
+//     the window resizes. Both columns are nullable; NULL means "auto"
+//     (responsive) / "landscape", preserving today's behavior for existing rows.
+const pageColumns = db.prepare("PRAGMA table_info(pages)").all() as { name: string }[];
+if (!pageColumns.some((c) => c.name === "layout_preset")) {
+  db.exec("ALTER TABLE pages ADD COLUMN layout_preset TEXT");
+}
+if (!pageColumns.some((c) => c.name === "layout_orientation")) {
+  db.exec("ALTER TABLE pages ADD COLUMN layout_orientation TEXT");
+}
+
 // 2. One-time data migration: existing integration-typed tiles become app/link
 //    tiles whose `integration` carries the old type. Styling fields are left
 //    untouched. After this runs `type` is 'app' so it never matches again.
@@ -218,6 +232,8 @@ export interface DbPage {
   user_id: number;
   name: string;
   position: number;
+  layout_preset: string | null;
+  layout_orientation: string | null;
   created_at: string;
 }
 
@@ -324,6 +340,9 @@ export const pageStmts = {
   ),
   rename: db.prepare<[string, number, number], void>(
     "UPDATE pages SET name = ? WHERE id = ? AND user_id = ?"
+  ),
+  updateLayout: db.prepare<[string | null, string | null, number, number], void>(
+    "UPDATE pages SET layout_preset = ?, layout_orientation = ? WHERE id = ? AND user_id = ?"
   ),
   updatePosition: db.prepare<[number, number, number], void>(
     "UPDATE pages SET position = ? WHERE id = ? AND user_id = ?"

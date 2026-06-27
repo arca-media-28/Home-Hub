@@ -5,6 +5,8 @@
  * HomeHub API
  * OpenAPI spec version: 0.1.0
  */
+import type { ExportedPageLayoutOrientation } from './exportedPageLayoutOrientation';
+import type { ExportedPageLayoutPreset } from './exportedPageLayoutPreset';
 import type { ExportedTile } from './exportedTile';
 
 /**
@@ -12,5 +14,7 @@ import type { ExportedTile } from './exportedTile';
  */
 export interface ExportedPage {
   name: string;
+  layoutPreset?: ExportedPageLayoutPreset;
+  layoutOrientation?: ExportedPageLayoutOrientation;
   tiles: ExportedTile[];
 }

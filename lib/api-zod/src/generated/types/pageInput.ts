@@ -5,7 +5,11 @@
  * HomeHub API
  * OpenAPI spec version: 0.1.0
  */
+import type { PageInputLayoutOrientation } from './pageInputLayoutOrientation';
+import type { PageInputLayoutPreset } from './pageInputLayoutPreset';
 
 export interface PageInput {
   name?: string;
+  layoutPreset?: PageInputLayoutPreset;
+  layoutOrientation?: PageInputLayoutOrientation;
 }

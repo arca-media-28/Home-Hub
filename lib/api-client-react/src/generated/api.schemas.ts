@@ -714,16 +714,66 @@ export interface LayoutUpdate {
   tiles: LayoutItem[];
 }
 
+/**
+ * Fixed scale preset that maps to a locked column count. "auto" (the default) keeps today's responsive behavior (columns derived from window width). Any other value locks the page to a fixed column count that is CSS-scaled to fit the viewport so tiles never reflow.
+ */
+export type PageLayoutPreset = typeof PageLayoutPreset[keyof typeof PageLayoutPreset];
+
+
+export const PageLayoutPreset = {
+  auto: 'auto',
+  compact: 'compact',
+  fhd: 'fhd',
+  qhd: 'qhd',
+  uhd: 'uhd',
+} as const;
+
+/**
+ * How a fixed-preset page is scaled to fit. "landscape" fits to width, "portrait" fits to height. Ignored when layoutPreset is "auto".
+ */
+export type PageLayoutOrientation = typeof PageLayoutOrientation[keyof typeof PageLayoutOrientation];
+
+
+export const PageLayoutOrientation = {
+  landscape: 'landscape',
+  portrait: 'portrait',
+} as const;
+
 export interface Page {
   id: number;
   userId: number;
   name: string;
   position: number;
+  /** Fixed scale preset that maps to a locked column count. "auto" (the default) keeps today's responsive behavior (columns derived from window width). Any other value locks the page to a fixed column count that is CSS-scaled to fit the viewport so tiles never reflow. */
+  layoutPreset?: PageLayoutPreset;
+  /** How a fixed-preset page is scaled to fit. "landscape" fits to width, "portrait" fits to height. Ignored when layoutPreset is "auto". */
+  layoutOrientation?: PageLayoutOrientation;
   createdAt?: string;
 }
 
+export type PageInputLayoutPreset = typeof PageInputLayoutPreset[keyof typeof PageInputLayoutPreset];
+
+
+export const PageInputLayoutPreset = {
+  auto: 'auto',
+  compact: 'compact',
+  fhd: 'fhd',
+  qhd: 'qhd',
+  uhd: 'uhd',
+} as const;
+
+export type PageInputLayoutOrientation = typeof PageInputLayoutOrientation[keyof typeof PageInputLayoutOrientation];
+
+
+export const PageInputLayoutOrientation = {
+  landscape: 'landscape',
+  portrait: 'portrait',
+} as const;
+
 export interface PageInput {
   name?: string;
+  layoutPreset?: PageInputLayoutPreset;
+  layoutOrientation?: PageInputLayoutOrientation;
 }
 
 export interface PageReorder {
@@ -768,11 +818,32 @@ export interface ExportedTile {
   tileSettings?: TileSettings | null;
 }
 
+export type ExportedPageLayoutPreset = typeof ExportedPageLayoutPreset[keyof typeof ExportedPageLayoutPreset];
+
+
+export const ExportedPageLayoutPreset = {
+  auto: 'auto',
+  compact: 'compact',
+  fhd: 'fhd',
+  qhd: 'qhd',
+  uhd: 'uhd',
+} as const;
+
+export type ExportedPageLayoutOrientation = typeof ExportedPageLayoutOrientation[keyof typeof ExportedPageLayoutOrientation];
+
+
+export const ExportedPageLayoutOrientation = {
+  landscape: 'landscape',
+  portrait: 'portrait',
+} as const;
+
 /**
  * A single page within an export envelope.
  */
 export interface ExportedPage {
   name: string;
+  layoutPreset?: ExportedPageLayoutPreset;
+  layoutOrientation?: ExportedPageLayoutOrientation;
   tiles: ExportedTile[];
 }
 

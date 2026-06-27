@@ -23,6 +23,7 @@ import {
   TileType,
   type Tile,
   type Page,
+  type PageInput,
   type PageExport,
   type ServiceStatus,
 } from "@workspace/api-client-react";
@@ -43,6 +44,10 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -65,6 +70,7 @@ import {
   Trash2,
   Download,
   Upload,
+  MonitorSmartphone,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -99,6 +105,40 @@ function colsForWidth(width: number): number {
     MIN_COLS,
     Math.round((width + GRID_MARGIN) / (COL_WIDTH + GRID_MARGIN)),
   );
+}
+
+// Fixed scale presets. "auto" keeps the responsive (window-width-driven) column
+// count. Every other preset locks the page to a fixed column count chosen to
+// echo a target screen resolution, so a denser preset (uhd) fits more tiles and
+// a lighter one (compact) fewer. The whole grid is then CSS-scaled to fit the
+// viewport, so tiles keep their relative positions and never reflow on resize.
+const PRESET_COLS: Record<string, number> = {
+  compact: 18,
+  fhd: 24,
+  qhd: 32,
+  uhd: 48,
+};
+
+// Human-friendly labels for the layout dropdown.
+const PRESET_LABEL: Record<string, string> = {
+  auto: "Auto / responsive",
+  compact: "Compact",
+  fhd: "1080p",
+  qhd: "2K",
+  uhd: "4K",
+};
+const PRESET_ORDER = ["auto", "compact", "fhd", "qhd", "uhd"] as const;
+
+// A page is locked to a fixed layout when its preset is a known non-auto preset.
+function isFixedPreset(preset: string | undefined): boolean {
+  return preset !== undefined && preset !== "auto" && preset in PRESET_COLS;
+}
+
+// The intrinsic (unscaled) pixel width of a grid rendered at `cols` columns,
+// using the same per-column footprint react-grid-layout derives from width when
+// containerPadding is [0,0]: width = colWidth*cols + margin*(cols-1).
+function intrinsicGridWidth(cols: number): number {
+  return COL_WIDTH * cols + GRID_MARGIN * (cols - 1);
 }
 
 function tileToLayout(tile: Tile) {
@@ -226,6 +266,16 @@ export default function Dashboard() {
   // column count correct on the very first paint, so saved tile positions are
   // never compacted out of bounds on a hard refresh.
   const [gridWidth, setGridWidth] = useState<number | null>(null);
+  // Available height below the grid container, used to fit-to-height vertical
+  // (portrait) fixed-preset pages. null until measured.
+  const [availHeight, setAvailHeight] = useState<number | null>(null);
+  // The unscaled (intrinsic) height of the fixed-preset grid, measured after
+  // render. Transforms don't change offsetHeight, so this stays the true size
+  // even while a scale transform is applied.
+  const [intrinsicHeight, setIntrinsicHeight] = useState<number | null>(null);
+  // Ref to the inner (unscaled) wrapper around the grid so its natural height
+  // can be measured for the scale computation.
+  const scaleInnerRef = useRef<HTMLDivElement>(null);
 
   // The currently-shown page. null until pages load / are reconciled below.
   // Persisted to localStorage so the active page survives reloads.
@@ -255,11 +305,23 @@ export default function Dashboard() {
     const measure = () => {
       const w = el.clientWidth;
       if (w) setGridWidth(w);
+      // Height from the container's top to the bottom of the viewport, less a
+      // little breathing room. Drives fit-to-height for portrait pages.
+      const top = el.getBoundingClientRect().top;
+      const h = window.innerHeight - top - 24;
+      if (h > 0) setAvailHeight(h);
     };
     measure();
     const ro = new ResizeObserver(measure);
     ro.observe(el);
-    return () => ro.disconnect();
+    // The container's width changes are caught by the ResizeObserver, but a pure
+    // viewport-height change (window shorter, no width change) is not — so also
+    // remeasure on window resize for the portrait fit-to-height case.
+    window.addEventListener("resize", measure);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", measure);
+    };
   }, []);
 
   const { data: me, isError: meError } = useGetMe({
@@ -414,7 +476,43 @@ export default function Dashboard() {
   });
 
   const layout = tiles.map(tileToLayout);
-  const cols = gridWidth !== null ? colsForWidth(gridWidth) : MIN_COLS;
+
+  // Resolve the active page's fixed-scale settings. A fixed preset locks the
+  // grid to a preset column count (independent of window width); "auto" keeps
+  // the responsive behavior. Orientation only matters for a fixed page: it
+  // selects fit-to-width (landscape) vs fit-to-height (portrait) scaling.
+  const activePage = pages.find((p) => p.id === activePageId) ?? null;
+  const preset = activePage?.layoutPreset ?? "auto";
+  const orientation = activePage?.layoutOrientation ?? "landscape";
+  const fixedLayout = isFixedPreset(preset);
+
+  const cols = fixedLayout
+    ? PRESET_COLS[preset]!
+    : gridWidth !== null
+      ? colsForWidth(gridWidth)
+      : MIN_COLS;
+
+  // For a fixed page the grid is rendered at its intrinsic pixel width (derived
+  // from the locked column count) and then CSS-scaled to fit. For an auto page
+  // it renders at the measured container width as before.
+  const renderWidth = fixedLayout ? intrinsicGridWidth(cols) : gridWidth;
+
+  // The scale factor applied to a fixed grid in locked (non-edit) mode. Edit
+  // mode is never scaled so react-grid-layout's pointer math stays correct.
+  // Landscape fits to width. Portrait fits to height but is also clamped by the
+  // width-fit scale (min of the two) so a short page never scales up past the
+  // viewport width and clips horizontally — the grid stays fully visible and
+  // centered. Defaults to 1 until the inputs are known.
+  const widthScale =
+    gridWidth !== null ? gridWidth / intrinsicGridWidth(cols) : 1;
+  const scale =
+    fixedLayout && !editMode
+      ? orientation === "portrait"
+        ? availHeight !== null && intrinsicHeight
+          ? Math.min(availHeight / intrinsicHeight, widthScale)
+          : 1
+        : widthScale
+      : 1;
 
   const handleLayoutChange = useCallback(
     (currentLayout: { i: string; x: number; y: number; w: number; h: number }[]) => {
@@ -447,12 +545,43 @@ export default function Dashboard() {
     [editMode, saveLayout, queryClient, tilesQueryKey, activePageId],
   );
 
+  // Measure the fixed grid's intrinsic (unscaled) height so a portrait page can
+  // be fit to height. offsetHeight (and ResizeObserver's reported size) ignore
+  // CSS transforms, so the measured height is the true layout height even while
+  // a scale is applied — and since scaling only changes the OUTER wrapper, the
+  // observed inner element never resizes in response, so there's no feedback
+  // loop. The value guard keeps an unchanged measurement from re-rendering. Only
+  // the locked fixed branch attaches scaleInnerRef; otherwise the height clears.
+  useLayoutEffect(() => {
+    if (!fixedLayout || editMode) {
+      setIntrinsicHeight(null);
+      return;
+    }
+    const el = scaleInnerRef.current;
+    if (!el) return;
+    const measure = () => {
+      const h = el.offsetHeight;
+      setIntrinsicHeight((prev) => (prev === h ? prev : h));
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [fixedLayout, editMode, cols, renderWidth, gridWidth]);
+
   // Clean up the "saved" indicator timer on unmount
   useEffect(() => {
     return () => {
       if (savedTimeoutRef.current) clearTimeout(savedTimeoutRef.current);
     };
   }, []);
+
+  // Update the active page's fixed-scale layout settings. A partial patch (just
+  // preset or just orientation) is fine — the backend keeps the other side.
+  function setPageLayout(patch: { layoutPreset?: string; layoutOrientation?: string }) {
+    if (!activePage) return;
+    updatePage.mutate({ id: activePage.id, data: patch as PageInput });
+  }
 
   // Warn before leaving the tab if a layout save is still in flight or has
   // failed and not yet been retried, so a slow-network change is never lost.
@@ -925,6 +1054,52 @@ export default function Dashboard() {
 
               {editMode && (
                 <>
+                  {activePage && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="gap-1.5 shrink-0 h-7 ml-1"
+                          title="Lock this page to a fixed scale so tiles don't reflow on resize"
+                        >
+                          <MonitorSmartphone className="w-3.5 h-3.5" />
+                          {PRESET_LABEL[preset] ?? "Auto / responsive"}
+                          {fixedLayout && (
+                            <span className="text-muted-foreground">
+                              · {orientation === "portrait" ? "Vertical" : "Landscape"}
+                            </span>
+                          )}
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start" className="w-48">
+                        <DropdownMenuLabel>Page scale</DropdownMenuLabel>
+                        <DropdownMenuRadioGroup
+                          value={preset}
+                          onValueChange={(v) => setPageLayout({ layoutPreset: v })}
+                        >
+                          {PRESET_ORDER.map((p) => (
+                            <DropdownMenuRadioItem key={p} value={p}>
+                              {PRESET_LABEL[p]}
+                            </DropdownMenuRadioItem>
+                          ))}
+                        </DropdownMenuRadioGroup>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuLabel>Orientation</DropdownMenuLabel>
+                        <DropdownMenuRadioGroup
+                          value={orientation}
+                          onValueChange={(v) => setPageLayout({ layoutOrientation: v })}
+                        >
+                          <DropdownMenuRadioItem value="landscape" disabled={!fixedLayout}>
+                            Landscape (fit width)
+                          </DropdownMenuRadioItem>
+                          <DropdownMenuRadioItem value="portrait" disabled={!fixedLayout}>
+                            Vertical (fit height)
+                          </DropdownMenuRadioItem>
+                        </DropdownMenuRadioGroup>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
                   <Button
                     size="sm"
                     variant="ghost"
@@ -1003,11 +1178,12 @@ export default function Dashboard() {
           </div>
         ) : (
           <div>
-            {gridWidth !== null && (
+            {gridWidth !== null && (() => {
+            const gridEl = (
             <Grid
               className={`layout ${editMode ? "grid-editing" : "grid-locked"}`}
               layout={layout}
-              width={gridWidth}
+              width={renderWidth ?? gridWidth}
               gridConfig={{
                 cols,
                 rowHeight: ROW_HEIGHT,
@@ -1076,7 +1252,50 @@ export default function Dashboard() {
                 );
               })}
             </Grid>
-            )}
+            );
+
+            // Auto (responsive) pages render the grid directly, as before.
+            if (!fixedLayout) return gridEl;
+
+            // A fixed page being edited renders at full intrinsic size (no
+            // scaling) so react-grid-layout's drag/resize pointer math stays
+            // correct; it scrolls horizontally if it's wider than the viewport.
+            if (editMode) return <div className="overflow-x-auto">{gridEl}</div>;
+
+            // A locked fixed page is CSS-scaled to fit and centered. The outer
+            // wrapper reserves the scaled height (and clips the unscaled layout
+            // box's leftover space) so the page neither clips nor leaves dead
+            // scroll area. transform-origin "top center" keeps it centered.
+            return (
+              <div
+                // items-start is critical: the default align-items:stretch would
+                // stretch the measured inner wrapper to this parent's height
+                // (intrinsicHeight*scale). Since the ResizeObserver reads that
+                // wrapper's offsetHeight back into intrinsicHeight, a scale < 1
+                // (a fixed canvas wider than the viewport, e.g. the 2K/4K presets
+                // on a smaller screen) would shrink the height geometrically to
+                // zero each cycle and collapse the grid out of view.
+                className="flex items-start justify-center overflow-hidden"
+                style={{
+                  height:
+                    intrinsicHeight != null ? intrinsicHeight * scale : undefined,
+                }}
+              >
+                <div
+                  ref={scaleInnerRef}
+                  data-testid="fixed-scale-wrapper"
+                  className="shrink-0"
+                  style={{
+                    width: renderWidth ?? undefined,
+                    transform: `scale(${scale})`,
+                    transformOrigin: "top center",
+                  }}
+                >
+                  {gridEl}
+                </div>
+              </div>
+            );
+            })()}
           </div>
         )}
         </div>

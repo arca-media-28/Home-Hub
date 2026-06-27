@@ -157,6 +157,54 @@ describe("page export/import", () => {
     });
   });
 
+  it("round-trips a page's fixed-scale layout settings", async () => {
+    const pageId = await createPage(1, "Wallboard");
+
+    // Switch the page to a fixed QHD / portrait layout.
+    const updated = await request(app)
+      .put(`/pages/${pageId}`)
+      .set("x-user-id", "1")
+      .send({ layoutPreset: "qhd", layoutOrientation: "portrait" });
+    expect(updated.status).toBe(200);
+    expect(updated.body.layoutPreset).toBe("qhd");
+    expect(updated.body.layoutOrientation).toBe("portrait");
+
+    const exported = await request(app)
+      .get(`/pages/${pageId}/export`)
+      .set("x-user-id", "1");
+    expect(exported.status).toBe(200);
+    expect(exported.body.pages[0].layoutPreset).toBe("qhd");
+    expect(exported.body.pages[0].layoutOrientation).toBe("portrait");
+
+    const imported = await request(app)
+      .post("/pages/import")
+      .set("x-user-id", "1")
+      .send(exported.body);
+    expect(imported.status).toBe(201);
+    expect(imported.body[0].layoutPreset).toBe("qhd");
+    expect(imported.body[0].layoutOrientation).toBe("portrait");
+  });
+
+  it("defaults layout settings to auto/landscape for new and bare-import pages", async () => {
+    const pageId = await createPage(1, "Defaults");
+    const page = await request(app).get("/pages").set("x-user-id", "1");
+    const created = page.body.find((p: { id: number }) => p.id === pageId);
+    expect(created.layoutPreset).toBe("auto");
+    expect(created.layoutOrientation).toBe("landscape");
+
+    const imported = await request(app)
+      .post("/pages/import")
+      .set("x-user-id", "1")
+      .send({
+        format: "homelab-dashboard-pages",
+        version: 1,
+        pages: [{ name: "NoLayout", tiles: [] }],
+      });
+    expect(imported.status).toBe(201);
+    expect(imported.body[0].layoutPreset).toBe("auto");
+    expect(imported.body[0].layoutOrientation).toBe("landscape");
+  });
+
   it("exports omit all identity fields", async () => {
     const pageId = await createPage(1, "Identity");
     await request(app)

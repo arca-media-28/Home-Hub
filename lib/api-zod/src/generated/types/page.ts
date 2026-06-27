@@ -5,11 +5,17 @@
  * HomeHub API
  * OpenAPI spec version: 0.1.0
  */
+import type { PageLayoutOrientation } from './pageLayoutOrientation';
+import type { PageLayoutPreset } from './pageLayoutPreset';
 
 export interface Page {
   id: number;
   userId: number;
   name: string;
   position: number;
+  /** Fixed scale preset that maps to a locked column count. "auto" (the default) keeps today's responsive behavior (columns derived from window width). Any other value locks the page to a fixed column count that is CSS-scaled to fit the viewport so tiles never reflow. */
+  layoutPreset?: PageLayoutPreset;
+  /** How a fixed-preset page is scaled to fit. "landscape" fits to width, "portrait" fits to height. Ignored when layoutPreset is "auto". */
+  layoutOrientation?: PageLayoutOrientation;
   createdAt?: string;
 }
