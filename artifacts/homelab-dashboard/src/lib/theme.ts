@@ -3,6 +3,14 @@
 // it can run before first paint. This module owns the theme metadata, the React
 // state, and persistence, and delegates the DOM work to that global.
 
+import type {
+  CustomThemeMap,
+  ShadowStyle,
+  BackgroundPattern,
+  HeadingFont,
+} from "./customThemes";
+import { isCustomThemeId } from "./customThemes";
+
 export type ThemeId = "rack" | "hearth" | "nebula" | "friction" | "workshop" | "pebble";
 
 export interface ThemeMeta {
@@ -26,6 +34,17 @@ export interface ThemeMeta {
     primary: string;
     background: string;
   };
+  /**
+   * Structural traits in the custom-theme template vocabulary, so "Download
+   * template" can serialize a built-in into a real, working starting point.
+   */
+  template?: {
+    shadow: ShadowStyle;
+    backgroundPattern: BackgroundPattern;
+    uppercase: boolean;
+    headingFont: HeadingFont;
+    fontUrl?: string;
+  };
 }
 
 export const THEMES: ThemeMeta[] = [
@@ -38,6 +57,13 @@ export const THEMES: ThemeMeta[] = [
     font: "'Outfit', ui-sans-serif, system-ui, sans-serif",
     swatch: { background: "#11264f", surface: "#16305e", primary: "#d23f30", accent: "#d23f30" },
     defaults: { primary: "#d23f30", background: "#11264f" },
+    template: {
+      shadow: "hard",
+      backgroundPattern: "grid",
+      uppercase: true,
+      headingFont: "sans",
+      fontUrl: "https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap",
+    },
   },
   {
     id: "rack",
@@ -48,6 +74,13 @@ export const THEMES: ThemeMeta[] = [
     font: "'Space Mono', ui-monospace, monospace",
     swatch: { background: "#0a0a0c", surface: "#0f0f12", primary: "#ffb000", accent: "#ffb000" },
     defaults: { primary: "#ffb000", background: "#0a0a0c" },
+    template: {
+      shadow: "flat",
+      backgroundPattern: "grid",
+      uppercase: true,
+      headingFont: "sans",
+      fontUrl: "https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap",
+    },
   },
   {
     id: "nebula",
@@ -58,6 +91,13 @@ export const THEMES: ThemeMeta[] = [
     font: "'Space Grotesk', ui-sans-serif, system-ui, sans-serif",
     swatch: { background: "#0b0a1a", surface: "#15123a", primary: "#7c5cff", accent: "#22d3ee" },
     defaults: { primary: "#7c5cff", background: "#0b0a1a" },
+    template: {
+      shadow: "glow",
+      backgroundPattern: "gradient",
+      uppercase: false,
+      headingFont: "sans",
+      fontUrl: "https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap",
+    },
   },
   {
     id: "hearth",
@@ -68,6 +108,13 @@ export const THEMES: ThemeMeta[] = [
     font: "'Fraunces', Georgia, serif",
     swatch: { background: "#fdfbf7", surface: "#ffffff", primary: "#d97736", accent: "#d97736" },
     defaults: { primary: "#d97736", background: "#fdfbf7" },
+    template: {
+      shadow: "soft",
+      backgroundPattern: "gradient",
+      uppercase: false,
+      headingFont: "serif",
+      fontUrl: "https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&display=swap",
+    },
   },
   {
     id: "workshop",
@@ -78,6 +125,13 @@ export const THEMES: ThemeMeta[] = [
     font: "'Nunito Sans', ui-sans-serif, system-ui, sans-serif",
     swatch: { background: "#bbc3cc", surface: "#e1e7ec", primary: "#2774b3", accent: "#cf9836" },
     defaults: { primary: "#2774b3", background: "#bbc3cc" },
+    template: {
+      shadow: "soft",
+      backgroundPattern: "none",
+      uppercase: false,
+      headingFont: "sans",
+      fontUrl: "https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@400;600;700;800&display=swap",
+    },
   },
   {
     id: "pebble",
@@ -88,6 +142,13 @@ export const THEMES: ThemeMeta[] = [
     font: "'Inter', ui-sans-serif, system-ui, sans-serif",
     swatch: { background: "#dfe2e9", surface: "#e6e9ef", primary: "#5a6ad6", accent: "#5a6ad6" },
     defaults: { primary: "#5a6ad6", background: "#dfe2e9" },
+    template: {
+      shadow: "soft",
+      backgroundPattern: "none",
+      uppercase: false,
+      headingFont: "sans",
+      fontUrl: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap",
+    },
   },
 ];
 
@@ -105,7 +166,11 @@ export type ColorOverrides = Partial<Record<ThemeId, CustomColors>>;
 
 declare global {
   interface Window {
-    __homehubApplyTheme?: (theme: string, colors?: CustomColors) => void;
+    __homehubApplyTheme?: (
+      theme: string,
+      colors?: CustomColors,
+      customThemes?: CustomThemeMap,
+    ) => void;
   }
 }
 
@@ -117,10 +182,17 @@ export function isKnownTheme(id: string | null): id is ThemeId {
   return !!id && THEMES.some((t) => t.id === id);
 }
 
-export function readSavedTheme(): ThemeId {
+/**
+ * Reads the saved active theme. A custom theme id is honored only when it still
+ * exists in the supplied custom-theme map; otherwise we fall back to the default
+ * built-in (so deleting the active custom theme is migration-safe).
+ */
+export function readSavedTheme(customThemes: CustomThemeMap = {}): ThemeId | string {
   try {
     const v = localStorage.getItem(THEME_KEY);
-    return isKnownTheme(v) ? v : DEFAULT_THEME;
+    if (isKnownTheme(v)) return v;
+    if (v && isCustomThemeId(v) && customThemes[v]) return v;
+    return DEFAULT_THEME;
   } catch {
     return DEFAULT_THEME;
   }
@@ -137,7 +209,7 @@ export function readSavedColors(): ColorOverrides {
   }
 }
 
-export function persistTheme(theme: ThemeId): void {
+export function persistTheme(theme: ThemeId | string): void {
   try {
     localStorage.setItem(THEME_KEY, theme);
   } catch {
@@ -154,9 +226,13 @@ export function persistColors(overrides: ColorOverrides): void {
 }
 
 /** Applies a theme + custom colors to the document via the shared global. */
-export function applyThemeToDom(theme: ThemeId, colors?: CustomColors): void {
+export function applyThemeToDom(
+  theme: ThemeId | string,
+  colors?: CustomColors,
+  customThemes?: CustomThemeMap,
+): void {
   if (typeof window !== "undefined" && window.__homehubApplyTheme) {
-    window.__homehubApplyTheme(theme, colors);
+    window.__homehubApplyTheme(theme, colors, customThemes);
   } else if (typeof document !== "undefined") {
     document.documentElement.setAttribute("data-theme", theme);
   }

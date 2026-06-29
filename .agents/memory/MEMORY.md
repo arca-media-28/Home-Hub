@@ -3,6 +3,7 @@
 - [TanStack Query v5 onError](tanstack-query-v5.md) — onError removed from useQuery options in v5; use useEffect + isError instead
 - [JWT secret self-host](jwt-secret-self-host.md) — prod auto-generates + persists a random JWT secret in DATA_DIR (no fail-closed); keep compose JWT_SECRET default empty
 - [Homelab theming](homelab-theming.md) — reskin via index.css tokens; now a 6-theme picker (data-theme attr, before-paint script, per-theme color overrides), NOT :root/.dark; set all --radius-* for sharp corners, verify authed views with runTest.
+- [Custom uploaded themes](custom-themes.md) — users export/edit/upload JSON theme templates; NO raw CSS (only enumerated knobs); validateCustomTheme is the gatekeeper; logic mirrored in 3 places (customThemes.ts spec, index.html before-paint, index.css [data-theme="custom"] rules).
 - [service_connections is global](service-connections-global.md) — table keyed by service only (no userId); rows shared across all users; PUT clobbers real settings, beware testing on live.
 - [Widget data + HTTP convention](widget-data-convention.md) — mock only when unconfigured, configured-failure→502; shared httpClient (self-signed TLS) in lib/http.ts; TrueNAS/Sonarr/Radarr/qBittorrent API gotchas.
 - [Upstream error body](upstream-error-body.md) — normalizeHttpError DROPS the response body; use describeHttpError (status+body) to see the real reason; /widgets/truenas/diagnostics probes reporting forms; http.js mock must add new exports or route 500s.

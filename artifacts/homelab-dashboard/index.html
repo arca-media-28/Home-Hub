@@ -28,8 +28,11 @@
       (function () {
         var THEME_KEY = "homehub:theme";
         var COLORS_KEY = "homehub:colors";
+        var CUSTOM_THEMES_KEY = "homehub:customThemes";
         var DEFAULT_THEME = "friction";
         var KNOWN = ["friction", "hearth", "nebula", "rack", "workshop", "pebble"];
+        var CUSTOM_PREFIX = "custom:";
+        var CUSTOM_FONT_LINK_ID = "homehub-custom-font";
 
         // Inline overrides we set / clear so re-applying never leaves stale vars.
         var OVERRIDE_VARS = [
@@ -42,6 +45,15 @@
           "--primary", "--primary-foreground", "--sidebar-primary",
           "--sidebar-primary-foreground", "--ring", "--sidebar-ring", "--chart-1"
         ];
+
+        // Extra inline vars only custom themes set (radius/fonts/outlines), cleared
+        // when switching back to a built-in so nothing leaks across themes.
+        var CUSTOM_VARS = [
+          "--radius", "--app-font-sans", "--app-font-mono", "--app-font-serif",
+          "--button-outline", "--badge-outline", "--elevate-1", "--elevate-2"
+        ];
+        // data-* attributes that drive the [data-theme="custom"] structural CSS.
+        var CUSTOM_ATTRS = ["data-shadow", "data-pattern", "data-uppercase", "data-heading"];
 
         function clamp(n, lo, hi) { return Math.min(hi, Math.max(lo, n)); }
 
@@ -115,13 +127,70 @@
           root.style.setProperty("--chart-1", t);
         }
 
-        window.__homehubApplyTheme = function (theme, colors) {
+        function clearOverrides(root) {
+          var i;
+          for (i = 0; i < OVERRIDE_VARS.length; i++) root.style.removeProperty(OVERRIDE_VARS[i]);
+          for (i = 0; i < CUSTOM_VARS.length; i++) root.style.removeProperty(CUSTOM_VARS[i]);
+          for (i = 0; i < CUSTOM_ATTRS.length; i++) root.removeAttribute(CUSTOM_ATTRS[i]);
+        }
+
+        function setCustomFont(url) {
+          var link = document.getElementById(CUSTOM_FONT_LINK_ID);
+          if (!url) { if (link && link.parentNode) link.parentNode.removeChild(link); return; }
+          if (!link) {
+            link = document.createElement("link");
+            link.id = CUSTOM_FONT_LINK_ID;
+            link.rel = "stylesheet";
+            document.head.appendChild(link);
+          }
+          if (link.getAttribute("href") !== url) link.setAttribute("href", url);
+        }
+
+        // Applies a validated custom-theme definition. Colors reuse the exact same
+        // derivation math as built-ins; structural traits (radius/font/shadow/
+        // pattern/caps/headings) are set via inline vars + data-* attributes that
+        // the [data-theme="custom"] CSS in index.css consumes. No raw CSS is ever
+        // taken from the definition. Mirror of customThemes.ts (keep in sync).
+        function applyCustomTheme(root, def) {
+          root.setAttribute("data-theme", "custom");
+          var bg = hexToHsl(def.colors && def.colors.background);
+          if (bg) applyBackground(root, bg);
+          var pr = hexToHsl(def.colors && def.colors.primary);
+          if (pr) applyPrimary(root, pr);
+          if (def.radius) root.style.setProperty("--radius", def.radius);
+          if (def.font) {
+            root.style.setProperty("--app-font-sans", def.font);
+            root.style.setProperty("--app-font-mono", def.font);
+            root.style.setProperty(
+              "--app-font-serif",
+              def.headingFont === "serif" ? "Georgia, 'Times New Roman', serif" : def.font
+            );
+          }
+          var dark = !!def.dark;
+          root.style.setProperty("--button-outline", dark ? "rgba(255,255,255,.12)" : "rgba(0,0,0,.12)");
+          root.style.setProperty("--badge-outline", dark ? "rgba(255,255,255,.06)" : "rgba(0,0,0,.06)");
+          root.style.setProperty("--elevate-1", dark ? "rgba(255,255,255,.05)" : "rgba(0,0,0,.04)");
+          root.style.setProperty("--elevate-2", dark ? "rgba(255,255,255,.10)" : "rgba(0,0,0,.08)");
+          root.setAttribute("data-shadow", def.shadow || "soft");
+          root.setAttribute("data-pattern", def.backgroundPattern || "none");
+          root.setAttribute("data-uppercase", def.uppercase ? "on" : "off");
+          root.setAttribute("data-heading", def.headingFont || "sans");
+          setCustomFont(def.fontUrl);
+        }
+
+        window.__homehubApplyTheme = function (theme, colors, customThemes) {
           var root = document.documentElement;
+          clearOverrides(root);
+          customThemes = customThemes || {};
+          var def = (typeof theme === "string" && theme.indexOf(CUSTOM_PREFIX) === 0)
+            ? customThemes[theme] : null;
+          if (def && def.colors) {
+            applyCustomTheme(root, def);
+            return;
+          }
+          setCustomFont(null);
           if (KNOWN.indexOf(theme) === -1) theme = DEFAULT_THEME;
           root.setAttribute("data-theme", theme);
-          for (var i = 0; i < OVERRIDE_VARS.length; i++) {
-            root.style.removeProperty(OVERRIDE_VARS[i]);
-          }
           colors = colors || {};
           if (colors.background) {
             var bg = hexToHsl(colors.background);
@@ -137,7 +206,9 @@
           var theme = localStorage.getItem(THEME_KEY) || DEFAULT_THEME;
           var all = {};
           try { all = JSON.parse(localStorage.getItem(COLORS_KEY) || "{}") || {}; } catch (e) { all = {}; }
-          window.__homehubApplyTheme(theme, all[theme]);
+          var custom = {};
+          try { custom = JSON.parse(localStorage.getItem(CUSTOM_THEMES_KEY) || "{}") || {}; } catch (e) { custom = {}; }
+          window.__homehubApplyTheme(theme, all[theme], custom);
         } catch (e) {
           document.documentElement.setAttribute("data-theme", DEFAULT_THEME);
         }

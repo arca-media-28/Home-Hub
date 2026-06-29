@@ -458,6 +458,84 @@
   --app-shadow-2xl: 14px 14px 32px hsl(222 24% 72% / .5), -14px -14px 32px hsl(0 0% 100% / .9);
 }
 
+/* ============================================================
+ * CUSTOM (user-uploaded) themes. A custom theme sets data-theme="custom" plus a
+ * fixed set of data-* attributes; all color/font/radius tokens are applied inline
+ * by window.__homehubApplyTheme. These rules turn the validated, enumerated
+ * structural knobs (shadow / backgroundPattern / uppercase / headingFont) into
+ * real CSS WITHOUT ever consuming raw CSS from the uploaded file. Color-derived
+ * tokens (--destructive, --chart-2..5) fall through to :root, which is fine.
+ * ============================================================ */
+
+/* Shadow elevation by data-shadow. */
+[data-theme="custom"][data-shadow="flat"] {
+  --app-shadow-sm: 0 1px 2px rgba(0,0,0,.3);
+  --app-shadow-md: 0 1px 2px rgba(0,0,0,.3);
+  --app-shadow-lg: 0 2px 6px rgba(0,0,0,.35);
+  --app-shadow-xl: 0 4px 10px rgba(0,0,0,.4);
+  --app-shadow-2xl: 0 8px 18px rgba(0,0,0,.45);
+}
+[data-theme="custom"][data-shadow="soft"] {
+  --app-shadow-sm: 0 1px 2px hsl(var(--foreground) / .05);
+  --app-shadow-md: 0 6px 20px hsl(var(--foreground) / .10);
+  --app-shadow-lg: 0 18px 40px hsl(var(--foreground) / .12);
+  --app-shadow-xl: 0 26px 52px hsl(var(--foreground) / .14);
+  --app-shadow-2xl: 0 36px 72px hsl(var(--foreground) / .17);
+}
+[data-theme="custom"][data-shadow="hard"] {
+  --app-shadow-sm: 0 1px 2px rgba(0,0,0,.5);
+  --app-shadow-md: 0 4px 14px rgba(0,0,0,.5);
+  --app-shadow-lg: 0 12px 30px rgba(0,0,0,.55);
+  --app-shadow-xl: 0 18px 40px rgba(0,0,0,.6);
+  --app-shadow-2xl: 0 28px 64px rgba(0,0,0,.7);
+}
+[data-theme="custom"][data-shadow="glow"] {
+  --app-shadow-sm: 0 1px 2px rgba(0,0,0,.5);
+  --app-shadow-md: 0 4px 18px hsl(var(--primary) / .30);
+  --app-shadow-lg: 0 12px 36px hsl(var(--primary) / .34);
+  --app-shadow-xl: 0 16px 48px hsl(var(--primary) / .38);
+  --app-shadow-2xl: 0 0 70px hsl(var(--primary) / .34), 0 26px 64px rgba(0,0,0,.5);
+}
+
+/* Ambient page background by data-pattern (all derive from --primary). */
+[data-theme="custom"][data-pattern="none"] .bg-dot-pattern {
+  background-image: none;
+}
+[data-theme="custom"][data-pattern="grid"] .bg-dot-pattern {
+  background-image:
+    linear-gradient(hsl(var(--primary) / 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, hsl(var(--primary) / 0.06) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+[data-theme="custom"][data-pattern="dots"] .bg-dot-pattern {
+  background-image: radial-gradient(hsl(var(--primary) / 0.14) 1.5px, transparent 1.5px);
+  background-size: 22px 22px;
+}
+[data-theme="custom"][data-pattern="gradient"] .bg-dot-pattern {
+  background-image:
+    radial-gradient(900px 560px at 82% -14%, hsl(var(--primary) / .20), transparent 60%),
+    radial-gradient(760px 520px at -6% 112%, hsl(var(--primary) / .12), transparent 55%);
+  background-size: cover;
+  background-attachment: fixed;
+}
+
+/* Typographic voice — drop the terminal caps + wide tracking when uppercase off. */
+[data-theme="custom"][data-uppercase="off"] .uppercase {
+  text-transform: none;
+}
+[data-theme="custom"][data-uppercase="off"] .tracking-widest,
+[data-theme="custom"][data-uppercase="off"] .tracking-wider {
+  letter-spacing: normal;
+}
+
+/* Heading treatment — serif headings use the inline --app-font-serif. */
+[data-theme="custom"][data-heading="serif"] h1,
+[data-theme="custom"][data-heading="serif"] h2,
+[data-theme="custom"][data-heading="serif"] h3 {
+  font-family: var(--app-font-serif);
+  letter-spacing: -0.01em;
+}
+
 /* Ambient backgrounds — Rack keeps its technical grid (the default
    .bg-dot-pattern below); Hearth gets a soft warm gradient wash with no
    grid; Nebula gets pure cosmic glows (no grid, so it stays distinct from
