@@ -96,6 +96,7 @@ interface TileSettings {
   bonsaiStyle?: string | null;
   truenasMetric?: "cpuram" | "network" | "arc" | "pools" | "disks" | null;
   truenasPools?: string[] | null;
+  truenasPoolOrder?: string[] | null;
 }
 
 // A single checklist/to-do item on a Note (post-it) tile: its label text and
@@ -319,6 +320,13 @@ function pickTileSettings(obj: Record<string, unknown>): TileSettings {
     );
   } else if (obj["truenasPools"] === null) {
     result.truenasPools = null;
+  }
+  if (Array.isArray(obj["truenasPoolOrder"])) {
+    result.truenasPoolOrder = obj["truenasPoolOrder"].filter(
+      (x): x is string => typeof x === "string",
+    );
+  } else if (obj["truenasPoolOrder"] === null) {
+    result.truenasPoolOrder = null;
   }
   if (typeof obj["noteBody"] === "string") {
     result.noteBody = obj["noteBody"];

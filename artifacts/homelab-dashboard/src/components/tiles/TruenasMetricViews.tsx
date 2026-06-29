@@ -327,9 +327,11 @@ export function ArcView({
 export function PoolsView({
   data,
   selectedPools,
+  poolOrder,
 }: {
   data: TruenasMetrics;
   selectedPools?: string[] | null;
+  poolOrder?: string[] | null;
 }) {
   const allPools = data.pools ?? [];
   if (allPools.length === 0) {
@@ -339,7 +341,7 @@ export function PoolsView({
       </div>
     );
   }
-  const pools = filterTruenasPools(allPools, selectedPools);
+  const pools = filterTruenasPools(allPools, selectedPools, poolOrder);
   // The tile filters to specific volumes, but none of them are currently
   // reported (e.g. a chosen pool was renamed/removed) — say so rather than
   // showing an empty body.

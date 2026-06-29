@@ -92,6 +92,42 @@ describe("filterTruenasPools", () => {
     ]);
     expect(filterTruenasPools(pools, ["gone"])).toEqual([]);
   });
+
+  it("keeps server order when the order is null/undefined/empty", () => {
+    expect(filterTruenasPools(pools, null, null)).toEqual(pools);
+    expect(filterTruenasPools(pools, null, undefined)).toEqual(pools);
+    expect(filterTruenasPools(pools, null, [])).toEqual(pools);
+  });
+
+  it("reorders pools by the explicit order list", () => {
+    expect(filterTruenasPools(pools, null, ["scratch", "tank", "backup"])).toEqual([
+      { name: "scratch" },
+      { name: "tank" },
+      { name: "backup" },
+    ]);
+  });
+
+  it("pins ordered pools first and keeps the rest in server order", () => {
+    expect(filterTruenasPools(pools, null, ["scratch"])).toEqual([
+      { name: "scratch" },
+      { name: "tank" },
+      { name: "backup" },
+    ]);
+  });
+
+  it("ignores ordered names that aren't reported", () => {
+    expect(filterTruenasPools(pools, null, ["gone", "backup"])).toEqual([
+      { name: "backup" },
+      { name: "tank" },
+      { name: "scratch" },
+    ]);
+  });
+
+  it("filters first, then applies the order to what remains", () => {
+    expect(
+      filterTruenasPools(pools, ["tank", "scratch"], ["scratch", "tank"]),
+    ).toEqual([{ name: "scratch" }, { name: "tank" }]);
+  });
 });
 
 describe("tileDensity", () => {

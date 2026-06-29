@@ -164,17 +164,47 @@ export function resolveEnabledMetrics(
   return new Set(selected.filter((k) => valid.has(k)));
 }
 
-// Filter a list of TrueNAS pools by a selected-volume allow-list. A
-// null/undefined/empty selection means "show all" (backward-compatible
-// default); otherwise only pools whose name is in the selection are kept. The
-// generic shape keeps it usable from both the combined and dedicated views.
+// Filter and order a list of TrueNAS pools.
+//
+// `selected` is a volume allow-list: a null/undefined/empty selection means
+// "show all" (backward-compatible default); otherwise only pools whose name is
+// in the selection are kept.
+//
+// `order` is an explicit display order of volume names: pools whose name appears
+// in it are placed first, in that order; any remaining pools keep their original
+// (server-reported) relative order after them. A null/undefined/empty order
+// leaves the server order untouched (also backward-compatible). Names in `order`
+// that aren't present (e.g. filtered out or renamed) are simply ignored.
+//
+// The generic shape keeps it usable from both the combined and dedicated views.
 export function filterTruenasPools<T extends { name: string }>(
   pools: T[],
   selected: string[] | null | undefined,
+  order?: string[] | null,
 ): T[] {
-  if (!selected || selected.length === 0) return pools;
-  const set = new Set(selected);
-  return pools.filter((p) => set.has(p.name));
+  let result = pools;
+  if (selected && selected.length > 0) {
+    const set = new Set(selected);
+    result = pools.filter((p) => set.has(p.name));
+  }
+  if (order && order.length > 0) {
+    const rank = new Map<string, number>();
+    order.forEach((name, i) => {
+      if (!rank.has(name)) rank.set(name, i);
+    });
+    // Stable sort: rank ranked pools by their position in `order`, and keep
+    // unranked pools (and ties) in their original relative order.
+    result = result
+      .map((p, i) => ({ p, i }))
+      .sort((a, b) => {
+        const ra = rank.has(a.p.name) ? (rank.get(a.p.name) as number) : Infinity;
+        const rb = rank.has(b.p.name) ? (rank.get(b.p.name) as number) : Infinity;
+        if (ra !== rb) return ra - rb;
+        return a.i - b.i;
+      })
+      .map((e) => e.p);
+  }
+  return result;
 }
 
 // ── Size-aware density ────────────────────────────────────────────────────────

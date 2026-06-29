@@ -169,6 +169,11 @@ export type TileSettings = {
      */
   truenasPools?: string[] | null;
   /**
+     * Explicit display order of TrueNAS ZFS pool (volume) names. Pools whose name appears here are shown first, in this order; any remaining pools follow in their server-reported order. Applies to both the dedicated ZFS Pools view and the pools section of the combined view. Null, absent, or empty keeps the server-reported order (the default, backward-compatible behavior).
+     * @nullable
+     */
+  truenasPoolOrder?: string[] | null;
+  /**
      * Free-form note text for a Note (post-it) tile. Null or absent means an empty note.
      * @nullable
      */

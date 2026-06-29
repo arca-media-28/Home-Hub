@@ -115,7 +115,13 @@ export default function TruenasTile({ enabled, density, tileSettings }: WidgetPr
     case "arc":
       return <ArcView data={data} density={density} />;
     case "pools":
-      return <PoolsView data={data} selectedPools={tileSettings?.truenasPools} />;
+      return (
+        <PoolsView
+          data={data}
+          selectedPools={tileSettings?.truenasPools}
+          poolOrder={tileSettings?.truenasPoolOrder}
+        />
+      );
     case "disks":
       return <DisksView data={data} />;
   }
@@ -149,7 +155,11 @@ export default function TruenasTile({ enabled, density, tileSettings }: WidgetPr
 
   // Narrow the pool list to the tile's selected volumes (empty/unset = all)
   // before measuring how many fit, so the reveal budget reflects what's shown.
-  const visiblePools = filterTruenasPools(data.pools, tileSettings?.truenasPools);
+  const visiblePools = filterTruenasPools(
+    data.pools,
+    tileSettings?.truenasPools,
+    tileSettings?.truenasPoolOrder,
+  );
   const poolCount =
     enabled.has("pools") && visiblePools.length > 0
       ? budget.list(SECTION_PX, ROW_PX, visiblePools.length)

@@ -27,6 +27,7 @@ import {
   allMetricKeys,
   TRUENAS_METRIC_VARIANTS,
   truenasMetricVariant,
+  filterTruenasPools,
 } from "@/components/tiles/metrics";
 import {
   resolveImageStyle,
@@ -135,7 +136,7 @@ import {
   type NewsItem,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Trash2, X, Pipette, RotateCcw } from "lucide-react";
+import { Trash2, X, Pipette, RotateCcw, ChevronUp, ChevronDown } from "lucide-react";
 
 export type EditMode = "create" | "edit";
 
@@ -254,6 +255,12 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
   // section of the combined view to those volumes.
   const [truenasPools, setTruenasPools] = useState<string[] | null>(
     tile?.tileSettings?.truenasPools ?? null,
+  );
+  // Explicit display order of TrueNAS volumes (ZFS pools). null/empty = keep the
+  // server-reported order (backward-compatible default). Volumes listed here are
+  // pinned to the top in this order; the rest follow in server order.
+  const [truenasPoolOrder, setTruenasPoolOrder] = useState<string[] | null>(
+    tile?.tileSettings?.truenasPoolOrder ?? null,
   );
   // qBittorrent category allow-list. null = "show all categories"; an explicit
   // array narrows the tile's torrent list to those categories.
@@ -492,6 +499,7 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
       setMetrics(tile?.metrics ?? null);
       setTruenasMetric(tile?.tileSettings?.truenasMetric ?? null);
       setTruenasPools(tile?.tileSettings?.truenasPools ?? null);
+      setTruenasPoolOrder(tile?.tileSettings?.truenasPoolOrder ?? null);
       setCategoryFilter(tile?.tileSettings?.categoryFilter ?? null);
       setGroupByCategory(tile?.tileSettings?.groupByCategory ?? false);
       setClockFormat(tile?.tileSettings?.clockFormat ?? "24");
@@ -841,6 +849,44 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
     setTruenasPools(coversAll ? null : next);
   }
 
+  // The volumes the tile actually shows, in their current display order. We mirror
+  // the runtime ordering (filter by selection, then apply the saved order) using
+  // the *server-reported* pool order as the base — not the alphabetical
+  // availablePools — so reordering reflects exactly what renders on the tile.
+  const reportedPoolNames = (truenasMetricsQuery.data?.pools ?? [])
+    .map((p) => p.name)
+    .filter((n): n is string => typeof n === "string" && n.length > 0);
+  const orderedVisiblePools = filterTruenasPools(
+    reportedPoolNames.map((name) => ({ name })),
+    truenasPools,
+    truenasPoolOrder,
+  ).map((p) => p.name);
+
+  function moveTruenasVolume(from: number, to: number) {
+    if (
+      from === to ||
+      from < 0 ||
+      to < 0 ||
+      from >= orderedVisiblePools.length ||
+      to >= orderedVisiblePools.length
+    ) {
+      return;
+    }
+    const next = [...orderedVisiblePools];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    // Collapse back to null ("server order") when the new order matches the
+    // natural server order of the same visible set, so the default stays
+    // backward-compatible and newly-appearing volumes keep flowing in server
+    // order. Otherwise persist the explicit order of the visible volumes.
+    const visibleSet = new Set(next);
+    const naturalOrder = reportedPoolNames.filter((n) => visibleSet.has(n));
+    const matchesServerOrder =
+      next.length === naturalOrder.length &&
+      next.every((n, i) => n === naturalOrder[i]);
+    setTruenasPoolOrder(matchesServerOrder ? null : next);
+  }
+
   function toggleCategory(category: string, checked: boolean) {
     // Start from the saved selection when present; otherwise (null = "all")
     // start from the full catalog so unchecking one leaves the rest selected.
@@ -1133,7 +1179,7 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
       // is merged in below regardless of integration.
       tileSettings: (() => {
         const widget = isTruenas
-          ? { truenasMetric, truenasPools }
+          ? { truenasMetric, truenasPools, truenasPoolOrder }
           : isQbittorrent
           ? { categoryFilter, groupByCategory }
           : isClock
@@ -2045,6 +2091,55 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
                         <span className="text-sm">{pool}</span>
                       </label>
                     ))}
+                  </div>
+                )}
+                {orderedVisiblePools.length > 1 && (
+                  <div className="space-y-2 pt-3">
+                    <Label>Volume order</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Move volumes up or down to set the order they appear on the
+                      tile.
+                    </p>
+                    <ul className="space-y-1 pt-1">
+                      {orderedVisiblePools.map((pool, index) => (
+                        <li
+                          key={pool}
+                          className="flex items-center justify-between gap-2 rounded-md border border-border px-2 py-1"
+                        >
+                          <span className="text-sm truncate">{pool}</span>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6"
+                              aria-label={`Move ${pool} up`}
+                              disabled={index === 0}
+                              onClick={() =>
+                                moveTruenasVolume(index, index - 1)
+                              }
+                            >
+                              <ChevronUp className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6"
+                              aria-label={`Move ${pool} down`}
+                              disabled={
+                                index === orderedVisiblePools.length - 1
+                              }
+                              onClick={() =>
+                                moveTruenasVolume(index, index + 1)
+                              }
+                            >
+                              <ChevronDown className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
                   </div>
                 )}
               </div>

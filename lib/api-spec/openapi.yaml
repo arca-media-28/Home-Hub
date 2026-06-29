@@ -1675,6 +1675,17 @@ components:
           type: ["array", "null"]
           items:
             type: string
+        truenasPoolOrder:
+          description: >-
+            Explicit display order of TrueNAS ZFS pool (volume) names. Pools
+            whose name appears here are shown first, in this order; any remaining
+            pools follow in their server-reported order. Applies to both the
+            dedicated ZFS Pools view and the pools section of the combined view.
+            Null, absent, or empty keeps the server-reported order (the default,
+            backward-compatible behavior).
+          type: ["array", "null"]
+          items:
+            type: string
         noteBody:
           description: >-
             Free-form note text for a Note (post-it) tile. Null or absent means
