@@ -4,6 +4,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -16,11 +17,13 @@ import {
   persistTheme,
   persistColors,
   applyThemeToDom,
+  wasSavedThemeDiscarded,
   type ThemeId,
   type CustomColors,
   type ColorOverrides,
   type ThemeMeta,
 } from "@/lib/theme";
+import { toast } from "@/hooks/use-toast";
 import {
   readCustomThemes,
   persistCustomThemes,
@@ -82,6 +85,25 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const [customThemes, setCustomThemes] = useState<CustomThemeMap>(() => readCustomThemes());
   const [theme, setThemeState] = useState<string>(() => readSavedTheme(readCustomThemes()));
   const [overrides, setOverrides] = useState<ColorOverrides>(() => readSavedColors());
+
+  // If the saved active theme pointed at a custom theme that no longer validates,
+  // readSavedTheme() already fell back to the default built-in. Tell the user once
+  // why their custom theme vanished, and repair the dangling pointer so the notice
+  // doesn't reappear on the next load.
+  const discardNoticeShown = useRef(false);
+  useEffect(() => {
+    if (discardNoticeShown.current) return;
+    if (wasSavedThemeDiscarded(customThemes)) {
+      discardNoticeShown.current = true;
+      persistTheme(theme);
+      toast({
+        title: "Custom theme reset",
+        description: "Your custom theme couldn't be loaded and was reset to the default.",
+      });
+    }
+    // Intentionally runs once on mount with the initial saved/parsed values.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const activeCustom: CustomThemeDefinition | undefined = isCustomThemeId(theme)
     ? customThemes[theme]

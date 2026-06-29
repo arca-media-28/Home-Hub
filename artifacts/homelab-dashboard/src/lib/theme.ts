@@ -198,6 +198,25 @@ export function readSavedTheme(customThemes: CustomThemeMap = {}): ThemeId | str
   }
 }
 
+/**
+ * True when the persisted active theme pointed at a custom theme that no longer
+ * resolves — i.e. `homehub:theme` holds a "custom:" id that is absent from the
+ * supplied (already-validated) custom-theme map. This is exactly the case where
+ * `readSavedTheme` silently falls back to the default built-in, so callers can
+ * surface a notice explaining why the user's custom theme disappeared.
+ *
+ * Returns false for normal loads, built-in themes, and custom themes that still
+ * resolve, so it never fires when the user simply switched themes.
+ */
+export function wasSavedThemeDiscarded(customThemes: CustomThemeMap = {}): boolean {
+  try {
+    const v = localStorage.getItem(THEME_KEY);
+    return !!v && isCustomThemeId(v) && !customThemes[v];
+  } catch {
+    return false;
+  }
+}
+
 export function readSavedColors(): ColorOverrides {
   try {
     const raw = localStorage.getItem(COLORS_KEY);
