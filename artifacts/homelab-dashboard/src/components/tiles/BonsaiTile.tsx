@@ -186,9 +186,137 @@ function lerpHex(a: string, b: string, t: number): string {
   return `#${c.map((v) => v.toString(16).padStart(2, "0")).join("")}`;
 }
 
-// A lush, healthy canopy green and the dry, wilted tone a parched tree fades to.
-const LEAF_LUSH = "#4ea832";
+// Darken a #rrggbb color toward near-black by amt in [0,1].
+function darken(hex: string, amt: number): string {
+  return lerpHex(hex, "#1b1b1b", amt);
+}
+
+// The dry, wilted tones a parched tree fades to (the healthy tone is the user's
+// chosen leaf color; only dryness pulls it toward these).
 const LEAF_DRY = "#a98a3c";
+const LEAF_DRY_DARK = "#7d6526";
+
+// ---------------------------------------------------------------------------
+// Appearance customization (cosmetic only — never affects living-state logic).
+// Pot color, foliage color, blossoms, and tree style are stored per-tile in
+// tileSettings and chosen in the Add/Edit tile modal, mirroring the Tamagotchi.
+// ---------------------------------------------------------------------------
+
+export type BonsaiStyle = "upright" | "slanted" | "windswept" | "cascade";
+
+export const DEFAULT_POT_COLOR = "terracotta";
+export const DEFAULT_LEAF_COLOR = "green";
+export const DEFAULT_BLOSSOM = "none";
+export const DEFAULT_STYLE: BonsaiStyle = "upright";
+
+// Each preset's `color` is the base #hex the renderer actually uses; a custom
+// #hex stored on the tile is used directly (see resolve* helpers).
+export const BONSAI_POT_COLORS: { value: string; label: string; color: string }[] = [
+  { value: "terracotta", label: "Terracotta", color: "#9c5a33" },
+  { value: "slate", label: "Slate", color: "#5b6770" },
+  { value: "charcoal", label: "Charcoal", color: "#3b3b3b" },
+  { value: "glazed", label: "Glazed blue", color: "#3f6f8f" },
+  { value: "cream", label: "Cream", color: "#cabfa6" },
+  { value: "moss", label: "Moss", color: "#5a6f3f" },
+];
+
+export const BONSAI_LEAF_COLORS: { value: string; label: string; color: string }[] = [
+  { value: "green", label: "Green", color: "#4ea832" },
+  { value: "emerald", label: "Emerald", color: "#2f9e5f" },
+  { value: "jade", label: "Jade", color: "#6fb98f" },
+  { value: "olive", label: "Olive", color: "#7a8c3f" },
+  { value: "maple", label: "Maple", color: "#b3472f" },
+  { value: "golden", label: "Golden", color: "#c9a227" },
+];
+
+// "none" yields a plain canopy; any other entry scatters small flowers.
+export const BONSAI_BLOSSOM_COLORS: { value: string; label: string; color: string | null }[] = [
+  { value: "none", label: "None", color: null },
+  { value: "pink", label: "Pink", color: "#f7a8c4" },
+  { value: "white", label: "White", color: "#f3f0ea" },
+  { value: "red", label: "Red", color: "#e0556b" },
+  { value: "lavender", label: "Lavender", color: "#c3a6e0" },
+  { value: "yellow", label: "Yellow", color: "#f3d35b" },
+];
+
+export const BONSAI_STYLE_OPTIONS: { value: BonsaiStyle; label: string }[] = [
+  { value: "upright", label: "Formal upright" },
+  { value: "slanted", label: "Slanted" },
+  { value: "windswept", label: "Windswept" },
+  { value: "cascade", label: "Cascade" },
+];
+
+// Resolve a stored value (preset key or custom #hex) to a usable #hex color.
+function resolveFromPresets(
+  presets: { value: string; color: string | null }[],
+  value: string | null | undefined,
+  fallback: string,
+): string {
+  if (typeof value === "string" && value.startsWith("#")) return value;
+  const preset = presets.find((p) => p.value === value);
+  if (preset && preset.color) return preset.color;
+  return fallback;
+}
+
+export function resolvePotColor(value: string | null | undefined): string {
+  return resolveFromPresets(BONSAI_POT_COLORS, value, BONSAI_POT_COLORS[0]!.color);
+}
+
+export function resolveLeafColor(value: string | null | undefined): string {
+  return resolveFromPresets(BONSAI_LEAF_COLORS, value, BONSAI_LEAF_COLORS[0]!.color);
+}
+
+// Blossoms can be turned off ("none" -> null = no flowers). A custom #hex is
+// honored; the "none" key (and anything unknown) yields null.
+export function resolveBlossomColor(value: string | null | undefined): string | null {
+  if (value == null || value === "none") return null;
+  if (value.startsWith("#")) return value;
+  const preset = BONSAI_BLOSSOM_COLORS.find((p) => p.value === value);
+  return preset?.color ?? null;
+}
+
+export function resolveStyle(value: string | null | undefined): BonsaiStyle {
+  if (BONSAI_STYLE_OPTIONS.some((o) => o.value === value)) return value as BonsaiStyle;
+  return DEFAULT_STYLE;
+}
+
+export interface BonsaiAppearance {
+  potColor: string | null;
+  leafColor: string | null;
+  blossom: string | null;
+  style: BonsaiStyle;
+}
+
+// Pull the cosmetic appearance keys off a tile, falling back to defaults. Read
+// straight from the tile prop (not the decayed local state) so modal edits show
+// immediately without disturbing the living-state machinery.
+function appearanceFromTile(tile: Tile): BonsaiAppearance {
+  const s = tile.tileSettings;
+  return {
+    potColor: s?.bonsaiPotColor ?? DEFAULT_POT_COLOR,
+    leafColor: s?.bonsaiLeafColor ?? DEFAULT_LEAF_COLOR,
+    blossom: s?.bonsaiBlossom ?? DEFAULT_BLOSSOM,
+    style: resolveStyle(s?.bonsaiStyle),
+  };
+}
+
+// Per-style canopy placement: where the trunk forks (and thus where the canopy
+// sits) plus a small rotation for character. The blob layout is shared across
+// styles; only this transform changes, so each species reads distinctly without
+// duplicating the canopy geometry.
+const STYLE_FORK: Record<BonsaiStyle, (trunkTop: number) => { x: number; y: number; rot: number }> = {
+  upright: (t) => ({ x: 50, y: t, rot: 0 }),
+  slanted: (t) => ({ x: 61, y: t + 2, rot: 7 }),
+  windswept: (t) => ({ x: 39, y: t + 1, rot: -9 }),
+  cascade: (t) => ({ x: 60, y: t + 22, rot: 12 }),
+};
+
+// A smooth S-curved trunk from the soil (50,80) up to the canopy fork.
+function trunkPath(fx: number, fy: number): string {
+  const mx = (50 + fx) / 2;
+  const my = (80 + fy) / 2;
+  return `M50 80 C48 72 ${mx - 4} ${my + 4} ${mx} ${my} S${fx - 2} ${fy + 5} ${fx} ${fy}`;
+}
 
 // Canopy layout per stage: the trunk's top height and the foliage blobs (cx, cy,
 // r on the 0-100 viewBox). Higher stages have a taller trunk and a fuller,
@@ -243,22 +371,36 @@ interface BonsaiTreeProps {
   stage: Stage;
   hydration: number;
   overgrowth: number;
+  appearance: BonsaiAppearance;
 }
 
 // The bonsai itself — a pot, a curved trunk, and a stage-sized canopy drawn on a
 // 0-100 SVG viewBox so it scales to any tile size via the container. Hydration
 // tints the foliage (lush green -> dry tan) and droops it when low; overgrowth
 // fades in scraggly offshoots beyond the tidy canopy.
-function BonsaiTree({ stage, hydration, overgrowth }: BonsaiTreeProps) {
+function BonsaiTree({ stage, hydration, overgrowth, appearance }: BonsaiTreeProps) {
   const blobs = STAGE_BLOBS[stage];
   const trunkTop = STAGE_TRUNK_TOP[stage];
-  // Drier soil = wilted tone + a slight downward droop of the canopy.
+  // Drier soil = wilted tone + a slight downward droop of the canopy. The user's
+  // chosen leaf color is the healthy tone; dryness pulls it toward dry tan.
   const dryness = 1 - hydration / 100;
-  const leaf = lerpHex(LEAF_LUSH, LEAF_DRY, dryness);
-  const leafDark = lerpHex("#3a7d24", "#7d6526", dryness);
+  const baseLeaf = resolveLeafColor(appearance.leafColor);
+  const leaf = lerpHex(baseLeaf, LEAF_DRY, dryness);
+  const leafDark = lerpHex(darken(baseLeaf, 0.4), LEAF_DRY_DARK, dryness);
   const droop = dryness * 6; // px on the viewBox
   // Scraggly offshoots fade in as overgrowth climbs past tidy.
   const sprigOpacity = Math.max(0, Math.min(0.9, (overgrowth - 35) / 65));
+
+  // Cosmetic pot color: chosen base for the body, a lighter tone for the rim.
+  const potBase = resolvePotColor(appearance.potColor);
+  const potRim = lerpHex(potBase, "#ffffff", 0.2);
+
+  // Optional blossoms scattered over the foliage.
+  const blossomColor = resolveBlossomColor(appearance.blossom);
+
+  // Style decides where the canopy sits and how the trunk curves up to it.
+  const fork = STYLE_FORK[appearance.style](trunkTop);
+  const canopyTransform = `translate(${fork.x - 50} ${fork.y - trunkTop + droop}) rotate(${fork.rot} 50 ${trunkTop})`;
 
   return (
     <svg
@@ -267,11 +409,8 @@ function BonsaiTree({ stage, hydration, overgrowth }: BonsaiTreeProps) {
       aria-hidden="true"
     >
       {/* Pot */}
-      <path
-        d="M30 80 L70 80 L65 96 L35 96 Z"
-        fill="#9c5a33"
-      />
-      <path d="M28 78 L72 78 L70 83 L30 83 Z" fill="#b87142" />
+      <path d="M30 80 L70 80 L65 96 L35 96 Z" fill={potBase} />
+      <path d="M28 78 L72 78 L70 83 L30 83 Z" fill={potRim} />
       {/* Soil — darkens when well watered, pales when dry. */}
       <ellipse
         cx={50}
@@ -281,32 +420,54 @@ function BonsaiTree({ stage, hydration, overgrowth }: BonsaiTreeProps) {
         fill={lerpHex("#7a5230", "#3f2a16", hydration / 100)}
       />
 
-      {/* Trunk: a gently curved path from the soil up to the canopy fork. */}
+      {/* Trunk: a curved path from the soil up to the style's canopy fork. */}
       <path
-        d={`M50 80 C46 ${72} 54 ${64} 49 ${trunkTop + 10} C46 ${trunkTop + 4} 52 ${trunkTop + 2} 50 ${trunkTop}`}
+        d={trunkPath(fork.x, fork.y)}
         stroke="#7a4a28"
         strokeWidth={stage === "mature" ? 6 : stage === "young" ? 5 : 4}
         strokeLinecap="round"
         fill="none"
       />
 
-      {/* Scraggly overgrowth offshoots (behind the canopy blobs). */}
+      {/* Scraggly overgrowth offshoots (behind the canopy blobs), swept along
+          with the canopy so they track the chosen style. */}
       {sprigOpacity > 0.02 && (
-        <g stroke={leafDark} strokeWidth={1.6} strokeLinecap="round" opacity={sprigOpacity}>
+        <g
+          transform={canopyTransform}
+          stroke={leafDark}
+          strokeWidth={1.6}
+          strokeLinecap="round"
+          opacity={sprigOpacity}
+        >
           {SPRIGS.map((s, i) => (
-            <line key={i} x1={s.x1} y1={s.y1 + droop} x2={s.x2} y2={s.y2 + droop} />
+            <line key={i} x1={s.x1} y1={s.y1} x2={s.x2} y2={s.y2} />
           ))}
         </g>
       )}
 
-      {/* Canopy: overlapping foliage blobs sized by stage. */}
-      <g transform={`translate(0 ${droop})`}>
+      {/* Canopy: overlapping foliage blobs sized by stage, positioned by style. */}
+      <g transform={canopyTransform}>
         {blobs.map((b, i) => (
           <circle key={`d${i}`} cx={b.cx} cy={b.cy + 1.5} r={b.r} fill={leafDark} />
         ))}
         {blobs.map((b, i) => (
           <circle key={`l${i}`} cx={b.cx} cy={b.cy} r={b.r} fill={leaf} />
         ))}
+        {/* Blossoms: a couple of small flowers per foliage blob. */}
+        {blossomColor &&
+          blobs.flatMap((b, i) => {
+            const fr = Math.max(1.6, b.r * 0.22);
+            const spots = [
+              { x: b.cx - b.r * 0.45, y: b.cy - b.r * 0.4 },
+              { x: b.cx + b.r * 0.5, y: b.cy + b.r * 0.05 },
+            ];
+            return spots.map((p, j) => (
+              <g key={`b${i}-${j}`}>
+                <circle cx={p.x} cy={p.y} r={fr} fill={blossomColor} />
+                <circle cx={p.x} cy={p.y} r={fr * 0.4} fill="rgba(255,255,255,0.6)" />
+              </g>
+            ));
+          })}
         {/* A soft highlight on the main canopy blob for a little depth. */}
         <circle
           cx={blobs[0]!.cx - blobs[0]!.r * 0.3}
@@ -316,6 +477,23 @@ function BonsaiTree({ stage, hydration, overgrowth }: BonsaiTreeProps) {
         />
       </g>
     </svg>
+  );
+}
+
+// A standalone, fixed-state bonsai preview for the editor — a healthy mature
+// tree so every cosmetic choice reads clearly regardless of the tile's live
+// state. Reuses BonsaiTree so the preview always matches the real tile.
+export function BonsaiPreview({
+  appearance,
+  size = 112,
+}: {
+  appearance: BonsaiAppearance;
+  size?: number;
+}) {
+  return (
+    <div style={{ width: size, height: size }}>
+      <BonsaiTree stage="mature" hydration={100} overgrowth={8} appearance={appearance} />
+    </div>
   );
 }
 
@@ -560,6 +738,9 @@ export default function BonsaiTile({ tile, editMode }: BonsaiTileProps) {
   const need = urgentNeed(tree);
   const readOnly = editMode;
   const tidiness = STAT_MAX - tree.overgrowth;
+  // Cosmetic look read straight from the tile prop so modal edits apply
+  // immediately without touching the decayed living-state.
+  const appearance = appearanceFromTile(tile);
 
   return (
     <div
@@ -643,7 +824,12 @@ export default function BonsaiTile({ tile, editMode }: BonsaiTileProps) {
               : "bonsai-sway 4s ease-in-out infinite",
           }}
         >
-          <BonsaiTree stage={stage} hydration={tree.hydration} overgrowth={tree.overgrowth} />
+          <BonsaiTree
+            stage={stage}
+            hydration={tree.hydration}
+            overgrowth={tree.overgrowth}
+            appearance={appearance}
+          />
 
           {/* Floating-icon burst on each care action. Keyed on reactionKey so
               repeating the same action restarts the animation. */}

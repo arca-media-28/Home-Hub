@@ -432,6 +432,26 @@ export type TileSettings = {
      * @nullable
      */
   bonsaiUpdatedAt?: number | null;
+  /**
+     * A Bonsai tile's pot color: a preset key (e.g. "terracotta", "slate", "glazed") or a custom #hex value. Cosmetic only. Null or absent uses the default preset.
+     * @nullable
+     */
+  bonsaiPotColor?: string | null;
+  /**
+     * A Bonsai tile's foliage color: a preset key (e.g. "green", "emerald", "maple") or a custom #hex value. The chosen color is the healthy tone; the tree still fades toward dry tan when thirsty. Cosmetic only. Null or absent uses the default preset.
+     * @nullable
+     */
+  bonsaiLeafColor?: string | null;
+  /**
+     * A Bonsai tile's blossom color: "none" for a plain canopy or a preset key (e.g. "pink", "white", "red") that scatters flowers over the foliage. Cosmetic only. Null or absent means no blossoms.
+     * @nullable
+     */
+  bonsaiBlossom?: string | null;
+  /**
+     * A Bonsai tile's tree shape/style (e.g. "upright", "slanted", "windswept", "cascade"). Cosmetic only. Null or absent uses the default upright style.
+     * @nullable
+     */
+  bonsaiStyle?: string | null;
 } | null | null;
 
 export interface Tile {

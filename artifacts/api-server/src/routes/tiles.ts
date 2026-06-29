@@ -89,6 +89,10 @@ interface TileSettings {
   bonsaiOvergrowth?: number | null;
   bonsaiGrowth?: number | null;
   bonsaiUpdatedAt?: number | null;
+  bonsaiPotColor?: string | null;
+  bonsaiLeafColor?: string | null;
+  bonsaiBlossom?: string | null;
+  bonsaiStyle?: string | null;
   truenasMetric?: "cpuram" | "network" | "arc" | "pools" | "disks" | null;
   truenasPools?: string[] | null;
 }
@@ -479,6 +483,26 @@ function pickTileSettings(obj: Record<string, unknown>): TileSettings {
     result.bonsaiUpdatedAt = obj["bonsaiUpdatedAt"];
   } else if (obj["bonsaiUpdatedAt"] === null) {
     result.bonsaiUpdatedAt = null;
+  }
+  if (typeof obj["bonsaiPotColor"] === "string") {
+    result.bonsaiPotColor = obj["bonsaiPotColor"];
+  } else if (obj["bonsaiPotColor"] === null) {
+    result.bonsaiPotColor = null;
+  }
+  if (typeof obj["bonsaiLeafColor"] === "string") {
+    result.bonsaiLeafColor = obj["bonsaiLeafColor"];
+  } else if (obj["bonsaiLeafColor"] === null) {
+    result.bonsaiLeafColor = null;
+  }
+  if (typeof obj["bonsaiBlossom"] === "string") {
+    result.bonsaiBlossom = obj["bonsaiBlossom"];
+  } else if (obj["bonsaiBlossom"] === null) {
+    result.bonsaiBlossom = null;
+  }
+  if (typeof obj["bonsaiStyle"] === "string") {
+    result.bonsaiStyle = obj["bonsaiStyle"];
+  } else if (obj["bonsaiStyle"] === null) {
+    result.bonsaiStyle = null;
   }
   return result;
 }

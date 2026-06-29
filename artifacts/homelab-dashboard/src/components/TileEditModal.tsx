@@ -85,6 +85,18 @@ import {
   type NoseStyle,
   type MouthStyle,
 } from "@/components/tiles/TamagotchiTile";
+import {
+  BONSAI_POT_COLORS,
+  BONSAI_LEAF_COLORS,
+  BONSAI_BLOSSOM_COLORS,
+  BONSAI_STYLE_OPTIONS,
+  DEFAULT_POT_COLOR,
+  DEFAULT_LEAF_COLOR,
+  DEFAULT_BLOSSOM,
+  DEFAULT_STYLE,
+  BonsaiPreview,
+  type BonsaiStyle,
+} from "@/components/tiles/BonsaiTile";
 import { SPORTS_LEAGUES, getLeagueTeams } from "@/lib/sports";
 import {
   fetchSleeperUser,
@@ -432,6 +444,24 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
   const [showPetColorPicker, setShowPetColorPicker] = useState(false);
   const [showNoteTextColorPicker, setShowNoteTextColorPicker] = useState(false);
 
+  // Bonsai appearance options. The tree's live state (hydration/overgrowth/
+  // growth) lives on the tile and is preserved on save; only the look is edited
+  // here.
+  const [bonsaiPotColor, setBonsaiPotColor] = useState<string>(
+    tile?.tileSettings?.bonsaiPotColor ?? DEFAULT_POT_COLOR,
+  );
+  const [bonsaiLeafColor, setBonsaiLeafColor] = useState<string>(
+    tile?.tileSettings?.bonsaiLeafColor ?? DEFAULT_LEAF_COLOR,
+  );
+  const [bonsaiBlossom, setBonsaiBlossom] = useState<string>(
+    tile?.tileSettings?.bonsaiBlossom ?? DEFAULT_BLOSSOM,
+  );
+  const [bonsaiStyle, setBonsaiStyle] = useState<BonsaiStyle>(
+    (tile?.tileSettings?.bonsaiStyle as BonsaiStyle) ?? DEFAULT_STYLE,
+  );
+  const [showBonsaiPotPicker, setShowBonsaiPotPicker] = useState(false);
+  const [showBonsaiLeafPicker, setShowBonsaiLeafPicker] = useState(false);
+
   useEffect(() => {
     if (open) {
       const placement = normalizePlacement(tile ?? {});
@@ -524,6 +554,12 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
       setPetEyes((tile?.tileSettings?.petEyes as EyeStyle) ?? DEFAULT_EYES);
       setPetNose((tile?.tileSettings?.petNose as NoseStyle) ?? DEFAULT_NOSE);
       setPetMouth((tile?.tileSettings?.petMouth as MouthStyle) ?? DEFAULT_MOUTH);
+      setBonsaiPotColor(tile?.tileSettings?.bonsaiPotColor ?? DEFAULT_POT_COLOR);
+      setBonsaiLeafColor(tile?.tileSettings?.bonsaiLeafColor ?? DEFAULT_LEAF_COLOR);
+      setBonsaiBlossom(tile?.tileSettings?.bonsaiBlossom ?? DEFAULT_BLOSSOM);
+      setBonsaiStyle((tile?.tileSettings?.bonsaiStyle as BonsaiStyle) ?? DEFAULT_STYLE);
+      setShowBonsaiPotPicker(false);
+      setShowBonsaiLeafPicker(false);
       setShowPetColorPicker(false);
       setShowNoteColorPicker(false);
       setShowNoteTextColorPicker(false);
@@ -590,6 +626,12 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
   // living state is operated in-place on the tile, so the editor strips
   // name/URL/image/background/metrics — only its size/position matter.
   const isTamagotchi = integration === TileIntegration.tamagotchi;
+  // The Bonsai is a self-contained living-plant toy. Like the Tamagotchi it
+  // paints its own surface (tree + stats + care buttons) with no header, and its
+  // living state is tended in-place on the tile, so the editor strips
+  // name/URL/image/background/metrics and instead exposes its cosmetic look
+  // (pot color, foliage color, blossoms, tree style).
+  const isBonsai = integration === TileIntegration.bonsai;
   // The spacer is a layout-only tile: an invisible gap with no name, URL,
   // image, background, or live data. Only its size/position matter, so the
   // editor strips every content field and shows a short description instead.
@@ -613,7 +655,7 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
   // Tiles that carry no link/image/background content: layout helpers plus the
   // note and timer, which paint their own surface.
   const isContentless =
-    isLayoutTile || isNote || isTimer || isEightball || isDice || isCoinFlip || isFortune || isTamagotchi;
+    isLayoutTile || isNote || isTimer || isEightball || isDice || isCoinFlip || isFortune || isTamagotchi || isBonsai;
 
   // Teams for the chosen leagues, for the dependent team multi-select. Sourced
   // from the baked-in catalog (ESPN's /teams endpoint isn't CORS-enabled), so
@@ -1048,7 +1090,7 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
       // A spacer carries no content at all; a divider keeps only its label
       // (name). Both clear url/background/image so converting an existing tile
       // into a layout tile leaves nothing behind.
-      name: isSpacer || isNote || isTimer || isTamagotchi ? "" : name || undefined,
+      name: isSpacer || isNote || isTimer || isTamagotchi || isBonsai ? "" : name || undefined,
       url: isContentless ? "" : url || undefined,
       // Send the raw value so clearing (null) reaches the body and the server
       // writes NULL; otherwise an undefined field is dropped and the old color
@@ -1178,7 +1220,21 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
                                   petEnergy: tile?.tileSettings?.petEnergy ?? null,
                                   petUpdatedAt: tile?.tileSettings?.petUpdatedAt ?? null,
                                 }
-                              : null;
+                              : isBonsai
+                                ? {
+                                    // Appearance is edited here; the tree's live
+                                    // state is persisted by the tile itself, so
+                                    // preserve whatever is already stored.
+                                    bonsaiPotColor,
+                                    bonsaiLeafColor,
+                                    bonsaiBlossom,
+                                    bonsaiStyle,
+                                    bonsaiHydration: tile?.tileSettings?.bonsaiHydration ?? null,
+                                    bonsaiOvergrowth: tile?.tileSettings?.bonsaiOvergrowth ?? null,
+                                    bonsaiGrowth: tile?.tileSettings?.bonsaiGrowth ?? null,
+                                    bonsaiUpdatedAt: tile?.tileSettings?.bonsaiUpdatedAt ?? null,
+                                  }
+                                : null;
         // Only emit a settings object when there is something to store; an
         // un-scrolled plain tile keeps tileSettings null as before.
         if (!widget && !scrollable) return null;
@@ -1506,6 +1562,184 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
                     </SelectTrigger>
                     <SelectContent>
                       {PET_MOUTH_OPTIONS.map((o) => (
+                        <SelectItem key={o.value} value={o.value}>
+                          {o.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {isBonsai && (
+            <div className="space-y-4 border-t border-border pt-4">
+              <p className="text-sm text-muted-foreground">
+                A living bonsai. Water it, prune it, and watch it grow right on
+                the tile — its hydration and tidiness slowly drift over real
+                time. Personalize its look below; this is cosmetic only and does
+                not affect how it grows.
+              </p>
+
+              {/* Live preview of the chosen look (a healthy mature tree). */}
+              <div className="flex justify-center">
+                <BonsaiPreview
+                  appearance={{
+                    potColor: bonsaiPotColor,
+                    leafColor: bonsaiLeafColor,
+                    blossom: bonsaiBlossom,
+                    style: bonsaiStyle,
+                  }}
+                  size={120}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>Pot color</Label>
+                <div className="flex flex-wrap items-center gap-2">
+                  {BONSAI_POT_COLORS.map((preset) => (
+                    <button
+                      key={preset.value}
+                      type="button"
+                      onClick={() => setBonsaiPotColor(preset.value)}
+                      title={preset.label}
+                      aria-label={preset.label}
+                      aria-pressed={bonsaiPotColor === preset.value}
+                      className={`h-8 w-8 rounded-full border shadow-sm transition-transform hover:scale-105 ${
+                        bonsaiPotColor === preset.value
+                          ? "ring-2 ring-ring ring-offset-2 ring-offset-background"
+                          : "border-border"
+                      }`}
+                      style={{ background: preset.color }}
+                    />
+                  ))}
+                </div>
+                <div className="flex items-center gap-2 pt-1">
+                  <button
+                    type="button"
+                    className="w-8 h-8 rounded-md border border-border flex-shrink-0 shadow-sm"
+                    style={{ background: bonsaiPotColor }}
+                    onClick={() => setShowBonsaiPotPicker((v) => !v)}
+                    aria-label="Pick custom pot color"
+                  />
+                  <Input
+                    value={bonsaiPotColor}
+                    onChange={(e) => setBonsaiPotColor(e.target.value)}
+                    placeholder="#9c5a33 or preset name"
+                    className="font-mono text-sm"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="flex-shrink-0"
+                    onClick={() => setBonsaiPotColor(DEFAULT_POT_COLOR)}
+                    disabled={bonsaiPotColor === DEFAULT_POT_COLOR}
+                    title="Reset to default pot color"
+                    aria-label="Reset to default pot color"
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                  </Button>
+                </div>
+                {showBonsaiPotPicker && (
+                  <div className="mt-2">
+                    <HexColorPicker
+                      color={bonsaiPotColor.startsWith("#") ? bonsaiPotColor : "#9c5a33"}
+                      onChange={setBonsaiPotColor}
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>Foliage color</Label>
+                <div className="flex flex-wrap items-center gap-2">
+                  {BONSAI_LEAF_COLORS.map((preset) => (
+                    <button
+                      key={preset.value}
+                      type="button"
+                      onClick={() => setBonsaiLeafColor(preset.value)}
+                      title={preset.label}
+                      aria-label={preset.label}
+                      aria-pressed={bonsaiLeafColor === preset.value}
+                      className={`h-8 w-8 rounded-full border shadow-sm transition-transform hover:scale-105 ${
+                        bonsaiLeafColor === preset.value
+                          ? "ring-2 ring-ring ring-offset-2 ring-offset-background"
+                          : "border-border"
+                      }`}
+                      style={{ background: preset.color }}
+                    />
+                  ))}
+                </div>
+                <div className="flex items-center gap-2 pt-1">
+                  <button
+                    type="button"
+                    className="w-8 h-8 rounded-md border border-border flex-shrink-0 shadow-sm"
+                    style={{ background: bonsaiLeafColor }}
+                    onClick={() => setShowBonsaiLeafPicker((v) => !v)}
+                    aria-label="Pick custom foliage color"
+                  />
+                  <Input
+                    value={bonsaiLeafColor}
+                    onChange={(e) => setBonsaiLeafColor(e.target.value)}
+                    placeholder="#4ea832 or preset name"
+                    className="font-mono text-sm"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="flex-shrink-0"
+                    onClick={() => setBonsaiLeafColor(DEFAULT_LEAF_COLOR)}
+                    disabled={bonsaiLeafColor === DEFAULT_LEAF_COLOR}
+                    title="Reset to default foliage color"
+                    aria-label="Reset to default foliage color"
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                  </Button>
+                </div>
+                {showBonsaiLeafPicker && (
+                  <div className="mt-2">
+                    <HexColorPicker
+                      color={bonsaiLeafColor.startsWith("#") ? bonsaiLeafColor : "#4ea832"}
+                      onChange={setBonsaiLeafColor}
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label>Blossoms</Label>
+                  <Select
+                    value={bonsaiBlossom}
+                    onValueChange={(v) => setBonsaiBlossom(v)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {BONSAI_BLOSSOM_COLORS.map((o) => (
+                        <SelectItem key={o.value} value={o.value}>
+                          {o.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label>Tree style</Label>
+                  <Select
+                    value={bonsaiStyle}
+                    onValueChange={(v) => setBonsaiStyle(v as BonsaiStyle)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {BONSAI_STYLE_OPTIONS.map((o) => (
                         <SelectItem key={o.value} value={o.value}>
                           {o.label}
                         </SelectItem>
