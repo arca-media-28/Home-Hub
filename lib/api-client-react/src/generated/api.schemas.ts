@@ -358,10 +358,15 @@ export type TileSettings = {
      */
   pomodoroCompletedSessions?: number | null;
   /**
-     * Whether a countdown Timer tile plays a chime and fires a browser notification when it reaches zero. Null or absent means disabled.
+     * Whether a Timer tile alerts on completion (countdown) or phase change (pomodoro) by playing a sound and/or firing a browser notification. Null or absent means disabled.
      * @nullable
      */
   timerAlertEnabled?: boolean | null;
+  /**
+     * Which alert sound a Timer tile plays when it alerts: "chime", "bell", "beep", or "digital", or "none" for a browser notification only. Honored for both countdown completion and pomodoro phase transitions. Null or absent defaults to "chime".
+     * @nullable
+     */
+  timerAlertSound?: 'chime' | 'bell' | 'beep' | 'digital' | 'none' | null;
   /**
      * Die type for a Dice Roller tile, e.g. "d4", "d6", "d20". The number after the "d" is the number of sides each die has. Null or absent defaults to "d6".
      * @nullable

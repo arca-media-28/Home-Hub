@@ -13,3 +13,4 @@ Pomodoro is a third `timerMode` (alongside countup/countdown) on the single Time
 - **Why:** task required accuracy across refresh/navigation using the same anchor-timestamp approach as the other modes.
 - applyRun now always persists pomodoroPhase + pomodoroCompletedSessions (harmless for countup/countdown). Editing config in the modal resets the cycle to focus/0, like the existing run-state reset.
 - Whitelist: new keys MUST be added to pickTileSettings() in api-server routes/tiles.ts or saves silently drop them (see tile-settings-whitelist memory).
+- Alert sound is user-pickable (timerAlertSound: chime|bell|beep|digital|none) in lib/timerAlert.ts via playTimerSound(sound); "none" = notification only. Sounds are pure Web Audio note recipes (no asset files). The alert enable+sound picker in TileEditModal now shows for BOTH countdown and pomodoro (was countdown-only); both modes honor the chosen sound.

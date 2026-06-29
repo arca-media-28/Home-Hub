@@ -64,6 +64,12 @@ import {
   DEFAULT_POMODORO_SESSIONS,
 } from "@/components/tiles/TimerTile";
 import {
+  TIMER_ALERT_SOUND_OPTIONS,
+  DEFAULT_TIMER_ALERT_SOUND,
+  playTimerSound,
+  type TimerAlertSound,
+} from "@/lib/timerAlert";
+import {
   DICE_TYPES,
   DEFAULT_DICE_TYPE,
   DEFAULT_DICE_COUNT,
@@ -303,6 +309,11 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
   const [timerAlertEnabled, setTimerAlertEnabled] = useState<boolean>(
     tile?.tileSettings?.timerAlertEnabled ?? false,
   );
+  // Which alert sound plays when the timer alerts (or "none" for notify-only).
+  const [timerAlertSound, setTimerAlertSound] = useState<TimerAlertSound>(
+    (tile?.tileSettings?.timerAlertSound as TimerAlertSound | undefined) ??
+      DEFAULT_TIMER_ALERT_SOUND,
+  );
   // Dice Roller options: which die type to roll and how many.
   const [diceType, setDiceType] = useState<DiceType>(
     tile?.tileSettings?.diceType ?? DEFAULT_DICE_TYPE,
@@ -508,6 +519,10 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
             DEFAULT_POMODORO_SESSIONS,
         );
         setTimerAlertEnabled(tile?.tileSettings?.timerAlertEnabled ?? false);
+        setTimerAlertSound(
+          (tile?.tileSettings?.timerAlertSound as TimerAlertSound | undefined) ??
+            DEFAULT_TIMER_ALERT_SOUND,
+        );
       }
       setDiceType((tile?.tileSettings?.diceType as DiceType) ?? DEFAULT_DICE_TYPE);
       setDiceCount(tile?.tileSettings?.diceCount ?? DEFAULT_DICE_COUNT);
@@ -1151,9 +1166,11 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
                 ),
                 pomodoroPhase: "focus" as const,
                 pomodoroCompletedSessions: 0,
-                // Only countdown timers can finish; persist the alert choice
-                // regardless of mode so it sticks when switching back.
+                // Persist the alert choice regardless of mode so it sticks when
+                // switching back. The sound is honored by both countdown
+                // completion and pomodoro phase transitions.
                 timerAlertEnabled,
+                timerAlertSound,
               }
             : isWeather
               ? {
@@ -2299,35 +2316,85 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
                   </div>
                 </div>
               )}
-              {timerMode === "countdown" && (
-                <div className="space-y-1.5">
-                  <label
-                    htmlFor="timer-alert"
-                    className="flex items-center gap-2 cursor-pointer select-none"
-                  >
-                    <Checkbox
-                      id="timer-alert"
-                      checked={timerAlertEnabled}
-                      onCheckedChange={(c) => {
-                        const on = c === true;
-                        setTimerAlertEnabled(on);
-                        // Request notification permission up front so the alert
-                        // can fire later without a user gesture.
-                        if (
-                          on &&
-                          typeof Notification !== "undefined" &&
-                          Notification.permission === "default"
-                        ) {
-                          void Notification.requestPermission();
-                        }
-                      }}
-                    />
-                    <span className="text-sm">Alert when finished</span>
-                  </label>
-                  <p className="text-[11px] text-muted-foreground">
-                    Plays a chime and shows a browser notification when the
-                    countdown reaches zero.
-                  </p>
+              {(timerMode === "countdown" || timerMode === "pomodoro") && (
+                <div className="space-y-2.5">
+                  <div className="space-y-1.5">
+                    <label
+                      htmlFor="timer-alert"
+                      className="flex items-center gap-2 cursor-pointer select-none"
+                    >
+                      <Checkbox
+                        id="timer-alert"
+                        checked={timerAlertEnabled}
+                        onCheckedChange={(c) => {
+                          const on = c === true;
+                          setTimerAlertEnabled(on);
+                          // Request notification permission up front so the alert
+                          // can fire later without a user gesture.
+                          if (
+                            on &&
+                            typeof Notification !== "undefined" &&
+                            Notification.permission === "default"
+                          ) {
+                            void Notification.requestPermission();
+                          }
+                        }}
+                      />
+                      <span className="text-sm">
+                        {timerMode === "pomodoro"
+                          ? "Alert on phase change"
+                          : "Alert when finished"}
+                      </span>
+                    </label>
+                    <p className="text-[11px] text-muted-foreground">
+                      {timerMode === "pomodoro"
+                        ? "Plays a sound and shows a browser notification each time a focus or break phase ends."
+                        : "Plays a sound and shows a browser notification when the countdown reaches zero."}
+                    </p>
+                  </div>
+                  {timerAlertEnabled && (
+                    <div className="space-y-1.5">
+                      <Label>Alert sound</Label>
+                      <div className="flex items-center gap-2">
+                        <Select
+                          value={timerAlertSound}
+                          onValueChange={(v) => {
+                            const sound = v as TimerAlertSound;
+                            setTimerAlertSound(sound);
+                            // Preview the chosen sound so picking is a one-click
+                            // audition. The select click counts as the gesture
+                            // browsers require to unmute the AudioContext.
+                            playTimerSound(sound);
+                          }}
+                        >
+                          <SelectTrigger className="flex-1">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {TIMER_ALERT_SOUND_OPTIONS.map((o) => (
+                              <SelectItem key={o.value} value={o.value}>
+                                {o.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={timerAlertSound === "none"}
+                          onClick={() => playTimerSound(timerAlertSound)}
+                          aria-label="Preview alert sound"
+                        >
+                          Preview
+                        </Button>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground">
+                        Choose "None" to show a browser notification without a
+                        sound.
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
               <p className="text-xs text-muted-foreground">

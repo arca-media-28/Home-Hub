@@ -75,6 +75,7 @@ interface TileSettings {
   pomodoroPhase?: "focus" | "shortBreak" | "longBreak" | null;
   pomodoroCompletedSessions?: number | null;
   timerAlertEnabled?: boolean | null;
+  timerAlertSound?: "chime" | "bell" | "beep" | "digital" | "none" | null;
   diceType?: string | null;
   diceCount?: number | null;
   petHunger?: number | null;
@@ -413,6 +414,17 @@ function pickTileSettings(obj: Record<string, unknown>): TileSettings {
     result.timerAlertEnabled = obj["timerAlertEnabled"];
   } else if (obj["timerAlertEnabled"] === null) {
     result.timerAlertEnabled = null;
+  }
+  if (
+    obj["timerAlertSound"] === "chime" ||
+    obj["timerAlertSound"] === "bell" ||
+    obj["timerAlertSound"] === "beep" ||
+    obj["timerAlertSound"] === "digital" ||
+    obj["timerAlertSound"] === "none"
+  ) {
+    result.timerAlertSound = obj["timerAlertSound"];
+  } else if (obj["timerAlertSound"] === null) {
+    result.timerAlertSound = null;
   }
   if (typeof obj["diceType"] === "string") {
     result.diceType = obj["diceType"];

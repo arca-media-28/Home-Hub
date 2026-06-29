@@ -3,7 +3,12 @@ import type { Tile, TileSettings } from "@workspace/api-client-react";
 import { useUpdateTile, getGetTilesQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Play, Pause, RotateCcw } from "lucide-react";
-import { playTimerChime, showTimerNotification } from "@/lib/timerAlert";
+import {
+  playTimerSound,
+  showTimerNotification,
+  DEFAULT_TIMER_ALERT_SOUND,
+  type TimerAlertSound,
+} from "@/lib/timerAlert";
 
 // Default countdown duration (5 minutes) when a countdown tile has none set.
 export const DEFAULT_TIMER_DURATION_SECONDS = 5 * 60;
@@ -114,6 +119,9 @@ export default function TimerTile({ tile, editMode }: TimerTileProps) {
   const durationMs =
     (tile.tileSettings?.timerDuration ?? DEFAULT_TIMER_DURATION_SECONDS) * 1000;
   const alertEnabled = tile.tileSettings?.timerAlertEnabled ?? false;
+  const alertSound =
+    (tile.tileSettings?.timerAlertSound as TimerAlertSound | undefined) ??
+    DEFAULT_TIMER_ALERT_SOUND;
 
   // Pomodoro configuration (minutes -> ms), with classic-technique defaults.
   const focusMs =
@@ -231,7 +239,7 @@ export default function TimerTile({ tile, editMode }: TimerTileProps) {
       // resumes a timer that has already elapsed (it loads as running, then
       // this effect settles it to finished).
       if (alertEnabled) {
-        playTimerChime();
+        playTimerSound(alertSound);
         showTimerNotification(
           tile.name?.trim() ? tile.name : "Timer",
           "Your countdown has finished.",
@@ -280,7 +288,7 @@ export default function TimerTile({ tile, editMode }: TimerTileProps) {
       // several intervals elapsed during a refresh/hidden tab, so this fires once
       // per advance — no double-firing across multiple skipped phases.
       if (alertEnabled) {
-        playTimerChime();
+        playTimerSound(alertSound);
         const tileName = tile.name?.trim() ? tile.name : "Pomodoro";
         const body =
           phase === "focus"
