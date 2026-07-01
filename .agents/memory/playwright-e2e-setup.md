@@ -13,7 +13,8 @@ Root config `playwright.config.ts` + specs under `tests/e2e/`; run with `pnpm ru
 
 ## Pointing the suite at a server
 - Default `baseURL` is `http://localhost:3000` and the config auto-boots `pnpm run dev:local` as a webServer (CI path; off-Replit the Vite `/api` proxy is ON).
-- **On Replit the Vite `/api` proxy is OFF** (gated on REPL_ID), so localhost:3000 has no API. To verify locally here, run against the platform-proxied dev domain which path-routes `/api` to the API server: `E2E_BASE_URL="https://$REPLIT_DEV_DOMAIN" pnpm exec playwright test` (setting E2E_BASE_URL skips the embedded webServer).
+- **On Replit the Vite `/api` proxy is OFF** (gated on REPL_ID), so localhost:3000 has no API. To verify locally here, run against the platform-proxied dev domain which path-routes `/api` to the API server: `E2E_BASE_URL="https://$REPLIT_DEV_DOMAIN" pnpm exec playwright test` (setting E2E_BASE_URL skips the embedded webServer) — but this needs a running workflow, else 502.
+- **Simplest reliable local run**: `env -u REPL_ID pnpm exec playwright test <spec>`. Unsetting REPL_ID turns the Vite `/api` proxy back ON, and Playwright's embedded webServer (`pnpm run dev:local`, boots api:5000 + web:3000) inherits the env, so localhost:3000 serves both app and API. Playwright manages the server lifecycle (no flaky manual nohup). chromium must be installed first (`pnpm exec playwright install chromium` + `installSystemDependencies` — param is `packages`, not `dependencies`).
 
 ## Auth in tests (NOT cookies)
 - Auth is a **Bearer JWT**: `POST /api/auth/register` (or `/login`) returns `{ token, user }`; the web app stores it in `localStorage["token"]` and sends `Authorization: Bearer <token>`.

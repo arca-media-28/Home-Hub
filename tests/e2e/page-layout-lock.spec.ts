@@ -177,7 +177,7 @@ test("a page can be locked to a fixed scale preset that survives reload and resi
 
 // ---------------------------------------------------------------------------
 // Regression coverage for: the bottom of a fixed-scale page is clipped on a
-// COLD refresh (task #258).
+// COLD refresh (task #258, broadened in #259).
 //
 // A locked fixed page reserves its outer container height as
 // intrinsicHeight * scale with overflow-hidden. The intrinsic height is read by
@@ -186,86 +186,137 @@ test("a page can be locked to a fixed scale preset that survives reload and resi
 // placeholder and the scaled wrapper does not exist yet — the effect finds a
 // null ref and bails. If it never re-runs when the grid finally mounts, the
 // reserved height stays stale and overflow-hidden clips the bottom rows. A
-// settings round-trip remounts the dashboard and masks the bug, so this test
-// loads the fixed page cold (tiles fetched fresh, no Settings toggle) and
-// asserts the reserved outer height matches the scaled grid height.
+// settings round-trip remounts the dashboard and masks the bug, so these tests
+// load the fixed page cold (tiles fetched fresh, no Settings toggle) and assert
+// the reserved outer height matches the scaled grid height.
+//
+// The same measurement-timing path runs for every preset and orientation, so a
+// regression could reappear in a combination the original single-scenario test
+// (2K landscape) never exercised. Each scenario below drives the flow through a
+// different preset/orientation/viewport, including a portrait fixed page and a
+// scale<1 case (a dense preset on a small viewport), reusing the same
+// transform-independent probe (grid.offsetHeight * scale vs. reserved outer
+// height; data-testid="fixed-scale-wrapper").
 // ---------------------------------------------------------------------------
-test("a fixed-scale page shows its full height on a cold refresh (no bottom clip)", async ({
-  page,
-}) => {
-  const username = `layoutclip_${rand()}`;
-  const password = `Pw_${rand()}!`;
+type ColdRefreshScenario = {
+  name: string;
+  preset: RegExp;
+  // Undefined = leave the default (landscape) orientation.
+  orientation?: RegExp;
+  viewport: { width: number; height: number };
+};
 
-  const reg = await page.request.post("/api/auth/register", {
-    data: { username, password },
-  });
-  expect(reg.ok(), `register failed: ${reg.status()}`).toBeTruthy();
-  const { token } = (await reg.json()) as { token: string };
-  expect(token, "register returned no token").toBeTruthy();
-  const authHeaders = { Authorization: `Bearer ${token}` };
+const coldRefreshScenarios: ColdRefreshScenario[] = [
+  // Original coverage: a landscape preset scaled UP to a wide viewport.
+  {
+    name: "2K landscape",
+    preset: /^2K$/,
+    viewport: { width: 1920, height: 1080 },
+  },
+  // Portrait fixed preset: scale is clamped by width (min of height/width fit),
+  // and the measurement-timing path runs through the portrait branch.
+  {
+    name: "1080p portrait",
+    preset: /^1080p$/,
+    orientation: /Vertical/,
+    viewport: { width: 900, height: 1400 },
+  },
+  // Dense preset on a small viewport → the fixed canvas is much wider than the
+  // screen, so scale < 1. This is where the align-items:stretch feedback loop
+  // and any stale-measurement clip are most likely to resurface.
+  {
+    name: "4K dense (scale < 1)",
+    preset: /^4K$/,
+    viewport: { width: 1100, height: 800 },
+  },
+];
 
-  // Seed several tiles stacked across many rows so the intrinsic grid height is
-  // large — a stale/unset reserved height would clip the lower rows visibly.
-  for (let row = 0; row < 5; row++) {
-    const res = await page.request.post("/api/tiles", {
-      data: { name: `Row ${row}`, gridX: 0, gridY: row * 4, gridW: 4, gridH: 4 },
-      headers: authHeaders,
+for (const scenario of coldRefreshScenarios) {
+  test(`a fixed-scale ${scenario.name} page shows its full height on a cold refresh (no bottom clip)`, async ({
+    page,
+  }) => {
+    const username = `layoutclip_${rand()}`;
+    const password = `Pw_${rand()}!`;
+
+    const reg = await page.request.post("/api/auth/register", {
+      data: { username, password },
     });
-    expect(res.ok(), `tile create failed: ${res.status()}`).toBeTruthy();
-  }
+    expect(reg.ok(), `register failed: ${reg.status()}`).toBeTruthy();
+    const { token } = (await reg.json()) as { token: string };
+    expect(token, "register returned no token").toBeTruthy();
+    const authHeaders = { Authorization: `Bearer ${token}` };
 
-  await page.addInitScript((t) => {
-    window.localStorage.setItem("token", t as string);
-  }, token);
+    // Seed several tiles stacked across many rows so the intrinsic grid height
+    // is large — a stale/unset reserved height would clip the lower rows.
+    for (let row = 0; row < 5; row++) {
+      const res = await page.request.post("/api/tiles", {
+        data: { name: `Row ${row}`, gridX: 0, gridY: row * 4, gridW: 4, gridH: 4 },
+        headers: authHeaders,
+      });
+      expect(res.ok(), `tile create failed: ${res.status()}`).toBeTruthy();
+    }
 
-  // Lock the page to a fixed 2K/QHD landscape preset (once), via edit mode.
-  await page.setViewportSize({ width: 1920, height: 1080 });
-  await page.goto("/");
-  await page.locator(".react-grid-layout").waitFor();
-  await page.getByRole("button", { name: /^Edit$/ }).click();
-  await page.getByRole("button", { name: /Auto \/ responsive/i }).click();
-  await page.getByRole("menuitemradio", { name: /^2K$/ }).click();
-  await page.getByRole("button", { name: /^Done$/ }).click();
-  await expect(page.getByTestId("fixed-scale-wrapper")).toBeVisible();
+    await page.addInitScript((t) => {
+      window.localStorage.setItem("token", t as string);
+    }, token);
 
-  // Probe: the outer clipping container's height must match the scaled grid
-  // height (grid.offsetHeight * scaleY). offsetHeight ignores CSS transforms, so
-  // this is the transform-independent true layout height. A bottom clip shows up
-  // as the reserved outer height being smaller than the scaled grid height.
-  const clipProbe = () =>
-    page.evaluate(() => {
-      const grid = document.querySelector<HTMLElement>(".react-grid-layout");
-      const wrap = document.querySelector<HTMLElement>(
-        '[data-testid="fixed-scale-wrapper"]',
-      );
-      const outer = wrap?.parentElement as HTMLElement | undefined;
-      if (!grid || !wrap || !outer) throw new Error("grid/wrapper not found");
-      const scaleY = new DOMMatrixReadOnly(getComputedStyle(wrap).transform).d;
-      return {
-        scaledGridHeight: grid.offsetHeight * scaleY,
-        reservedHeight: outer.getBoundingClientRect().height,
-      };
-    });
-
-  // --- COLD refresh: reload the fixed page with tiles fetched fresh ----------
-  // This is the exact scenario the bug fires in — no Settings round-trip to
-  // remount the dashboard and hide the stale measurement.
-  for (let i = 0; i < 3; i++) {
+    // Lock the page to the scenario's fixed preset (and orientation) once, via
+    // edit mode. Selecting a radio item closes the menu, so re-open the trigger
+    // for each selection.
+    await page.setViewportSize(scenario.viewport);
     await page.goto("/");
     await page.locator(".react-grid-layout").waitFor();
+    await page.getByRole("button", { name: /^Edit$/ }).click();
+    await page.getByRole("button", { name: /Auto \/ responsive/i }).click();
+    await page.getByRole("menuitemradio", { name: scenario.preset }).click();
+    if (scenario.orientation) {
+      await page
+        .getByRole("button", { name: /Vertical|Horizontal|2K|4K|1080p|Compact/ })
+        .click();
+      await page.getByRole("menuitemradio", { name: scenario.orientation }).click();
+    }
+    await page.getByRole("button", { name: /^Done$/ }).click();
     await expect(page.getByTestId("fixed-scale-wrapper")).toBeVisible();
-    // Let the loading→loaded ResizeObserver measurement settle.
-    await expect
-      .poll(async () => (await clipProbe()).reservedHeight, { timeout: 10_000 })
-      .toBeGreaterThan(20);
 
-    const { scaledGridHeight, reservedHeight } = await clipProbe();
-    // The reserved (clipping) height must be at least the scaled grid height —
-    // anything less means the bottom rows are clipped and unreachable. Allow a
-    // couple px of sub-pixel rounding slack.
-    expect(
-      reservedHeight,
-      `cold refresh #${i}: reserved height ${reservedHeight} clips scaled grid ${scaledGridHeight}`,
-    ).toBeGreaterThanOrEqual(scaledGridHeight - 2);
-  }
-});
+    // Probe: the outer clipping container's height must match the scaled grid
+    // height (grid.offsetHeight * scaleY). offsetHeight ignores CSS transforms,
+    // so this is the transform-independent true layout height. A bottom clip
+    // shows up as the reserved outer height being smaller than the scaled grid.
+    const clipProbe = () =>
+      page.evaluate(() => {
+        const grid = document.querySelector<HTMLElement>(".react-grid-layout");
+        const wrap = document.querySelector<HTMLElement>(
+          '[data-testid="fixed-scale-wrapper"]',
+        );
+        const outer = wrap?.parentElement as HTMLElement | undefined;
+        if (!grid || !wrap || !outer) throw new Error("grid/wrapper not found");
+        const scaleY = new DOMMatrixReadOnly(getComputedStyle(wrap).transform).d;
+        return {
+          scaledGridHeight: grid.offsetHeight * scaleY,
+          reservedHeight: outer.getBoundingClientRect().height,
+        };
+      });
+
+    // --- COLD refresh: reload the fixed page with tiles fetched fresh --------
+    // This is the exact scenario the bug fires in — no Settings round-trip to
+    // remount the dashboard and hide the stale measurement.
+    for (let i = 0; i < 3; i++) {
+      await page.goto("/");
+      await page.locator(".react-grid-layout").waitFor();
+      await expect(page.getByTestId("fixed-scale-wrapper")).toBeVisible();
+      // Let the loading→loaded ResizeObserver measurement settle.
+      await expect
+        .poll(async () => (await clipProbe()).reservedHeight, { timeout: 10_000 })
+        .toBeGreaterThan(20);
+
+      const { scaledGridHeight, reservedHeight } = await clipProbe();
+      // The reserved (clipping) height must be at least the scaled grid height —
+      // anything less means the bottom rows are clipped and unreachable. Allow a
+      // couple px of sub-pixel rounding slack.
+      expect(
+        reservedHeight,
+        `${scenario.name} cold refresh #${i}: reserved height ${reservedHeight} clips scaled grid ${scaledGridHeight}`,
+      ).toBeGreaterThanOrEqual(scaledGridHeight - 2);
+    }
+  });
+}
