@@ -552,6 +552,15 @@ export default function Dashboard() {
   // observed inner element never resizes in response, so there's no feedback
   // loop. The value guard keeps an unchanged measurement from re-rendering. Only
   // the locked fixed branch attaches scaleInnerRef; otherwise the height clears.
+  //
+  // isLoading and tiles.length are dependencies (not just fixedLayout/width): on
+  // a hard refresh the tiles are still fetching, so the render shows the
+  // "Loading tiles…" placeholder and the scaled wrapper (with its ref) does not
+  // exist yet. Without these deps the effect would run once against a null ref,
+  // bail, and never re-run when the grid finally mounts — leaving intrinsicHeight
+  // stale so the outer overflow-hidden clips the bottom of the page. Re-running
+  // on the loading→loaded transition attaches the observer once the wrapper is
+  // actually present.
   useLayoutEffect(() => {
     if (!fixedLayout || editMode) {
       setIntrinsicHeight(null);
@@ -567,7 +576,7 @@ export default function Dashboard() {
     const ro = new ResizeObserver(measure);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [fixedLayout, editMode, cols, renderWidth, gridWidth]);
+  }, [fixedLayout, editMode, cols, renderWidth, gridWidth, isLoading, tiles.length]);
 
   // Clean up the "saved" indicator timer on unmount
   useEffect(() => {
