@@ -75,7 +75,7 @@ export const GetTilesResponseItem = zod.object({
   "userId": zod.number(),
   "pageId": zod.number().nullish().describe('The page this tile belongs to. Null only for tiles that predate the multi-page migration and could not be assigned a page.'),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'lidarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal('bonsai'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('email'),zod.literal('calendar'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal('bonsai'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -125,6 +125,12 @@ export const GetTilesResponseItem = zod.object({
   "audioSearch": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Search tab (Plex \/ Subsonic only). Absent or null defaults to true.'),
   "audioBrowse": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Browse tab (recently added \/ albums \/ artists, Plex \/ Subsonic only). Absent or null defaults to true.'),
   "audioPlaylists": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Playlists tab (Plex \/ Subsonic only). Absent or null defaults to true.'),
+  "emailAccounts": zod.array(zod.string()).nullish().describe('Allow-list of mail account keys the Email tile aggregates: \"gmail\" for the linked Google account, or the id of a saved IMAP account. Null or absent means all configured accounts.'),
+  "emailMaxMessages": zod.number().nullish().describe('Maximum number of messages the Email tile requests\/shows. Null or absent defaults to a sensible value (clamped server-side).'),
+  "emailUnreadOnly": zod.boolean().nullish().describe('When true, the Email tile shows only unread messages. Absent or false shows the most recent messages regardless of read state.'),
+  "calendarAccounts": zod.array(zod.string()).nullish().describe('Allow-list of calendar account keys the Calendar tile aggregates: \"google\" for the linked Google account, or the id of a saved CalDAV account. Null or absent means all configured accounts.'),
+  "calendarDaysAhead": zod.number().nullish().describe('How many days ahead the Calendar tile looks for upcoming events. Null or absent defaults to a sensible value (clamped server-side).'),
+  "calendarMaxEvents": zod.number().nullish().describe('Maximum number of events the Calendar tile requests\/shows. Null or absent defaults to a sensible value (clamped server-side).'),
   "scrollable": zod.boolean().nullish().describe('When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).'),
   "truenasMetric": zod.union([zod.literal('cpuram'),zod.literal('network'),zod.literal('arc'),zod.literal('pools'),zod.literal('disks'),zod.literal(null)]).nullish().describe('Which single TrueNAS metric a dedicated TrueNAS tile renders with its bespoke visual: \"cpuram\", \"network\", \"arc\", \"pools\", or \"disks\". Null or absent means the tile shows the combined multi-section view (the default, backward-compatible behavior).'),
   "truenasPools": zod.array(zod.string()).nullish().describe('Allow-list of TrueNAS ZFS pool (volume) names to show on the tile. Applies to both the dedicated ZFS Pools view and the pools section of the combined view. Null, absent, or empty means show all pools (the default, backward-compatible behavior).'),
@@ -180,7 +186,7 @@ export const GetTilesResponse = zod.array(GetTilesResponseItem)
 export const CreateTileBody = zod.object({
   "pageId": zod.number().nullish().describe('The page to create this tile on. Omit to fall back to the user\'s first page.'),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'lidarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal('bonsai'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('email'),zod.literal('calendar'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal('bonsai'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -230,6 +236,12 @@ export const CreateTileBody = zod.object({
   "audioSearch": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Search tab (Plex \/ Subsonic only). Absent or null defaults to true.'),
   "audioBrowse": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Browse tab (recently added \/ albums \/ artists, Plex \/ Subsonic only). Absent or null defaults to true.'),
   "audioPlaylists": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Playlists tab (Plex \/ Subsonic only). Absent or null defaults to true.'),
+  "emailAccounts": zod.array(zod.string()).nullish().describe('Allow-list of mail account keys the Email tile aggregates: \"gmail\" for the linked Google account, or the id of a saved IMAP account. Null or absent means all configured accounts.'),
+  "emailMaxMessages": zod.number().nullish().describe('Maximum number of messages the Email tile requests\/shows. Null or absent defaults to a sensible value (clamped server-side).'),
+  "emailUnreadOnly": zod.boolean().nullish().describe('When true, the Email tile shows only unread messages. Absent or false shows the most recent messages regardless of read state.'),
+  "calendarAccounts": zod.array(zod.string()).nullish().describe('Allow-list of calendar account keys the Calendar tile aggregates: \"google\" for the linked Google account, or the id of a saved CalDAV account. Null or absent means all configured accounts.'),
+  "calendarDaysAhead": zod.number().nullish().describe('How many days ahead the Calendar tile looks for upcoming events. Null or absent defaults to a sensible value (clamped server-side).'),
+  "calendarMaxEvents": zod.number().nullish().describe('Maximum number of events the Calendar tile requests\/shows. Null or absent defaults to a sensible value (clamped server-side).'),
   "scrollable": zod.boolean().nullish().describe('When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).'),
   "truenasMetric": zod.union([zod.literal('cpuram'),zod.literal('network'),zod.literal('arc'),zod.literal('pools'),zod.literal('disks'),zod.literal(null)]).nullish().describe('Which single TrueNAS metric a dedicated TrueNAS tile renders with its bespoke visual: \"cpuram\", \"network\", \"arc\", \"pools\", or \"disks\". Null or absent means the tile shows the combined multi-section view (the default, backward-compatible behavior).'),
   "truenasPools": zod.array(zod.string()).nullish().describe('Allow-list of TrueNAS ZFS pool (volume) names to show on the tile. Applies to both the dedicated ZFS Pools view and the pools section of the combined view. Null, absent, or empty means show all pools (the default, backward-compatible behavior).'),
@@ -289,7 +301,7 @@ export const GetTileResponse = zod.object({
   "userId": zod.number(),
   "pageId": zod.number().nullish().describe('The page this tile belongs to. Null only for tiles that predate the multi-page migration and could not be assigned a page.'),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'lidarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal('bonsai'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('email'),zod.literal('calendar'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal('bonsai'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -339,6 +351,12 @@ export const GetTileResponse = zod.object({
   "audioSearch": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Search tab (Plex \/ Subsonic only). Absent or null defaults to true.'),
   "audioBrowse": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Browse tab (recently added \/ albums \/ artists, Plex \/ Subsonic only). Absent or null defaults to true.'),
   "audioPlaylists": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Playlists tab (Plex \/ Subsonic only). Absent or null defaults to true.'),
+  "emailAccounts": zod.array(zod.string()).nullish().describe('Allow-list of mail account keys the Email tile aggregates: \"gmail\" for the linked Google account, or the id of a saved IMAP account. Null or absent means all configured accounts.'),
+  "emailMaxMessages": zod.number().nullish().describe('Maximum number of messages the Email tile requests\/shows. Null or absent defaults to a sensible value (clamped server-side).'),
+  "emailUnreadOnly": zod.boolean().nullish().describe('When true, the Email tile shows only unread messages. Absent or false shows the most recent messages regardless of read state.'),
+  "calendarAccounts": zod.array(zod.string()).nullish().describe('Allow-list of calendar account keys the Calendar tile aggregates: \"google\" for the linked Google account, or the id of a saved CalDAV account. Null or absent means all configured accounts.'),
+  "calendarDaysAhead": zod.number().nullish().describe('How many days ahead the Calendar tile looks for upcoming events. Null or absent defaults to a sensible value (clamped server-side).'),
+  "calendarMaxEvents": zod.number().nullish().describe('Maximum number of events the Calendar tile requests\/shows. Null or absent defaults to a sensible value (clamped server-side).'),
   "scrollable": zod.boolean().nullish().describe('When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).'),
   "truenasMetric": zod.union([zod.literal('cpuram'),zod.literal('network'),zod.literal('arc'),zod.literal('pools'),zod.literal('disks'),zod.literal(null)]).nullish().describe('Which single TrueNAS metric a dedicated TrueNAS tile renders with its bespoke visual: \"cpuram\", \"network\", \"arc\", \"pools\", or \"disks\". Null or absent means the tile shows the combined multi-section view (the default, backward-compatible behavior).'),
   "truenasPools": zod.array(zod.string()).nullish().describe('Allow-list of TrueNAS ZFS pool (volume) names to show on the tile. Applies to both the dedicated ZFS Pools view and the pools section of the combined view. Null, absent, or empty means show all pools (the default, backward-compatible behavior).'),
@@ -395,7 +413,7 @@ export const UpdateTileParams = zod.object({
 })
 
 export const UpdateTileBody = zod.object({
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal('bonsai'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('email'),zod.literal('calendar'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal('bonsai'),zod.literal(null)]).nullish(),
   "gridX": zod.number().optional(),
   "gridY": zod.number().optional(),
   "gridW": zod.number().optional(),
@@ -445,6 +463,12 @@ export const UpdateTileBody = zod.object({
   "audioSearch": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Search tab (Plex \/ Subsonic only). Absent or null defaults to true.'),
   "audioBrowse": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Browse tab (recently added \/ albums \/ artists, Plex \/ Subsonic only). Absent or null defaults to true.'),
   "audioPlaylists": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Playlists tab (Plex \/ Subsonic only). Absent or null defaults to true.'),
+  "emailAccounts": zod.array(zod.string()).nullish().describe('Allow-list of mail account keys the Email tile aggregates: \"gmail\" for the linked Google account, or the id of a saved IMAP account. Null or absent means all configured accounts.'),
+  "emailMaxMessages": zod.number().nullish().describe('Maximum number of messages the Email tile requests\/shows. Null or absent defaults to a sensible value (clamped server-side).'),
+  "emailUnreadOnly": zod.boolean().nullish().describe('When true, the Email tile shows only unread messages. Absent or false shows the most recent messages regardless of read state.'),
+  "calendarAccounts": zod.array(zod.string()).nullish().describe('Allow-list of calendar account keys the Calendar tile aggregates: \"google\" for the linked Google account, or the id of a saved CalDAV account. Null or absent means all configured accounts.'),
+  "calendarDaysAhead": zod.number().nullish().describe('How many days ahead the Calendar tile looks for upcoming events. Null or absent defaults to a sensible value (clamped server-side).'),
+  "calendarMaxEvents": zod.number().nullish().describe('Maximum number of events the Calendar tile requests\/shows. Null or absent defaults to a sensible value (clamped server-side).'),
   "scrollable": zod.boolean().nullish().describe('When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).'),
   "truenasMetric": zod.union([zod.literal('cpuram'),zod.literal('network'),zod.literal('arc'),zod.literal('pools'),zod.literal('disks'),zod.literal(null)]).nullish().describe('Which single TrueNAS metric a dedicated TrueNAS tile renders with its bespoke visual: \"cpuram\", \"network\", \"arc\", \"pools\", or \"disks\". Null or absent means the tile shows the combined multi-section view (the default, backward-compatible behavior).'),
   "truenasPools": zod.array(zod.string()).nullish().describe('Allow-list of TrueNAS ZFS pool (volume) names to show on the tile. Applies to both the dedicated ZFS Pools view and the pools section of the combined view. Null, absent, or empty means show all pools (the default, backward-compatible behavior).'),
@@ -496,7 +520,7 @@ export const UpdateTileResponse = zod.object({
   "userId": zod.number(),
   "pageId": zod.number().nullish().describe('The page this tile belongs to. Null only for tiles that predate the multi-page migration and could not be assigned a page.'),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'lidarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal('bonsai'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('email'),zod.literal('calendar'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal('bonsai'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -546,6 +570,12 @@ export const UpdateTileResponse = zod.object({
   "audioSearch": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Search tab (Plex \/ Subsonic only). Absent or null defaults to true.'),
   "audioBrowse": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Browse tab (recently added \/ albums \/ artists, Plex \/ Subsonic only). Absent or null defaults to true.'),
   "audioPlaylists": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Playlists tab (Plex \/ Subsonic only). Absent or null defaults to true.'),
+  "emailAccounts": zod.array(zod.string()).nullish().describe('Allow-list of mail account keys the Email tile aggregates: \"gmail\" for the linked Google account, or the id of a saved IMAP account. Null or absent means all configured accounts.'),
+  "emailMaxMessages": zod.number().nullish().describe('Maximum number of messages the Email tile requests\/shows. Null or absent defaults to a sensible value (clamped server-side).'),
+  "emailUnreadOnly": zod.boolean().nullish().describe('When true, the Email tile shows only unread messages. Absent or false shows the most recent messages regardless of read state.'),
+  "calendarAccounts": zod.array(zod.string()).nullish().describe('Allow-list of calendar account keys the Calendar tile aggregates: \"google\" for the linked Google account, or the id of a saved CalDAV account. Null or absent means all configured accounts.'),
+  "calendarDaysAhead": zod.number().nullish().describe('How many days ahead the Calendar tile looks for upcoming events. Null or absent defaults to a sensible value (clamped server-side).'),
+  "calendarMaxEvents": zod.number().nullish().describe('Maximum number of events the Calendar tile requests\/shows. Null or absent defaults to a sensible value (clamped server-side).'),
   "scrollable": zod.boolean().nullish().describe('When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).'),
   "truenasMetric": zod.union([zod.literal('cpuram'),zod.literal('network'),zod.literal('arc'),zod.literal('pools'),zod.literal('disks'),zod.literal(null)]).nullish().describe('Which single TrueNAS metric a dedicated TrueNAS tile renders with its bespoke visual: \"cpuram\", \"network\", \"arc\", \"pools\", or \"disks\". Null or absent means the tile shows the combined multi-section view (the default, backward-compatible behavior).'),
   "truenasPools": zod.array(zod.string()).nullish().describe('Allow-list of TrueNAS ZFS pool (volume) names to show on the tile. Applies to both the dedicated ZFS Pools view and the pools section of the combined view. Null, absent, or empty means show all pools (the default, backward-compatible behavior).'),
@@ -621,7 +651,7 @@ export const SaveLayoutResponseItem = zod.object({
   "userId": zod.number(),
   "pageId": zod.number().nullish().describe('The page this tile belongs to. Null only for tiles that predate the multi-page migration and could not be assigned a page.'),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'lidarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal('bonsai'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('email'),zod.literal('calendar'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal('bonsai'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -671,6 +701,12 @@ export const SaveLayoutResponseItem = zod.object({
   "audioSearch": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Search tab (Plex \/ Subsonic only). Absent or null defaults to true.'),
   "audioBrowse": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Browse tab (recently added \/ albums \/ artists, Plex \/ Subsonic only). Absent or null defaults to true.'),
   "audioPlaylists": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Playlists tab (Plex \/ Subsonic only). Absent or null defaults to true.'),
+  "emailAccounts": zod.array(zod.string()).nullish().describe('Allow-list of mail account keys the Email tile aggregates: \"gmail\" for the linked Google account, or the id of a saved IMAP account. Null or absent means all configured accounts.'),
+  "emailMaxMessages": zod.number().nullish().describe('Maximum number of messages the Email tile requests\/shows. Null or absent defaults to a sensible value (clamped server-side).'),
+  "emailUnreadOnly": zod.boolean().nullish().describe('When true, the Email tile shows only unread messages. Absent or false shows the most recent messages regardless of read state.'),
+  "calendarAccounts": zod.array(zod.string()).nullish().describe('Allow-list of calendar account keys the Calendar tile aggregates: \"google\" for the linked Google account, or the id of a saved CalDAV account. Null or absent means all configured accounts.'),
+  "calendarDaysAhead": zod.number().nullish().describe('How many days ahead the Calendar tile looks for upcoming events. Null or absent defaults to a sensible value (clamped server-side).'),
+  "calendarMaxEvents": zod.number().nullish().describe('Maximum number of events the Calendar tile requests\/shows. Null or absent defaults to a sensible value (clamped server-side).'),
   "scrollable": zod.boolean().nullish().describe('When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).'),
   "truenasMetric": zod.union([zod.literal('cpuram'),zod.literal('network'),zod.literal('arc'),zod.literal('pools'),zod.literal('disks'),zod.literal(null)]).nullish().describe('Which single TrueNAS metric a dedicated TrueNAS tile renders with its bespoke visual: \"cpuram\", \"network\", \"arc\", \"pools\", or \"disks\". Null or absent means the tile shows the combined multi-section view (the default, backward-compatible behavior).'),
   "truenasPools": zod.array(zod.string()).nullish().describe('Allow-list of TrueNAS ZFS pool (volume) names to show on the tile. Applies to both the dedicated ZFS Pools view and the pools section of the combined view. Null, absent, or empty means show all pools (the default, backward-compatible behavior).'),
@@ -859,6 +895,12 @@ export const ExportAllPagesResponse = zod.object({
   "audioSearch": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Search tab (Plex \/ Subsonic only). Absent or null defaults to true.'),
   "audioBrowse": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Browse tab (recently added \/ albums \/ artists, Plex \/ Subsonic only). Absent or null defaults to true.'),
   "audioPlaylists": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Playlists tab (Plex \/ Subsonic only). Absent or null defaults to true.'),
+  "emailAccounts": zod.array(zod.string()).nullish().describe('Allow-list of mail account keys the Email tile aggregates: \"gmail\" for the linked Google account, or the id of a saved IMAP account. Null or absent means all configured accounts.'),
+  "emailMaxMessages": zod.number().nullish().describe('Maximum number of messages the Email tile requests\/shows. Null or absent defaults to a sensible value (clamped server-side).'),
+  "emailUnreadOnly": zod.boolean().nullish().describe('When true, the Email tile shows only unread messages. Absent or false shows the most recent messages regardless of read state.'),
+  "calendarAccounts": zod.array(zod.string()).nullish().describe('Allow-list of calendar account keys the Calendar tile aggregates: \"google\" for the linked Google account, or the id of a saved CalDAV account. Null or absent means all configured accounts.'),
+  "calendarDaysAhead": zod.number().nullish().describe('How many days ahead the Calendar tile looks for upcoming events. Null or absent defaults to a sensible value (clamped server-side).'),
+  "calendarMaxEvents": zod.number().nullish().describe('Maximum number of events the Calendar tile requests\/shows. Null or absent defaults to a sensible value (clamped server-side).'),
   "scrollable": zod.boolean().nullish().describe('When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).'),
   "truenasMetric": zod.union([zod.literal('cpuram'),zod.literal('network'),zod.literal('arc'),zod.literal('pools'),zod.literal('disks'),zod.literal(null)]).nullish().describe('Which single TrueNAS metric a dedicated TrueNAS tile renders with its bespoke visual: \"cpuram\", \"network\", \"arc\", \"pools\", or \"disks\". Null or absent means the tile shows the combined multi-section view (the default, backward-compatible behavior).'),
   "truenasPools": zod.array(zod.string()).nullish().describe('Allow-list of TrueNAS ZFS pool (volume) names to show on the tile. Applies to both the dedicated ZFS Pools view and the pools section of the combined view. Null, absent, or empty means show all pools (the default, backward-compatible behavior).'),
@@ -975,6 +1017,12 @@ export const ExportPageResponse = zod.object({
   "audioSearch": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Search tab (Plex \/ Subsonic only). Absent or null defaults to true.'),
   "audioBrowse": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Browse tab (recently added \/ albums \/ artists, Plex \/ Subsonic only). Absent or null defaults to true.'),
   "audioPlaylists": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Playlists tab (Plex \/ Subsonic only). Absent or null defaults to true.'),
+  "emailAccounts": zod.array(zod.string()).nullish().describe('Allow-list of mail account keys the Email tile aggregates: \"gmail\" for the linked Google account, or the id of a saved IMAP account. Null or absent means all configured accounts.'),
+  "emailMaxMessages": zod.number().nullish().describe('Maximum number of messages the Email tile requests\/shows. Null or absent defaults to a sensible value (clamped server-side).'),
+  "emailUnreadOnly": zod.boolean().nullish().describe('When true, the Email tile shows only unread messages. Absent or false shows the most recent messages regardless of read state.'),
+  "calendarAccounts": zod.array(zod.string()).nullish().describe('Allow-list of calendar account keys the Calendar tile aggregates: \"google\" for the linked Google account, or the id of a saved CalDAV account. Null or absent means all configured accounts.'),
+  "calendarDaysAhead": zod.number().nullish().describe('How many days ahead the Calendar tile looks for upcoming events. Null or absent defaults to a sensible value (clamped server-side).'),
+  "calendarMaxEvents": zod.number().nullish().describe('Maximum number of events the Calendar tile requests\/shows. Null or absent defaults to a sensible value (clamped server-side).'),
   "scrollable": zod.boolean().nullish().describe('When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).'),
   "truenasMetric": zod.union([zod.literal('cpuram'),zod.literal('network'),zod.literal('arc'),zod.literal('pools'),zod.literal('disks'),zod.literal(null)]).nullish().describe('Which single TrueNAS metric a dedicated TrueNAS tile renders with its bespoke visual: \"cpuram\", \"network\", \"arc\", \"pools\", or \"disks\". Null or absent means the tile shows the combined multi-section view (the default, backward-compatible behavior).'),
   "truenasPools": zod.array(zod.string()).nullish().describe('Allow-list of TrueNAS ZFS pool (volume) names to show on the tile. Applies to both the dedicated ZFS Pools view and the pools section of the combined view. Null, absent, or empty means show all pools (the default, backward-compatible behavior).'),
@@ -1087,6 +1135,12 @@ export const ImportPagesBody = zod.object({
   "audioSearch": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Search tab (Plex \/ Subsonic only). Absent or null defaults to true.'),
   "audioBrowse": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Browse tab (recently added \/ albums \/ artists, Plex \/ Subsonic only). Absent or null defaults to true.'),
   "audioPlaylists": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Playlists tab (Plex \/ Subsonic only). Absent or null defaults to true.'),
+  "emailAccounts": zod.array(zod.string()).nullish().describe('Allow-list of mail account keys the Email tile aggregates: \"gmail\" for the linked Google account, or the id of a saved IMAP account. Null or absent means all configured accounts.'),
+  "emailMaxMessages": zod.number().nullish().describe('Maximum number of messages the Email tile requests\/shows. Null or absent defaults to a sensible value (clamped server-side).'),
+  "emailUnreadOnly": zod.boolean().nullish().describe('When true, the Email tile shows only unread messages. Absent or false shows the most recent messages regardless of read state.'),
+  "calendarAccounts": zod.array(zod.string()).nullish().describe('Allow-list of calendar account keys the Calendar tile aggregates: \"google\" for the linked Google account, or the id of a saved CalDAV account. Null or absent means all configured accounts.'),
+  "calendarDaysAhead": zod.number().nullish().describe('How many days ahead the Calendar tile looks for upcoming events. Null or absent defaults to a sensible value (clamped server-side).'),
+  "calendarMaxEvents": zod.number().nullish().describe('Maximum number of events the Calendar tile requests\/shows. Null or absent defaults to a sensible value (clamped server-side).'),
   "scrollable": zod.boolean().nullish().describe('When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).'),
   "truenasMetric": zod.union([zod.literal('cpuram'),zod.literal('network'),zod.literal('arc'),zod.literal('pools'),zod.literal('disks'),zod.literal(null)]).nullish().describe('Which single TrueNAS metric a dedicated TrueNAS tile renders with its bespoke visual: \"cpuram\", \"network\", \"arc\", \"pools\", or \"disks\". Null or absent means the tile shows the combined multi-section view (the default, backward-compatible behavior).'),
   "truenasPools": zod.array(zod.string()).nullish().describe('Allow-list of TrueNAS ZFS pool (volume) names to show on the tile. Applies to both the dedicated ZFS Pools view and the pools section of the combined view. Null, absent, or empty means show all pools (the default, backward-compatible behavior).'),
@@ -1575,6 +1629,65 @@ export const GetNewsWidgetResponse = zod.object({
 
 
 /**
+ * @summary Aggregated recent messages across the configured mail accounts
+ */
+export const GetEmailInboxQueryParams = zod.object({
+  "accounts": zod.coerce.string().optional().describe('Comma-separated account keys to include (\"gmail\" or an IMAP account id). When omitted, all configured accounts are aggregated. When no accounts are configured at all, demo messages are returned so an unconfigured tile still renders.'),
+  "max": zod.coerce.number().optional().describe('Maximum number of messages to return (clamped server-side).'),
+  "unreadOnly": zod.coerce.string().optional().describe('When \"true\", only unread messages are returned.')
+})
+
+export const GetEmailInboxResponse = zod.object({
+  "messages": zod.array(zod.object({
+  "id": zod.string().describe('Provider-scoped message id, unique within the response.'),
+  "account": zod.string().describe('Key of the account this message came from (\"gmail\" or an IMAP account id).'),
+  "accountLabel": zod.string().describe('Human-readable label of the source account.'),
+  "from": zod.string().describe('Display name (or address) of the sender.'),
+  "subject": zod.string().describe('Message subject line (may be empty).'),
+  "snippet": zod.string().nullish().describe('Short plain-text preview of the message body when the provider supplies one. Null when unavailable.'),
+  "date": zod.string().describe('When the message was received (ISO 8601).'),
+  "unread": zod.boolean().describe('True when the message is unread.'),
+  "link": zod.string().nullish().describe('Deep link to open the message in the provider\'s web UI (Gmail only). Null when unavailable.')
+})).describe('Recent messages across the requested accounts, newest first.'),
+  "unreadTotal": zod.number().nullish().describe('Total unread count across accounts when the providers report one. Null when unknown.'),
+  "errors": zod.array(zod.object({
+  "account": zod.string().describe('Label of the failing account.'),
+  "message": zod.string().describe('Short human-readable failure reason.')
+}).describe('A configured account that failed to respond during the fetch.')).nullish().describe('Accounts that failed during the fetch (partial results). Null or absent when every account responded.'),
+  "sample": zod.boolean().describe('True when these are demo messages because no mail account is configured yet.')
+})
+
+
+/**
+ * @summary Aggregated upcoming events across the configured calendar accounts
+ */
+export const GetCalendarEventsQueryParams = zod.object({
+  "accounts": zod.coerce.string().optional().describe('Comma-separated account keys to include (\"google\" or a CalDAV account id). When omitted, all configured accounts are aggregated. When no accounts are configured at all, demo events are returned so an unconfigured tile still renders.'),
+  "days": zod.coerce.number().optional().describe('How many days ahead to look (clamped server-side).'),
+  "max": zod.coerce.number().optional().describe('Maximum number of events to return (clamped server-side).')
+})
+
+export const GetCalendarEventsResponse = zod.object({
+  "events": zod.array(zod.object({
+  "id": zod.string().describe('Provider-scoped event id, unique within the response.'),
+  "account": zod.string().describe('Key of the account this event came from (\"google\" or a CalDAV account id).'),
+  "accountLabel": zod.string().describe('Human-readable label of the source account.'),
+  "calendar": zod.string().nullish().describe('Name of the calendar the event belongs to, when known.'),
+  "title": zod.string().describe('Event title\/summary.'),
+  "start": zod.string().describe('Event start (ISO 8601; date-only for all-day events).'),
+  "end": zod.string().nullish().describe('Event end (ISO 8601; date-only for all-day events). Null when the provider does not supply one.'),
+  "allDay": zod.boolean().describe('True for all-day events.'),
+  "location": zod.string().nullish().describe('Event location when set. Null otherwise.')
+})).describe('Upcoming events across the requested accounts, soonest first.'),
+  "errors": zod.array(zod.object({
+  "account": zod.string().describe('Label of the failing account.'),
+  "message": zod.string().describe('Short human-readable failure reason.')
+}).describe('A configured account that failed to respond during the fetch.')).nullish().describe('Accounts that failed during the fetch (partial results). Null or absent when every account responded.'),
+  "sample": zod.boolean().describe('True when these are demo events because no calendar account is configured yet.')
+})
+
+
+/**
  * @summary Get current price and daily change for a set of stock symbols
  */
 export const GetStocksWidgetQueryParams = zod.object({
@@ -1709,6 +1822,197 @@ export const UpdateConnectionResponse = zod.object({
   "token": zod.string().nullish(),
   "updatedAt": zod.string().nullish()
 })
+
+
+/**
+ * @summary Report whether Google OAuth is configured and an account is linked
+ */
+export const GetGoogleStatusResponse = zod.object({
+  "configured": zod.boolean().describe('True when OAuth client credentials are available, either from the GOOGLE_CLIENT_ID \/ GOOGLE_CLIENT_SECRET environment variables or saved via Settings.'),
+  "connected": zod.boolean().describe('True when at least one Google account is linked and usable.'),
+  "email": zod.string().nullable().describe('Email address of the first connected Google account (legacy summary field — prefer the accounts list).'),
+  "accounts": zod.array(zod.object({
+  "id": zod.string().describe('Stable id for this linked account (used in tile account filters).'),
+  "email": zod.string().nullable().describe('Email address of the linked account, when known.'),
+  "connected": zod.boolean().describe('True when this account\'s tokens are currently usable.')
+})).optional().describe('Every linked Google account.'),
+  "redirectUri": zod.string().nullish().describe('The exact OAuth redirect URI the Google Cloud project must allow-list.'),
+  "credentialSource": zod.union([zod.literal('env'),zod.literal('stored'),zod.literal(null)]).nullish().describe('Where the active OAuth client credentials come from: \"env\" (server environment variables, read-only in the UI) or \"stored\" (saved via Settings). Null when not configured.'),
+  "clientId": zod.string().nullish().describe('The active OAuth client ID (the secret is never returned). Null when not configured.')
+})
+
+
+/**
+ * @summary Mint a short-lived single-use token authorizing one popup OAuth flow run
+ */
+export const CreateGoogleAuthIntentResponse = zod.object({
+  "intent": zod.string().describe('Short-lived single-use token; append as ?intent= to the \/widgets\/gmail\/auth popup URL to authorize one OAuth flow run.')
+})
+
+
+/**
+ * @summary Save the Google OAuth client ID and secret (clears any existing account link)
+ */
+export const SetGoogleCredentialsBody = zod.object({
+  "clientId": zod.string().describe('OAuth 2.0 client ID from the Google Cloud Console.'),
+  "clientSecret": zod.string().describe('OAuth 2.0 client secret from the Google Cloud Console.')
+})
+
+export const SetGoogleCredentialsResponse = zod.object({
+  "configured": zod.boolean().describe('True when OAuth client credentials are available, either from the GOOGLE_CLIENT_ID \/ GOOGLE_CLIENT_SECRET environment variables or saved via Settings.'),
+  "connected": zod.boolean().describe('True when at least one Google account is linked and usable.'),
+  "email": zod.string().nullable().describe('Email address of the first connected Google account (legacy summary field — prefer the accounts list).'),
+  "accounts": zod.array(zod.object({
+  "id": zod.string().describe('Stable id for this linked account (used in tile account filters).'),
+  "email": zod.string().nullable().describe('Email address of the linked account, when known.'),
+  "connected": zod.boolean().describe('True when this account\'s tokens are currently usable.')
+})).optional().describe('Every linked Google account.'),
+  "redirectUri": zod.string().nullish().describe('The exact OAuth redirect URI the Google Cloud project must allow-list.'),
+  "credentialSource": zod.union([zod.literal('env'),zod.literal('stored'),zod.literal(null)]).nullish().describe('Where the active OAuth client credentials come from: \"env\" (server environment variables, read-only in the UI) or \"stored\" (saved via Settings). Null when not configured.'),
+  "clientId": zod.string().nullish().describe('The active OAuth client ID (the secret is never returned). Null when not configured.')
+})
+
+
+/**
+ * @summary Remove stored Google OAuth credentials (and the account link)
+ */
+export const ClearGoogleCredentialsResponse = zod.object({
+  "configured": zod.boolean().describe('True when OAuth client credentials are available, either from the GOOGLE_CLIENT_ID \/ GOOGLE_CLIENT_SECRET environment variables or saved via Settings.'),
+  "connected": zod.boolean().describe('True when at least one Google account is linked and usable.'),
+  "email": zod.string().nullable().describe('Email address of the first connected Google account (legacy summary field — prefer the accounts list).'),
+  "accounts": zod.array(zod.object({
+  "id": zod.string().describe('Stable id for this linked account (used in tile account filters).'),
+  "email": zod.string().nullable().describe('Email address of the linked account, when known.'),
+  "connected": zod.boolean().describe('True when this account\'s tokens are currently usable.')
+})).optional().describe('Every linked Google account.'),
+  "redirectUri": zod.string().nullish().describe('The exact OAuth redirect URI the Google Cloud project must allow-list.'),
+  "credentialSource": zod.union([zod.literal('env'),zod.literal('stored'),zod.literal(null)]).nullish().describe('Where the active OAuth client credentials come from: \"env\" (server environment variables, read-only in the UI) or \"stored\" (saved via Settings). Null when not configured.'),
+  "clientId": zod.string().nullish().describe('The active OAuth client ID (the secret is never returned). Null when not configured.')
+})
+
+
+/**
+ * @summary Unlink a Google account. With an accountId in the body only that account is unlinked; without one, every linked account is removed.
+ */
+export const DisconnectGoogleBody = zod.object({
+  "accountId": zod.string().optional().describe('Id of the single account to unlink.')
+})
+
+export const DisconnectGoogleResponse = zod.object({
+  "configured": zod.boolean().describe('True when OAuth client credentials are available, either from the GOOGLE_CLIENT_ID \/ GOOGLE_CLIENT_SECRET environment variables or saved via Settings.'),
+  "connected": zod.boolean().describe('True when at least one Google account is linked and usable.'),
+  "email": zod.string().nullable().describe('Email address of the first connected Google account (legacy summary field — prefer the accounts list).'),
+  "accounts": zod.array(zod.object({
+  "id": zod.string().describe('Stable id for this linked account (used in tile account filters).'),
+  "email": zod.string().nullable().describe('Email address of the linked account, when known.'),
+  "connected": zod.boolean().describe('True when this account\'s tokens are currently usable.')
+})).optional().describe('Every linked Google account.'),
+  "redirectUri": zod.string().nullish().describe('The exact OAuth redirect URI the Google Cloud project must allow-list.'),
+  "credentialSource": zod.union([zod.literal('env'),zod.literal('stored'),zod.literal(null)]).nullish().describe('Where the active OAuth client credentials come from: \"env\" (server environment variables, read-only in the UI) or \"stored\" (saved via Settings). Null when not configured.'),
+  "clientId": zod.string().nullish().describe('The active OAuth client ID (the secret is never returned). Null when not configured.')
+})
+
+
+/**
+ * @summary List the saved IMAP mail accounts (passwords omitted)
+ */
+export const ListImapAccountsResponseItem = zod.object({
+  "id": zod.string().describe('Stable id for this saved account.'),
+  "label": zod.string().describe('Friendly display name.'),
+  "host": zod.string(),
+  "port": zod.number(),
+  "secure": zod.boolean(),
+  "username": zod.string()
+})
+export const ListImapAccountsResponse = zod.array(ListImapAccountsResponseItem)
+
+
+/**
+ * @summary Add an IMAP mail account
+ */
+export const AddImapAccountBody = zod.object({
+  "label": zod.string().nullish().describe('Friendly display name; defaults to the username.'),
+  "host": zod.string().describe('IMAP server hostname (e.g. \"imap.example.com\").'),
+  "port": zod.number().nullish().describe('IMAP port; defaults to 993.'),
+  "secure": zod.boolean().nullish().describe('Use implicit TLS; defaults to true.'),
+  "username": zod.string().describe('IMAP login username.'),
+  "password": zod.string().describe('IMAP login password (stored server-side, never returned).')
+})
+
+export const AddImapAccountResponseItem = zod.object({
+  "id": zod.string().describe('Stable id for this saved account.'),
+  "label": zod.string().describe('Friendly display name.'),
+  "host": zod.string(),
+  "port": zod.number(),
+  "secure": zod.boolean(),
+  "username": zod.string()
+})
+export const AddImapAccountResponse = zod.array(AddImapAccountResponseItem)
+
+
+/**
+ * @summary Remove a saved IMAP mail account
+ */
+export const RemoveImapAccountParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const RemoveImapAccountResponseItem = zod.object({
+  "id": zod.string().describe('Stable id for this saved account.'),
+  "label": zod.string().describe('Friendly display name.'),
+  "host": zod.string(),
+  "port": zod.number(),
+  "secure": zod.boolean(),
+  "username": zod.string()
+})
+export const RemoveImapAccountResponse = zod.array(RemoveImapAccountResponseItem)
+
+
+/**
+ * @summary List the saved CalDAV calendar accounts (passwords omitted)
+ */
+export const ListCalDavAccountsResponseItem = zod.object({
+  "id": zod.string().describe('Stable id for this saved account.'),
+  "label": zod.string().describe('Friendly display name.'),
+  "url": zod.string(),
+  "username": zod.string()
+})
+export const ListCalDavAccountsResponse = zod.array(ListCalDavAccountsResponseItem)
+
+
+/**
+ * @summary Add a CalDAV calendar account
+ */
+export const AddCalDavAccountBody = zod.object({
+  "label": zod.string().nullish().describe('Friendly display name; defaults to the username.'),
+  "url": zod.string().describe('CalDAV server URL (e.g. \"https:\/\/cal.example.com\/dav\" or a provider\'s caldav endpoint).'),
+  "username": zod.string().describe('CalDAV login username.'),
+  "password": zod.string().describe('CalDAV login password (stored server-side, never returned).')
+})
+
+export const AddCalDavAccountResponseItem = zod.object({
+  "id": zod.string().describe('Stable id for this saved account.'),
+  "label": zod.string().describe('Friendly display name.'),
+  "url": zod.string(),
+  "username": zod.string()
+})
+export const AddCalDavAccountResponse = zod.array(AddCalDavAccountResponseItem)
+
+
+/**
+ * @summary Remove a saved CalDAV calendar account
+ */
+export const RemoveCalDavAccountParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const RemoveCalDavAccountResponseItem = zod.object({
+  "id": zod.string().describe('Stable id for this saved account.'),
+  "label": zod.string().describe('Friendly display name.'),
+  "url": zod.string(),
+  "username": zod.string()
+})
+export const RemoveCalDavAccountResponse = zod.array(RemoveCalDavAccountResponseItem)
 
 
 /**

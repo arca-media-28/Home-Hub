@@ -1,0 +1,17 @@
+---
+name: Email + Calendar tiles
+description: How the Email/Calendar live tiles map onto Google OAuth, IMAP (imapflow), and CalDAV (tsdav); route layout and account-storage gotchas.
+---
+
+# Email + Calendar tiles (Communication category)
+
+- **Google OAuth link is app-wide, not per-user**: tokens live in `service_connections.extra` and are mirrored into BOTH the `gmail` and `google_calendar` rows so either feature can inspect the link independently. `isGoogleLinked()` = client credentials available AND a stored refreshToken.
+- **Client credentials are Settings-managed with env override**: the OAuth client ID/secret live in a dedicated `google` service row's `extra` JSON, editable via authenticated PUT/DELETE credentials routes; `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` env vars take precedence and make the routes 409 (UI shows read-only note). Saving/removing credentials always clears tokens — old refresh tokens are bound to the old client. Status exposes `credentialSource` ("env"/"stored"/null) and the clientId, never the secret.
+- **OAuth popup cannot carry the bearer token**, so `/widgets/gmail/auth` is gated by a short-lived single-use intent token minted via the authenticated `POST /connections/google/auth-intent`; without it, any unauthenticated visitor could bind their own Google account to the shared link. Callback is protected transitively by the single-use `state` (only created after a valid intent).
+- **Route layout is split**: OAuth start/callback are `GET /api/widgets/gmail/auth` + `/gmail/callback` (browser redirects), but status/auth-intent/disconnect live under `/api/connections/google/...`. IMAP/CalDAV multi-account CRUD is `/api/connections/{imap,caldav}/accounts[/:id]`.
+- **Multi-account storage**: IMAP and CalDAV account LISTS are JSON arrays in the `extra` column of the global `imap`/`caldav` service rows (not one row per account). Route layer must sanitize passwords out of every response.
+- **Multi-Google-account storage**: `gmail` row extra is `{accounts:[{id,email,tokens…}]}` (mirrored to `google_calendar`); a legacy single-token blob migrates on read with the stable id `"legacy"` (never a random id — it re-derives each read until the next write). `exchangeGoogleCode` upserts by email; OAuth prompt is `consent select_account` so a second account can be linked while one is signed in. `getGoogleAccessToken(accountId)` is per-account.
+- **Tile account filter keys**: each Google account's stable id selects that one account; legacy `gmail`/`google` keys (tiles saved pre multi-account) mean ALL Google accounts; raw account ids select imap/caldav entries. Empty selection saved as `null` = all accounts. Configured-but-filter-matches-nothing returns live empty data with `sample:false` (never demo fallback — would look like real mail).
+- **unreadOnly is a string query param** (`"true"`), per generated client typing.
+- **Why:** demo-vs-live ambiguity was the main design risk; the rule is sample:true ONLY when zero accounts are configured, matching the widget-data convention.
+- **How to apply:** when adding another mail/calendar source, plug into lib/email.ts / lib/calendar.ts collectors, keep failures per-account (all-fail→502), and avoid unit-testing IMAP failure paths — imapflow is lazy-imported and hits the network.

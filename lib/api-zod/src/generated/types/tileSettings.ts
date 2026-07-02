@@ -154,6 +154,36 @@ export type TileSettings = {
      */
   audioPlaylists?: boolean | null;
   /**
+     * Allow-list of mail account keys the Email tile aggregates: "gmail" for the linked Google account, or the id of a saved IMAP account. Null or absent means all configured accounts.
+     * @nullable
+     */
+  emailAccounts?: string[] | null;
+  /**
+     * Maximum number of messages the Email tile requests/shows. Null or absent defaults to a sensible value (clamped server-side).
+     * @nullable
+     */
+  emailMaxMessages?: number | null;
+  /**
+     * When true, the Email tile shows only unread messages. Absent or false shows the most recent messages regardless of read state.
+     * @nullable
+     */
+  emailUnreadOnly?: boolean | null;
+  /**
+     * Allow-list of calendar account keys the Calendar tile aggregates: "google" for the linked Google account, or the id of a saved CalDAV account. Null or absent means all configured accounts.
+     * @nullable
+     */
+  calendarAccounts?: string[] | null;
+  /**
+     * How many days ahead the Calendar tile looks for upcoming events. Null or absent defaults to a sensible value (clamped server-side).
+     * @nullable
+     */
+  calendarDaysAhead?: number | null;
+  /**
+     * Maximum number of events the Calendar tile requests/shows. Null or absent defaults to a sensible value (clamped server-side).
+     * @nullable
+     */
+  calendarMaxEvents?: number | null;
+  /**
      * When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).
      * @nullable
      */

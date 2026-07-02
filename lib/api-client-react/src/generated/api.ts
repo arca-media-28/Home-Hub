@@ -25,12 +25,18 @@ import type {
   AuthCredentials,
   AuthResponse,
   BrowseAudioLibraryParams,
+  CalDavAccount,
+  CalDavAccountInput,
+  CalendarEventsData,
   ConnectionHealth,
   ConnectionTestResult,
   ContinueWatchingItem,
+  EmailInboxData,
   ErrorResponse,
   ErsatzTvData,
   GetAudioPlayerNowPlayingParams,
+  GetCalendarEventsParams,
+  GetEmailInboxParams,
   GetMediaContinueParams,
   GetMediaRecentParams,
   GetNewsWidgetParams,
@@ -39,7 +45,13 @@ import type {
   GetTilesParams,
   GetTruenasDiagnostics200,
   GetTruenasDiagnostics409,
+  GoogleAuthIntent,
+  GoogleCredentialsInput,
+  GoogleDisconnectInput,
+  GoogleStatus,
   HealthStatus,
+  ImapAccount,
+  ImapAccountInput,
   LayoutUpdate,
   LidarrData,
   MediaItem,
@@ -2988,6 +3000,174 @@ export function useGetNewsWidget<TData = Awaited<ReturnType<typeof getNewsWidget
 
 
 
+export const getGetEmailInboxUrl = (params?: GetEmailInboxParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/widgets/email/inbox?${stringifiedParams}` : `/api/widgets/email/inbox`
+}
+
+/**
+ * @summary Aggregated recent messages across the configured mail accounts
+ */
+export const getEmailInbox = async (params?: GetEmailInboxParams, options?: RequestInit): Promise<EmailInboxData> => {
+
+  return customFetch<EmailInboxData>(getGetEmailInboxUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetEmailInboxQueryKey = (params?: GetEmailInboxParams,) => {
+    return [
+    `/api/widgets/email/inbox`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetEmailInboxQueryOptions = <TData = Awaited<ReturnType<typeof getEmailInbox>>, TError = ErrorType<ErrorResponse>>(params?: GetEmailInboxParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEmailInbox>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetEmailInboxQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getEmailInbox>>> = ({ signal }) => getEmailInbox(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getEmailInbox>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetEmailInboxQueryResult = NonNullable<Awaited<ReturnType<typeof getEmailInbox>>>
+export type GetEmailInboxQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Aggregated recent messages across the configured mail accounts
+ */
+
+export function useGetEmailInbox<TData = Awaited<ReturnType<typeof getEmailInbox>>, TError = ErrorType<ErrorResponse>>(
+ params?: GetEmailInboxParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEmailInbox>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetEmailInboxQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetCalendarEventsUrl = (params?: GetCalendarEventsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/widgets/calendar/events?${stringifiedParams}` : `/api/widgets/calendar/events`
+}
+
+/**
+ * @summary Aggregated upcoming events across the configured calendar accounts
+ */
+export const getCalendarEvents = async (params?: GetCalendarEventsParams, options?: RequestInit): Promise<CalendarEventsData> => {
+
+  return customFetch<CalendarEventsData>(getGetCalendarEventsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCalendarEventsQueryKey = (params?: GetCalendarEventsParams,) => {
+    return [
+    `/api/widgets/calendar/events`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetCalendarEventsQueryOptions = <TData = Awaited<ReturnType<typeof getCalendarEvents>>, TError = ErrorType<ErrorResponse>>(params?: GetCalendarEventsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCalendarEvents>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCalendarEventsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCalendarEvents>>> = ({ signal }) => getCalendarEvents(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCalendarEvents>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCalendarEventsQueryResult = NonNullable<Awaited<ReturnType<typeof getCalendarEvents>>>
+export type GetCalendarEventsQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Aggregated upcoming events across the configured calendar accounts
+ */
+
+export function useGetCalendarEvents<TData = Awaited<ReturnType<typeof getCalendarEvents>>, TError = ErrorType<ErrorResponse>>(
+ params?: GetCalendarEventsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCalendarEvents>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCalendarEventsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
 export const getGetStocksWidgetUrl = (params?: GetStocksWidgetParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -3613,6 +3793,801 @@ export const useUpdateConnection = <TError = ErrorType<ErrorResponse>,
         TContext
       > => {
       return useMutation(getUpdateConnectionMutationOptions(options));
+    }
+
+export const getGetGoogleStatusUrl = () => {
+
+
+
+
+  return `/api/connections/google/status`
+}
+
+/**
+ * @summary Report whether Google OAuth is configured and an account is linked
+ */
+export const getGoogleStatus = async ( options?: RequestInit): Promise<GoogleStatus> => {
+
+  return customFetch<GoogleStatus>(getGetGoogleStatusUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetGoogleStatusQueryKey = () => {
+    return [
+    `/api/connections/google/status`
+    ] as const;
+    }
+
+
+export const getGetGoogleStatusQueryOptions = <TData = Awaited<ReturnType<typeof getGoogleStatus>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getGoogleStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetGoogleStatusQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getGoogleStatus>>> = ({ signal }) => getGoogleStatus({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getGoogleStatus>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetGoogleStatusQueryResult = NonNullable<Awaited<ReturnType<typeof getGoogleStatus>>>
+export type GetGoogleStatusQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Report whether Google OAuth is configured and an account is linked
+ */
+
+export function useGetGoogleStatus<TData = Awaited<ReturnType<typeof getGoogleStatus>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getGoogleStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetGoogleStatusQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateGoogleAuthIntentUrl = () => {
+
+
+
+
+  return `/api/connections/google/auth-intent`
+}
+
+/**
+ * @summary Mint a short-lived single-use token authorizing one popup OAuth flow run
+ */
+export const createGoogleAuthIntent = async ( options?: RequestInit): Promise<GoogleAuthIntent> => {
+
+  return customFetch<GoogleAuthIntent>(getCreateGoogleAuthIntentUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getCreateGoogleAuthIntentMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createGoogleAuthIntent>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createGoogleAuthIntent>>, TError,void, TContext> => {
+
+const mutationKey = ['createGoogleAuthIntent'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createGoogleAuthIntent>>, void> = () => {
+
+
+          return  createGoogleAuthIntent(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateGoogleAuthIntentMutationResult = NonNullable<Awaited<ReturnType<typeof createGoogleAuthIntent>>>
+
+    export type CreateGoogleAuthIntentMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Mint a short-lived single-use token authorizing one popup OAuth flow run
+ */
+export const useCreateGoogleAuthIntent = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createGoogleAuthIntent>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createGoogleAuthIntent>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getCreateGoogleAuthIntentMutationOptions(options));
+    }
+
+export const getSetGoogleCredentialsUrl = () => {
+
+
+
+
+  return `/api/connections/google/credentials`
+}
+
+/**
+ * @summary Save the Google OAuth client ID and secret (clears any existing account link)
+ */
+export const setGoogleCredentials = async (googleCredentialsInput: GoogleCredentialsInput, options?: RequestInit): Promise<GoogleStatus> => {
+
+  return customFetch<GoogleStatus>(getSetGoogleCredentialsUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      googleCredentialsInput,)
+  }
+);}
+
+
+
+
+export const getSetGoogleCredentialsMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setGoogleCredentials>>, TError,{data: BodyType<GoogleCredentialsInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof setGoogleCredentials>>, TError,{data: BodyType<GoogleCredentialsInput>}, TContext> => {
+
+const mutationKey = ['setGoogleCredentials'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof setGoogleCredentials>>, {data: BodyType<GoogleCredentialsInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  setGoogleCredentials(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SetGoogleCredentialsMutationResult = NonNullable<Awaited<ReturnType<typeof setGoogleCredentials>>>
+    export type SetGoogleCredentialsMutationBody = BodyType<GoogleCredentialsInput>
+    export type SetGoogleCredentialsMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Save the Google OAuth client ID and secret (clears any existing account link)
+ */
+export const useSetGoogleCredentials = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setGoogleCredentials>>, TError,{data: BodyType<GoogleCredentialsInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof setGoogleCredentials>>,
+        TError,
+        {data: BodyType<GoogleCredentialsInput>},
+        TContext
+      > => {
+      return useMutation(getSetGoogleCredentialsMutationOptions(options));
+    }
+
+export const getClearGoogleCredentialsUrl = () => {
+
+
+
+
+  return `/api/connections/google/credentials`
+}
+
+/**
+ * @summary Remove stored Google OAuth credentials (and the account link)
+ */
+export const clearGoogleCredentials = async ( options?: RequestInit): Promise<GoogleStatus> => {
+
+  return customFetch<GoogleStatus>(getClearGoogleCredentialsUrl(),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getClearGoogleCredentialsMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof clearGoogleCredentials>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof clearGoogleCredentials>>, TError,void, TContext> => {
+
+const mutationKey = ['clearGoogleCredentials'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof clearGoogleCredentials>>, void> = () => {
+
+
+          return  clearGoogleCredentials(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ClearGoogleCredentialsMutationResult = NonNullable<Awaited<ReturnType<typeof clearGoogleCredentials>>>
+
+    export type ClearGoogleCredentialsMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Remove stored Google OAuth credentials (and the account link)
+ */
+export const useClearGoogleCredentials = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof clearGoogleCredentials>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof clearGoogleCredentials>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getClearGoogleCredentialsMutationOptions(options));
+    }
+
+export const getDisconnectGoogleUrl = () => {
+
+
+
+
+  return `/api/connections/google/disconnect`
+}
+
+/**
+ * @summary Unlink a Google account. With an accountId in the body only that account is unlinked; without one, every linked account is removed.
+ */
+export const disconnectGoogle = async (googleDisconnectInput?: GoogleDisconnectInput, options?: RequestInit): Promise<GoogleStatus> => {
+
+  return customFetch<GoogleStatus>(getDisconnectGoogleUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      googleDisconnectInput,)
+  }
+);}
+
+
+
+
+export const getDisconnectGoogleMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof disconnectGoogle>>, TError,{data?: BodyType<GoogleDisconnectInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof disconnectGoogle>>, TError,{data?: BodyType<GoogleDisconnectInput>}, TContext> => {
+
+const mutationKey = ['disconnectGoogle'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof disconnectGoogle>>, {data?: BodyType<GoogleDisconnectInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  disconnectGoogle(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DisconnectGoogleMutationResult = NonNullable<Awaited<ReturnType<typeof disconnectGoogle>>>
+    export type DisconnectGoogleMutationBody = BodyType<GoogleDisconnectInput> | undefined
+    export type DisconnectGoogleMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Unlink a Google account. With an accountId in the body only that account is unlinked; without one, every linked account is removed.
+ */
+export const useDisconnectGoogle = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof disconnectGoogle>>, TError,{data?: BodyType<GoogleDisconnectInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof disconnectGoogle>>,
+        TError,
+        {data?: BodyType<GoogleDisconnectInput>},
+        TContext
+      > => {
+      return useMutation(getDisconnectGoogleMutationOptions(options));
+    }
+
+export const getListImapAccountsUrl = () => {
+
+
+
+
+  return `/api/connections/imap/accounts`
+}
+
+/**
+ * @summary List the saved IMAP mail accounts (passwords omitted)
+ */
+export const listImapAccounts = async ( options?: RequestInit): Promise<ImapAccount[]> => {
+
+  return customFetch<ImapAccount[]>(getListImapAccountsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListImapAccountsQueryKey = () => {
+    return [
+    `/api/connections/imap/accounts`
+    ] as const;
+    }
+
+
+export const getListImapAccountsQueryOptions = <TData = Awaited<ReturnType<typeof listImapAccounts>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listImapAccounts>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListImapAccountsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listImapAccounts>>> = ({ signal }) => listImapAccounts({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listImapAccounts>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListImapAccountsQueryResult = NonNullable<Awaited<ReturnType<typeof listImapAccounts>>>
+export type ListImapAccountsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List the saved IMAP mail accounts (passwords omitted)
+ */
+
+export function useListImapAccounts<TData = Awaited<ReturnType<typeof listImapAccounts>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listImapAccounts>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListImapAccountsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getAddImapAccountUrl = () => {
+
+
+
+
+  return `/api/connections/imap/accounts`
+}
+
+/**
+ * @summary Add an IMAP mail account
+ */
+export const addImapAccount = async (imapAccountInput: ImapAccountInput, options?: RequestInit): Promise<ImapAccount[]> => {
+
+  return customFetch<ImapAccount[]>(getAddImapAccountUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      imapAccountInput,)
+  }
+);}
+
+
+
+
+export const getAddImapAccountMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof addImapAccount>>, TError,{data: BodyType<ImapAccountInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof addImapAccount>>, TError,{data: BodyType<ImapAccountInput>}, TContext> => {
+
+const mutationKey = ['addImapAccount'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof addImapAccount>>, {data: BodyType<ImapAccountInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  addImapAccount(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AddImapAccountMutationResult = NonNullable<Awaited<ReturnType<typeof addImapAccount>>>
+    export type AddImapAccountMutationBody = BodyType<ImapAccountInput>
+    export type AddImapAccountMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Add an IMAP mail account
+ */
+export const useAddImapAccount = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof addImapAccount>>, TError,{data: BodyType<ImapAccountInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof addImapAccount>>,
+        TError,
+        {data: BodyType<ImapAccountInput>},
+        TContext
+      > => {
+      return useMutation(getAddImapAccountMutationOptions(options));
+    }
+
+export const getRemoveImapAccountUrl = (id: string,) => {
+
+
+
+
+  return `/api/connections/imap/accounts/${id}`
+}
+
+/**
+ * @summary Remove a saved IMAP mail account
+ */
+export const removeImapAccount = async (id: string, options?: RequestInit): Promise<ImapAccount[]> => {
+
+  return customFetch<ImapAccount[]>(getRemoveImapAccountUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getRemoveImapAccountMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof removeImapAccount>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof removeImapAccount>>, TError,{id: string}, TContext> => {
+
+const mutationKey = ['removeImapAccount'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof removeImapAccount>>, {id: string}> = (props) => {
+          const {id} = props ?? {};
+
+          return  removeImapAccount(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RemoveImapAccountMutationResult = NonNullable<Awaited<ReturnType<typeof removeImapAccount>>>
+
+    export type RemoveImapAccountMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Remove a saved IMAP mail account
+ */
+export const useRemoveImapAccount = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof removeImapAccount>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof removeImapAccount>>,
+        TError,
+        {id: string},
+        TContext
+      > => {
+      return useMutation(getRemoveImapAccountMutationOptions(options));
+    }
+
+export const getListCalDavAccountsUrl = () => {
+
+
+
+
+  return `/api/connections/caldav/accounts`
+}
+
+/**
+ * @summary List the saved CalDAV calendar accounts (passwords omitted)
+ */
+export const listCalDavAccounts = async ( options?: RequestInit): Promise<CalDavAccount[]> => {
+
+  return customFetch<CalDavAccount[]>(getListCalDavAccountsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListCalDavAccountsQueryKey = () => {
+    return [
+    `/api/connections/caldav/accounts`
+    ] as const;
+    }
+
+
+export const getListCalDavAccountsQueryOptions = <TData = Awaited<ReturnType<typeof listCalDavAccounts>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCalDavAccounts>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListCalDavAccountsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listCalDavAccounts>>> = ({ signal }) => listCalDavAccounts({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listCalDavAccounts>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListCalDavAccountsQueryResult = NonNullable<Awaited<ReturnType<typeof listCalDavAccounts>>>
+export type ListCalDavAccountsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List the saved CalDAV calendar accounts (passwords omitted)
+ */
+
+export function useListCalDavAccounts<TData = Awaited<ReturnType<typeof listCalDavAccounts>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCalDavAccounts>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListCalDavAccountsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getAddCalDavAccountUrl = () => {
+
+
+
+
+  return `/api/connections/caldav/accounts`
+}
+
+/**
+ * @summary Add a CalDAV calendar account
+ */
+export const addCalDavAccount = async (calDavAccountInput: CalDavAccountInput, options?: RequestInit): Promise<CalDavAccount[]> => {
+
+  return customFetch<CalDavAccount[]>(getAddCalDavAccountUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      calDavAccountInput,)
+  }
+);}
+
+
+
+
+export const getAddCalDavAccountMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof addCalDavAccount>>, TError,{data: BodyType<CalDavAccountInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof addCalDavAccount>>, TError,{data: BodyType<CalDavAccountInput>}, TContext> => {
+
+const mutationKey = ['addCalDavAccount'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof addCalDavAccount>>, {data: BodyType<CalDavAccountInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  addCalDavAccount(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AddCalDavAccountMutationResult = NonNullable<Awaited<ReturnType<typeof addCalDavAccount>>>
+    export type AddCalDavAccountMutationBody = BodyType<CalDavAccountInput>
+    export type AddCalDavAccountMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Add a CalDAV calendar account
+ */
+export const useAddCalDavAccount = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof addCalDavAccount>>, TError,{data: BodyType<CalDavAccountInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof addCalDavAccount>>,
+        TError,
+        {data: BodyType<CalDavAccountInput>},
+        TContext
+      > => {
+      return useMutation(getAddCalDavAccountMutationOptions(options));
+    }
+
+export const getRemoveCalDavAccountUrl = (id: string,) => {
+
+
+
+
+  return `/api/connections/caldav/accounts/${id}`
+}
+
+/**
+ * @summary Remove a saved CalDAV calendar account
+ */
+export const removeCalDavAccount = async (id: string, options?: RequestInit): Promise<CalDavAccount[]> => {
+
+  return customFetch<CalDavAccount[]>(getRemoveCalDavAccountUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getRemoveCalDavAccountMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof removeCalDavAccount>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof removeCalDavAccount>>, TError,{id: string}, TContext> => {
+
+const mutationKey = ['removeCalDavAccount'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof removeCalDavAccount>>, {id: string}> = (props) => {
+          const {id} = props ?? {};
+
+          return  removeCalDavAccount(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RemoveCalDavAccountMutationResult = NonNullable<Awaited<ReturnType<typeof removeCalDavAccount>>>
+
+    export type RemoveCalDavAccountMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Remove a saved CalDAV calendar account
+ */
+export const useRemoveCalDavAccount = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof removeCalDavAccount>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof removeCalDavAccount>>,
+        TError,
+        {id: string},
+        TContext
+      > => {
+      return useMutation(getRemoveCalDavAccountMutationOptions(options));
     }
 
 export const getSaveSpotifyCredentialsUrl = () => {

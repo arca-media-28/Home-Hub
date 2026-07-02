@@ -2,6 +2,16 @@ import { Router } from "express";
 import { connectionStmts, healthStmts, type DbServiceConnection } from "../lib/db.js";
 import { requireAuth } from "../lib/auth.js";
 import {
+  listImapAccounts,
+  addImapAccount,
+  removeImapAccount,
+  listCalDavAccounts,
+  addCalDavAccount,
+  removeCalDavAccount,
+  type ImapAccount,
+  type CalDavAccount,
+} from "../lib/mailAccounts.js";
+import {
   runPing,
   connectionToValues,
   isConfigured,
@@ -74,6 +84,94 @@ router.get("/status", requireAuth, async (_req, res) => {
   );
 
   res.json(statuses);
+});
+
+// ── IMAP / CalDAV multi-account management ────────────────────────────────────
+// These lists live in the `extra` JSON of the "imap"/"caldav" rows and support
+// several accounts each, so they get dedicated add/remove routes instead of
+// the single-connection PUT below. Passwords never leave the server.
+
+function sanitizeImap(a: ImapAccount) {
+  return { id: a.id, label: a.label, host: a.host, port: a.port, secure: a.secure, username: a.username };
+}
+function sanitizeCalDav(a: CalDavAccount) {
+  return { id: a.id, label: a.label, url: a.url, username: a.username };
+}
+
+// GET /api/connections/imap/accounts
+router.get("/imap/accounts", requireAuth, (_req, res) => {
+  res.json(listImapAccounts().map(sanitizeImap));
+});
+
+// POST /api/connections/imap/accounts
+router.post("/imap/accounts", requireAuth, (req, res) => {
+  const body = (req.body ?? {}) as {
+    label?: string | null;
+    host?: string;
+    port?: number | null;
+    secure?: boolean | null;
+    username?: string;
+    password?: string;
+  };
+  if (!body.host?.trim() || !body.username?.trim() || !body.password) {
+    res.status(400).json({ error: "host, username and password are required" });
+    return;
+  }
+  const accounts = addImapAccount({
+    label: body.label ?? null,
+    host: body.host,
+    port: typeof body.port === "number" ? body.port : null,
+    secure: typeof body.secure === "boolean" ? body.secure : null,
+    username: body.username,
+    password: body.password,
+  });
+  res.json(accounts.map(sanitizeImap));
+});
+
+// DELETE /api/connections/imap/accounts/:id
+router.delete("/imap/accounts/:id", requireAuth, (req, res) => {
+  const next = removeImapAccount(String(req.params["id"]));
+  if (next === null) {
+    res.status(404).json({ error: "No IMAP account with that id" });
+    return;
+  }
+  res.json(next.map(sanitizeImap));
+});
+
+// GET /api/connections/caldav/accounts
+router.get("/caldav/accounts", requireAuth, (_req, res) => {
+  res.json(listCalDavAccounts().map(sanitizeCalDav));
+});
+
+// POST /api/connections/caldav/accounts
+router.post("/caldav/accounts", requireAuth, (req, res) => {
+  const body = (req.body ?? {}) as {
+    label?: string | null;
+    url?: string;
+    username?: string;
+    password?: string;
+  };
+  if (!body.url?.trim() || !body.username?.trim() || !body.password) {
+    res.status(400).json({ error: "url, username and password are required" });
+    return;
+  }
+  const accounts = addCalDavAccount({
+    label: body.label ?? null,
+    url: body.url,
+    username: body.username,
+    password: body.password,
+  });
+  res.json(accounts.map(sanitizeCalDav));
+});
+
+// DELETE /api/connections/caldav/accounts/:id
+router.delete("/caldav/accounts/:id", requireAuth, (req, res) => {
+  const next = removeCalDavAccount(String(req.params["id"]));
+  if (next === null) {
+    res.status(404).json({ error: "No CalDAV account with that id" });
+    return;
+  }
+  res.json(next.map(sanitizeCalDav));
 });
 
 // PUT /api/connections/:service — upsert a single service's connection

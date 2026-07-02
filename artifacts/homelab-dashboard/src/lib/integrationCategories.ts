@@ -7,6 +7,7 @@
 
 export const CATEGORY_ORDER = [
   "News",
+  "Communication",
   "Media",
   "Downloads",
   "Server",
@@ -25,6 +26,14 @@ const CATEGORY_BY_KEY: Record<string, Category> = {
   sports: "News",
   sleeper: "News",
   stocks: "News",
+  // Communication — tile keys (email/calendar) plus their service-connection
+  // keys (gmail, google_calendar, imap, caldav).
+  email: "Communication",
+  calendar: "Communication",
+  gmail: "Communication",
+  google_calendar: "Communication",
+  imap: "Communication",
+  caldav: "Communication",
   // Media
   media: "Media",
   plex: "Media",

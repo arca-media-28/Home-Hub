@@ -128,6 +128,12 @@ import {
   getGetConnectionsStatusQueryKey,
   useGetTruenasMetrics,
   getGetTruenasMetricsQueryKey,
+  useGetGoogleStatus,
+  getGetGoogleStatusQueryKey,
+  useListImapAccounts,
+  getListImapAccountsQueryKey,
+  useListCalDavAccounts,
+  getListCalDavAccountsQueryKey,
   TileType,
   TileIntegration,
   type Tile,
@@ -189,6 +195,8 @@ const INTEGRATIONS = [
   { value: TileIntegration.sports, label: "Sports" },
   { value: TileIntegration.sleeper, label: "Fantasy" },
   { value: TileIntegration.news, label: "News" },
+  { value: TileIntegration.email, label: "Email" },
+  { value: TileIntegration.calendar, label: "Calendar" },
   { value: TileIntegration.stocks, label: "Stocks" },
   { value: TileIntegration.eightball, label: "Magic Eight Ball" },
   { value: TileIntegration.dice, label: "Dice Roller" },
@@ -369,6 +377,26 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
   const [newsTestItems, setNewsTestItems] = useState<NewsItem[]>([]);
   const [newsTestTitle, setNewsTestTitle] = useState<string | null>(null);
   const [newsTestError, setNewsTestError] = useState<string | null>(null);
+  // Email widget options. An empty account selection means "all accounts".
+  const [emailAccounts, setEmailAccounts] = useState<string[]>(
+    tile?.tileSettings?.emailAccounts ?? [],
+  );
+  const [emailMaxMessages, setEmailMaxMessages] = useState<number>(
+    tile?.tileSettings?.emailMaxMessages ?? 15,
+  );
+  const [emailUnreadOnly, setEmailUnreadOnly] = useState<boolean>(
+    tile?.tileSettings?.emailUnreadOnly ?? false,
+  );
+  // Calendar widget options. An empty account selection means "all accounts".
+  const [calendarAccounts, setCalendarAccounts] = useState<string[]>(
+    tile?.tileSettings?.calendarAccounts ?? [],
+  );
+  const [calendarDaysAhead, setCalendarDaysAhead] = useState<number>(
+    tile?.tileSettings?.calendarDaysAhead ?? 14,
+  );
+  const [calendarMaxEvents, setCalendarMaxEvents] = useState<number>(
+    tile?.tileSettings?.calendarMaxEvents ?? 20,
+  );
   // Stocks (watchlist) widget options. Each entry holds a symbol plus optional
   // share quantity and cost basis (turning the watchlist into a portfolio).
   const [stockWatchlist, setStockWatchlist] = useState<StockWatchEntry[]>(
@@ -548,6 +576,12 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
       setNewsTestItems([]);
       setNewsTestTitle(null);
       setNewsTestError(null);
+      setEmailAccounts(tile?.tileSettings?.emailAccounts ?? []);
+      setEmailMaxMessages(tile?.tileSettings?.emailMaxMessages ?? 15);
+      setEmailUnreadOnly(tile?.tileSettings?.emailUnreadOnly ?? false);
+      setCalendarAccounts(tile?.tileSettings?.calendarAccounts ?? []);
+      setCalendarDaysAhead(tile?.tileSettings?.calendarDaysAhead ?? 14);
+      setCalendarMaxEvents(tile?.tileSettings?.calendarMaxEvents ?? 20);
       setStockWatchlist(tile?.tileSettings?.stockWatchlist ?? []);
       setStockSearch("");
       setSleeperUsername(tile?.tileSettings?.sleeperUsername ?? "");
@@ -628,6 +662,8 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
   const isWeather = integration === TileIntegration.weather;
   const isSports = integration === TileIntegration.sports;
   const isNews = integration === TileIntegration.news;
+  const isEmail = integration === TileIntegration.email;
+  const isCalendar = integration === TileIntegration.calendar;
   const isStocks = integration === TileIntegration.stocks;
   const isSleeper = integration === TileIntegration.sleeper;
   const isAudioPlayer = integration === TileIntegration.audioplayer;
@@ -787,6 +823,64 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
       enabled: open && isQbittorrent,
     },
   });
+
+  // Email/Calendar account discovery — only fetched while the editor is open on
+  // one of those integrations. The Google link is shared by both.
+  const googleStatusQuery = useGetGoogleStatus({
+    query: {
+      queryKey: getGetGoogleStatusQueryKey(),
+      enabled: open && (isEmail || isCalendar),
+    },
+  });
+  const imapAccountsQuery = useListImapAccounts({
+    query: {
+      queryKey: getListImapAccountsQueryKey(),
+      enabled: open && isEmail,
+    },
+  });
+  const caldavAccountsQuery = useListCalDavAccounts({
+    query: {
+      queryKey: getListCalDavAccountsQueryKey(),
+      enabled: open && isCalendar,
+    },
+  });
+  // Every linked Google account is individually selectable (keyed by its
+  // stable account id). Legacy tiles saved with the old "gmail"/"google" keys
+  // still work — the backend treats those as "all Google accounts".
+  const googleAccounts = (googleStatusQuery.data?.accounts ?? []).map((a) => ({
+    key: a.id,
+    label: a.email ?? "Google account",
+  }));
+  // Selectable account choices for the Email tile: each linked Google account
+  // plus every saved IMAP account (keyed by id).
+  const emailAccountChoices: { key: string; label: string }[] = [
+    ...googleAccounts,
+    ...(imapAccountsQuery.data ?? []).map((a) => ({ key: a.id, label: a.label })),
+  ];
+  // Selectable account choices for the Calendar tile: each linked Google
+  // account plus every saved CalDAV account (keyed by id).
+  const calendarAccountChoices: { key: string; label: string }[] = [
+    ...googleAccounts,
+    ...(caldavAccountsQuery.data ?? []).map((a) => ({ key: a.id, label: a.label })),
+  ];
+
+  // Toggle one account key in a selection list. An empty selection means "all
+  // accounts", so unchecking from the implicit-all state first materializes the
+  // full list minus the toggled key.
+  function toggleAccount(
+    selection: string[],
+    setSelection: (next: string[]) => void,
+    allKeys: string[],
+    key: string,
+    checked: boolean,
+  ): void {
+    const effective = selection.length > 0 ? selection : allKeys;
+    const next = checked
+      ? Array.from(new Set([...effective, key]))
+      : effective.filter((k) => k !== key);
+    // Selecting every account collapses back to the implicit "all" state.
+    setSelection(next.length >= allKeys.length ? [] : next);
+  }
   const availableCategories = Array.from(
     new Set(
       (qbStatusQuery.data?.categories ?? []).filter(
@@ -1237,6 +1331,20 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
                       newsMaxItems,
                       newsShowTimestamp,
                     }
+                  : isEmail
+                    ? {
+                        // Empty selection = all accounts (stored as null).
+                        emailAccounts: emailAccounts.length > 0 ? emailAccounts : null,
+                        emailMaxMessages,
+                        emailUnreadOnly,
+                      }
+                  : isCalendar
+                    ? {
+                        calendarAccounts:
+                          calendarAccounts.length > 0 ? calendarAccounts : null,
+                        calendarDaysAhead,
+                        calendarMaxEvents,
+                      }
                   : isStocks
                     ? { stockWatchlist }
                     : isSleeper
@@ -2746,6 +2854,164 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
                 />
                 <span className="text-sm">Show published time</span>
               </label>
+            </div>
+          )}
+
+          {isEmail && (
+            <div className="space-y-3 border-t border-border pt-4">
+              <div className="space-y-1.5">
+                <Label>Accounts</Label>
+                {emailAccountChoices.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">
+                    No mail accounts connected yet — link Gmail or add an IMAP
+                    account in Settings. Until then the tile shows sample
+                    messages.
+                  </p>
+                ) : (
+                  <div className="space-y-1.5">
+                    {emailAccountChoices.map((choice) => {
+                      const checked =
+                        emailAccounts.length === 0 ||
+                        emailAccounts.includes(choice.key);
+                      return (
+                        <label
+                          key={choice.key}
+                          className="flex items-center gap-2 cursor-pointer select-none"
+                        >
+                          <Checkbox
+                            checked={checked}
+                            onCheckedChange={(c) =>
+                              toggleAccount(
+                                emailAccounts,
+                                setEmailAccounts,
+                                emailAccountChoices.map((x) => x.key),
+                                choice.key,
+                                c === true,
+                              )
+                            }
+                          />
+                          <span className="text-sm truncate">{choice.label}</span>
+                        </label>
+                      );
+                    })}
+                    <p className="text-xs text-muted-foreground">
+                      Which inboxes this tile combines.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>Maximum messages</Label>
+                <Select
+                  value={String(emailMaxMessages)}
+                  onValueChange={(v) => setEmailMaxMessages(Number(v))}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[5, 10, 15, 20, 30, 50].map((n) => (
+                      <SelectItem key={n} value={String(n)}>
+                        {n} messages
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <Checkbox
+                  checked={emailUnreadOnly}
+                  onCheckedChange={(c) => setEmailUnreadOnly(c === true)}
+                />
+                <span className="text-sm">Unread messages only</span>
+              </label>
+            </div>
+          )}
+
+          {isCalendar && (
+            <div className="space-y-3 border-t border-border pt-4">
+              <div className="space-y-1.5">
+                <Label>Accounts</Label>
+                {calendarAccountChoices.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">
+                    No calendar accounts connected yet — link Google or add a
+                    CalDAV account in Settings. Until then the tile shows sample
+                    events.
+                  </p>
+                ) : (
+                  <div className="space-y-1.5">
+                    {calendarAccountChoices.map((choice) => {
+                      const checked =
+                        calendarAccounts.length === 0 ||
+                        calendarAccounts.includes(choice.key);
+                      return (
+                        <label
+                          key={choice.key}
+                          className="flex items-center gap-2 cursor-pointer select-none"
+                        >
+                          <Checkbox
+                            checked={checked}
+                            onCheckedChange={(c) =>
+                              toggleAccount(
+                                calendarAccounts,
+                                setCalendarAccounts,
+                                calendarAccountChoices.map((x) => x.key),
+                                choice.key,
+                                c === true,
+                              )
+                            }
+                          />
+                          <span className="text-sm truncate">{choice.label}</span>
+                        </label>
+                      );
+                    })}
+                    <p className="text-xs text-muted-foreground">
+                      Which calendars this tile combines.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Look ahead</Label>
+                  <Select
+                    value={String(calendarDaysAhead)}
+                    onValueChange={(v) => setCalendarDaysAhead(Number(v))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {[1, 3, 7, 14, 30, 60].map((n) => (
+                        <SelectItem key={n} value={String(n)}>
+                          {n === 1 ? "1 day" : `${n} days`}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Maximum events</Label>
+                  <Select
+                    value={String(calendarMaxEvents)}
+                    onValueChange={(v) => setCalendarMaxEvents(Number(v))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {[5, 10, 20, 30, 50].map((n) => (
+                        <SelectItem key={n} value={String(n)}>
+                          {n} events
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
             </div>
           )}
 

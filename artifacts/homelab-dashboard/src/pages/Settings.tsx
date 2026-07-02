@@ -11,9 +11,23 @@ import {
   useSaveSpotifyCredentials,
   useStartSpotifyAuth,
   useDisconnectSpotify,
+  useGetGoogleStatus,
+  useDisconnectGoogle,
+  useSetGoogleCredentials,
+  useClearGoogleCredentials,
+  createGoogleAuthIntent,
+  useListImapAccounts,
+  useAddImapAccount,
+  useRemoveImapAccount,
+  useListCalDavAccounts,
+  useAddCalDavAccount,
+  useRemoveCalDavAccount,
   getGetConnectionsQueryKey,
   getGetConnectionsStatusQueryKey,
   getGetSpotifyStatusQueryKey,
+  getGetGoogleStatusQueryKey,
+  getListImapAccountsQueryKey,
+  getListCalDavAccountsQueryKey,
   getGetMeQueryKey,
   type ServiceConnection,
   type ServiceConnectionUpdate,
@@ -23,6 +37,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import AppearanceSettings from "@/components/AppearanceSettings";
 import {
   Boxes,
@@ -50,6 +65,9 @@ import {
   Copy,
   ExternalLink,
   Unplug,
+  Mail,
+  CalendarDays,
+  Trash2,
 } from "lucide-react";
 import {
   Collapsible,
@@ -811,6 +829,826 @@ function SpotifyCard() {
   );
 }
 
+function GoogleCard() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const { data: status, isLoading } = useGetGoogleStatus({
+    query: { queryKey: getGetGoogleStatusQueryKey() },
+  });
+
+  const [clientIdInput, setClientIdInput] = useState("");
+  const [clientSecretInput, setClientSecretInput] = useState("");
+  const [editingCredentials, setEditingCredentials] = useState(false);
+
+  const saveCredentialsMutation = useSetGoogleCredentials({
+    mutation: {
+      onSuccess: (next) => {
+        queryClient.setQueryData(getGetGoogleStatusQueryKey(), next);
+        setClientIdInput("");
+        setClientSecretInput("");
+        setEditingCredentials(false);
+        toast({
+          title: "Google credentials saved",
+          description: "Now click Connect Google to link your account.",
+        });
+      },
+      onError: (err) => {
+        queryClient.invalidateQueries({ queryKey: getGetGoogleStatusQueryKey() });
+        toast({
+          title: "Couldn’t save credentials",
+          description: err instanceof ApiError ? err.message : "Please try again.",
+          variant: "destructive",
+        });
+      },
+    },
+  });
+
+  const clearCredentialsMutation = useClearGoogleCredentials({
+    mutation: {
+      onSuccess: (next) => {
+        queryClient.setQueryData(getGetGoogleStatusQueryKey(), next);
+        toast({ title: "Google credentials removed" });
+      },
+      onError: () =>
+        queryClient.invalidateQueries({ queryKey: getGetGoogleStatusQueryKey() }),
+    },
+  });
+
+  const disconnectMutation = useDisconnectGoogle({
+    mutation: {
+      onSuccess: (next) => {
+        queryClient.setQueryData(getGetGoogleStatusQueryKey(), next);
+        toast({ title: "Google disconnected" });
+      },
+      onError: () =>
+        queryClient.invalidateQueries({ queryKey: getGetGoogleStatusQueryKey() }),
+    },
+  });
+
+  // The OAuth popup posts its result here when it returns; refresh status and
+  // toast in this (the dashboard) tab.
+  useEffect(() => {
+    function onMessage(e: MessageEvent) {
+      if (e.origin !== window.location.origin) return;
+      if (e.data?.type !== "google-auth") return;
+      queryClient.invalidateQueries({ queryKey: getGetGoogleStatusQueryKey() });
+      if (e.data.result === "connected") {
+        toast({ title: "Google account connected" });
+      } else {
+        toast({
+          title: "Google connection failed",
+          description: "Please try linking your account again.",
+          variant: "destructive",
+        });
+      }
+    }
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, [queryClient, toast]);
+
+  const configured = status?.configured ?? false;
+  const connected = status?.connected ?? false;
+  const accounts = status?.accounts ?? [];
+  const redirectUri = status?.redirectUri ?? "";
+  const credentialSource = status?.credentialSource ?? null;
+  const activeClientId = status?.clientId ?? null;
+  const fromEnv = credentialSource === "env";
+  const showCredentialForm = !fromEnv && (!configured || editingCredentials);
+
+  function handleSaveCredentials() {
+    saveCredentialsMutation.mutate({
+      data: { clientId: clientIdInput.trim(), clientSecret: clientSecretInput.trim() },
+    });
+  }
+
+  async function handleConnect() {
+    // Google's consent page refuses to be framed, and the dashboard may run
+    // inside an iframe — open the flow in a top-level popup. The auth endpoint
+    // is an unauthenticated GET redirect, so it requires a short-lived
+    // single-use intent token minted here (with the bearer token) first;
+    // otherwise anyone could start the flow and bind their own account.
+    // Open the popup synchronously so the click isn't lost to popup blockers,
+    // then point it at the auth URL once the intent arrives.
+    const popup = window.open("about:blank", "google-auth", "width=520,height=720");
+    try {
+      const { intent } = await createGoogleAuthIntent();
+      const origin = window.location.origin + import.meta.env.BASE_URL;
+      const url =
+        `${import.meta.env.BASE_URL}api/widgets/gmail/auth` +
+        `?origin=${encodeURIComponent(origin)}&intent=${encodeURIComponent(intent)}`;
+      if (popup) {
+        popup.location.href = url;
+      } else {
+        // Popup was blocked — try a fresh top-level tab as a fallback.
+        window.open(url, "_blank", "noopener");
+      }
+    } catch {
+      popup?.close();
+      toast({
+        title: "Couldn’t start Google sign-in",
+        description: "Please try again.",
+        variant: "destructive",
+      });
+    }
+  }
+
+  async function copyRedirect() {
+    if (await copyText(redirectUri)) toast({ title: "Redirect URI copied" });
+  }
+
+  return (
+    <div className="border border-border bg-card relative">
+      <div className="absolute top-0 left-0 h-full w-0.5 bg-primary/60" />
+      <div className="flex items-center justify-between gap-2.5 px-5 py-4 border-b border-border">
+        <div className="flex items-center gap-2.5">
+          <Mail className="w-4 h-4 text-primary" />
+          <h2 className="font-bold text-sm uppercase tracking-widest text-foreground">
+            Google (Gmail + Calendar)
+          </h2>
+        </div>
+        {!isLoading && (
+          <span
+            className={`text-[10px] uppercase tracking-wider font-bold ${
+              connected ? "text-primary" : "text-muted-foreground"
+            }`}
+          >
+            {connected ? "Connected" : configured ? "Not linked" : "Not configured"}
+          </span>
+        )}
+      </div>
+
+      <div className="p-5 space-y-4">
+        <p className="text-xs text-muted-foreground">
+          One Google sign-in powers both the Email tile (Gmail inbox) and the
+          Calendar tile (Google Calendar). Google requires each app that reads
+          your mail or calendar to have its own free OAuth credentials, so a
+          one-time setup in the Google Cloud Console is needed before you can
+          connect your account.
+        </p>
+
+        {!connected && (
+          <ol className="list-decimal list-inside space-y-1.5 text-xs text-muted-foreground border border-border bg-muted/20 px-4 py-3">
+            <li>
+              Open the{" "}
+              <a
+                href="https://console.cloud.google.com/apis/credentials"
+                target="_blank"
+                rel="noreferrer"
+                className="text-primary inline-flex items-center gap-0.5 hover:underline"
+              >
+                Google Cloud Console credentials page
+                <ExternalLink className="w-3 h-3" />
+              </a>{" "}
+              and create (or select) a project.
+            </li>
+            <li>
+              Enable the <span className="text-foreground">Gmail API</span> and{" "}
+              <span className="text-foreground">Google Calendar API</span> under{" "}
+              <a
+                href="https://console.cloud.google.com/apis/library"
+                target="_blank"
+                rel="noreferrer"
+                className="text-primary inline-flex items-center gap-0.5 hover:underline"
+              >
+                APIs &amp; Services → Library
+                <ExternalLink className="w-3 h-3" />
+              </a>
+              .
+            </li>
+            <li>
+              Configure the OAuth consent screen (choose{" "}
+              <span className="text-foreground">External</span> and add your own
+              Google address as a test user).
+            </li>
+            <li>
+              Create credentials: <span className="text-foreground">OAuth client ID</span>{" "}
+              → application type <span className="text-foreground">Web application</span>,
+              and paste the Redirect URI below into{" "}
+              <span className="text-foreground">Authorized redirect URIs</span>.
+            </li>
+            <li>
+              Copy the generated <span className="text-foreground">Client ID</span> and{" "}
+              <span className="text-foreground">Client secret</span> into the fields
+              below and save.
+            </li>
+            <li>
+              Click <span className="text-foreground">Connect Google</span> and sign in
+              with the account whose mail and calendar you want on the dashboard.
+            </li>
+          </ol>
+        )}
+
+        {/* Redirect URI to allow-list in the Google OAuth app */}
+        <div className="space-y-1.5">
+          <Label className="text-xs uppercase tracking-wider text-muted-foreground">
+            Redirect URI
+          </Label>
+          <div className="flex items-center gap-2">
+            <code className="flex-1 truncate border border-border bg-muted/40 px-2 py-1.5 text-xs text-foreground">
+              {redirectUri || "—"}
+            </code>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={copyRedirect}
+              disabled={!redirectUri}
+              className="gap-1.5"
+            >
+              <Copy className="w-3.5 h-3.5" />
+              Copy
+            </Button>
+          </div>
+        </div>
+
+        {fromEnv ? (
+          <p className="text-xs text-muted-foreground border border-border bg-muted/20 px-4 py-3">
+            Credentials are provided by the server’s{" "}
+            <code className="text-foreground">GOOGLE_CLIENT_ID</code> and{" "}
+            <code className="text-foreground">GOOGLE_CLIENT_SECRET</code>{" "}
+            environment variables, so they can’t be edited here.
+          </p>
+        ) : showCredentialForm ? (
+          <div className="space-y-3">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label
+                  htmlFor="google-client-id"
+                  className="text-xs uppercase tracking-wider text-muted-foreground"
+                >
+                  Client ID
+                </Label>
+                <Input
+                  id="google-client-id"
+                  value={clientIdInput}
+                  onChange={(e) => setClientIdInput(e.target.value)}
+                  placeholder="1234567890-abc123.apps.googleusercontent.com"
+                  autoComplete="off"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label
+                  htmlFor="google-client-secret"
+                  className="text-xs uppercase tracking-wider text-muted-foreground"
+                >
+                  Client Secret
+                </Label>
+                <Input
+                  id="google-client-secret"
+                  type="password"
+                  value={clientSecretInput}
+                  onChange={(e) => setClientSecretInput(e.target.value)}
+                  placeholder="GOCSPX-…"
+                  autoComplete="off"
+                />
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                size="sm"
+                onClick={handleSaveCredentials}
+                disabled={
+                  !clientIdInput.trim() ||
+                  !clientSecretInput.trim() ||
+                  saveCredentialsMutation.isPending
+                }
+                className="gap-1.5"
+              >
+                {saveCredentialsMutation.isPending ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Check className="w-3.5 h-3.5" />
+                )}
+                Save Credentials
+              </Button>
+              {editingCredentials && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    setEditingCredentials(false);
+                    setClientIdInput("");
+                    setClientSecretInput("");
+                  }}
+                >
+                  Cancel
+                </Button>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between gap-2 border border-border bg-muted/20 px-4 py-3">
+            <div className="min-w-0 text-xs text-muted-foreground">
+              <span className="uppercase tracking-wider font-bold">Client ID:&nbsp;</span>
+              <code className="text-foreground break-all">{activeClientId ?? "—"}</code>
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => setEditingCredentials(true)}
+              >
+                Change
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={() => clearCredentialsMutation.mutate()}
+                disabled={clearCredentialsMutation.isPending}
+                className="text-muted-foreground hover:text-destructive"
+                aria-label="Remove Google credentials"
+              >
+                {clearCredentialsMutation.isPending ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Trash2 className="w-3.5 h-3.5" />
+                )}
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="px-5 py-4 border-t border-border space-y-3">
+        {accounts.length > 0 && (
+          <ul className="space-y-2">
+            {accounts.map((account) => (
+              <li
+                key={account.id}
+                className="flex items-center justify-between gap-2 border border-border bg-muted/20 px-4 py-2.5"
+              >
+                <div className="min-w-0 flex items-center gap-2 text-xs">
+                  <span
+                    className={`w-1.5 h-1.5 shrink-0 rounded-full ${
+                      account.connected ? "bg-primary" : "bg-destructive"
+                    }`}
+                    aria-hidden
+                  />
+                  <span className="truncate text-foreground">
+                    {account.email ?? "Google account"}
+                  </span>
+                  {!account.connected && (
+                    <span className="shrink-0 text-[10px] uppercase tracking-wider text-destructive">
+                      needs reconnect
+                    </span>
+                  )}
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => disconnectMutation.mutate({ data: { accountId: account.id } })}
+                  disabled={disconnectMutation.isPending}
+                  className="gap-1.5 shrink-0 text-muted-foreground hover:text-destructive"
+                  aria-label={`Disconnect ${account.email ?? "Google account"}`}
+                >
+                  <Unplug className="w-3.5 h-3.5" />
+                  Disconnect
+                </Button>
+              </li>
+            ))}
+          </ul>
+        )}
+        <div className="flex items-center justify-between gap-3">
+          <div className="text-xs text-muted-foreground">
+            {accounts.length > 0 ? (
+              "Each linked account can be shown on its own Email or Calendar tile."
+            ) : configured ? (
+              "Credentials saved — click Connect Google to link your account."
+            ) : (
+              "Follow the steps above, then save your credentials to enable linking."
+            )}
+          </div>
+          <Button
+            type="button"
+            size="sm"
+            variant={accounts.length > 0 ? "outline" : "default"}
+            onClick={handleConnect}
+            disabled={!configured}
+            className="gap-1.5 shrink-0"
+          >
+            <Plug className="w-3.5 h-3.5" />
+            {accounts.length > 0 ? "Connect another account" : "Connect Google"}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ImapAccountsCard() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const { data: accounts, isLoading } = useListImapAccounts({
+    query: { queryKey: getListImapAccountsQueryKey() },
+  });
+
+  const [label, setLabel] = useState("");
+  const [host, setHost] = useState("");
+  const [port, setPort] = useState("993");
+  const [secure, setSecure] = useState(true);
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+
+  const addMutation = useAddImapAccount({
+    mutation: {
+      onSuccess: (next) => {
+        queryClient.setQueryData(getListImapAccountsQueryKey(), next);
+        setLabel("");
+        setHost("");
+        setPort("993");
+        setSecure(true);
+        setUsername("");
+        setPassword("");
+        toast({ title: "IMAP account added" });
+      },
+      onError: (err) =>
+        toast({
+          title: "Couldn’t add IMAP account",
+          description: err instanceof ApiError ? err.message : "Check the details and try again.",
+          variant: "destructive",
+        }),
+    },
+  });
+
+  const removeMutation = useRemoveImapAccount({
+    mutation: {
+      onSuccess: (next) => {
+        queryClient.setQueryData(getListImapAccountsQueryKey(), next);
+        toast({ title: "IMAP account removed" });
+      },
+      onError: () =>
+        queryClient.invalidateQueries({ queryKey: getListImapAccountsQueryKey() }),
+    },
+  });
+
+  function handleAdd(e: React.FormEvent) {
+    e.preventDefault();
+    if (!host.trim() || !username.trim() || !password) return;
+    const portNum = Number.parseInt(port, 10);
+    addMutation.mutate({
+      data: {
+        label: label.trim() || null,
+        host: host.trim(),
+        port: Number.isFinite(portNum) && portNum > 0 ? portNum : null,
+        secure,
+        username: username.trim(),
+        password,
+      },
+    });
+  }
+
+  return (
+    <div className="border border-border bg-card relative">
+      <div className="absolute top-0 left-0 h-full w-0.5 bg-primary/60" />
+      <div className="flex items-center justify-between gap-2.5 px-5 py-4 border-b border-border">
+        <div className="flex items-center gap-2.5">
+          <Mail className="w-4 h-4 text-primary" />
+          <h2 className="font-bold text-sm uppercase tracking-widest text-foreground">
+            IMAP Mail Accounts
+          </h2>
+        </div>
+        {!isLoading && (
+          <span className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground">
+            {(accounts ?? []).length > 0
+              ? `${(accounts ?? []).length} account${(accounts ?? []).length === 1 ? "" : "s"}`
+              : "None"}
+          </span>
+        )}
+      </div>
+
+      <div className="p-5 space-y-4">
+        <p className="text-xs text-muted-foreground">
+          Add any standard IMAP mailbox (Fastmail, iCloud, a self-hosted server,
+          …) to show it on the Email tile. Passwords are stored on the host and
+          never sent back to the browser — for most providers use an
+          app-specific password.
+        </p>
+
+        {(accounts ?? []).length > 0 && (
+          <ul className="space-y-2">
+            {(accounts ?? []).map((a) => (
+              <li
+                key={a.id}
+                className="flex items-center justify-between gap-3 border border-border bg-muted/30 px-3 py-2"
+              >
+                <div className="min-w-0">
+                  <div className="text-sm text-foreground truncate">{a.label}</div>
+                  <div className="text-xs text-muted-foreground truncate">
+                    {a.username} @ {a.host}:{a.port}
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => removeMutation.mutate({ id: a.id })}
+                  disabled={removeMutation.isPending}
+                  className="shrink-0 text-muted-foreground hover:text-destructive"
+                  aria-label={`Remove ${a.label}`}
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </Button>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        <form onSubmit={handleAdd} className="grid gap-3 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label className="text-xs uppercase tracking-wider text-muted-foreground">
+              Label (optional)
+            </Label>
+            <Input
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
+              placeholder="Personal mail"
+              autoComplete="off"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs uppercase tracking-wider text-muted-foreground">
+              IMAP host
+            </Label>
+            <Input
+              value={host}
+              onChange={(e) => setHost(e.target.value)}
+              placeholder="imap.fastmail.com"
+              autoComplete="off"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs uppercase tracking-wider text-muted-foreground">
+              Port
+            </Label>
+            <Input
+              value={port}
+              onChange={(e) => setPort(e.target.value)}
+              placeholder={secure ? "993" : "143"}
+              inputMode="numeric"
+              autoComplete="off"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label
+              htmlFor="imap-secure"
+              className="text-xs uppercase tracking-wider text-muted-foreground"
+            >
+              Use SSL/TLS
+            </Label>
+            <div className="flex items-center gap-2.5 h-9">
+              <Switch
+                id="imap-secure"
+                checked={secure}
+                onCheckedChange={(checked) => {
+                  setSecure(checked);
+                  // Swap the default port along with the mode, but only if the
+                  // user hasn't typed a custom one.
+                  if (checked && port === "143") setPort("993");
+                  if (!checked && port === "993") setPort("143");
+                }}
+              />
+              <span className="text-xs text-muted-foreground">
+                {secure ? "Implicit TLS (usually port 993)" : "Plain / STARTTLS (usually port 143)"}
+              </span>
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs uppercase tracking-wider text-muted-foreground">
+              Username
+            </Label>
+            <Input
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="you@example.com"
+              autoComplete="off"
+            />
+          </div>
+          <div className="space-y-1.5 sm:col-span-2">
+            <Label className="text-xs uppercase tracking-wider text-muted-foreground">
+              Password
+            </Label>
+            <Input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="App password"
+              autoComplete="new-password"
+            />
+          </div>
+          <div className="sm:col-span-2 flex justify-end">
+            <Button
+              type="submit"
+              size="sm"
+              disabled={
+                addMutation.isPending || !host.trim() || !username.trim() || !password
+              }
+              className="gap-1.5"
+            >
+              {addMutation.isPending ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  Adding…
+                </>
+              ) : (
+                "Add account"
+              )}
+            </Button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function CalDavAccountsCard() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const { data: accounts, isLoading } = useListCalDavAccounts({
+    query: { queryKey: getListCalDavAccountsQueryKey() },
+  });
+
+  const [label, setLabel] = useState("");
+  const [url, setUrl] = useState("");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+
+  const addMutation = useAddCalDavAccount({
+    mutation: {
+      onSuccess: (next) => {
+        queryClient.setQueryData(getListCalDavAccountsQueryKey(), next);
+        setLabel("");
+        setUrl("");
+        setUsername("");
+        setPassword("");
+        toast({ title: "CalDAV account added" });
+      },
+      onError: (err) =>
+        toast({
+          title: "Couldn’t add CalDAV account",
+          description: err instanceof ApiError ? err.message : "Check the details and try again.",
+          variant: "destructive",
+        }),
+    },
+  });
+
+  const removeMutation = useRemoveCalDavAccount({
+    mutation: {
+      onSuccess: (next) => {
+        queryClient.setQueryData(getListCalDavAccountsQueryKey(), next);
+        toast({ title: "CalDAV account removed" });
+      },
+      onError: () =>
+        queryClient.invalidateQueries({ queryKey: getListCalDavAccountsQueryKey() }),
+    },
+  });
+
+  function handleAdd(e: React.FormEvent) {
+    e.preventDefault();
+    if (!url.trim() || !username.trim() || !password) return;
+    addMutation.mutate({
+      data: {
+        label: label.trim() || null,
+        url: url.trim(),
+        username: username.trim(),
+        password,
+      },
+    });
+  }
+
+  return (
+    <div className="border border-border bg-card relative">
+      <div className="absolute top-0 left-0 h-full w-0.5 bg-primary/60" />
+      <div className="flex items-center justify-between gap-2.5 px-5 py-4 border-b border-border">
+        <div className="flex items-center gap-2.5">
+          <CalendarDays className="w-4 h-4 text-primary" />
+          <h2 className="font-bold text-sm uppercase tracking-widest text-foreground">
+            CalDAV Calendars
+          </h2>
+        </div>
+        {!isLoading && (
+          <span className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground">
+            {(accounts ?? []).length > 0
+              ? `${(accounts ?? []).length} account${(accounts ?? []).length === 1 ? "" : "s"}`
+              : "None"}
+          </span>
+        )}
+      </div>
+
+      <div className="p-5 space-y-4">
+        <p className="text-xs text-muted-foreground">
+          Add any CalDAV calendar (Nextcloud, Radicale, Fastmail, iCloud, …) to
+          show its events on the Calendar tile. Passwords are stored on the
+          host and never sent back to the browser.
+        </p>
+
+        {(accounts ?? []).length > 0 && (
+          <ul className="space-y-2">
+            {(accounts ?? []).map((a) => (
+              <li
+                key={a.id}
+                className="flex items-center justify-between gap-3 border border-border bg-muted/30 px-3 py-2"
+              >
+                <div className="min-w-0">
+                  <div className="text-sm text-foreground truncate">{a.label}</div>
+                  <div className="text-xs text-muted-foreground truncate">
+                    {a.username} @ {a.url}
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => removeMutation.mutate({ id: a.id })}
+                  disabled={removeMutation.isPending}
+                  className="shrink-0 text-muted-foreground hover:text-destructive"
+                  aria-label={`Remove ${a.label}`}
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </Button>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        <form onSubmit={handleAdd} className="grid gap-3 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label className="text-xs uppercase tracking-wider text-muted-foreground">
+              Label (optional)
+            </Label>
+            <Input
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
+              placeholder="Family calendar"
+              autoComplete="off"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs uppercase tracking-wider text-muted-foreground">
+              Server URL
+            </Label>
+            <Input
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              placeholder="https://cloud.example.com/remote.php/dav"
+              autoComplete="off"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs uppercase tracking-wider text-muted-foreground">
+              Username
+            </Label>
+            <Input
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="you@example.com"
+              autoComplete="off"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs uppercase tracking-wider text-muted-foreground">
+              Password
+            </Label>
+            <Input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="App password"
+              autoComplete="new-password"
+            />
+          </div>
+          <div className="sm:col-span-2 flex justify-end">
+            <Button
+              type="submit"
+              size="sm"
+              disabled={
+                addMutation.isPending || !url.trim() || !username.trim() || !password
+              }
+              className="gap-1.5"
+            >
+              {addMutation.isPending ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  Adding…
+                </>
+              ) : (
+                "Add account"
+              )}
+            </Button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 // Persist each category's collapsed/expanded state in localStorage, keyed per
 // category, so a user's choice survives reloads and sessions. Defaults to
 // expanded the first time (matching the original behaviour).
@@ -881,13 +1719,19 @@ export default function Settings() {
     if (meError) setLocation("/login");
   }, [meError, setLocation]);
 
-  // Surface the result of the Spotify OAuth round-trip (the server redirects back
-  // here with ?spotify=connected|error), then strip the param so it doesn't
-  // re-fire on refresh.
+  // Surface the result of an OAuth round-trip (the server redirects back here
+  // with ?spotify=connected|error or ?google=connected|error), then strip the
+  // param so it doesn't re-fire on refresh.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const result = params.get("spotify");
-    if (!result) return;
+    // Each entry: query param name → postMessage type + display name.
+    const flows = [
+      { param: "spotify", type: "spotify-auth", name: "Spotify" },
+      { param: "google", type: "google-auth", name: "Google" },
+    ];
+    const flow = flows.find((f) => params.get(f.param));
+    if (!flow) return;
+    const result = params.get(flow.param)!;
 
     // When this page is the OAuth popup (opened by handleConnect), hand the
     // result back to the dashboard tab and close — the opener refreshes status
@@ -895,7 +1739,7 @@ export default function Settings() {
     if (window.opener && window.opener !== window) {
       try {
         window.opener.postMessage(
-          { type: "spotify-auth", result },
+          { type: flow.type, result },
           window.location.origin,
         );
       } catch {
@@ -906,15 +1750,15 @@ export default function Settings() {
     }
 
     if (result === "connected") {
-      toast({ title: "Spotify connected" });
+      toast({ title: `${flow.name} connected` });
     } else if (result === "error") {
       toast({
-        title: "Spotify connection failed",
+        title: `${flow.name} connection failed`,
         description: "Please try linking your account again.",
         variant: "destructive",
       });
     }
-    params.delete("spotify");
+    params.delete(flow.param);
     const query = params.toString();
     window.history.replaceState(
       {},
@@ -1000,6 +1844,13 @@ export default function Settings() {
                 {group.category === "Media" && <SpotifyCard />}
               </CategorySection>
             ))}
+            {/* Communication has no generic ServiceCard entries — its cards are
+                all bespoke (Google OAuth + multi-account IMAP/CalDAV lists). */}
+            <CategorySection title="Communication">
+              <GoogleCard />
+              <ImapAccountsCard />
+              <CalDavAccountsCard />
+            </CategorySection>
           </div>
         )}
       </main>

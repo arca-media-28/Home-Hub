@@ -910,6 +910,94 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /widgets/email/inbox:
+    get:
+      operationId: getEmailInbox
+      tags: [widgets]
+      summary: Aggregated recent messages across the configured mail accounts
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: accounts
+          in: query
+          required: false
+          description: >-
+            Comma-separated account keys to include ("gmail" or an IMAP account
+            id). When omitted, all configured accounts are aggregated. When no
+            accounts are configured at all, demo messages are returned so an
+            unconfigured tile still renders.
+          schema:
+            type: string
+        - name: max
+          in: query
+          required: false
+          description: Maximum number of messages to return (clamped server-side).
+          schema:
+            type: integer
+        - name: unreadOnly
+          in: query
+          required: false
+          description: When "true", only unread messages are returned.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Recent messages, newest first
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmailInboxData"
+        "502":
+          description: Every configured mail account failed to respond
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /widgets/calendar/events:
+    get:
+      operationId: getCalendarEvents
+      tags: [widgets]
+      summary: Aggregated upcoming events across the configured calendar accounts
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: accounts
+          in: query
+          required: false
+          description: >-
+            Comma-separated account keys to include ("google" or a CalDAV
+            account id). When omitted, all configured accounts are aggregated.
+            When no accounts are configured at all, demo events are returned so
+            an unconfigured tile still renders.
+          schema:
+            type: string
+        - name: days
+          in: query
+          required: false
+          description: How many days ahead to look (clamped server-side).
+          schema:
+            type: integer
+        - name: max
+          in: query
+          required: false
+          description: Maximum number of events to return (clamped server-side).
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Upcoming events, soonest first
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CalendarEventsData"
+        "502":
+          description: Every configured calendar account failed to respond
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /widgets/stocks:
     get:
       operationId: getStocksWidget
@@ -1119,6 +1207,257 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /connections/google/status:
+    get:
+      operationId: getGoogleStatus
+      tags: [connections]
+      summary: Report whether Google OAuth is configured and an account is linked
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Google link status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GoogleStatus"
+
+  /connections/google/auth-intent:
+    post:
+      operationId: createGoogleAuthIntent
+      tags: [connections]
+      summary: Mint a short-lived single-use token authorizing one popup OAuth flow run
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Auth intent token to pass to the /widgets/gmail/auth popup URL
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GoogleAuthIntent"
+
+  /connections/google/credentials:
+    put:
+      operationId: setGoogleCredentials
+      tags: [connections]
+      summary: Save the Google OAuth client ID and secret (clears any existing account link)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GoogleCredentialsInput"
+      responses:
+        "200":
+          description: Updated Google link status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GoogleStatus"
+        "400":
+          description: Missing clientId or clientSecret
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Credentials are provided via environment variables and cannot be edited
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      operationId: clearGoogleCredentials
+      tags: [connections]
+      summary: Remove stored Google OAuth credentials (and the account link)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Updated Google link status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GoogleStatus"
+        "409":
+          description: Credentials are provided via environment variables and cannot be removed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /connections/google/disconnect:
+    post:
+      operationId: disconnectGoogle
+      tags: [connections]
+      summary: >-
+        Unlink a Google account. With an accountId in the body only that
+        account is unlinked; without one, every linked account is removed.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GoogleDisconnectInput"
+      responses:
+        "200":
+          description: Updated Google link status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GoogleStatus"
+
+  /connections/imap/accounts:
+    get:
+      operationId: listImapAccounts
+      tags: [connections]
+      summary: List the saved IMAP mail accounts (passwords omitted)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Saved IMAP accounts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ImapAccount"
+    post:
+      operationId: addImapAccount
+      tags: [connections]
+      summary: Add an IMAP mail account
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ImapAccountInput"
+      responses:
+        "200":
+          description: Updated list of saved IMAP accounts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ImapAccount"
+        "400":
+          description: Missing or invalid account fields
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /connections/imap/accounts/{id}:
+    delete:
+      operationId: removeImapAccount
+      tags: [connections]
+      summary: Remove a saved IMAP mail account
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Updated list of saved IMAP accounts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ImapAccount"
+        "404":
+          description: No account with that id
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /connections/caldav/accounts:
+    get:
+      operationId: listCalDavAccounts
+      tags: [connections]
+      summary: List the saved CalDAV calendar accounts (passwords omitted)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Saved CalDAV accounts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CalDavAccount"
+    post:
+      operationId: addCalDavAccount
+      tags: [connections]
+      summary: Add a CalDAV calendar account
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CalDavAccountInput"
+      responses:
+        "200":
+          description: Updated list of saved CalDAV accounts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CalDavAccount"
+        "400":
+          description: Missing or invalid account fields
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /connections/caldav/accounts/{id}:
+    delete:
+      operationId: removeCalDavAccount
+      tags: [connections]
+      summary: Remove a saved CalDAV calendar account
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Updated list of saved CalDAV accounts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CalDavAccount"
+        "404":
+          description: No account with that id
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /connections/spotify/credentials:
     post:
       operationId: saveSpotifyCredentials
@@ -1314,7 +1653,7 @@ components:
           enum: [app, truenas, media, sonarr, radarr, lidarr, qbittorrent]
         integration:
           type: ["string", "null"]
-          enum: [truenas, media, jellyfin, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, audioplayer, clock, timer, weather, sports, news, stocks, sleeper, note, spacer, divider, eightball, dice, coinflip, fortune, tamagotchi, bonsai, null]
+          enum: [truenas, media, jellyfin, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, audioplayer, clock, timer, weather, sports, news, stocks, sleeper, email, calendar, note, spacer, divider, eightball, dice, coinflip, fortune, tamagotchi, bonsai, null]
         gridX:
           type: integer
         gridY:
@@ -1398,7 +1737,7 @@ components:
           enum: [app, truenas, media, sonarr, radarr, lidarr, qbittorrent]
         integration:
           type: ["string", "null"]
-          enum: [truenas, media, jellyfin, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, audioplayer, clock, timer, weather, sports, news, stocks, sleeper, note, spacer, divider, eightball, dice, coinflip, fortune, tamagotchi, bonsai, null]
+          enum: [truenas, media, jellyfin, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, audioplayer, clock, timer, weather, sports, news, stocks, sleeper, email, calendar, note, spacer, divider, eightball, dice, coinflip, fortune, tamagotchi, bonsai, null]
         gridX:
           type: integer
         gridY:
@@ -1441,7 +1780,7 @@ components:
       properties:
         integration:
           type: ["string", "null"]
-          enum: [truenas, media, jellyfin, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, audioplayer, clock, timer, weather, sports, news, stocks, sleeper, note, spacer, divider, eightball, dice, coinflip, fortune, tamagotchi, bonsai, null]
+          enum: [truenas, media, jellyfin, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, audioplayer, clock, timer, weather, sports, news, stocks, sleeper, email, calendar, note, spacer, divider, eightball, dice, coinflip, fortune, tamagotchi, bonsai, null]
         gridX:
           type: integer
         gridY:
@@ -1652,6 +1991,42 @@ components:
             Playlists tab (Plex / Subsonic only). Absent or null defaults to
             true.
           type: ["boolean", "null"]
+        emailAccounts:
+          description: >-
+            Allow-list of mail account keys the Email tile aggregates: "gmail"
+            for the linked Google account, or the id of a saved IMAP account.
+            Null or absent means all configured accounts.
+          type: ["array", "null"]
+          items:
+            type: string
+        emailMaxMessages:
+          description: >-
+            Maximum number of messages the Email tile requests/shows. Null or
+            absent defaults to a sensible value (clamped server-side).
+          type: ["integer", "null"]
+        emailUnreadOnly:
+          description: >-
+            When true, the Email tile shows only unread messages. Absent or
+            false shows the most recent messages regardless of read state.
+          type: ["boolean", "null"]
+        calendarAccounts:
+          description: >-
+            Allow-list of calendar account keys the Calendar tile aggregates:
+            "google" for the linked Google account, or the id of a saved CalDAV
+            account. Null or absent means all configured accounts.
+          type: ["array", "null"]
+          items:
+            type: string
+        calendarDaysAhead:
+          description: >-
+            How many days ahead the Calendar tile looks for upcoming events.
+            Null or absent defaults to a sensible value (clamped server-side).
+          type: ["integer", "null"]
+        calendarMaxEvents:
+          description: >-
+            Maximum number of events the Calendar tile requests/shows. Null or
+            absent defaults to a sensible value (clamped server-side).
+          type: ["integer", "null"]
         scrollable:
           description: >-
             When true, the tile body shows a scrollbar when its content
@@ -1936,6 +2311,300 @@ components:
             Optional average cost per share. Used with shares to compute
             gain/loss. Null or absent when not tracking cost.
           type: ["number", "null"]
+
+    EmailMessage:
+      type: object
+      required: [id, account, accountLabel, from, subject, date, unread]
+      properties:
+        id:
+          description: Provider-scoped message id, unique within the response.
+          type: string
+        account:
+          description: >-
+            Key of the account this message came from ("gmail" or an IMAP
+            account id).
+          type: string
+        accountLabel:
+          description: Human-readable label of the source account.
+          type: string
+        from:
+          description: Display name (or address) of the sender.
+          type: string
+        subject:
+          description: Message subject line (may be empty).
+          type: string
+        snippet:
+          description: >-
+            Short plain-text preview of the message body when the provider
+            supplies one. Null when unavailable.
+          type: ["string", "null"]
+        date:
+          description: When the message was received (ISO 8601).
+          type: string
+        unread:
+          description: True when the message is unread.
+          type: boolean
+        link:
+          description: >-
+            Deep link to open the message in the provider's web UI (Gmail
+            only). Null when unavailable.
+          type: ["string", "null"]
+
+    EmailAccountError:
+      description: A configured account that failed to respond during the fetch.
+      type: object
+      required: [account, message]
+      properties:
+        account:
+          description: Label of the failing account.
+          type: string
+        message:
+          description: Short human-readable failure reason.
+          type: string
+
+    EmailInboxData:
+      type: object
+      required: [messages, sample]
+      properties:
+        messages:
+          description: Recent messages across the requested accounts, newest first.
+          type: array
+          items:
+            $ref: "#/components/schemas/EmailMessage"
+        unreadTotal:
+          description: >-
+            Total unread count across accounts when the providers report one.
+            Null when unknown.
+          type: ["integer", "null"]
+        errors:
+          description: >-
+            Accounts that failed during the fetch (partial results). Null or
+            absent when every account responded.
+          type: ["array", "null"]
+          items:
+            $ref: "#/components/schemas/EmailAccountError"
+        sample:
+          description: >-
+            True when these are demo messages because no mail account is
+            configured yet.
+          type: boolean
+
+    CalendarEvent:
+      type: object
+      required: [id, account, accountLabel, title, start, allDay]
+      properties:
+        id:
+          description: Provider-scoped event id, unique within the response.
+          type: string
+        account:
+          description: >-
+            Key of the account this event came from ("google" or a CalDAV
+            account id).
+          type: string
+        accountLabel:
+          description: Human-readable label of the source account.
+          type: string
+        calendar:
+          description: Name of the calendar the event belongs to, when known.
+          type: ["string", "null"]
+        title:
+          description: Event title/summary.
+          type: string
+        start:
+          description: Event start (ISO 8601; date-only for all-day events).
+          type: string
+        end:
+          description: >-
+            Event end (ISO 8601; date-only for all-day events). Null when the
+            provider does not supply one.
+          type: ["string", "null"]
+        allDay:
+          description: True for all-day events.
+          type: boolean
+        location:
+          description: Event location when set. Null otherwise.
+          type: ["string", "null"]
+
+    CalendarEventsData:
+      type: object
+      required: [events, sample]
+      properties:
+        events:
+          description: Upcoming events across the requested accounts, soonest first.
+          type: array
+          items:
+            $ref: "#/components/schemas/CalendarEvent"
+        errors:
+          description: >-
+            Accounts that failed during the fetch (partial results). Null or
+            absent when every account responded.
+          type: ["array", "null"]
+          items:
+            $ref: "#/components/schemas/EmailAccountError"
+        sample:
+          description: >-
+            True when these are demo events because no calendar account is
+            configured yet.
+          type: boolean
+
+    GoogleStatus:
+      type: object
+      required: [configured, connected, email]
+      properties:
+        configured:
+          description: >-
+            True when OAuth client credentials are available, either from the
+            GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET environment variables or
+            saved via Settings.
+          type: boolean
+        connected:
+          description: True when at least one Google account is linked and usable.
+          type: boolean
+        email:
+          description: >-
+            Email address of the first connected Google account (legacy summary
+            field — prefer the accounts list).
+          type: ["string", "null"]
+        accounts:
+          description: Every linked Google account.
+          type: array
+          items:
+            $ref: "#/components/schemas/GoogleAccountStatus"
+        redirectUri:
+          description: >-
+            The exact OAuth redirect URI the Google Cloud project must
+            allow-list.
+          type: ["string", "null"]
+        credentialSource:
+          description: >-
+            Where the active OAuth client credentials come from: "env"
+            (server environment variables, read-only in the UI) or "stored"
+            (saved via Settings). Null when not configured.
+          type: ["string", "null"]
+          enum: [env, stored, null]
+        clientId:
+          description: >-
+            The active OAuth client ID (the secret is never returned). Null
+            when not configured.
+          type: ["string", "null"]
+
+    GoogleDisconnectInput:
+      type: object
+      properties:
+        accountId:
+          description: Id of the single account to unlink.
+          type: string
+
+    GoogleAccountStatus:
+      type: object
+      required: [id, email, connected]
+      properties:
+        id:
+          description: Stable id for this linked account (used in tile account filters).
+          type: string
+        email:
+          description: Email address of the linked account, when known.
+          type: ["string", "null"]
+        connected:
+          description: True when this account's tokens are currently usable.
+          type: boolean
+
+    GoogleCredentialsInput:
+      type: object
+      required: [clientId, clientSecret]
+      properties:
+        clientId:
+          description: OAuth 2.0 client ID from the Google Cloud Console.
+          type: string
+        clientSecret:
+          description: OAuth 2.0 client secret from the Google Cloud Console.
+          type: string
+
+    GoogleAuthIntent:
+      type: object
+      required: [intent]
+      properties:
+        intent:
+          description: >-
+            Short-lived single-use token; append as ?intent= to the
+            /widgets/gmail/auth popup URL to authorize one OAuth flow run.
+          type: string
+
+    ImapAccountInput:
+      type: object
+      required: [host, username, password]
+      properties:
+        label:
+          description: Friendly display name; defaults to the username.
+          type: ["string", "null"]
+        host:
+          description: IMAP server hostname (e.g. "imap.example.com").
+          type: string
+        port:
+          description: IMAP port; defaults to 993.
+          type: ["integer", "null"]
+        secure:
+          description: Use implicit TLS; defaults to true.
+          type: ["boolean", "null"]
+        username:
+          description: IMAP login username.
+          type: string
+        password:
+          description: IMAP login password (stored server-side, never returned).
+          type: string
+
+    ImapAccount:
+      type: object
+      required: [id, label, host, port, secure, username]
+      properties:
+        id:
+          description: Stable id for this saved account.
+          type: string
+        label:
+          description: Friendly display name.
+          type: string
+        host:
+          type: string
+        port:
+          type: integer
+        secure:
+          type: boolean
+        username:
+          type: string
+
+    CalDavAccountInput:
+      type: object
+      required: [url, username, password]
+      properties:
+        label:
+          description: Friendly display name; defaults to the username.
+          type: ["string", "null"]
+        url:
+          description: >-
+            CalDAV server URL (e.g. "https://cal.example.com/dav" or a
+            provider's caldav endpoint).
+          type: string
+        username:
+          description: CalDAV login username.
+          type: string
+        password:
+          description: CalDAV login password (stored server-side, never returned).
+          type: string
+
+    CalDavAccount:
+      type: object
+      required: [id, label, url, username]
+      properties:
+        id:
+          description: Stable id for this saved account.
+          type: string
+        label:
+          description: Friendly display name.
+          type: string
+        url:
+          type: string
+        username:
+          type: string
 
     StockQuote:
       type: object

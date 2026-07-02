@@ -20,6 +20,8 @@ import {
   Music,
   Clock,
   Timer,
+  Mail,
+  CalendarDays,
   CloudSun,
   Trophy,
   Shirt,
@@ -103,6 +105,14 @@ export const INTEGRATION_META: Record<string, IntegrationMeta> = {
   [TileIntegration.audioplayer]: {
     icon: Music,
     description: "Stream music from your media server.",
+  },
+  [TileIntegration.email]: {
+    icon: Mail,
+    description: "Recent messages from Gmail or IMAP inboxes.",
+  },
+  [TileIntegration.calendar]: {
+    icon: CalendarDays,
+    description: "Upcoming events from Google Calendar or CalDAV.",
   },
   [TileIntegration.clock]: {
     icon: Clock,

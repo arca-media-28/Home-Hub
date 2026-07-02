@@ -17,6 +17,8 @@ import ClockTile from "./ClockTile";
 import WeatherTile from "./WeatherTile";
 import SportsTile from "./SportsTile";
 import NewsTile from "./NewsTile";
+import EmailTile from "./EmailTile";
+import CalendarTile from "./CalendarTile";
 import StocksTile from "./StocksTile";
 import SleeperTile from "./SleeperTile";
 import AudioPlayerTile from "./AudioPlayerTile";
@@ -46,6 +48,8 @@ export const INTEGRATION_LABELS: Record<string, string> = {
   [TileIntegration.weather]: "Weather",
   [TileIntegration.sports]: "Sports",
   [TileIntegration.news]: "News",
+  [TileIntegration.email]: "Email",
+  [TileIntegration.calendar]: "Calendar",
   [TileIntegration.stocks]: "Stocks",
   [TileIntegration.sleeper]: "Fantasy",
   [TileIntegration.audioplayer]: "Audio Player",
@@ -101,6 +105,10 @@ function renderStatusView(integration: string, props: WidgetProps) {
       return <SportsTile {...props} />;
     case TileIntegration.news:
       return <NewsTile {...props} />;
+    case TileIntegration.email:
+      return <EmailTile {...props} />;
+    case TileIntegration.calendar:
+      return <CalendarTile {...props} />;
     case TileIntegration.stocks:
       return <StocksTile {...props} />;
     case TileIntegration.sleeper:

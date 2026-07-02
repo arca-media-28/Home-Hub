@@ -70,6 +70,8 @@ export const TileIntegration = {
   news: 'news',
   stocks: 'stocks',
   sleeper: 'sleeper',
+  email: 'email',
+  calendar: 'calendar',
   note: 'note',
   spacer: 'spacer',
   divider: 'divider',
@@ -262,6 +264,36 @@ export type TileSettings = {
      * @nullable
      */
   audioPlaylists?: boolean | null;
+  /**
+     * Allow-list of mail account keys the Email tile aggregates: "gmail" for the linked Google account, or the id of a saved IMAP account. Null or absent means all configured accounts.
+     * @nullable
+     */
+  emailAccounts?: string[] | null;
+  /**
+     * Maximum number of messages the Email tile requests/shows. Null or absent defaults to a sensible value (clamped server-side).
+     * @nullable
+     */
+  emailMaxMessages?: number | null;
+  /**
+     * When true, the Email tile shows only unread messages. Absent or false shows the most recent messages regardless of read state.
+     * @nullable
+     */
+  emailUnreadOnly?: boolean | null;
+  /**
+     * Allow-list of calendar account keys the Calendar tile aggregates: "google" for the linked Google account, or the id of a saved CalDAV account. Null or absent means all configured accounts.
+     * @nullable
+     */
+  calendarAccounts?: string[] | null;
+  /**
+     * How many days ahead the Calendar tile looks for upcoming events. Null or absent defaults to a sensible value (clamped server-side).
+     * @nullable
+     */
+  calendarDaysAhead?: number | null;
+  /**
+     * Maximum number of events the Calendar tile requests/shows. Null or absent defaults to a sensible value (clamped server-side).
+     * @nullable
+     */
+  calendarMaxEvents?: number | null;
   /**
      * When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).
      * @nullable
@@ -565,6 +597,8 @@ export const TileInputIntegration = {
   news: 'news',
   stocks: 'stocks',
   sleeper: 'sleeper',
+  email: 'email',
+  calendar: 'calendar',
   note: 'note',
   spacer: 'spacer',
   divider: 'divider',
@@ -636,6 +670,8 @@ export const TileUpdateIntegration = {
   news: 'news',
   stocks: 'stocks',
   sleeper: 'sleeper',
+  email: 'email',
+  calendar: 'calendar',
   note: 'note',
   spacer: 'spacer',
   divider: 'divider',
@@ -675,6 +711,230 @@ export interface TileUpdate {
   /** @nullable */
   metrics?: string[] | null;
   tileSettings?: TileSettings | null;
+}
+
+export interface EmailMessage {
+  /** Provider-scoped message id, unique within the response. */
+  id: string;
+  /** Key of the account this message came from ("gmail" or an IMAP account id). */
+  account: string;
+  /** Human-readable label of the source account. */
+  accountLabel: string;
+  /** Display name (or address) of the sender. */
+  from: string;
+  /** Message subject line (may be empty). */
+  subject: string;
+  /**
+     * Short plain-text preview of the message body when the provider supplies one. Null when unavailable.
+     * @nullable
+     */
+  snippet?: string | null;
+  /** When the message was received (ISO 8601). */
+  date: string;
+  /** True when the message is unread. */
+  unread: boolean;
+  /**
+     * Deep link to open the message in the provider's web UI (Gmail only). Null when unavailable.
+     * @nullable
+     */
+  link?: string | null;
+}
+
+/**
+ * A configured account that failed to respond during the fetch.
+ */
+export interface EmailAccountError {
+  /** Label of the failing account. */
+  account: string;
+  /** Short human-readable failure reason. */
+  message: string;
+}
+
+export interface EmailInboxData {
+  /** Recent messages across the requested accounts, newest first. */
+  messages: EmailMessage[];
+  /**
+     * Total unread count across accounts when the providers report one. Null when unknown.
+     * @nullable
+     */
+  unreadTotal?: number | null;
+  /**
+     * Accounts that failed during the fetch (partial results). Null or absent when every account responded.
+     * @nullable
+     */
+  errors?: EmailAccountError[] | null;
+  /** True when these are demo messages because no mail account is configured yet. */
+  sample: boolean;
+}
+
+export interface CalendarEvent {
+  /** Provider-scoped event id, unique within the response. */
+  id: string;
+  /** Key of the account this event came from ("google" or a CalDAV account id). */
+  account: string;
+  /** Human-readable label of the source account. */
+  accountLabel: string;
+  /**
+     * Name of the calendar the event belongs to, when known.
+     * @nullable
+     */
+  calendar?: string | null;
+  /** Event title/summary. */
+  title: string;
+  /** Event start (ISO 8601; date-only for all-day events). */
+  start: string;
+  /**
+     * Event end (ISO 8601; date-only for all-day events). Null when the provider does not supply one.
+     * @nullable
+     */
+  end?: string | null;
+  /** True for all-day events. */
+  allDay: boolean;
+  /**
+     * Event location when set. Null otherwise.
+     * @nullable
+     */
+  location?: string | null;
+}
+
+export interface CalendarEventsData {
+  /** Upcoming events across the requested accounts, soonest first. */
+  events: CalendarEvent[];
+  /**
+     * Accounts that failed during the fetch (partial results). Null or absent when every account responded.
+     * @nullable
+     */
+  errors?: EmailAccountError[] | null;
+  /** True when these are demo events because no calendar account is configured yet. */
+  sample: boolean;
+}
+
+/**
+ * Where the active OAuth client credentials come from: "env" (server environment variables, read-only in the UI) or "stored" (saved via Settings). Null when not configured.
+ * @nullable
+ */
+export type GoogleStatusCredentialSource = typeof GoogleStatusCredentialSource[keyof typeof GoogleStatusCredentialSource] | null;
+
+
+export const GoogleStatusCredentialSource = {
+  env: 'env',
+  stored: 'stored',
+} as const;
+
+export interface GoogleAccountStatus {
+  /** Stable id for this linked account (used in tile account filters). */
+  id: string;
+  /**
+     * Email address of the linked account, when known.
+     * @nullable
+     */
+  email: string | null;
+  /** True when this account's tokens are currently usable. */
+  connected: boolean;
+}
+
+export interface GoogleStatus {
+  /** True when OAuth client credentials are available, either from the GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET environment variables or saved via Settings. */
+  configured: boolean;
+  /** True when at least one Google account is linked and usable. */
+  connected: boolean;
+  /**
+     * Email address of the first connected Google account (legacy summary field — prefer the accounts list).
+     * @nullable
+     */
+  email: string | null;
+  /** Every linked Google account. */
+  accounts?: GoogleAccountStatus[];
+  /**
+     * The exact OAuth redirect URI the Google Cloud project must allow-list.
+     * @nullable
+     */
+  redirectUri?: string | null;
+  /**
+     * Where the active OAuth client credentials come from: "env" (server environment variables, read-only in the UI) or "stored" (saved via Settings). Null when not configured.
+     * @nullable
+     */
+  credentialSource?: GoogleStatusCredentialSource;
+  /**
+     * The active OAuth client ID (the secret is never returned). Null when not configured.
+     * @nullable
+     */
+  clientId?: string | null;
+}
+
+export interface GoogleDisconnectInput {
+  /** Id of the single account to unlink. */
+  accountId?: string;
+}
+
+export interface GoogleCredentialsInput {
+  /** OAuth 2.0 client ID from the Google Cloud Console. */
+  clientId: string;
+  /** OAuth 2.0 client secret from the Google Cloud Console. */
+  clientSecret: string;
+}
+
+export interface GoogleAuthIntent {
+  /** Short-lived single-use token; append as ?intent= to the /widgets/gmail/auth popup URL to authorize one OAuth flow run. */
+  intent: string;
+}
+
+export interface ImapAccountInput {
+  /**
+     * Friendly display name; defaults to the username.
+     * @nullable
+     */
+  label?: string | null;
+  /** IMAP server hostname (e.g. "imap.example.com"). */
+  host: string;
+  /**
+     * IMAP port; defaults to 993.
+     * @nullable
+     */
+  port?: number | null;
+  /**
+     * Use implicit TLS; defaults to true.
+     * @nullable
+     */
+  secure?: boolean | null;
+  /** IMAP login username. */
+  username: string;
+  /** IMAP login password (stored server-side, never returned). */
+  password: string;
+}
+
+export interface ImapAccount {
+  /** Stable id for this saved account. */
+  id: string;
+  /** Friendly display name. */
+  label: string;
+  host: string;
+  port: number;
+  secure: boolean;
+  username: string;
+}
+
+export interface CalDavAccountInput {
+  /**
+     * Friendly display name; defaults to the username.
+     * @nullable
+     */
+  label?: string | null;
+  /** CalDAV server URL (e.g. "https://cal.example.com/dav" or a provider's caldav endpoint). */
+  url: string;
+  /** CalDAV login username. */
+  username: string;
+  /** CalDAV login password (stored server-side, never returned). */
+  password: string;
+}
+
+export interface CalDavAccount {
+  /** Stable id for this saved account. */
+  id: string;
+  /** Friendly display name. */
+  label: string;
+  url: string;
+  username: string;
 }
 
 export interface StockQuote {
@@ -1652,6 +1912,36 @@ url?: string;
  * Maximum number of headlines to return (clamped server-side).
  */
 limit?: number;
+};
+
+export type GetEmailInboxParams = {
+/**
+ * Comma-separated account keys to include ("gmail" or an IMAP account id). When omitted, all configured accounts are aggregated. When no accounts are configured at all, demo messages are returned so an unconfigured tile still renders.
+ */
+accounts?: string;
+/**
+ * Maximum number of messages to return (clamped server-side).
+ */
+max?: number;
+/**
+ * When "true", only unread messages are returned.
+ */
+unreadOnly?: string;
+};
+
+export type GetCalendarEventsParams = {
+/**
+ * Comma-separated account keys to include ("google" or a CalDAV account id). When omitted, all configured accounts are aggregated. When no accounts are configured at all, demo events are returned so an unconfigured tile still renders.
+ */
+accounts?: string;
+/**
+ * How many days ahead to look (clamped server-side).
+ */
+days?: number;
+/**
+ * Maximum number of events to return (clamped server-side).
+ */
+max?: number;
 };
 
 export type GetStocksWidgetParams = {

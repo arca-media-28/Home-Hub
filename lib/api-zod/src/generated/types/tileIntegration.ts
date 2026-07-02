@@ -33,6 +33,8 @@ export const TileIntegration = {
   news: 'news',
   stocks: 'stocks',
   sleeper: 'sleeper',
+  email: 'email',
+  calendar: 'calendar',
   note: 'note',
   spacer: 'spacer',
   divider: 'divider',

@@ -17,6 +17,30 @@ import {
   type SpotifyPlayback,
   type SpotifyCommand,
 } from "../lib/spotify.js";
+import {
+  isGoogleConfigured,
+  isGoogleLinked,
+  listGoogleAccounts,
+  buildGoogleAuthUrl,
+  exchangeGoogleCode,
+  createGooglePendingAuth,
+  consumeGooglePendingAuth,
+  consumeGoogleAuthIntent,
+  CALLBACK_PATH as GMAIL_CALLBACK_PATH,
+} from "../lib/google.js";
+import { listImapAccounts, listCalDavAccounts } from "../lib/mailAccounts.js";
+import {
+  fetchGmailMessages,
+  fetchImapMessages,
+  demoEmailMessages,
+  type EmailMessage,
+} from "../lib/email.js";
+import {
+  fetchGoogleCalendarEvents,
+  fetchCalDavEvents,
+  demoCalendarEvents,
+  type CalendarEvent,
+} from "../lib/calendar.js";
 
 const router = Router();
 
@@ -3898,6 +3922,391 @@ router.get("/stocks/search", requireAuth, async (req, res) => {
     logger.error({ reason: normalizeHttpError(err) }, "Stocks search error");
     res.status(502).json({ error: "Failed to search stock symbols" });
   }
+});
+
+// ── Email + Calendar (Gmail / IMAP / Google Calendar / CalDAV) ────────────────
+
+// Derive the browser-facing origin from the (proxied) request so the OAuth
+// redirect URI matches what Google will actually call back.
+function originFromRequest(req: {
+  headers: Record<string, unknown>;
+  protocol: string;
+  get: (h: string) => string | undefined;
+}): string {
+  const proto =
+    (req.headers["x-forwarded-proto"] as string | undefined)?.split(",")[0]?.trim() ||
+    req.protocol;
+  const host =
+    (req.headers["x-forwarded-host"] as string | undefined)?.split(",")[0]?.trim() ||
+    req.get("host") ||
+    "";
+  return `${proto}://${host}`;
+}
+
+// GET /api/widgets/gmail/auth — begin the Google OAuth flow. This is a
+// top-level browser navigation (opened in a popup by Settings), so it cannot
+// carry the bearer token; instead it must present a short-lived single-use
+// `intent` token minted by the authenticated
+// POST /connections/google/auth-intent. Without this, any unauthenticated
+// visitor could bind their own Google account to the app-wide link. `origin`
+// is the dashboard's base URL (host + SPA base path) used to build the
+// post-auth return URL.
+router.get("/gmail/auth", (req, res) => {
+  const intent = typeof req.query["intent"] === "string" ? req.query["intent"] : "";
+  if (!intent || !consumeGoogleAuthIntent(intent)) {
+    res.status(403).send("Missing or expired authorization. Start the flow from Settings.");
+    return;
+  }
+  if (!isGoogleConfigured()) {
+    res
+      .status(400)
+      .send("Google OAuth is not configured. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET.");
+    return;
+  }
+  const base =
+    (typeof req.query["origin"] === "string" && req.query["origin"].trim()) ||
+    originFromRequest(req);
+  let hostOrigin: string;
+  try {
+    hostOrigin = new URL(base).origin;
+  } catch {
+    hostOrigin = originFromRequest(req);
+  }
+  const redirectUri = `${hostOrigin.replace(/\/+$/, "")}${GMAIL_CALLBACK_PATH}`;
+  const returnTo = `${base.replace(/\/+$/, "")}/settings`;
+  const state = createGooglePendingAuth(redirectUri, returnTo);
+  res.redirect(buildGoogleAuthUrl(redirectUri, state));
+});
+
+// GET /api/widgets/gmail/callback — Google redirects the browser here.
+// Unauthenticated by necessity (top-level navigation can't carry the bearer
+// token); protected by the single-use `state` value instead.
+router.get("/gmail/callback", async (req, res) => {
+  const code = typeof req.query["code"] === "string" ? req.query["code"] : null;
+  const state = typeof req.query["state"] === "string" ? req.query["state"] : null;
+  const error = typeof req.query["error"] === "string" ? req.query["error"] : null;
+
+  const pending = state ? consumeGooglePendingAuth(state) : null;
+  const fallbackReturn = `${originFromRequest(req).replace(/\/+$/, "")}/settings`;
+  const returnTo = pending?.returnTo || fallbackReturn;
+  const settingsUrl = (status: string) => `${returnTo}?google=${status}`;
+
+  if (error || !code || !pending) {
+    logger.warn(
+      { error, hasCode: Boolean(code), hasPending: Boolean(pending) },
+      "Google callback rejected",
+    );
+    res.redirect(settingsUrl("error"));
+    return;
+  }
+
+  try {
+    await exchangeGoogleCode(code, pending.redirectUri);
+    res.redirect(settingsUrl("connected"));
+  } catch (err) {
+    logger.error({ reason: normalizeHttpError(err) }, "Google token exchange failed");
+    res.redirect(settingsUrl("error"));
+  }
+});
+
+const EMAIL_MAX_DEFAULT = 15;
+const EMAIL_MAX_CAP = 50;
+const CALENDAR_DAYS_DEFAULT = 14;
+const CALENDAR_DAYS_CAP = 60;
+const CALENDAR_MAX_DEFAULT = 20;
+const CALENDAR_MAX_CAP = 50;
+
+function clampInt(raw: unknown, def: number, cap: number): number {
+  const n = typeof raw === "string" ? Number.parseInt(raw, 10) : NaN;
+  if (!Number.isFinite(n) || n <= 0) return def;
+  return Math.min(n, cap);
+}
+
+interface AccountError {
+  account: string;
+  message: string;
+}
+
+function errMessage(err: unknown): string {
+  const norm = normalizeHttpError(err);
+  return typeof norm === "string" ? norm : err instanceof Error ? err.message : String(err);
+}
+
+// Shared aggregation for /email/inbox (and the per-provider variants). Returns
+// mock data only when NO mail account is configured; when accounts are
+// configured but every one of them fails, the caller answers 502.
+async function collectEmail(opts: {
+  accountsFilter: string[] | null;
+  max: number;
+  unreadOnly: boolean;
+  include: "all" | "gmail" | "imap";
+}): Promise<
+  | { kind: "sample"; messages: EmailMessage[] }
+  | { kind: "data"; messages: EmailMessage[]; unreadTotal: number | null; errors: AccountError[] }
+  | { kind: "all-failed"; errors: AccountError[] }
+> {
+  const googleAccounts = isGoogleLinked() ? listGoogleAccounts() : [];
+  const imapAccounts = listImapAccounts();
+
+  // Filter matches a specific Google account id; the legacy "gmail" key (from
+  // tiles saved before multi-account support) selects every Google account.
+  const wantGmail =
+    opts.include !== "imap"
+      ? googleAccounts.filter(
+          (a) =>
+            !opts.accountsFilter ||
+            opts.accountsFilter.includes(a.id) ||
+            opts.accountsFilter.includes("gmail"),
+        )
+      : [];
+  const wantImap =
+    opts.include !== "gmail"
+      ? imapAccounts.filter((a) => !opts.accountsFilter || opts.accountsFilter.includes(a.id))
+      : [];
+
+  if (wantGmail.length === 0 && wantImap.length === 0) {
+    // Nothing configured (or the filter matched nothing that exists).
+    const configuredAtAll = googleAccounts.length > 0 || imapAccounts.length > 0;
+    if (!configuredAtAll) {
+      let demo = demoEmailMessages();
+      if (opts.unreadOnly) demo = demo.filter((m) => m.unread);
+      return { kind: "sample", messages: demo.slice(0, opts.max) };
+    }
+    return { kind: "data", messages: [], unreadTotal: null, errors: [] };
+  }
+
+  const errors: AccountError[] = [];
+  const all: EmailMessage[] = [];
+  let unreadTotal: number | null = null;
+  let successes = 0;
+
+  const tasks: Promise<void>[] = [];
+  for (const account of wantGmail) {
+    const label = account.email ?? "Gmail";
+    tasks.push(
+      fetchGmailMessages({
+        accountId: account.id,
+        accountLabel: label,
+        max: opts.max,
+        unreadOnly: opts.unreadOnly,
+      })
+        .then((r) => {
+          successes += 1;
+          all.push(...r.messages);
+          if (r.unread !== null) unreadTotal = (unreadTotal ?? 0) + r.unread;
+        })
+        .catch((err) => {
+          logger.warn({ reason: normalizeHttpError(err), account: label }, "Gmail fetch failed");
+          errors.push({ account: label, message: errMessage(err) });
+        }),
+    );
+  }
+  for (const account of wantImap) {
+    tasks.push(
+      fetchImapMessages(account, { max: opts.max, unreadOnly: opts.unreadOnly })
+        .then((r) => {
+          successes += 1;
+          all.push(...r.messages);
+          if (r.unread !== null) unreadTotal = (unreadTotal ?? 0) + r.unread;
+        })
+        .catch((err) => {
+          logger.warn(
+            { reason: normalizeHttpError(err), account: account.label },
+            "IMAP fetch failed",
+          );
+          errors.push({ account: account.label, message: errMessage(err) });
+        }),
+    );
+  }
+  await Promise.all(tasks);
+
+  if (successes === 0) return { kind: "all-failed", errors };
+
+  all.sort((a, b) => (a.date < b.date ? 1 : -1));
+  const messages = (opts.unreadOnly ? all.filter((m) => m.unread) : all).slice(0, opts.max);
+  return { kind: "data", messages, unreadTotal, errors };
+}
+
+async function handleEmailRequest(
+  req: { query: Record<string, unknown> },
+  res: { json: (b: unknown) => void; status: (c: number) => { json: (b: unknown) => void } },
+  include: "all" | "gmail" | "imap",
+): Promise<void> {
+  const accountsRaw = typeof req.query["accounts"] === "string" ? req.query["accounts"] : "";
+  const accountsFilter = accountsRaw
+    ? accountsRaw.split(",").map((s) => s.trim()).filter(Boolean)
+    : null;
+  const max = clampInt(req.query["max"], EMAIL_MAX_DEFAULT, EMAIL_MAX_CAP);
+  const unreadOnly = req.query["unreadOnly"] === "true";
+
+  try {
+    const result = await collectEmail({ accountsFilter, max, unreadOnly, include });
+    if (result.kind === "sample") {
+      res.json({ messages: result.messages, unreadTotal: 2, errors: null, sample: true });
+      return;
+    }
+    if (result.kind === "all-failed") {
+      res.status(502).json({ error: "All configured mail accounts failed to respond" });
+      return;
+    }
+    res.json({
+      messages: result.messages,
+      unreadTotal: result.unreadTotal,
+      errors: result.errors.length > 0 ? result.errors : null,
+      sample: false,
+    });
+  } catch (err) {
+    logger.error({ reason: normalizeHttpError(err) }, "Email widget error");
+    res.status(502).json({ error: "Failed to fetch mail" });
+  }
+}
+
+// GET /api/widgets/email/inbox — aggregated recent messages across accounts.
+router.get("/email/inbox", requireAuth, async (req, res) => {
+  await handleEmailRequest(req, res, "all");
+});
+
+// Per-provider variants (same shape, narrowed to one provider).
+router.get("/email/gmail", requireAuth, async (req, res) => {
+  await handleEmailRequest(req, res, "gmail");
+});
+router.get("/email/imap", requireAuth, async (req, res) => {
+  await handleEmailRequest(req, res, "imap");
+});
+
+// Shared aggregation for /calendar/events (and the per-provider variants).
+async function collectCalendar(opts: {
+  accountsFilter: string[] | null;
+  days: number;
+  max: number;
+  include: "all" | "google" | "caldav";
+}): Promise<
+  | { kind: "sample"; events: CalendarEvent[] }
+  | { kind: "data"; events: CalendarEvent[]; errors: AccountError[] }
+  | { kind: "all-failed"; errors: AccountError[] }
+> {
+  const googleAccounts = isGoogleLinked() ? listGoogleAccounts() : [];
+  const caldavAccounts = listCalDavAccounts();
+
+  // Filter matches a specific Google account id; the legacy "google" key (from
+  // tiles saved before multi-account support) selects every Google account.
+  const wantGoogle =
+    opts.include !== "caldav"
+      ? googleAccounts.filter(
+          (a) =>
+            !opts.accountsFilter ||
+            opts.accountsFilter.includes(a.id) ||
+            opts.accountsFilter.includes("google"),
+        )
+      : [];
+  const wantCalDav =
+    opts.include !== "google"
+      ? caldavAccounts.filter((a) => !opts.accountsFilter || opts.accountsFilter.includes(a.id))
+      : [];
+
+  if (wantGoogle.length === 0 && wantCalDav.length === 0) {
+    const configuredAtAll = googleAccounts.length > 0 || caldavAccounts.length > 0;
+    if (!configuredAtAll) {
+      return { kind: "sample", events: demoCalendarEvents().slice(0, opts.max) };
+    }
+    return { kind: "data", events: [], errors: [] };
+  }
+
+  const errors: AccountError[] = [];
+  const all: CalendarEvent[] = [];
+  let successes = 0;
+
+  const tasks: Promise<void>[] = [];
+  for (const account of wantGoogle) {
+    const label = account.email ?? "Google Calendar";
+    tasks.push(
+      fetchGoogleCalendarEvents({
+        accountId: account.id,
+        accountLabel: label,
+        daysAhead: opts.days,
+        max: opts.max,
+      })
+        .then((events) => {
+          successes += 1;
+          all.push(...events);
+        })
+        .catch((err) => {
+          logger.warn(
+            { reason: normalizeHttpError(err), account: label },
+            "Google Calendar fetch failed",
+          );
+          errors.push({ account: label, message: errMessage(err) });
+        }),
+    );
+  }
+  for (const account of wantCalDav) {
+    tasks.push(
+      fetchCalDavEvents(account, { daysAhead: opts.days, max: opts.max })
+        .then((events) => {
+          successes += 1;
+          all.push(...events);
+        })
+        .catch((err) => {
+          logger.warn(
+            { reason: normalizeHttpError(err), account: account.label },
+            "CalDAV fetch failed",
+          );
+          errors.push({ account: account.label, message: errMessage(err) });
+        }),
+    );
+  }
+  await Promise.all(tasks);
+
+  if (successes === 0) return { kind: "all-failed", errors };
+
+  all.sort((a, b) => (a.start < b.start ? -1 : 1));
+  return { kind: "data", events: all.slice(0, opts.max), errors };
+}
+
+async function handleCalendarRequest(
+  req: { query: Record<string, unknown> },
+  res: { json: (b: unknown) => void; status: (c: number) => { json: (b: unknown) => void } },
+  include: "all" | "google" | "caldav",
+): Promise<void> {
+  const accountsRaw = typeof req.query["accounts"] === "string" ? req.query["accounts"] : "";
+  const accountsFilter = accountsRaw
+    ? accountsRaw.split(",").map((s) => s.trim()).filter(Boolean)
+    : null;
+  const days = clampInt(req.query["days"], CALENDAR_DAYS_DEFAULT, CALENDAR_DAYS_CAP);
+  const max = clampInt(req.query["max"], CALENDAR_MAX_DEFAULT, CALENDAR_MAX_CAP);
+
+  try {
+    const result = await collectCalendar({ accountsFilter, days, max, include });
+    if (result.kind === "sample") {
+      res.json({ events: result.events, errors: null, sample: true });
+      return;
+    }
+    if (result.kind === "all-failed") {
+      res.status(502).json({ error: "All configured calendar accounts failed to respond" });
+      return;
+    }
+    res.json({
+      events: result.events,
+      errors: result.errors.length > 0 ? result.errors : null,
+      sample: false,
+    });
+  } catch (err) {
+    logger.error({ reason: normalizeHttpError(err) }, "Calendar widget error");
+    res.status(502).json({ error: "Failed to fetch calendar events" });
+  }
+}
+
+// GET /api/widgets/calendar/events — aggregated upcoming events across accounts.
+router.get("/calendar/events", requireAuth, async (req, res) => {
+  await handleCalendarRequest(req, res, "all");
+});
+
+// Per-provider variants (same shape, narrowed to one provider).
+router.get("/calendar/google", requireAuth, async (req, res) => {
+  await handleCalendarRequest(req, res, "google");
+});
+router.get("/calendar/caldav", requireAuth, async (req, res) => {
+  await handleCalendarRequest(req, res, "caldav");
 });
 
 export default router;

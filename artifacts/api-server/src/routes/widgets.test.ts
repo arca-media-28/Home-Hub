@@ -12,9 +12,11 @@ vi.mock("../lib/auth.js", () => ({
 // Stub the DB layer so no real SQLite file is opened and we can dictate, per
 // test, whether a service is "configured" (has a stored connection row).
 const findByService = vi.fn();
+const upsertRun = vi.fn();
 vi.mock("../lib/db.js", () => ({
   connectionStmts: {
     findByService: { get: (...args: unknown[]) => findByService(...args) },
+    upsert: { run: (...args: unknown[]) => upsertRun(...args) },
   },
 }));
 
@@ -25,6 +27,7 @@ const httpPost = vi.fn();
 const httpDelete = vi.fn();
 // Tailscale (and other cloud-only services) use the TLS-verifying cloud client.
 const cloudGet = vi.fn();
+const cloudPost = vi.fn();
 vi.mock("../lib/http.js", () => ({
   httpClient: {
     get: (...args: unknown[]) => httpGet(...args),
@@ -33,6 +36,7 @@ vi.mock("../lib/http.js", () => ({
   },
   cloudHttpClient: {
     get: (...args: unknown[]) => cloudGet(...args),
+    post: (...args: unknown[]) => cloudPost(...args),
   },
   normalizeBaseUrl: (url: string | undefined | null) => {
     const trimmed = url?.trim();
@@ -96,10 +100,12 @@ function httpError(status = 500): Error {
 
 beforeEach(() => {
   findByService.mockReset();
+  upsertRun.mockReset();
   httpGet.mockReset();
   httpPost.mockReset();
   httpDelete.mockReset();
   cloudGet.mockReset();
+  cloudPost.mockReset();
   httpDelete.mockResolvedValue({ data: {} });
   // Default: every service is unconfigured unless a test says otherwise.
   findByService.mockReturnValue(undefined);
@@ -1798,5 +1804,129 @@ describe("GET /widgets/tailscale", () => {
     const res = await request(app).get("/widgets/tailscale");
     expect(res.status).toBe(502);
     expect(res.body.error).toMatch(/tailscale/i);
+  });
+});
+
+// ── Email ───────────────────────────────────────────────────────────────────
+describe("GET /widgets/email/inbox", () => {
+  it("returns sample messages when no mail account is configured", async () => {
+    const res = await request(app).get("/widgets/email/inbox");
+    expect(res.status).toBe(200);
+    expect(res.body.sample).toBe(true);
+    expect(res.body.messages.length).toBeGreaterThan(0);
+    expect(res.body.messages[0]).toHaveProperty("subject");
+    expect(res.body.messages[0]).toHaveProperty("from");
+    // Demo data never touches the network.
+    expect(cloudGet).not.toHaveBeenCalled();
+    expect(httpGet).not.toHaveBeenCalled();
+  });
+
+  it("filters demo data to unread when unreadOnly=true", async () => {
+    const res = await request(app).get("/widgets/email/inbox?unreadOnly=true");
+    expect(res.status).toBe(200);
+    expect(res.body.sample).toBe(true);
+    expect(res.body.messages.every((m: { unread: boolean }) => m.unread)).toBe(true);
+  });
+
+  it("caps the message count via max", async () => {
+    const res = await request(app).get("/widgets/email/inbox?max=2");
+    expect(res.status).toBe(200);
+    expect(res.body.messages.length).toBeLessThanOrEqual(2);
+  });
+
+  it("returns empty live data (not sample) when an account exists but the filter matches none", async () => {
+    // An IMAP account is configured, but the tile's filter names a stale id —
+    // the route must NOT fall back to demo data (that would look like real mail).
+    findByService.mockImplementation((service: string) =>
+      service === "imap"
+        ? connRow({
+            service: "imap",
+            extra: JSON.stringify([
+              { id: "acc1", label: "Home", host: "imap.example.com", port: 993, secure: true, username: "u", password: "p" },
+            ]),
+          })
+        : undefined,
+    );
+    const res = await request(app).get("/widgets/email/inbox?accounts=deleted-id");
+    expect(res.status).toBe(200);
+    expect(res.body.sample).toBe(false);
+    expect(res.body.messages).toEqual([]);
+  });
+});
+
+// ── Calendar ────────────────────────────────────────────────────────────────
+describe("GET /widgets/calendar/events", () => {
+  it("returns sample events when no calendar account is configured", async () => {
+    const res = await request(app).get("/widgets/calendar/events");
+    expect(res.status).toBe(200);
+    expect(res.body.sample).toBe(true);
+    expect(res.body.events.length).toBeGreaterThan(0);
+    expect(res.body.events[0]).toHaveProperty("title");
+    expect(res.body.events[0]).toHaveProperty("start");
+    expect(cloudGet).not.toHaveBeenCalled();
+    expect(httpGet).not.toHaveBeenCalled();
+  });
+
+  it("caps the event count via max", async () => {
+    const res = await request(app).get("/widgets/calendar/events?max=1");
+    expect(res.status).toBe(200);
+    expect(res.body.events.length).toBeLessThanOrEqual(1);
+  });
+
+  it("returns empty live data (not sample) when an account exists but the filter matches none", async () => {
+    findByService.mockImplementation((service: string) =>
+      service === "caldav"
+        ? connRow({
+            service: "caldav",
+            extra: JSON.stringify([
+              { id: "cal1", label: "Home", url: "https://dav.example.com", username: "u", password: "p" },
+            ]),
+          })
+        : undefined,
+    );
+    const res = await request(app).get("/widgets/calendar/events?accounts=deleted-id");
+    expect(res.status).toBe(200);
+    expect(res.body.sample).toBe(false);
+    expect(res.body.events).toEqual([]);
+  });
+});
+
+// ── Google OAuth flow guard ─────────────────────────────────────────────────
+// /gmail/auth is unauthenticated by necessity (top-level popup navigation), so
+// it must demand a single-use intent token minted via the authenticated
+// /connections/google/auth-intent route.
+describe("GET /widgets/gmail/auth", () => {
+  it("rejects requests without an intent token", async () => {
+    const res = await request(app).get("/widgets/gmail/auth");
+    expect(res.status).toBe(403);
+  });
+
+  it("rejects requests with an unknown intent token", async () => {
+    const res = await request(app).get("/widgets/gmail/auth?intent=not-a-real-token");
+    expect(res.status).toBe(403);
+  });
+
+  it("accepts a freshly minted intent exactly once", async () => {
+    const { createGoogleAuthIntent } = await import("../lib/google.js");
+    const intent = createGoogleAuthIntent();
+    // Env vars are unset in tests, so a valid intent proceeds past the guard
+    // and fails on the "not configured" check (400), NOT the 403 guard.
+    const first = await request(app).get(`/widgets/gmail/auth?intent=${intent}`);
+    expect(first.status).toBe(400);
+    // The intent is single-use: replaying it must be rejected.
+    const second = await request(app).get(`/widgets/gmail/auth?intent=${intent}`);
+    expect(second.status).toBe(403);
+  });
+});
+
+describe("GET /widgets/gmail/callback", () => {
+  it("redirects to settings with an error when the state is unknown", async () => {
+    // Without a pending state created by a legitimate /gmail/auth run, the
+    // callback must not exchange the code or persist any tokens.
+    const res = await request(app).get("/widgets/gmail/callback?code=abc&state=bogus");
+    expect(res.status).toBe(302);
+    expect(res.headers["location"]).toContain("google=error");
+    expect(cloudPost).not.toHaveBeenCalled();
+    expect(upsertRun).not.toHaveBeenCalled();
   });
 });

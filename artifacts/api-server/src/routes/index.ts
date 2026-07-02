@@ -8,6 +8,7 @@ import uploadsRouter from "./uploads.js";
 import widgetsRouter from "./widgets.js";
 import connectionsRouter from "./connections.js";
 import spotifyRouter from "./spotify.js";
+import googleRouter from "./google.js";
 
 const router: IRouter = Router();
 
@@ -21,6 +22,9 @@ router.use("/widgets", widgetsRouter);
 // Spotify's dedicated OAuth + control endpoints. Mounted before the generic
 // connections router so its specific paths win over /connections/:service.
 router.use("/connections/spotify", spotifyRouter);
+// Google link status/disconnect for the Settings card (the OAuth flow itself
+// lives under /widgets/gmail). Mounted before the generic connections router.
+router.use("/connections/google", googleRouter);
 router.use("/connections", connectionsRouter);
 
 export default router;

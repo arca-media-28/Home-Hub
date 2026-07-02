@@ -52,6 +52,12 @@ interface TileSettings {
   sleeperShowMatchup?: boolean | null;
   sleeperShowStandings?: boolean | null;
   sleeperShowTransactions?: boolean | null;
+  emailAccounts?: string[] | null;
+  emailMaxMessages?: number | null;
+  emailUnreadOnly?: boolean | null;
+  calendarAccounts?: string[] | null;
+  calendarDaysAhead?: number | null;
+  calendarMaxEvents?: number | null;
   audioSource?: string | null;
   audioFindMusic?: boolean | null;
   audioSearch?: boolean | null;
@@ -272,6 +278,40 @@ function pickTileSettings(obj: Record<string, unknown>): TileSettings {
     result.sleeperShowTransactions = obj["sleeperShowTransactions"];
   } else if (obj["sleeperShowTransactions"] === null) {
     result.sleeperShowTransactions = null;
+  }
+  if (Array.isArray(obj["emailAccounts"])) {
+    result.emailAccounts = obj["emailAccounts"].filter(
+      (x): x is string => typeof x === "string",
+    );
+  } else if (obj["emailAccounts"] === null) {
+    result.emailAccounts = null;
+  }
+  if (typeof obj["emailMaxMessages"] === "number") {
+    result.emailMaxMessages = obj["emailMaxMessages"];
+  } else if (obj["emailMaxMessages"] === null) {
+    result.emailMaxMessages = null;
+  }
+  if (typeof obj["emailUnreadOnly"] === "boolean") {
+    result.emailUnreadOnly = obj["emailUnreadOnly"];
+  } else if (obj["emailUnreadOnly"] === null) {
+    result.emailUnreadOnly = null;
+  }
+  if (Array.isArray(obj["calendarAccounts"])) {
+    result.calendarAccounts = obj["calendarAccounts"].filter(
+      (x): x is string => typeof x === "string",
+    );
+  } else if (obj["calendarAccounts"] === null) {
+    result.calendarAccounts = null;
+  }
+  if (typeof obj["calendarDaysAhead"] === "number") {
+    result.calendarDaysAhead = obj["calendarDaysAhead"];
+  } else if (obj["calendarDaysAhead"] === null) {
+    result.calendarDaysAhead = null;
+  }
+  if (typeof obj["calendarMaxEvents"] === "number") {
+    result.calendarMaxEvents = obj["calendarMaxEvents"];
+  } else if (obj["calendarMaxEvents"] === null) {
+    result.calendarMaxEvents = null;
   }
   if (typeof obj["audioSource"] === "string") {
     result.audioSource = obj["audioSource"];
