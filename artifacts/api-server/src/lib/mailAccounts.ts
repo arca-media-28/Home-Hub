@@ -1,5 +1,6 @@
 import { randomBytes } from "crypto";
 import { connectionStmts } from "./db.js";
+import { invalidateFetchCache } from "./fetchCache.js";
 
 // ── Multi-account storage for IMAP and CalDAV ─────────────────────────────────
 // Unlike the single-connection services, users can add several IMAP mailboxes
@@ -46,6 +47,9 @@ function writeAccounts<T>(service: string, accounts: T[]): void {
     null,
     accounts.length > 0 ? JSON.stringify(accounts) : null,
   );
+  // Account list changed — drop any cached inbox/event responses for this
+  // provider so tiles reflect the change on their next refresh.
+  invalidateFetchCache(service === "imap" ? "mail:imap:" : "mail:caldav:");
 }
 
 function newId(): string {

@@ -2,6 +2,14 @@ import { randomBytes } from "crypto";
 import { cloudHttpClient } from "./http.js";
 import { connectionStmts } from "./db.js";
 import { logger } from "./logger.js";
+import { invalidateFetchCache } from "./fetchCache.js";
+
+// The linked-account list changed (link/unlink/re-link) — drop cached Gmail
+// inbox and Google Calendar responses so tiles reflect it immediately.
+function invalidateGoogleWidgetCaches(): void {
+  invalidateFetchCache("mail:gmail:");
+  invalidateFetchCache("mail:gcal:");
+}
 
 // ── Google OAuth helper (Gmail + Google Calendar) ────────────────────────────
 // The app credentials (OAuth client ID/secret) come from either the
@@ -216,11 +224,13 @@ export function upsertGoogleAccount(tokens: GoogleTokens & { email?: string }): 
   if (existing) {
     Object.assign(existing, tokens);
     persistStore(store);
+    invalidateGoogleWidgetCaches();
     return existing;
   }
   const account: GoogleAccount = { id: randomBytes(6).toString("hex"), ...tokens };
   store.accounts.push(account);
   persistStore(store);
+  invalidateGoogleWidgetCaches();
   return account;
 }
 
@@ -237,11 +247,13 @@ export function removeGoogleAccount(id: string): boolean {
   const before = store.accounts.length;
   store.accounts = store.accounts.filter((a) => a.id !== id);
   persistStore(store);
+  invalidateGoogleWidgetCaches();
   return store.accounts.length < before;
 }
 
 export function clearGoogleTokens(): void {
   persistStore({ accounts: [] });
+  invalidateGoogleWidgetCaches();
 }
 
 export function isGoogleLinked(): boolean {

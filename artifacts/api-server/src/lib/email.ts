@@ -1,5 +1,6 @@
 import { cloudHttpClient } from "./http.js";
 import { getGoogleAccessToken } from "./google.js";
+import { cachedFetch } from "./fetchCache.js";
 import type { ImapAccount } from "./mailAccounts.js";
 
 // ── Mail fetchers (Gmail REST + generic IMAP) ─────────────────────────────────
@@ -46,7 +47,21 @@ function displayFrom(raw: string): string {
   return (m?.[1] ?? raw).trim() || raw.trim();
 }
 
-export async function fetchGmailMessages(opts: {
+// Cached wrapper — tiles poll frequently, so identical per-account requests
+// within the TTL share one upstream fetch (see fetchCache.ts).
+export function fetchGmailMessages(opts: {
+  accountId: string;
+  accountLabel: string;
+  max: number;
+  unreadOnly: boolean;
+}): Promise<{ messages: EmailMessage[]; unread: number | null }> {
+  return cachedFetch(
+    `mail:gmail:${opts.accountId}:${opts.max}:${opts.unreadOnly}`,
+    () => fetchGmailMessagesUncached(opts),
+  );
+}
+
+async function fetchGmailMessagesUncached(opts: {
   accountId: string;
   accountLabel: string;
   max: number;
@@ -113,7 +128,19 @@ export async function fetchGmailMessages(opts: {
 // must not hang the whole aggregated inbox request.
 const IMAP_TIMEOUT_MS = 15_000;
 
-export async function fetchImapMessages(
+// Cached wrapper — avoids opening a fresh IMAP connection per tile refresh
+// and dedupes concurrent logins to the same mailbox (see fetchCache.ts).
+export function fetchImapMessages(
+  account: ImapAccount,
+  opts: { max: number; unreadOnly: boolean },
+): Promise<{ messages: EmailMessage[]; unread: number | null }> {
+  return cachedFetch(
+    `mail:imap:${account.id}:${opts.max}:${opts.unreadOnly}`,
+    () => fetchImapMessagesUncached(account, opts),
+  );
+}
+
+async function fetchImapMessagesUncached(
   account: ImapAccount,
   opts: { max: number; unreadOnly: boolean },
 ): Promise<{ messages: EmailMessage[]; unread: number | null }> {

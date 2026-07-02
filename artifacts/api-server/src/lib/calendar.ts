@@ -1,5 +1,6 @@
 import { cloudHttpClient } from "./http.js";
 import { getGoogleAccessToken } from "./google.js";
+import { cachedFetch } from "./fetchCache.js";
 import type { CalDavAccount } from "./mailAccounts.js";
 
 // ── Calendar fetchers (Google Calendar REST + generic CalDAV) ────────────────
@@ -34,7 +35,21 @@ interface GoogleEvent {
   status?: string;
 }
 
-export async function fetchGoogleCalendarEvents(opts: {
+// Cached wrapper — tiles poll frequently, so identical per-account requests
+// within the TTL share one upstream fetch (see fetchCache.ts).
+export function fetchGoogleCalendarEvents(opts: {
+  accountId: string;
+  accountLabel: string;
+  daysAhead: number;
+  max: number;
+}): Promise<CalendarEvent[]> {
+  return cachedFetch(
+    `mail:gcal:${opts.accountId}:${opts.daysAhead}:${opts.max}`,
+    () => fetchGoogleCalendarEventsUncached(opts),
+  );
+}
+
+async function fetchGoogleCalendarEventsUncached(opts: {
   accountId: string;
   accountLabel: string;
   daysAhead: number;
@@ -212,7 +227,19 @@ export function parseVEvents(ics: string): VEvent[] {
   return events;
 }
 
-export async function fetchCalDavEvents(
+// Cached wrapper — avoids re-running CalDAV discovery + per-calendar report
+// queries on every tile refresh (see fetchCache.ts).
+export function fetchCalDavEvents(
+  account: CalDavAccount,
+  opts: { daysAhead: number; max: number },
+): Promise<CalendarEvent[]> {
+  return cachedFetch(
+    `mail:caldav:${account.id}:${opts.daysAhead}:${opts.max}`,
+    () => fetchCalDavEventsUncached(account, opts),
+  );
+}
+
+async function fetchCalDavEventsUncached(
   account: CalDavAccount,
   opts: { daysAhead: number; max: number },
 ): Promise<CalendarEvent[]> {
