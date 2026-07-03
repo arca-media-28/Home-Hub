@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import {
   useGetMe,
@@ -886,19 +886,43 @@ function GoogleCard() {
     },
   });
 
+  // When the popup fails (or closes before ever reaching our callback — the
+  // classic redirect_uri_mismatch dead end happens entirely on Google's page),
+  // this holds a failure reason so the card can render targeted help.
+  // "no-callback" = popup closed without posting a result.
+  const [connectFailure, setConnectFailure] = useState<string | null>(null);
+  // True once the popup posted a result; the popup-close watcher checks this
+  // to distinguish a normal close from a dead-end abandon.
+  const authSettledRef = useRef(false);
+  const popupWatchRef = useRef<number | null>(null);
+
+  useEffect(
+    () => () => {
+      if (popupWatchRef.current !== null) window.clearInterval(popupWatchRef.current);
+    },
+    [],
+  );
+
   // The OAuth popup posts its result here when it returns; refresh status and
   // toast in this (the dashboard) tab.
   useEffect(() => {
     function onMessage(e: MessageEvent) {
       if (e.origin !== window.location.origin) return;
       if (e.data?.type !== "google-auth") return;
+      authSettledRef.current = true;
+      if (popupWatchRef.current !== null) {
+        window.clearInterval(popupWatchRef.current);
+        popupWatchRef.current = null;
+      }
       queryClient.invalidateQueries({ queryKey: getGetGoogleStatusQueryKey() });
       if (e.data.result === "connected") {
+        setConnectFailure(null);
         toast({ title: "Google account connected" });
       } else {
+        setConnectFailure(typeof e.data.reason === "string" ? e.data.reason : "unknown");
         toast({
           title: "Google connection failed",
-          description: "Please try linking your account again.",
+          description: "See the Google card for what to check.",
           variant: "destructive",
         });
       }
@@ -931,6 +955,8 @@ function GoogleCard() {
     // Open the popup synchronously so the click isn't lost to popup blockers,
     // then point it at the auth URL once the intent arrives.
     const popup = window.open("about:blank", "google-auth", "width=520,height=720");
+    authSettledRef.current = false;
+    setConnectFailure(null);
     try {
       const { intent } = await createGoogleAuthIntent();
       const origin = window.location.origin + import.meta.env.BASE_URL;
@@ -939,6 +965,21 @@ function GoogleCard() {
         `?origin=${encodeURIComponent(origin)}&intent=${encodeURIComponent(intent)}`;
       if (popup) {
         popup.location.href = url;
+        // Watch for the popup closing without ever reaching our callback —
+        // that's what a redirect_uri_mismatch dead end on Google's own error
+        // page looks like from here (no result is ever posted back).
+        if (popupWatchRef.current !== null) window.clearInterval(popupWatchRef.current);
+        popupWatchRef.current = window.setInterval(() => {
+          if (!popup.closed) return;
+          if (popupWatchRef.current !== null) {
+            window.clearInterval(popupWatchRef.current);
+            popupWatchRef.current = null;
+          }
+          // Give a just-posted result message a moment to arrive first.
+          window.setTimeout(() => {
+            if (!authSettledRef.current) setConnectFailure("no-callback");
+          }, 500);
+        }, 1000);
       } else {
         // Popup was blocked — try a fresh top-level tab as a fallback.
         window.open(url, "_blank", "noopener");
@@ -1039,6 +1080,78 @@ function GoogleCard() {
           </ol>
         )}
 
+        {/* Targeted help when the OAuth popup failed or never came back. The
+            most common dead end is Google's "Error 400: redirect_uri_mismatch"
+            page, which the user only ever sees inside the popup. */}
+        {connectFailure && (
+          <div className="border border-destructive/50 bg-destructive/10 px-4 py-3 space-y-2 text-xs">
+            <div className="flex items-center gap-2 text-destructive font-bold uppercase tracking-wider">
+              <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+              {connectFailure === "denied"
+                ? "Access was declined"
+                : "Google sign-in didn’t complete"}
+            </div>
+            {connectFailure === "denied" ? (
+              <p className="text-muted-foreground">
+                Google reported that access was declined. Click Connect Google
+                again and approve the requested permissions to link the account.
+              </p>
+            ) : connectFailure === "expired" ? (
+              <p className="text-muted-foreground">
+                The sign-in attempt expired before it finished. Click Connect
+                Google to start a fresh attempt.
+              </p>
+            ) : (
+              <>
+                <p className="text-muted-foreground">
+                  If Google showed{" "}
+                  <span className="text-foreground">
+                    “Error 400: redirect_uri_mismatch”
+                  </span>
+                  , the redirect URI below isn’t registered on your OAuth
+                  client. Open{" "}
+                  <a
+                    href="https://console.cloud.google.com/apis/credentials"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-primary inline-flex items-center gap-0.5 hover:underline"
+                  >
+                    Google Cloud Console → Credentials
+                    <ExternalLink className="w-3 h-3" />
+                  </a>{" "}
+                  and add it under{" "}
+                  <span className="text-foreground">Authorized redirect URIs</span>:
+                </p>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 truncate border border-border bg-muted/40 px-2 py-1.5 text-foreground">
+                    {redirectUri || "—"}
+                  </code>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={copyRedirect}
+                    disabled={!redirectUri}
+                    className="gap-1.5"
+                  >
+                    <Copy className="w-3.5 h-3.5" />
+                    Copy
+                  </Button>
+                </div>
+                <p className="text-muted-foreground">
+                  It must match{" "}
+                  <span className="text-foreground">character-for-character</span>{" "}
+                  (scheme, host, port, and path — the easiest way is the Copy
+                  button). If Google’s error page shows the URI it received,
+                  register exactly that value. Changes in Google Cloud Console
+                  can take a few minutes to apply, so wait a moment before
+                  trying again.
+                </p>
+              </>
+            )}
+          </div>
+        )}
+
         {/* Redirect URI to allow-list in the Google OAuth app */}
         <div className="space-y-1.5">
           <Label className="text-xs uppercase tracking-wider text-muted-foreground">
@@ -1060,6 +1173,16 @@ function GoogleCard() {
               Copy
             </Button>
           </div>
+          {!connected && (
+            <p className="text-xs text-muted-foreground">
+              Copy this exact URI into your OAuth client’s{" "}
+              <span className="text-foreground">Authorized redirect URIs</span>{" "}
+              in Google Cloud Console <span className="text-foreground">before</span>{" "}
+              clicking Connect — otherwise Google stops the sign-in with a{" "}
+              <span className="text-foreground">redirect_uri_mismatch</span> error.
+              Changes there take a few minutes to apply.
+            </p>
+          )}
         </div>
 
         {fromEnv ? (
@@ -1732,6 +1855,9 @@ export default function Settings() {
     const flow = flows.find((f) => params.get(f.param));
     if (!flow) return;
     const result = params.get(flow.param)!;
+    // Optional failure detail (e.g. google_reason=redirect) so the card can
+    // show targeted help instead of a generic error.
+    const reason = params.get(`${flow.param}_reason`);
 
     // When this page is the OAuth popup (opened by handleConnect), hand the
     // result back to the dashboard tab and close — the opener refreshes status
@@ -1739,7 +1865,7 @@ export default function Settings() {
     if (window.opener && window.opener !== window) {
       try {
         window.opener.postMessage(
-          { type: flow.type, result },
+          { type: flow.type, result, reason },
           window.location.origin,
         );
       } catch {
@@ -1749,7 +1875,13 @@ export default function Settings() {
       return;
     }
 
-    if (result === "connected") {
+    if (flow.param === "google") {
+      // The popup-blocked fallback opens the flow in a top-level tab, so the
+      // redirect lands here instead of in a popup. Forward the result to the
+      // GoogleCard listener (same window receives self-posted messages) so it
+      // can show the targeted redirect-URI help — it also handles the toast.
+      window.postMessage({ type: flow.type, result, reason }, window.location.origin);
+    } else if (result === "connected") {
       toast({ title: `${flow.name} connected` });
     } else if (result === "error") {
       toast({
@@ -1759,6 +1891,7 @@ export default function Settings() {
       });
     }
     params.delete(flow.param);
+    params.delete(`${flow.param}_reason`);
     const query = params.toString();
     window.history.replaceState(
       {},

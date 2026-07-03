@@ -3990,14 +3990,27 @@ router.get("/gmail/callback", async (req, res) => {
   const pending = state ? consumeGooglePendingAuth(state) : null;
   const fallbackReturn = `${originFromRequest(req).replace(/\/+$/, "")}/settings`;
   const returnTo = pending?.returnTo || fallbackReturn;
-  const settingsUrl = (status: string) => `${returnTo}?google=${status}`;
+  // `reason` gives Settings enough context for targeted help instead of a
+  // generic failure toast: "denied" (user declined consent), "expired" (state
+  // lost/timed out), "redirect" (Google rejected the redirect URI at token
+  // exchange), "exchange" (any other token-exchange failure), "provider"
+  // (Google sent some other error param).
+  const settingsUrl = (status: string, reason?: string) =>
+    `${returnTo}?google=${status}${reason ? `&google_reason=${encodeURIComponent(reason)}` : ""}`;
 
   if (error || !code || !pending) {
     logger.warn(
       { error, hasCode: Boolean(code), hasPending: Boolean(pending) },
       "Google callback rejected",
     );
-    res.redirect(settingsUrl("error"));
+    const reason = error
+      ? error === "access_denied"
+        ? "denied"
+        : "provider"
+      : !pending
+        ? "expired"
+        : "provider";
+    res.redirect(settingsUrl("error", reason));
     return;
   }
 
@@ -4005,8 +4018,11 @@ router.get("/gmail/callback", async (req, res) => {
     await exchangeGoogleCode(code, pending.redirectUri);
     res.redirect(settingsUrl("connected"));
   } catch (err) {
-    logger.error({ reason: normalizeHttpError(err) }, "Google token exchange failed");
-    res.redirect(settingsUrl("error"));
+    const detail = describeHttpError(err);
+    logger.error({ reason: normalizeHttpError(err), detail }, "Google token exchange failed");
+    const bodyText = typeof detail.body === "string" ? detail.body : JSON.stringify(detail.body ?? "");
+    const reason = bodyText.includes("redirect_uri_mismatch") ? "redirect" : "exchange";
+    res.redirect(settingsUrl("error", reason));
   }
 });
 
