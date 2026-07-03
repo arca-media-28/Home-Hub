@@ -26,9 +26,12 @@ const TOKEN_URL = "https://oauth2.googleapis.com/token";
 
 export const CALLBACK_PATH = "/api/widgets/gmail/callback";
 
-// Read-only mail + calendar, plus the email address for display in Settings.
+// Mail read + modify (archiving removes the INBOX label), read-only calendar,
+// plus the email address for display in Settings. Accounts linked before the
+// modify scope was added still work read-only; archiving them returns 403
+// until the user re-links.
 export const GOOGLE_SCOPES = [
-  "https://www.googleapis.com/auth/gmail.readonly",
+  "https://www.googleapis.com/auth/gmail.modify",
   "https://www.googleapis.com/auth/calendar.readonly",
   "https://www.googleapis.com/auth/userinfo.email",
 ].join(" ");

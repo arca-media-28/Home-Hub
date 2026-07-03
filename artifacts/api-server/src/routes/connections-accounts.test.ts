@@ -107,6 +107,41 @@ describe("POST /connections/imap/accounts", () => {
       .send({ host: "imap.example.com", username: "u" });
     expect(res.status).toBe(400);
   });
+
+  it("stores and returns an optional webmail URL", async () => {
+    const res = await request(app).post("/connections/imap/accounts").send({
+      host: "imap.example.com",
+      username: "u",
+      password: "pw",
+      webmailUrl: "  https://mail.example.com/inbox  ",
+    });
+    expect(res.status).toBe(200);
+    expect(res.body[0].webmailUrl).toBe("https://mail.example.com/inbox");
+    const stored = JSON.parse(rows.get("imap")?.extra ?? "[]");
+    expect(stored[0].webmailUrl).toBe("https://mail.example.com/inbox");
+  });
+
+  it("drops non-http(s) webmail URLs instead of storing them", async () => {
+    const res = await request(app).post("/connections/imap/accounts").send({
+      host: "imap.example.com",
+      username: "u",
+      password: "pw",
+      // eslint-disable-next-line no-script-url
+      webmailUrl: "javascript:alert(1)",
+    });
+    expect(res.status).toBe(200);
+    expect(res.body[0].webmailUrl).toBeNull();
+  });
+
+  it("returns webmailUrl null for accounts saved before the field existed", async () => {
+    const res = await request(app).post("/connections/imap/accounts").send({
+      host: "imap.example.com",
+      username: "u",
+      password: "pw",
+    });
+    expect(res.status).toBe(200);
+    expect(res.body[0].webmailUrl).toBeNull();
+  });
 });
 
 // ── Google OAuth credentials (Settings-managed) ─────────────────────────────

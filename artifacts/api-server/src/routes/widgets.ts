@@ -33,6 +33,8 @@ import { listImapAccounts, listCalDavAccounts } from "../lib/mailAccounts.js";
 import {
   fetchGmailMessages,
   fetchImapMessages,
+  archiveGmailMessage,
+  archiveImapMessage,
   demoEmailMessages,
   type EmailMessage,
 } from "../lib/email.js";
@@ -4359,6 +4361,66 @@ router.get("/email/gmail", requireAuth, async (req, res) => {
 });
 router.get("/email/imap", requireAuth, async (req, res) => {
   await handleEmailRequest(req, res, "imap");
+});
+
+// POST /api/widgets/email/archive — archive one message. The body carries the
+// EmailMessage.id, whose prefix encodes the provider: "gmail:<acct>:<msgId>"
+// removes the INBOX label via the Gmail API; "<imapAcct>:<uid>" moves the
+// message to the server's Archive mailbox. Demo rows are rejected up front.
+router.post("/email/archive", requireAuth, async (req, res) => {
+  const body = req.body as { id?: unknown } | undefined;
+  const id = typeof body?.id === "string" ? body.id : "";
+  if (!id) {
+    res.status(400).json({ error: "Message id is required" });
+    return;
+  }
+  if (id.startsWith("demo:")) {
+    res.status(400).json({ error: "Demo messages can't be archived" });
+    return;
+  }
+
+  try {
+    if (id.startsWith("gmail:")) {
+      const rest = id.slice("gmail:".length);
+      const sep = rest.lastIndexOf(":");
+      if (sep <= 0 || sep === rest.length - 1) {
+        res.status(400).json({ error: "Malformed message id" });
+        return;
+      }
+      const accountId = rest.slice(0, sep);
+      if (!listGoogleAccounts().some((a) => a.id === accountId)) {
+        res.status(404).json({ error: "Unknown Google account" });
+        return;
+      }
+      await archiveGmailMessage(accountId, rest.slice(sep + 1));
+    } else {
+      const sep = id.lastIndexOf(":");
+      const uid = sep > 0 ? Number(id.slice(sep + 1)) : NaN;
+      if (!Number.isInteger(uid) || uid <= 0) {
+        res.status(400).json({ error: "Malformed message id" });
+        return;
+      }
+      const account = listImapAccounts().find((a) => a.id === id.slice(0, sep));
+      if (!account) {
+        res.status(404).json({ error: "Unknown mail account" });
+        return;
+      }
+      await archiveImapMessage(account, uid);
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    const detail = describeHttpError(err);
+    // Gmail returns 403 when the token predates the gmail.modify scope.
+    if (id.startsWith("gmail:") && detail.status === 403) {
+      res.status(403).json({
+        error:
+          "This Google account was linked with read-only access. Disconnect and re-link it in Settings to allow archiving.",
+      });
+      return;
+    }
+    logger.error({ reason: detail, id }, "Email archive error");
+    res.status(502).json({ error: normalizeHttpError(err) });
+  }
 });
 
 // Shared aggregation for /calendar/events (and the per-provider variants).

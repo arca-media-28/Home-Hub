@@ -1,9 +1,23 @@
-import { useGetEmailInbox, getGetEmailInboxQueryKey } from "@workspace/api-client-react";
+import { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import {
+  useGetEmailInbox,
+  getGetEmailInboxQueryKey,
+  useArchiveEmailMessage,
+} from "@workspace/api-client-react";
 import type { EmailMessage } from "@workspace/api-client-react";
-import { Mail, AlertTriangle } from "lucide-react";
+import { Mail, AlertTriangle, Archive, ExternalLink } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import type { WidgetProps } from "./IntegrationTile";
 import { tileColumns, listColumnClass, listColumnStyle } from "./metrics";
-import { normalizeTileUrl, openTileUrl } from "@/lib/utils";
+import { openTileUrl } from "@/lib/utils";
 
 const EMAIL_DEFAULT_MAX = 15;
 
@@ -36,10 +50,12 @@ function MessageRow({
   msg,
   detailed,
   showAccount,
+  onSelect,
 }: {
   msg: EmailMessage;
   detailed: boolean;
   showAccount: boolean;
+  onSelect: (msg: EmailMessage) => void;
 }) {
   const time = relativeTime(msg.date);
   const body = (
@@ -69,28 +85,134 @@ function MessageRow({
     </>
   );
 
-  if (msg.link) {
-    const link = msg.link;
-    return (
-      <a
-        href={normalizeTileUrl(link)}
-        onClick={(e) => {
-          e.preventDefault();
-          openTileUrl(link);
-        }}
-        className="block space-y-0.5 hover:text-primary transition-colors cursor-pointer"
-      >
-        {body}
-      </a>
-    );
-  }
-  return <div className="space-y-0.5">{body}</div>;
+  // Every row opens the in-app detail pop-out, which carries the "open in
+  // Gmail/webmail" deep link (when available) plus the Archive action.
+  return (
+    <button
+      type="button"
+      onClick={() => onSelect(msg)}
+      className="block w-full text-left space-y-0.5 hover:text-primary transition-colors cursor-pointer"
+    >
+      {body}
+    </button>
+  );
+}
+
+// Full timestamp for the detail pop-out (the list only shows "5m" / "3h").
+function fullDate(iso: string): string | null {
+  const t = new Date(iso).getTime();
+  if (Number.isNaN(t)) return null;
+  return new Date(t).toLocaleString(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function MessageDetailDialog({
+  msg,
+  sample,
+  onClose,
+}: {
+  msg: EmailMessage | null;
+  sample: boolean;
+  onClose: () => void;
+}) {
+  const queryClient = useQueryClient();
+  const [archiveError, setArchiveError] = useState<string | null>(null);
+
+  // Clear any stale error when a different message is opened.
+  useEffect(() => {
+    setArchiveError(null);
+  }, [msg?.id]);
+
+  const archive = useArchiveEmailMessage({
+    mutation: {
+      onSuccess: () => {
+        // Refresh every email tile variant (each tile config caches under its
+        // own params) so the archived message disappears immediately.
+        void queryClient.invalidateQueries({
+          predicate: (q) => String(q.queryKey[0]).includes("/widgets/email/"),
+        });
+        onClose();
+      },
+      onError: (err) => {
+        setArchiveError(err.data?.error ?? "Couldn't archive the message — try again.");
+      },
+    },
+  });
+
+  const isGmail = msg?.id.startsWith("gmail:") ?? false;
+
+  return (
+    <Dialog open={msg !== null} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        {msg && (
+          <>
+            <DialogHeader>
+              <DialogTitle className="break-words">
+                {msg.subject || "(no subject)"}
+              </DialogTitle>
+              <DialogDescription asChild>
+                <div className="space-y-0.5 text-left">
+                  <div className="break-words">From: {msg.from}</div>
+                  {fullDate(msg.date) && <div>{fullDate(msg.date)}</div>}
+                  <div className="text-xs opacity-70">
+                    {msg.accountLabel}
+                    {msg.unread ? " · Unread" : ""}
+                  </div>
+                </div>
+              </DialogDescription>
+            </DialogHeader>
+            {msg.snippet ? (
+              <p className="text-sm text-foreground whitespace-pre-wrap break-words">
+                {msg.snippet}
+              </p>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                No preview available — open this message in your mail client to
+                read it.
+              </p>
+            )}
+            {archiveError && (
+              <p className="text-xs text-destructive break-words">{archiveError}</p>
+            )}
+            {(msg.link || !sample) && (
+              <div className="flex flex-wrap justify-end gap-2 pt-1">
+                {!sample && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={archive.isPending}
+                    onClick={() => archive.mutate({ data: { id: msg.id } })}
+                  >
+                    <Archive className="w-3.5 h-3.5 mr-1.5" />
+                    {archive.isPending ? "Archiving…" : "Archive"}
+                  </Button>
+                )}
+                {msg.link && (
+                  <Button size="sm" onClick={() => openTileUrl(msg.link as string)}>
+                    <ExternalLink className="w-3.5 h-3.5 mr-1.5" />
+                    {isGmail ? "Open in Gmail" : "Open webmail"}
+                  </Button>
+                )}
+              </div>
+            )}
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 export default function EmailTile({ density, tileSettings }: WidgetProps) {
   const accounts = tileSettings?.emailAccounts ?? null;
   const max = tileSettings?.emailMaxMessages ?? EMAIL_DEFAULT_MAX;
   const unreadOnly = tileSettings?.emailUnreadOnly ?? false;
+  const [selected, setSelected] = useState<EmailMessage | null>(null);
 
   // The route returns demo messages when no mail account is configured, so we
   // always run the query. All knobs live in the query key so distinct tile
@@ -158,9 +280,16 @@ export default function EmailTile({ density, tileSettings }: WidgetProps) {
         style={listColumnStyle(columns)}
       >
         {data.messages.map((msg) => (
-          <MessageRow key={msg.id} msg={msg} detailed={detailed} showAccount={accountCount > 1} />
+          <MessageRow
+            key={msg.id}
+            msg={msg}
+            detailed={detailed}
+            showAccount={accountCount > 1}
+            onSelect={setSelected}
+          />
         ))}
       </div>
+      <MessageDetailDialog msg={selected} sample={data.sample} onClose={() => setSelected(null)} />
     </div>
   );
 }

@@ -1,6 +1,14 @@
+import { useState } from "react";
 import { useGetCalendarEvents, getGetCalendarEventsQueryKey } from "@workspace/api-client-react";
 import type { CalendarEvent } from "@workspace/api-client-react";
 import { CalendarDays, AlertTriangle, MapPin } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import type { WidgetProps } from "./IntegrationTile";
 import { tileColumns, listColumnClass, listColumnStyle } from "./metrics";
 
@@ -56,10 +64,60 @@ function timeLabel(ev: CalendarEvent): string {
   return `${s} – ${end.toLocaleTimeString(undefined, fmt)}`;
 }
 
+// Full date line for the detail pop-out ("Saturday, Jul 4, 2026").
+function fullDayLabel(ev: CalendarEvent): string {
+  return eventDay(ev).toLocaleDateString(undefined, {
+    weekday: "long",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function EventDetailDialog({
+  event,
+  onClose,
+}: {
+  event: CalendarEvent | null;
+  onClose: () => void;
+}) {
+  return (
+    <Dialog open={event !== null} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        {event && (
+          <>
+            <DialogHeader>
+              <DialogTitle className="break-words">{event.title}</DialogTitle>
+              <DialogDescription asChild>
+                <div className="space-y-0.5 text-left">
+                  <div>{fullDayLabel(event)}</div>
+                  <div>{timeLabel(event)}</div>
+                </div>
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-1.5 text-sm">
+              {event.location && (
+                <div className="flex items-start gap-1.5">
+                  <MapPin className="w-3.5 h-3.5 flex-shrink-0 mt-0.5 text-muted-foreground" />
+                  <span className="break-words">{event.location}</span>
+                </div>
+              )}
+              <div className="text-xs text-muted-foreground">
+                {[event.calendar, event.accountLabel].filter(Boolean).join(" · ")}
+              </div>
+            </div>
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function CalendarTile({ density, tileSettings }: WidgetProps) {
   const accounts = tileSettings?.calendarAccounts ?? null;
   const days = tileSettings?.calendarDaysAhead ?? CALENDAR_DEFAULT_DAYS;
   const max = tileSettings?.calendarMaxEvents ?? CALENDAR_DEFAULT_MAX;
+  const [selected, setSelected] = useState<CalendarEvent | null>(null);
 
   // The route returns demo events when no calendar account is configured, so we
   // always run the query. All knobs live in the query key so distinct tile
@@ -136,7 +194,12 @@ export default function CalendarTile({ density, tileSettings }: WidgetProps) {
               {group.label}
             </div>
             {group.events.map((ev) => (
-              <div key={ev.id} className="space-y-0.5">
+              <button
+                key={ev.id}
+                type="button"
+                onClick={() => setSelected(ev)}
+                className="block w-full text-left space-y-0.5 hover:text-primary transition-colors cursor-pointer"
+              >
                 <div className="text-xs leading-snug truncate">{ev.title}</div>
                 <div className="text-[10px] text-muted-foreground truncate">
                   {timeLabel(ev)}
@@ -149,11 +212,12 @@ export default function CalendarTile({ density, tileSettings }: WidgetProps) {
                     <span className="truncate">{ev.location}</span>
                   </div>
                 )}
-              </div>
+              </button>
             ))}
           </div>
         ))}
       </div>
+      <EventDetailDialog event={selected} onClose={() => setSelected(null)} />
     </div>
   );
 }

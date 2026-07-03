@@ -28,4 +28,9 @@ export interface ImapAccountInput {
   username: string;
   /** IMAP login password (stored server-side, never returned). */
   password: string;
+  /**
+     * Optional http(s) URL of the provider's webmail UI. When set, messages from this account link to it from the Email tile.
+     * @nullable
+     */
+  webmailUrl?: string | null;
 }

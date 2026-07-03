@@ -1,6 +1,6 @@
 import { cloudHttpClient } from "./http.js";
 import { getGoogleAccessToken } from "./google.js";
-import { cachedFetch } from "./fetchCache.js";
+import { cachedFetch, invalidateFetchCache } from "./fetchCache.js";
 import type { ImapAccount } from "./mailAccounts.js";
 
 // ── Mail fetchers (Gmail REST + generic IMAP) ─────────────────────────────────
@@ -124,6 +124,21 @@ async function fetchGmailMessagesUncached(opts: {
   return { messages, unread };
 }
 
+// Archive one Gmail message by removing its INBOX label (the Gmail UI's
+// definition of "archive"). Requires the gmail.modify scope — accounts linked
+// before that scope was requested fail with 403 until re-linked.
+export async function archiveGmailMessage(accountId: string, messageId: string): Promise<void> {
+  const token = await getGoogleAccessToken(accountId);
+  await cloudHttpClient.post(
+    `${GMAIL_BASE}/messages/${encodeURIComponent(messageId)}/modify`,
+    { removeLabelIds: ["INBOX"] },
+    { headers: { Authorization: `Bearer ${token}` } },
+  );
+  // The inbox listing for this account is now stale — drop the cached fetch so
+  // the tile's next poll reflects the archive immediately.
+  invalidateFetchCache(`mail:gmail:${accountId}`);
+}
+
 // Hard cap on how long a single IMAP round-trip may take — a wedged server
 // must not hang the whole aggregated inbox request.
 const IMAP_TIMEOUT_MS = 15_000;
@@ -202,7 +217,9 @@ async function fetchImapMessagesUncached(
           snippet: null,
           date: (env?.date ?? new Date()).toISOString(),
           unread: !(msg.flags?.has("\\Seen") ?? false),
-          link: null,
+          // IMAP has no per-message deep link; fall back to the account's
+          // configured webmail UI when the user provided one.
+          link: account.webmailUrl ?? null,
         });
       }
       messages.sort((a, b) => (a.date < b.date ? 1 : -1));
@@ -210,6 +227,47 @@ async function fetchImapMessagesUncached(
     } finally {
       lock.release();
     }
+  } finally {
+    // logout() can hang on broken servers; close() force-drops the socket.
+    await client.logout().catch(() => client.close());
+  }
+}
+
+// Archive one IMAP message by moving it out of INBOX into the server's archive
+// mailbox — the special-use \Archive folder when advertised, otherwise a
+// mailbox literally named "Archive"/"Archives". Fails with a clear error when
+// the server has no such folder rather than guessing at a destination.
+export async function archiveImapMessage(account: ImapAccount, uid: number): Promise<void> {
+  const { ImapFlow } = await import("imapflow");
+  const client = new ImapFlow({
+    host: account.host,
+    port: account.port,
+    secure: account.secure,
+    auth: { user: account.username, pass: account.password },
+    logger: false,
+    socketTimeout: IMAP_TIMEOUT_MS,
+    greetingTimeout: IMAP_TIMEOUT_MS,
+    connectionTimeout: IMAP_TIMEOUT_MS,
+  });
+
+  await client.connect();
+  try {
+    const boxes = await client.list();
+    const target =
+      boxes.find((b) => b.specialUse === "\\Archive")?.path ??
+      boxes.find((b) => /^archives?$/i.test(b.name))?.path;
+    if (!target) {
+      throw new Error(`No Archive folder found on ${account.host}`);
+    }
+    const lock = await client.getMailboxLock("INBOX");
+    try {
+      await client.messageMove(String(uid), target, { uid: true });
+    } finally {
+      lock.release();
+    }
+    // Drop every cached inbox listing for this account (all max/unreadOnly
+    // variants) so the tile's next poll reflects the move immediately.
+    invalidateFetchCache(`mail:imap:${account.id}`);
   } finally {
     // logout() can hang on broken servers; close() force-drops the socket.
     await client.logout().catch(() => client.close());

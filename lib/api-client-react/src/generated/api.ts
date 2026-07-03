@@ -31,6 +31,8 @@ import type {
   ConnectionHealth,
   ConnectionTestResult,
   ContinueWatchingItem,
+  EmailArchiveRequest,
+  EmailArchiveResponse,
   EmailInboxData,
   ErrorResponse,
   ErsatzTvData,
@@ -3085,6 +3087,78 @@ export function useGetEmailInbox<TData = Awaited<ReturnType<typeof getEmailInbox
 
 
 
+
+export const getArchiveEmailMessageUrl = () => {
+
+
+
+
+  return `/api/widgets/email/archive`
+}
+
+/**
+ * Archives the message identified by its EmailMessage id. Gmail messages have the INBOX label removed (requires the account to be linked with modify access); IMAP messages are moved to the server's Archive mailbox. Demo messages are rejected.
+ * @summary Archive one email message
+ */
+export const archiveEmailMessage = async (emailArchiveRequest: EmailArchiveRequest, options?: RequestInit): Promise<EmailArchiveResponse> => {
+
+  return customFetch<EmailArchiveResponse>(getArchiveEmailMessageUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      emailArchiveRequest,)
+  }
+);}
+
+
+
+
+export const getArchiveEmailMessageMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof archiveEmailMessage>>, TError,{data: BodyType<EmailArchiveRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof archiveEmailMessage>>, TError,{data: BodyType<EmailArchiveRequest>}, TContext> => {
+
+const mutationKey = ['archiveEmailMessage'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof archiveEmailMessage>>, {data: BodyType<EmailArchiveRequest>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  archiveEmailMessage(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ArchiveEmailMessageMutationResult = NonNullable<Awaited<ReturnType<typeof archiveEmailMessage>>>
+    export type ArchiveEmailMessageMutationBody = BodyType<EmailArchiveRequest>
+    export type ArchiveEmailMessageMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Archive one email message
+ */
+export const useArchiveEmailMessage = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof archiveEmailMessage>>, TError,{data: BodyType<EmailArchiveRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof archiveEmailMessage>>,
+        TError,
+        {data: BodyType<EmailArchiveRequest>},
+        TContext
+      > => {
+      return useMutation(getArchiveEmailMessageMutationOptions(options));
+    }
 
 export const getGetCalendarEventsUrl = (params?: GetCalendarEventsParams,) => {
   const normalizedParams = new URLSearchParams();

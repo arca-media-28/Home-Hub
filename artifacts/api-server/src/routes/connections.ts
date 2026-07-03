@@ -92,7 +92,15 @@ router.get("/status", requireAuth, async (_req, res) => {
 // the single-connection PUT below. Passwords never leave the server.
 
 function sanitizeImap(a: ImapAccount) {
-  return { id: a.id, label: a.label, host: a.host, port: a.port, secure: a.secure, username: a.username };
+  return {
+    id: a.id,
+    label: a.label,
+    host: a.host,
+    port: a.port,
+    secure: a.secure,
+    username: a.username,
+    webmailUrl: a.webmailUrl ?? null,
+  };
 }
 function sanitizeCalDav(a: CalDavAccount) {
   return { id: a.id, label: a.label, url: a.url, username: a.username };
@@ -112,6 +120,7 @@ router.post("/imap/accounts", requireAuth, (req, res) => {
     secure?: boolean | null;
     username?: string;
     password?: string;
+    webmailUrl?: string | null;
   };
   if (!body.host?.trim() || !body.username?.trim() || !body.password) {
     res.status(400).json({ error: "host, username and password are required" });
@@ -124,6 +133,7 @@ router.post("/imap/accounts", requireAuth, (req, res) => {
     secure: typeof body.secure === "boolean" ? body.secure : null,
     username: body.username,
     password: body.password,
+    webmailUrl: typeof body.webmailUrl === "string" ? body.webmailUrl : null,
   });
   res.json(accounts.map(sanitizeImap));
 });

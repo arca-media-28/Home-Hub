@@ -17,6 +17,9 @@ export interface ImapAccount {
   secure: boolean;
   username: string;
   password: string;
+  // Optional webmail UI URL — when set, messages from this account carry it
+  // as their `link` so the Email tile can open the provider's web client.
+  webmailUrl?: string | null;
 }
 
 export interface CalDavAccount {
@@ -64,6 +67,20 @@ export function listImapAccounts(): ImapAccount[] {
   );
 }
 
+// Only accept http(s) URLs for the webmail link — anything else (javascript:,
+// bare hostnames, garbage) is dropped rather than rendered as a clickable link.
+export function normalizeWebmailUrl(raw: string | null | undefined): string | null {
+  const v = raw?.trim();
+  if (!v) return null;
+  try {
+    const u = new URL(v);
+    if (u.protocol !== "http:" && u.protocol !== "https:") return null;
+    return u.toString();
+  } catch {
+    return null;
+  }
+}
+
 export function addImapAccount(input: {
   label?: string | null;
   host: string;
@@ -71,6 +88,7 @@ export function addImapAccount(input: {
   secure?: boolean | null;
   username: string;
   password: string;
+  webmailUrl?: string | null;
 }): ImapAccount[] {
   const accounts = listImapAccounts();
   accounts.push({
@@ -81,6 +99,7 @@ export function addImapAccount(input: {
     secure: input.secure ?? true,
     username: input.username.trim(),
     password: input.password,
+    webmailUrl: normalizeWebmailUrl(input.webmailUrl),
   });
   writeAccounts("imap", accounts);
   return accounts;

@@ -1647,7 +1647,7 @@ export const GetEmailInboxResponse = zod.object({
   "snippet": zod.string().nullish().describe('Short plain-text preview of the message body when the provider supplies one. Null when unavailable.'),
   "date": zod.string().describe('When the message was received (ISO 8601).'),
   "unread": zod.boolean().describe('True when the message is unread.'),
-  "link": zod.string().nullish().describe('Deep link to open the message in the provider\'s web UI (Gmail only). Null when unavailable.')
+  "link": zod.string().nullish().describe('Deep link to open the message in the provider\'s web UI (Gmail deep link, or the account\'s configured webmail URL for IMAP). Null when unavailable.')
 })).describe('Recent messages across the requested accounts, newest first.'),
   "unreadTotal": zod.number().nullish().describe('Total unread count across accounts when the providers report one. Null when unknown.'),
   "errors": zod.array(zod.object({
@@ -1655,6 +1655,19 @@ export const GetEmailInboxResponse = zod.object({
   "message": zod.string().describe('Short human-readable failure reason.')
 }).describe('A configured account that failed to respond during the fetch.')).nullish().describe('Accounts that failed during the fetch (partial results). Null or absent when every account responded.'),
   "sample": zod.boolean().describe('True when these are demo messages because no mail account is configured yet.')
+})
+
+
+/**
+ * Archives the message identified by its EmailMessage id. Gmail messages have the INBOX label removed (requires the account to be linked with modify access); IMAP messages are moved to the server's Archive mailbox. Demo messages are rejected.
+ * @summary Archive one email message
+ */
+export const ArchiveEmailMessageBody = zod.object({
+  "id": zod.string().describe('The EmailMessage id of the message to archive.')
+})
+
+export const ArchiveEmailMessageResponse = zod.object({
+  "ok": zod.boolean().describe('True when the message was archived.')
 })
 
 
@@ -1949,7 +1962,8 @@ export const ListImapAccountsResponseItem = zod.object({
   "host": zod.string(),
   "port": zod.number(),
   "secure": zod.boolean(),
-  "username": zod.string()
+  "username": zod.string(),
+  "webmailUrl": zod.string().nullable().describe('Webmail URL messages from this account link to. Null when not configured.')
 })
 export const ListImapAccountsResponse = zod.array(ListImapAccountsResponseItem)
 
@@ -1963,7 +1977,8 @@ export const AddImapAccountBody = zod.object({
   "port": zod.number().nullish().describe('IMAP port; defaults to 993.'),
   "secure": zod.boolean().nullish().describe('Use implicit TLS; defaults to true.'),
   "username": zod.string().describe('IMAP login username.'),
-  "password": zod.string().describe('IMAP login password (stored server-side, never returned).')
+  "password": zod.string().describe('IMAP login password (stored server-side, never returned).'),
+  "webmailUrl": zod.string().nullish().describe('Optional http(s) URL of the provider\'s webmail UI. When set, messages from this account link to it from the Email tile.')
 })
 
 export const AddImapAccountResponseItem = zod.object({
@@ -1972,7 +1987,8 @@ export const AddImapAccountResponseItem = zod.object({
   "host": zod.string(),
   "port": zod.number(),
   "secure": zod.boolean(),
-  "username": zod.string()
+  "username": zod.string(),
+  "webmailUrl": zod.string().nullable().describe('Webmail URL messages from this account link to. Null when not configured.')
 })
 export const AddImapAccountResponse = zod.array(AddImapAccountResponseItem)
 
@@ -1990,7 +2006,8 @@ export const RemoveImapAccountResponseItem = zod.object({
   "host": zod.string(),
   "port": zod.number(),
   "secure": zod.boolean(),
-  "username": zod.string()
+  "username": zod.string(),
+  "webmailUrl": zod.string().nullable().describe('Webmail URL messages from this account link to. Null when not configured.')
 })
 export const RemoveImapAccountResponse = zod.array(RemoveImapAccountResponseItem)
 

@@ -26,6 +26,8 @@ export * from './connectionHealth';
 export * from './connectionTestResult';
 export * from './continueWatchingItem';
 export * from './emailAccountError';
+export * from './emailArchiveRequest';
+export * from './emailArchiveResponse';
 export * from './emailInboxData';
 export * from './emailMessage';
 export * from './errorResponse';

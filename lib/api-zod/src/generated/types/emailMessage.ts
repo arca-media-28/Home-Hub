@@ -27,7 +27,7 @@ export interface EmailMessage {
   /** True when the message is unread. */
   unread: boolean;
   /**
-     * Deep link to open the message in the provider's web UI (Gmail only). Null when unavailable.
+     * Deep link to open the message in the provider's web UI (Gmail deep link, or the account's configured webmail URL for IMAP). Null when unavailable.
      * @nullable
      */
   link?: string | null;

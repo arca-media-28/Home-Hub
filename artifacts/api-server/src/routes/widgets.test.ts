@@ -1857,6 +1857,40 @@ describe("GET /widgets/email/inbox", () => {
   });
 });
 
+describe("POST /widgets/email/archive", () => {
+  it("rejects a missing message id", async () => {
+    const res = await request(app).post("/widgets/email/archive").send({});
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/id/i);
+  });
+
+  it("rejects demo messages", async () => {
+    const res = await request(app).post("/widgets/email/archive").send({ id: "demo:0" });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/demo/i);
+  });
+
+  it("returns 404 for an unknown IMAP account", async () => {
+    const res = await request(app).post("/widgets/email/archive").send({ id: "nosuch:42" });
+    expect(res.status).toBe(404);
+    expect(res.body.error).toMatch(/account/i);
+  });
+
+  it("returns 404 for an unknown Google account", async () => {
+    const res = await request(app)
+      .post("/widgets/email/archive")
+      .send({ id: "gmail:nosuch:abc123" });
+    expect(res.status).toBe(404);
+    expect(res.body.error).toMatch(/google/i);
+  });
+
+  it("rejects a malformed IMAP id (non-numeric uid)", async () => {
+    const res = await request(app).post("/widgets/email/archive").send({ id: "acc1:notanumber" });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/malformed/i);
+  });
+});
+
 // ── Calendar ────────────────────────────────────────────────────────────────
 describe("GET /widgets/calendar/events", () => {
   it("returns sample events when no calendar account is configured", async () => {

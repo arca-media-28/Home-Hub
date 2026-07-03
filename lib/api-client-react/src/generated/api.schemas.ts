@@ -734,10 +734,20 @@ export interface EmailMessage {
   /** True when the message is unread. */
   unread: boolean;
   /**
-     * Deep link to open the message in the provider's web UI (Gmail only). Null when unavailable.
+     * Deep link to open the message in the provider's web UI (Gmail deep link, or the account's configured webmail URL for IMAP). Null when unavailable.
      * @nullable
      */
   link?: string | null;
+}
+
+export interface EmailArchiveRequest {
+  /** The EmailMessage id of the message to archive. */
+  id: string;
+}
+
+export interface EmailArchiveResponse {
+  /** True when the message was archived. */
+  ok: boolean;
 }
 
 /**
@@ -901,6 +911,11 @@ export interface ImapAccountInput {
   username: string;
   /** IMAP login password (stored server-side, never returned). */
   password: string;
+  /**
+     * Optional http(s) URL of the provider's webmail UI. When set, messages from this account link to it from the Email tile.
+     * @nullable
+     */
+  webmailUrl?: string | null;
 }
 
 export interface ImapAccount {
@@ -912,6 +927,11 @@ export interface ImapAccount {
   port: number;
   secure: boolean;
   username: string;
+  /**
+     * Webmail URL messages from this account link to. Null when not configured.
+     * @nullable
+     */
+  webmailUrl: string | null;
 }
 
 export interface CalDavAccountInput {

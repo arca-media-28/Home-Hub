@@ -1378,6 +1378,7 @@ function ImapAccountsCard() {
   const [secure, setSecure] = useState(true);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [webmailUrl, setWebmailUrl] = useState("");
 
   const addMutation = useAddImapAccount({
     mutation: {
@@ -1389,6 +1390,7 @@ function ImapAccountsCard() {
         setSecure(true);
         setUsername("");
         setPassword("");
+        setWebmailUrl("");
         toast({ title: "IMAP account added" });
       },
       onError: (err) =>
@@ -1423,6 +1425,7 @@ function ImapAccountsCard() {
         secure,
         username: username.trim(),
         password,
+        webmailUrl: webmailUrl.trim() || null,
       },
     });
   }
@@ -1564,6 +1567,21 @@ function ImapAccountsCard() {
               placeholder="App password"
               autoComplete="new-password"
             />
+          </div>
+          <div className="space-y-1.5 sm:col-span-2">
+            <Label className="text-xs uppercase tracking-wider text-muted-foreground">
+              Webmail URL (optional)
+            </Label>
+            <Input
+              value={webmailUrl}
+              onChange={(e) => setWebmailUrl(e.target.value)}
+              placeholder="https://mail.example.com"
+              autoComplete="off"
+            />
+            <p className="text-[11px] text-muted-foreground">
+              When set, clicking a message on the Email tile opens this webmail
+              in a new tab.
+            </p>
           </div>
           <div className="sm:col-span-2 flex justify-end">
             <Button

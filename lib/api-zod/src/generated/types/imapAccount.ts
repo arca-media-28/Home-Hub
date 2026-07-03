@@ -15,4 +15,9 @@ export interface ImapAccount {
   port: number;
   secure: boolean;
   username: string;
+  /**
+     * Webmail URL messages from this account link to. Null when not configured.
+     * @nullable
+     */
+  webmailUrl: string | null;
 }
