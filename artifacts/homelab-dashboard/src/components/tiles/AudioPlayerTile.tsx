@@ -10,6 +10,7 @@ import type { WidgetProps } from "./IntegrationTile";
 import { useAudioPlayer } from "@/lib/audioPlayer";
 import { tileBudget, SECTION_PX, MEDIA_ROW_PX } from "./metrics";
 import { Artwork, fmtTime } from "./audioShared";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import MusicBrowser from "./MusicBrowser";
 import SpotifyAudioPlayer from "./SpotifyAudioPlayer";
 
@@ -226,16 +227,24 @@ function StreamAudioPlayer({ enabled, density, tileSettings }: WidgetProps) {
     player.seek(ratio * liveDuration);
   };
 
-  // "Find music" pill placement. By default it anchors to the left edge of the
-  // playback controls row — the balanced counterpart to the volume control on
-  // the right — but only when that row is shown and the body is wide enough that
-  // a left pill won't crowd the centered transport buttons (or, when present,
-  // the volume control on the right). The p-3 root padding (24px) is subtracted
-  // from the measured body width to get the real horizontal room. When the row
-  // is hidden or too narrow, the pill falls back to the open top-right corner of
-  // the now-playing header so it stays visible without clipping the track info.
-  const volumeShown = isOurs && density.level !== "sm";
-  const controlsRowFits = density.bodyWidth >= (volumeShown ? 300 : 200);
+  // Width gating for the absolutely-positioned side elements of the playback
+  // controls row. The centered transport cluster (prev 18px + gap 12 + play 32
+  // + gap 12 + next 18) is ~92px wide, so each side element must fit inside
+  // (rowWidth / 2 − 46px) where rowWidth is the measured body width minus the
+  // root's p-3 padding (24px).
+  //   • Volume is a single ~28px round button that opens a pop-out slider
+  //     (portalled, so it can never collide with anything in the row); the
+  //     button itself needs only ~36px of side room → body ≥ ~200px.
+  //   • The "Find music" pill (two ~28px round buttons + 6px gap ≈ 62px)
+  //     needs ≥ ~260px and otherwise falls back to the open top-right corner
+  //     of the now-playing header.
+  // Because each element only occupies its own half of the row, the two
+  // thresholds are independent — whenever both are visible, neither can reach
+  // the centered transport buttons, let alone each other.
+  const VOLUME_MIN_BODY_WIDTH = 200;
+  const PILL_MIN_BODY_WIDTH = 260;
+  const volumeShown = density.bodyWidth >= VOLUME_MIN_BODY_WIDTH;
+  const controlsRowFits = density.bodyWidth >= PILL_MIN_BODY_WIDTH;
   const pillAtControls = showBrowser && showControls && controlsRowFits;
 
   return (
@@ -342,19 +351,38 @@ function StreamAudioPlayer({ enabled, density, tileSettings }: WidgetProps) {
           >
             <SkipForward size={18} />
           </button>
-          {isOurs && density.level !== "sm" && (
-            <div className="absolute right-0 flex items-center gap-1.5">
-              <Volume2 size={14} className="text-muted-foreground" aria-hidden="true" />
-              <input
-                type="range"
-                min={0}
-                max={1}
-                step={0.01}
-                value={player.volume}
-                onChange={(e) => player.setVolume(Number(e.target.value))}
-                className="h-1 w-16 cursor-pointer accent-primary"
-                aria-label="Volume"
-              />
+          {volumeShown && (
+            <div className="absolute right-0">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    className="flex items-center justify-center rounded-full border border-border p-1.5 text-foreground transition-colors hover:bg-muted"
+                    aria-label="Volume"
+                    title="Volume"
+                  >
+                    <Volume2 size={14} aria-hidden="true" />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent side="top" align="end" className="w-auto p-3">
+                  <div className="flex items-center gap-2">
+                    <Volume2 size={14} className="shrink-0 text-muted-foreground" aria-hidden="true" />
+                    <input
+                      type="range"
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      value={player.volume}
+                      onChange={(e) => player.setVolume(Number(e.target.value))}
+                      className="h-1 w-28 cursor-pointer accent-primary"
+                      aria-label="Volume level"
+                    />
+                    <span className="w-8 shrink-0 text-right text-[10px] tabular-nums text-muted-foreground">
+                      {Math.round(player.volume * 100)}%
+                    </span>
+                  </div>
+                </PopoverContent>
+              </Popover>
             </div>
           )}
           {pillAtControls && (
