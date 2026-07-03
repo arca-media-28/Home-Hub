@@ -42,10 +42,13 @@ export function fetchGoogleCalendarEvents(opts: {
   accountLabel: string;
   daysAhead: number;
   max: number;
+  fresh?: boolean;
 }): Promise<CalendarEvent[]> {
   return cachedFetch(
     `mail:gcal:${opts.accountId}:${opts.daysAhead}:${opts.max}`,
     () => fetchGoogleCalendarEventsUncached(opts),
+    undefined,
+    { fresh: opts.fresh ?? false },
   );
 }
 
@@ -231,11 +234,13 @@ export function parseVEvents(ics: string): VEvent[] {
 // queries on every tile refresh (see fetchCache.ts).
 export function fetchCalDavEvents(
   account: CalDavAccount,
-  opts: { daysAhead: number; max: number },
+  opts: { daysAhead: number; max: number; fresh?: boolean },
 ): Promise<CalendarEvent[]> {
   return cachedFetch(
     `mail:caldav:${account.id}:${opts.daysAhead}:${opts.max}`,
     () => fetchCalDavEventsUncached(account, opts),
+    undefined,
+    { fresh: opts.fresh ?? false },
   );
 }
 

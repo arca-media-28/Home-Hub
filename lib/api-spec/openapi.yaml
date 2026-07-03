@@ -940,6 +940,16 @@ paths:
           description: When "true", only unread messages are returned.
           schema:
             type: string
+        - name: fresh
+          in: query
+          required: false
+          description: >-
+            When "true", bypasses the short server-side fetch cache and pulls
+            straight from the mail providers (used by the tile's manual
+            refresh). Background polling should omit this so the cache keeps
+            protecting provider rate limits.
+          schema:
+            type: string
       responses:
         "200":
           description: Recent messages, newest first
@@ -1036,6 +1046,16 @@ paths:
           description: Maximum number of events to return (clamped server-side).
           schema:
             type: integer
+        - name: fresh
+          in: query
+          required: false
+          description: >-
+            When "true", bypasses the short server-side fetch cache and pulls
+            straight from the calendar providers (used by the tile's manual
+            refresh). Background polling should omit this so the cache keeps
+            protecting provider rate limits.
+          schema:
+            type: string
       responses:
         "200":
           description: Upcoming events, soonest first

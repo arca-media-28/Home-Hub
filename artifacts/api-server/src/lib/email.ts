@@ -54,10 +54,13 @@ export function fetchGmailMessages(opts: {
   accountLabel: string;
   max: number;
   unreadOnly: boolean;
+  fresh?: boolean;
 }): Promise<{ messages: EmailMessage[]; unread: number | null }> {
   return cachedFetch(
     `mail:gmail:${opts.accountId}:${opts.max}:${opts.unreadOnly}`,
     () => fetchGmailMessagesUncached(opts),
+    undefined,
+    { fresh: opts.fresh ?? false },
   );
 }
 
@@ -147,11 +150,13 @@ const IMAP_TIMEOUT_MS = 15_000;
 // and dedupes concurrent logins to the same mailbox (see fetchCache.ts).
 export function fetchImapMessages(
   account: ImapAccount,
-  opts: { max: number; unreadOnly: boolean },
+  opts: { max: number; unreadOnly: boolean; fresh?: boolean },
 ): Promise<{ messages: EmailMessage[]; unread: number | null }> {
   return cachedFetch(
     `mail:imap:${account.id}:${opts.max}:${opts.unreadOnly}`,
     () => fetchImapMessagesUncached(account, opts),
+    undefined,
+    { fresh: opts.fresh ?? false },
   );
 }
 

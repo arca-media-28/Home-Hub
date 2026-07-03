@@ -68,6 +68,36 @@ describe("cachedFetch", () => {
     expect(await cachedFetch("k:ttl", fn, 5)).toBe(2);
   });
 
+  it("fresh:true bypasses a live cached entry and re-fetches", async () => {
+    let calls = 0;
+    const fn = () => Promise.resolve(++calls);
+    expect(await cachedFetch("k:fresh", fn)).toBe(1);
+    expect(await cachedFetch("k:fresh", fn)).toBe(1); // cached
+    expect(await cachedFetch("k:fresh", fn, undefined, { fresh: true })).toBe(2);
+    // The fresh result replaces the cached entry for later normal callers.
+    expect(await cachedFetch("k:fresh", fn)).toBe(2);
+  });
+
+  it("fresh fetch is cached so concurrent callers dedupe onto it", async () => {
+    let calls = 0;
+    let release!: (v: string) => void;
+    const gate = new Promise<string>((resolve) => {
+      release = resolve;
+    });
+    const fn = () => {
+      calls += 1;
+      return calls === 1 ? Promise.resolve("stale") : gate;
+    };
+
+    expect(await cachedFetch("k:fresh-dedupe", fn)).toBe("stale");
+    const freshP = cachedFetch("k:fresh-dedupe", fn, undefined, { fresh: true });
+    const follower = cachedFetch("k:fresh-dedupe", fn); // arrives while fresh fetch is in flight
+    release("fresh");
+    expect(await freshP).toBe("fresh");
+    expect(await follower).toBe("fresh");
+    expect(calls).toBe(2);
+  });
+
   it("invalidates by prefix", async () => {
     let calls = 0;
     const fn = () => Promise.resolve(++calls);

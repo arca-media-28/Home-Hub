@@ -2,11 +2,12 @@ import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   useGetEmailInbox,
+  getEmailInbox,
   getGetEmailInboxQueryKey,
   useArchiveEmailMessage,
 } from "@workspace/api-client-react";
 import type { EmailMessage } from "@workspace/api-client-react";
-import { Mail, AlertTriangle, Archive, ExternalLink } from "lucide-react";
+import { Mail, AlertTriangle, Archive, ExternalLink, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -213,6 +214,8 @@ export default function EmailTile({ density, tileSettings }: WidgetProps) {
   const max = tileSettings?.emailMaxMessages ?? EMAIL_DEFAULT_MAX;
   const unreadOnly = tileSettings?.emailUnreadOnly ?? false;
   const [selected, setSelected] = useState<EmailMessage | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const queryClient = useQueryClient();
 
   // The route returns demo messages when no mail account is configured, so we
   // always run the query. All knobs live in the query key so distinct tile
@@ -231,6 +234,22 @@ export default function EmailTile({ density, tileSettings }: WidgetProps) {
     },
   });
 
+  // Manual refresh — bypasses the server's short fetch cache (fresh=true) so
+  // brand-new mail shows up instantly, then seeds the result into the normal
+  // query cache. Background polling keeps using the cached path.
+  const handleRefresh = async () => {
+    if (refreshing) return;
+    setRefreshing(true);
+    try {
+      const freshData = await getEmailInbox({ ...params, fresh: "true" });
+      queryClient.setQueryData(getGetEmailInboxQueryKey(params), freshData);
+    } catch {
+      // Keep showing the current list; the next poll will retry.
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="w-full h-full flex items-center justify-center text-muted-foreground text-sm">
@@ -243,9 +262,31 @@ export default function EmailTile({ density, tileSettings }: WidgetProps) {
     return <Placeholder>Couldn't reach your mail accounts — check Settings.</Placeholder>;
   }
 
+  const refreshButton = !data.sample && (
+    <button
+      type="button"
+      onClick={() => void handleRefresh()}
+      disabled={refreshing}
+      title="Check for new mail now"
+      aria-label="Refresh mail"
+      className="ml-auto flex-shrink-0 p-0.5 rounded text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50 cursor-pointer"
+    >
+      <RefreshCw className={`w-3 h-3 ${refreshing ? "animate-spin" : ""}`} />
+    </button>
+  );
+
   if (data.messages.length === 0) {
     return (
-      <Placeholder>{unreadOnly ? "No unread mail — inbox zero!" : "No messages here."}</Placeholder>
+      <div className="w-full h-full flex flex-col">
+        {refreshButton && (
+          <div className="flex items-center px-3 pt-2">{refreshButton}</div>
+        )}
+        <div className="flex-1 min-h-0">
+          <Placeholder>
+            {unreadOnly ? "No unread mail — inbox zero!" : "No messages here."}
+          </Placeholder>
+        </div>
+      </div>
     );
   }
 
@@ -257,7 +298,7 @@ export default function EmailTile({ density, tileSettings }: WidgetProps) {
 
   return (
     <div className="w-full h-full flex flex-col">
-      {(data.sample || typeof data.unreadTotal === "number" || failedAccounts.length > 0) && (
+      {(data.sample || typeof data.unreadTotal === "number" || failedAccounts.length > 0 || refreshButton) && (
         <div className="flex items-center gap-2 px-3 pt-2 text-[10px] text-muted-foreground">
           {typeof data.unreadTotal === "number" && (
             <span className="font-medium">
@@ -273,6 +314,7 @@ export default function EmailTile({ density, tileSettings }: WidgetProps) {
                 : `${failedAccounts.length} accounts unavailable`}
             </span>
           )}
+          {refreshButton}
         </div>
       )}
       <div

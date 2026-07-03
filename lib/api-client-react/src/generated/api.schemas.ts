@@ -1989,6 +1989,10 @@ max?: number;
  * When "true", only unread messages are returned.
  */
 unreadOnly?: string;
+/**
+ * When "true", bypasses the short server-side fetch cache and pulls straight from the mail providers (used by the tile's manual refresh). Background polling should omit this so the cache keeps protecting provider rate limits.
+ */
+fresh?: string;
 };
 
 export type GetCalendarEventsParams = {
@@ -2004,6 +2008,10 @@ days?: number;
  * Maximum number of events to return (clamped server-side).
  */
 max?: number;
+/**
+ * When "true", bypasses the short server-side fetch cache and pulls straight from the calendar providers (used by the tile's manual refresh). Background polling should omit this so the cache keeps protecting provider rate limits.
+ */
+fresh?: string;
 };
 
 export type GetStocksWidgetParams = {

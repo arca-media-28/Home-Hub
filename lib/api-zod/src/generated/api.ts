@@ -1634,7 +1634,8 @@ export const GetNewsWidgetResponse = zod.object({
 export const GetEmailInboxQueryParams = zod.object({
   "accounts": zod.coerce.string().optional().describe('Comma-separated account keys to include (\"gmail\" or an IMAP account id). When omitted, all configured accounts are aggregated. When no accounts are configured at all, demo messages are returned so an unconfigured tile still renders.'),
   "max": zod.coerce.number().optional().describe('Maximum number of messages to return (clamped server-side).'),
-  "unreadOnly": zod.coerce.string().optional().describe('When \"true\", only unread messages are returned.')
+  "unreadOnly": zod.coerce.string().optional().describe('When \"true\", only unread messages are returned.'),
+  "fresh": zod.coerce.string().optional().describe('When \"true\", bypasses the short server-side fetch cache and pulls straight from the mail providers (used by the tile\'s manual refresh). Background polling should omit this so the cache keeps protecting provider rate limits.')
 })
 
 export const GetEmailInboxResponse = zod.object({
@@ -1677,7 +1678,8 @@ export const ArchiveEmailMessageResponse = zod.object({
 export const GetCalendarEventsQueryParams = zod.object({
   "accounts": zod.coerce.string().optional().describe('Comma-separated account keys to include (\"google\" or a CalDAV account id). When omitted, all configured accounts are aggregated. When no accounts are configured at all, demo events are returned so an unconfigured tile still renders.'),
   "days": zod.coerce.number().optional().describe('How many days ahead to look (clamped server-side).'),
-  "max": zod.coerce.number().optional().describe('Maximum number of events to return (clamped server-side).')
+  "max": zod.coerce.number().optional().describe('Maximum number of events to return (clamped server-side).'),
+  "fresh": zod.coerce.string().optional().describe('When \"true\", bypasses the short server-side fetch cache and pulls straight from the calendar providers (used by the tile\'s manual refresh). Background polling should omit this so the cache keeps protecting provider rate limits.')
 })
 
 export const GetCalendarEventsResponse = zod.object({

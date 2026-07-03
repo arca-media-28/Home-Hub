@@ -1,7 +1,12 @@
 import { useState } from "react";
-import { useGetCalendarEvents, getGetCalendarEventsQueryKey } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
+import {
+  useGetCalendarEvents,
+  getCalendarEvents,
+  getGetCalendarEventsQueryKey,
+} from "@workspace/api-client-react";
 import type { CalendarEvent } from "@workspace/api-client-react";
-import { CalendarDays, AlertTriangle, MapPin } from "lucide-react";
+import { CalendarDays, AlertTriangle, MapPin, RefreshCw } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -118,6 +123,8 @@ export default function CalendarTile({ density, tileSettings }: WidgetProps) {
   const days = tileSettings?.calendarDaysAhead ?? CALENDAR_DEFAULT_DAYS;
   const max = tileSettings?.calendarMaxEvents ?? CALENDAR_DEFAULT_MAX;
   const [selected, setSelected] = useState<CalendarEvent | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const queryClient = useQueryClient();
 
   // The route returns demo events when no calendar account is configured, so we
   // always run the query. All knobs live in the query key so distinct tile
@@ -136,6 +143,22 @@ export default function CalendarTile({ density, tileSettings }: WidgetProps) {
     },
   });
 
+  // Manual refresh — bypasses the server's short fetch cache (fresh=true) so
+  // just-created events show up instantly, then seeds the result into the
+  // normal query cache. Background polling keeps using the cached path.
+  const handleRefresh = async () => {
+    if (refreshing) return;
+    setRefreshing(true);
+    try {
+      const freshData = await getCalendarEvents({ ...params, fresh: "true" });
+      queryClient.setQueryData(getGetCalendarEventsQueryKey(params), freshData);
+    } catch {
+      // Keep showing the current list; the next poll will retry.
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="w-full h-full flex items-center justify-center text-muted-foreground text-sm">
@@ -148,8 +171,30 @@ export default function CalendarTile({ density, tileSettings }: WidgetProps) {
     return <Placeholder>Couldn't reach your calendars — check Settings.</Placeholder>;
   }
 
+  const refreshButton = !data.sample && (
+    <button
+      type="button"
+      onClick={() => void handleRefresh()}
+      disabled={refreshing}
+      title="Check for new events now"
+      aria-label="Refresh calendar"
+      className="ml-auto flex-shrink-0 p-0.5 rounded text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50 cursor-pointer"
+    >
+      <RefreshCw className={`w-3 h-3 ${refreshing ? "animate-spin" : ""}`} />
+    </button>
+  );
+
   if (data.events.length === 0) {
-    return <Placeholder>Nothing coming up in the next {days} days.</Placeholder>;
+    return (
+      <div className="w-full h-full flex flex-col">
+        {refreshButton && (
+          <div className="flex items-center px-3 pt-2">{refreshButton}</div>
+        )}
+        <div className="flex-1 min-h-0">
+          <Placeholder>Nothing coming up in the next {days} days.</Placeholder>
+        </div>
+      </div>
+    );
   }
 
   const detailed = density.bodyHeight >= 150;
@@ -168,7 +213,7 @@ export default function CalendarTile({ density, tileSettings }: WidgetProps) {
 
   return (
     <div className="w-full h-full flex flex-col">
-      {(data.sample || failedAccounts.length > 0) && (
+      {(data.sample || failedAccounts.length > 0 || refreshButton) && (
         <div className="flex items-center gap-2 px-3 pt-2 text-[10px] text-muted-foreground">
           {data.sample && <span className="opacity-70">Sample data — connect an account</span>}
           {failedAccounts.length > 0 && (
@@ -182,6 +227,7 @@ export default function CalendarTile({ density, tileSettings }: WidgetProps) {
                 : `${failedAccounts.length} accounts unavailable`}
             </span>
           )}
+          {refreshButton}
         </div>
       )}
       <div

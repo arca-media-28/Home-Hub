@@ -4229,6 +4229,7 @@ async function collectEmail(opts: {
   max: number;
   unreadOnly: boolean;
   include: "all" | "gmail" | "imap";
+  fresh: boolean;
 }): Promise<
   | { kind: "sample"; messages: EmailMessage[] }
   | { kind: "data"; messages: EmailMessage[]; unreadTotal: number | null; errors: AccountError[] }
@@ -4278,6 +4279,7 @@ async function collectEmail(opts: {
         accountLabel: label,
         max: opts.max,
         unreadOnly: opts.unreadOnly,
+        fresh: opts.fresh,
       })
         .then((r) => {
           successes += 1;
@@ -4292,7 +4294,7 @@ async function collectEmail(opts: {
   }
   for (const account of wantImap) {
     tasks.push(
-      fetchImapMessages(account, { max: opts.max, unreadOnly: opts.unreadOnly })
+      fetchImapMessages(account, { max: opts.max, unreadOnly: opts.unreadOnly, fresh: opts.fresh })
         .then((r) => {
           successes += 1;
           all.push(...r.messages);
@@ -4327,9 +4329,12 @@ async function handleEmailRequest(
     : null;
   const max = clampInt(req.query["max"], EMAIL_MAX_DEFAULT, EMAIL_MAX_CAP);
   const unreadOnly = req.query["unreadOnly"] === "true";
+  // fresh=true bypasses the short server-side fetch cache (manual tile
+  // refresh); background polling omits it and keeps hitting the cache.
+  const fresh = req.query["fresh"] === "true";
 
   try {
-    const result = await collectEmail({ accountsFilter, max, unreadOnly, include });
+    const result = await collectEmail({ accountsFilter, max, unreadOnly, include, fresh });
     if (result.kind === "sample") {
       res.json({ messages: result.messages, unreadTotal: 2, errors: null, sample: true });
       return;
@@ -4429,6 +4434,7 @@ async function collectCalendar(opts: {
   days: number;
   max: number;
   include: "all" | "google" | "caldav";
+  fresh: boolean;
 }): Promise<
   | { kind: "sample"; events: CalendarEvent[] }
   | { kind: "data"; events: CalendarEvent[]; errors: AccountError[] }
@@ -4474,6 +4480,7 @@ async function collectCalendar(opts: {
         accountLabel: label,
         daysAhead: opts.days,
         max: opts.max,
+        fresh: opts.fresh,
       })
         .then((events) => {
           successes += 1;
@@ -4490,7 +4497,7 @@ async function collectCalendar(opts: {
   }
   for (const account of wantCalDav) {
     tasks.push(
-      fetchCalDavEvents(account, { daysAhead: opts.days, max: opts.max })
+      fetchCalDavEvents(account, { daysAhead: opts.days, max: opts.max, fresh: opts.fresh })
         .then((events) => {
           successes += 1;
           all.push(...events);
@@ -4523,9 +4530,12 @@ async function handleCalendarRequest(
     : null;
   const days = clampInt(req.query["days"], CALENDAR_DAYS_DEFAULT, CALENDAR_DAYS_CAP);
   const max = clampInt(req.query["max"], CALENDAR_MAX_DEFAULT, CALENDAR_MAX_CAP);
+  // fresh=true bypasses the short server-side fetch cache (manual tile
+  // refresh); background polling omits it and keeps hitting the cache.
+  const fresh = req.query["fresh"] === "true";
 
   try {
-    const result = await collectCalendar({ accountsFilter, days, max, include });
+    const result = await collectCalendar({ accountsFilter, days, max, include, fresh });
     if (result.kind === "sample") {
       res.json({ events: result.events, errors: null, sample: true });
       return;

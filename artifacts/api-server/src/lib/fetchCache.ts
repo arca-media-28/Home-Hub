@@ -23,10 +23,14 @@ export function cachedFetch<T>(
   key: string,
   fn: () => Promise<T>,
   ttlMs = DEFAULT_TTL_MS,
+  opts?: { fresh?: boolean },
 ): Promise<T> {
   const now = Date.now();
   const hit = cache.get(key);
-  if (hit && hit.expiresAt > now) return hit.promise as Promise<T>;
+  // `fresh` skips any cached entry and forces a new upstream fetch. The new
+  // promise is still stored under the key, so concurrent callers arriving
+  // right after the fresh request dedupe onto it as usual.
+  if (hit && hit.expiresAt > now && !opts?.fresh) return hit.promise as Promise<T>;
 
   const promise = fn();
   cache.set(key, { expiresAt: now + ttlMs, promise });
