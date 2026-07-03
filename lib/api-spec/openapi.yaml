@@ -964,6 +964,52 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /widgets/email/message:
+    get:
+      operationId: getEmailMessageBody
+      tags: [widgets]
+      summary: Fetch one email message's plain-text body on demand
+      description: >-
+        Fetches the full body of the message identified by its EmailMessage id,
+        sanitized to plain text (HTML parts are stripped, never rendered).
+        Gmail messages are pulled with format=full preferring the text/plain
+        part; IMAP messages fetch the text body part over IMAP. Demo messages
+        are rejected.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: query
+          required: true
+          description: The EmailMessage id whose body should be fetched.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The message body (null when the message has no text part)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmailMessageBodyData"
+        "400":
+          description: Missing/malformed message id, or a demo message
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: The message references an account that no longer exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "502":
+          description: The mail provider rejected or failed the fetch
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /widgets/email/archive:
     post:
       operationId: archiveEmailMessage
@@ -2487,6 +2533,16 @@ components:
             Deep link to open the message in the provider's web UI (Gmail
             deep link, or the account's configured webmail URL for IMAP).
             Null when unavailable.
+          type: ["string", "null"]
+
+    EmailMessageBodyData:
+      type: object
+      required: [body]
+      properties:
+        body:
+          description: >-
+            The message body as sanitized plain text (capped server-side).
+            Null when the message has no readable text part.
           type: ["string", "null"]
 
     EmailArchiveRequest:

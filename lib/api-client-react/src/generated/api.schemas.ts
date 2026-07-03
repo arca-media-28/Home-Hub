@@ -740,6 +740,14 @@ export interface EmailMessage {
   link?: string | null;
 }
 
+export interface EmailMessageBodyData {
+  /**
+     * The message body as sanitized plain text (capped server-side). Null when the message has no readable text part.
+     * @nullable
+     */
+  body: string | null;
+}
+
 export interface EmailArchiveRequest {
   /** The EmailMessage id of the message to archive. */
   id: string;
@@ -1993,6 +2001,13 @@ unreadOnly?: string;
  * When "true", bypasses the short server-side fetch cache and pulls straight from the mail providers (used by the tile's manual refresh). Background polling should omit this so the cache keeps protecting provider rate limits.
  */
 fresh?: string;
+};
+
+export type GetEmailMessageBodyParams = {
+/**
+ * The EmailMessage id whose body should be fetched.
+ */
+id: string;
 };
 
 export type GetCalendarEventsParams = {

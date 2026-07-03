@@ -33,6 +33,8 @@ import { listImapAccounts, listCalDavAccounts } from "../lib/mailAccounts.js";
 import {
   fetchGmailMessages,
   fetchImapMessages,
+  fetchGmailMessageBody,
+  fetchImapMessageBody,
   archiveGmailMessage,
   archiveImapMessage,
   demoEmailMessages,
@@ -4425,6 +4427,58 @@ router.post("/email/archive", requireAuth, async (req, res) => {
     }
     logger.error({ reason: detail, id }, "Email archive error");
     res.status(502).json({ error: normalizeHttpError(err) });
+  }
+});
+
+// GET /api/widgets/email/message — fetch one message's plain-text body on
+// demand for the detail pop-out. The id query param carries the EmailMessage
+// id, whose prefix encodes the provider (same convention as /email/archive):
+// "gmail:<acct>:<msgId>" pulls format=full from the Gmail API, "<imapAcct>:<uid>"
+// fetches the text body part over IMAP. Demo rows are rejected up front.
+router.get("/email/message", requireAuth, async (req, res) => {
+  const id = typeof req.query["id"] === "string" ? req.query["id"] : "";
+  if (!id) {
+    res.status(400).json({ error: "Message id is required" });
+    return;
+  }
+  if (id.startsWith("demo:")) {
+    res.status(400).json({ error: "Demo messages have no body to fetch" });
+    return;
+  }
+
+  try {
+    let body: string | null;
+    if (id.startsWith("gmail:")) {
+      const rest = id.slice("gmail:".length);
+      const sep = rest.lastIndexOf(":");
+      if (sep <= 0 || sep === rest.length - 1) {
+        res.status(400).json({ error: "Malformed message id" });
+        return;
+      }
+      const accountId = rest.slice(0, sep);
+      if (!listGoogleAccounts().some((a) => a.id === accountId)) {
+        res.status(404).json({ error: "Unknown Google account" });
+        return;
+      }
+      body = await fetchGmailMessageBody(accountId, rest.slice(sep + 1));
+    } else {
+      const sep = id.lastIndexOf(":");
+      const uid = sep > 0 ? Number(id.slice(sep + 1)) : NaN;
+      if (!Number.isInteger(uid) || uid <= 0) {
+        res.status(400).json({ error: "Malformed message id" });
+        return;
+      }
+      const account = listImapAccounts().find((a) => a.id === id.slice(0, sep));
+      if (!account) {
+        res.status(404).json({ error: "Unknown mail account" });
+        return;
+      }
+      body = await fetchImapMessageBody(account, uid);
+    }
+    res.json({ body });
+  } catch (err) {
+    logger.error({ reason: describeHttpError(err), id }, "Email message body error");
+    res.status(502).json({ error: "Failed to fetch the message body" });
   }
 });
 

@@ -34,11 +34,13 @@ import type {
   EmailArchiveRequest,
   EmailArchiveResponse,
   EmailInboxData,
+  EmailMessageBodyData,
   ErrorResponse,
   ErsatzTvData,
   GetAudioPlayerNowPlayingParams,
   GetCalendarEventsParams,
   GetEmailInboxParams,
+  GetEmailMessageBodyParams,
   GetMediaContinueParams,
   GetMediaRecentParams,
   GetNewsWidgetParams,
@@ -3076,6 +3078,91 @@ export function useGetEmailInbox<TData = Awaited<ReturnType<typeof getEmailInbox
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetEmailInboxQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetEmailMessageBodyUrl = (params: GetEmailMessageBodyParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/widgets/email/message?${stringifiedParams}` : `/api/widgets/email/message`
+}
+
+/**
+ * Fetches the full body of the message identified by its EmailMessage id, sanitized to plain text (HTML parts are stripped, never rendered). Gmail messages are pulled with format=full preferring the text/plain part; IMAP messages fetch the text body part over IMAP. Demo messages are rejected.
+ * @summary Fetch one email message's plain-text body on demand
+ */
+export const getEmailMessageBody = async (params: GetEmailMessageBodyParams, options?: RequestInit): Promise<EmailMessageBodyData> => {
+
+  return customFetch<EmailMessageBodyData>(getGetEmailMessageBodyUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetEmailMessageBodyQueryKey = (params?: GetEmailMessageBodyParams,) => {
+    return [
+    `/api/widgets/email/message`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetEmailMessageBodyQueryOptions = <TData = Awaited<ReturnType<typeof getEmailMessageBody>>, TError = ErrorType<ErrorResponse>>(params: GetEmailMessageBodyParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEmailMessageBody>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetEmailMessageBodyQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getEmailMessageBody>>> = ({ signal }) => getEmailMessageBody(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getEmailMessageBody>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetEmailMessageBodyQueryResult = NonNullable<Awaited<ReturnType<typeof getEmailMessageBody>>>
+export type GetEmailMessageBodyQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Fetch one email message's plain-text body on demand
+ */
+
+export function useGetEmailMessageBody<TData = Awaited<ReturnType<typeof getEmailMessageBody>>, TError = ErrorType<ErrorResponse>>(
+ params: GetEmailMessageBodyParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEmailMessageBody>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetEmailMessageBodyQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

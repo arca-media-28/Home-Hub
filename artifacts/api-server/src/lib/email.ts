@@ -127,6 +127,183 @@ async function fetchGmailMessagesUncached(opts: {
   return { messages, unread };
 }
 
+// ── Full message bodies (fetched on demand for the detail pop-out) ───────────
+// Both providers return sanitized plain text (never HTML). Bodies are capped
+// so one giant newsletter can't blow up the response.
+
+const BODY_MAX_CHARS = 50_000;
+
+// Crude but dependency-free HTML → text conversion. We never render HTML in
+// the UI, so this only needs to produce something readable.
+export function htmlToPlainText(html: string): string {
+  return html
+    .replace(/<!--[\s\S]*?-->/g, "")
+    .replace(/<style[\s\S]*?<\/style>/gi, "")
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<head[\s\S]*?<\/head>/gi, "")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/(p|div|tr|li|h[1-6]|blockquote|table)>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#0?39;|&apos;/gi, "'")
+    .replace(/&#(\d+);/g, (_, n: string) => {
+      const code = Number(n);
+      return Number.isFinite(code) && code > 0 && code < 0x110000
+        ? String.fromCodePoint(code)
+        : "";
+    })
+    .replace(/\r\n/g, "\n")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function finalizeBody(text: string): string | null {
+  const cleaned = text.replace(/\r\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+  if (!cleaned) return null;
+  return cleaned.length > BODY_MAX_CHARS ? `${cleaned.slice(0, BODY_MAX_CHARS)}\n…` : cleaned;
+}
+
+interface GmailBodyPart {
+  mimeType?: string;
+  body?: { data?: string };
+  parts?: GmailBodyPart[];
+}
+
+// Depth-first search for the first part matching the wanted MIME type that
+// actually carries inline data.
+function findGmailPart(part: GmailBodyPart, mimeType: string): string | null {
+  if (part.mimeType === mimeType && part.body?.data) return part.body.data;
+  for (const child of part.parts ?? []) {
+    const found = findGmailPart(child, mimeType);
+    if (found) return found;
+  }
+  return null;
+}
+
+function decodeBase64Url(data: string): string {
+  return Buffer.from(data.replace(/-/g, "+").replace(/_/g, "/"), "base64").toString("utf8");
+}
+
+// Fetch one Gmail message's plain-text body (format=full). Prefers text/plain;
+// falls back to a stripped text/html part; falls back to the snippet.
+export function fetchGmailMessageBody(accountId: string, messageId: string): Promise<string | null> {
+  return cachedFetch(`mail:gmail:${accountId}:body:${messageId}`, async () => {
+    const token = await getGoogleAccessToken(accountId);
+    const res = await cloudHttpClient.get<GmailBodyPart & { snippet?: string; payload?: GmailBodyPart }>(
+      `${GMAIL_BASE}/messages/${encodeURIComponent(messageId)}?format=full`,
+      { headers: { Authorization: `Bearer ${token}` } },
+    );
+    const payload = res.data.payload ?? {};
+    const plain = findGmailPart(payload, "text/plain");
+    if (plain) return finalizeBody(decodeBase64Url(plain));
+    const html = findGmailPart(payload, "text/html");
+    if (html) return finalizeBody(htmlToPlainText(decodeBase64Url(html)));
+    return finalizeBody(res.data.snippet ?? "");
+  });
+}
+
+// imapflow bodyStructure node (loosely typed — the library's own typing is any-ish).
+interface ImapBodyNode {
+  part?: string;
+  type?: string;
+  disposition?: string;
+  parameters?: Record<string, string>;
+  childNodes?: ImapBodyNode[];
+}
+
+// Find the part number of the first inline part with the wanted MIME type.
+// For non-multipart messages the root node has no part id — BODY[1] is the
+// content by IMAP convention.
+function findImapPart(node: ImapBodyNode, type: string): string | null {
+  if (node.type?.toLowerCase() === type && node.disposition !== "attachment") {
+    return node.part ?? "1";
+  }
+  for (const child of node.childNodes ?? []) {
+    const found = findImapPart(child, type);
+    if (found) return found;
+  }
+  return null;
+}
+
+async function streamToString(stream: NodeJS.ReadableStream): Promise<Buffer> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+  return Buffer.concat(chunks);
+}
+
+function decodeCharset(buf: Buffer, charset: string | undefined): string {
+  if (charset) {
+    try {
+      return new TextDecoder(charset).decode(buf);
+    } catch {
+      // Unknown/invalid charset label — fall through to UTF-8.
+    }
+  }
+  return buf.toString("utf8");
+}
+
+// Fetch one IMAP message's plain-text body on demand. Prefers the text/plain
+// part; falls back to stripped text/html. download() already reverses the
+// content-transfer-encoding, so only the charset is left to handle.
+export function fetchImapMessageBody(account: ImapAccount, uid: number): Promise<string | null> {
+  return cachedFetch(`mail:imap:${account.id}:body:${uid}`, () =>
+    fetchImapMessageBodyUncached(account, uid),
+  );
+}
+
+async function fetchImapMessageBodyUncached(
+  account: ImapAccount,
+  uid: number,
+): Promise<string | null> {
+  const { ImapFlow } = await import("imapflow");
+  const client = new ImapFlow({
+    host: account.host,
+    port: account.port,
+    secure: account.secure,
+    auth: { user: account.username, pass: account.password },
+    logger: false,
+    socketTimeout: IMAP_TIMEOUT_MS,
+    greetingTimeout: IMAP_TIMEOUT_MS,
+    connectionTimeout: IMAP_TIMEOUT_MS,
+  });
+
+  await client.connect();
+  try {
+    const lock = await client.getMailboxLock("INBOX");
+    try {
+      const msg = await client.fetchOne(String(uid), { uid: true, bodyStructure: true }, { uid: true });
+      if (!msg || !msg.bodyStructure) {
+        throw new Error("Message not found in INBOX");
+      }
+      const structure = msg.bodyStructure as ImapBodyNode;
+
+      const plainPart = findImapPart(structure, "text/plain");
+      const htmlPart = plainPart ? null : findImapPart(structure, "text/html");
+      const part = plainPart ?? htmlPart;
+      if (!part) return null;
+
+      const { content, meta } = await client.download(String(uid), part, { uid: true });
+      if (!content) return null;
+      const buf = await streamToString(content);
+      const metaCharset = (meta as { charset?: string } | undefined)?.charset;
+      const text = decodeCharset(buf, metaCharset);
+      return finalizeBody(plainPart ? text : htmlToPlainText(text));
+    } finally {
+      lock.release();
+    }
+  } finally {
+    // logout() can hang on broken servers; close() force-drops the socket.
+    await client.logout().catch(() => client.close());
+  }
+}
+
 // Archive one Gmail message by removing its INBOX label (the Gmail UI's
 // definition of "archive"). Requires the gmail.modify scope — accounts linked
 // before that scope was requested fail with 403 until re-linked.

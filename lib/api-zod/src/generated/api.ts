@@ -1660,6 +1660,19 @@ export const GetEmailInboxResponse = zod.object({
 
 
 /**
+ * Fetches the full body of the message identified by its EmailMessage id, sanitized to plain text (HTML parts are stripped, never rendered). Gmail messages are pulled with format=full preferring the text/plain part; IMAP messages fetch the text body part over IMAP. Demo messages are rejected.
+ * @summary Fetch one email message's plain-text body on demand
+ */
+export const GetEmailMessageBodyQueryParams = zod.object({
+  "id": zod.coerce.string().describe('The EmailMessage id whose body should be fetched.')
+})
+
+export const GetEmailMessageBodyResponse = zod.object({
+  "body": zod.string().nullable().describe('The message body as sanitized plain text (capped server-side). Null when the message has no readable text part.')
+})
+
+
+/**
  * Archives the message identified by its EmailMessage id. Gmail messages have the INBOX label removed (requires the account to be linked with modify access); IMAP messages are moved to the server's Archive mailbox. Demo messages are rejected.
  * @summary Archive one email message
  */

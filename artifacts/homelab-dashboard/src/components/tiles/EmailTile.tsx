@@ -4,10 +4,12 @@ import {
   useGetEmailInbox,
   getEmailInbox,
   getGetEmailInboxQueryKey,
+  useGetEmailMessageBody,
+  getGetEmailMessageBodyQueryKey,
   useArchiveEmailMessage,
 } from "@workspace/api-client-react";
 import type { EmailMessage } from "@workspace/api-client-react";
-import { Mail, AlertTriangle, Archive, ExternalLink, RefreshCw } from "lucide-react";
+import { Mail, AlertTriangle, Archive, ExternalLink, RefreshCw, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -148,6 +150,20 @@ function MessageDetailDialog({
 
   const isGmail = msg?.id.startsWith("gmail:") ?? false;
 
+  // Fetch the full plain-text body lazily when a real (non-demo) message is
+  // opened. Failures fall back to the snippet / no-preview state below.
+  const bodyParams = { id: msg?.id ?? "" };
+  const bodyQuery = useGetEmailMessageBody(bodyParams, {
+    query: {
+      queryKey: getGetEmailMessageBodyQueryKey(bodyParams),
+      enabled: msg !== null && !sample,
+      staleTime: 5 * 60_000,
+      retry: 1,
+    },
+  });
+  const bodyLoading = msg !== null && !sample && bodyQuery.isLoading;
+  const body = !sample && bodyQuery.data ? bodyQuery.data.body : null;
+
   return (
     <Dialog open={msg !== null} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-md">
@@ -168,7 +184,16 @@ function MessageDetailDialog({
                 </div>
               </DialogDescription>
             </DialogHeader>
-            {msg.snippet ? (
+            {bodyLoading ? (
+              <div className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Loading message…
+              </div>
+            ) : body ? (
+              <div className="max-h-[50vh] overflow-y-auto">
+                <p className="text-sm text-foreground whitespace-pre-wrap break-words">{body}</p>
+              </div>
+            ) : msg.snippet ? (
               <p className="text-sm text-foreground whitespace-pre-wrap break-words">
                 {msg.snippet}
               </p>
