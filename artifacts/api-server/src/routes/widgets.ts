@@ -6,6 +6,7 @@ import { httpClient, cloudHttpClient, normalizeBaseUrl, normalizeHttpError, desc
 import { fetchPiholeData } from "../lib/pihole.js";
 import { subsonicAuthParams, subsonicGet, subsonicMediaQuery, type SubsonicSong } from "../lib/subsonic.js";
 import { logger } from "../lib/logger.js";
+import { cachedFetch } from "../lib/fetchCache.js";
 import {
   getSpotifyConnection,
   getValidAccessToken,
@@ -3933,20 +3934,40 @@ interface WeatherDailyOut {
   low: number | null;
 }
 
+// Every browser polls this endpoint every ~10 minutes, and several users/tabs
+// often share a location, so upstream calls are cached (promise-cached, which
+// also dedupes concurrent requests). Coordinates are rounded so nearby
+// requests share an entry (~1 km at 2 decimals). Failures are never cached —
+// see lib/fetchCache.ts.
+const WEATHER_FORECAST_TTL_MS = 5 * 60_000; // conditions change slowly
+const WEATHER_GEO_TTL_MS = 24 * 60 * 60_000; // place names/coords don't change
+
+function weatherCoordKey(lat: number, lon: number): string {
+  return `${lat.toFixed(2)},${lon.toFixed(2)}`;
+}
+
 // Best-effort reverse geocode via Open-Meteo-adjacent BigDataCloud. The name is
 // a nicety — any failure just yields a generic label rather than an error.
+// The inner fetch throws on failure so only successful lookups get cached;
+// the generic fallback is applied outside the cache.
 async function reverseGeocodeName(lat: number, lon: number): Promise<string> {
   try {
-    const res = await cloudHttpClient.get(
-      "https://api.bigdatacloud.net/data/reverse-geocode-client",
-      { params: { latitude: lat, longitude: lon, localityLanguage: "en" } },
+    return await cachedFetch(
+      `weather:revgeo:${weatherCoordKey(lat, lon)}`,
+      async () => {
+        const res = await cloudHttpClient.get(
+          "https://api.bigdatacloud.net/data/reverse-geocode-client",
+          { params: { latitude: lat, longitude: lon, localityLanguage: "en" } },
+        );
+        const j = (res.data ?? {}) as {
+          city?: string;
+          locality?: string;
+          principalSubdivision?: string;
+        };
+        return j.city || j.locality || j.principalSubdivision || "Current location";
+      },
+      WEATHER_GEO_TTL_MS,
     );
-    const j = (res.data ?? {}) as {
-      city?: string;
-      locality?: string;
-      principalSubdivision?: string;
-    };
-    return j.city || j.locality || j.principalSubdivision || "Current location";
   } catch (err) {
     logger.warn({ reason: normalizeHttpError(err) }, "Weather reverse geocode failed");
     return "Current location";
@@ -3979,19 +4000,25 @@ router.get("/weather", requireAuth, async (req, res) => {
       | { latitude: number; longitude: number; name: string; country?: string }
       | undefined;
     try {
-      const geoRes = await cloudHttpClient.get(
-        "https://geocoding-api.open-meteo.com/v1/search",
-        { params: { name: city, count: 1, language: "en", format: "json" } },
+      first = await cachedFetch(
+        `weather:geo:${city.toLowerCase()}`,
+        async () => {
+          const geoRes = await cloudHttpClient.get(
+            "https://geocoding-api.open-meteo.com/v1/search",
+            { params: { name: city, count: 1, language: "en", format: "json" } },
+          );
+          const j = (geoRes.data ?? {}) as {
+            results?: Array<{
+              latitude: number;
+              longitude: number;
+              name: string;
+              country?: string;
+            }>;
+          };
+          return j.results?.[0];
+        },
+        WEATHER_GEO_TTL_MS,
       );
-      const j = (geoRes.data ?? {}) as {
-        results?: Array<{
-          latitude: number;
-          longitude: number;
-          name: string;
-          country?: string;
-        }>;
-      };
-      first = j.results?.[0];
     } catch (err) {
       logger.error({ reason: normalizeHttpError(err) }, "Weather geocoding error");
       res.status(502).json({ error: "Weather service unreachable — could not look up that city" });
@@ -4007,31 +4034,37 @@ router.get("/weather", requireAuth, async (req, res) => {
   }
 
   try {
-    const fcRes = await cloudHttpClient.get("https://api.open-meteo.com/v1/forecast", {
-      params: {
-        latitude: lat,
-        longitude: lon,
-        current: "temperature_2m,apparent_temperature,weather_code,is_day",
-        daily: "weather_code,temperature_2m_max,temperature_2m_min",
-        forecast_days: 6,
-        temperature_unit: units === "f" ? "fahrenheit" : "celsius",
-        timezone: "auto",
+    const j = await cachedFetch(
+      `weather:fc:${weatherCoordKey(lat, lon)}:${units}`,
+      async () => {
+        const fcRes = await cloudHttpClient.get("https://api.open-meteo.com/v1/forecast", {
+          params: {
+            latitude: lat,
+            longitude: lon,
+            current: "temperature_2m,apparent_temperature,weather_code,is_day",
+            daily: "weather_code,temperature_2m_max,temperature_2m_min",
+            forecast_days: 6,
+            temperature_unit: units === "f" ? "fahrenheit" : "celsius",
+            timezone: "auto",
+          },
+        });
+        return (fcRes.data ?? {}) as {
+          current?: {
+            temperature_2m: number;
+            apparent_temperature: number;
+            weather_code: number;
+            is_day: number;
+          };
+          daily?: {
+            time?: string[];
+            weather_code?: number[];
+            temperature_2m_max?: number[];
+            temperature_2m_min?: number[];
+          };
+        };
       },
-    });
-    const j = (fcRes.data ?? {}) as {
-      current?: {
-        temperature_2m: number;
-        apparent_temperature: number;
-        weather_code: number;
-        is_day: number;
-      };
-      daily?: {
-        time?: string[];
-        weather_code?: number[];
-        temperature_2m_max?: number[];
-        temperature_2m_min?: number[];
-      };
-    };
+      WEATHER_FORECAST_TTL_MS,
+    );
     if (!j.current) {
       res.status(502).json({ error: "Weather service returned no current conditions" });
       return;

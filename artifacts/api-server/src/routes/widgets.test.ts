@@ -67,6 +67,9 @@ vi.mock("../lib/logger.js", () => ({
 
 // Imported after the mocks are registered (vi.mock is hoisted above imports).
 const { default: widgetsRouter } = await import("./widgets.js");
+// The fetch cache is real (not mocked) — weather tests invalidate their keys
+// so entries never leak between tests.
+const { invalidateFetchCache } = await import("../lib/fetchCache.js");
 
 function makeApp(): Express {
   const app = express();
@@ -1928,5 +1931,125 @@ describe("GET /widgets/gmail/callback", () => {
     expect(res.headers["location"]).toContain("google=error");
     expect(cloudPost).not.toHaveBeenCalled();
     expect(upsertRun).not.toHaveBeenCalled();
+  });
+});
+
+// ── Weather (server-side cache) ───────────────────────────────────────────────
+describe("GET /widgets/weather", () => {
+  it("caches forecast + reverse-geocode responses per rounded coords and units", async () => {
+    invalidateFetchCache("weather:");
+    cloudGet.mockImplementation(async (url: string) => {
+      if (url.includes("bigdatacloud")) return { data: { city: "Springfield" } };
+      return {
+        data: {
+          current: { temperature_2m: 21, apparent_temperature: 20, weather_code: 1, is_day: 1 },
+          daily: {
+            time: ["2026-07-03"],
+            weather_code: [1],
+            temperature_2m_max: [25],
+            temperature_2m_min: [15],
+          },
+        },
+      };
+    });
+
+    const first = await request(app).get("/widgets/weather?lat=40.123&lon=-75.456&units=c");
+    expect(first.status).toBe(200);
+    expect(first.body.name).toBe("Springfield");
+    expect(first.body.temp).toBe(21);
+    // one reverse-geocode + one forecast call
+    expect(cloudGet).toHaveBeenCalledTimes(2);
+
+    // A second request for a coordinate that rounds to the same 2-decimal key
+    // must be served entirely from cache — no new upstream calls.
+    const second = await request(app).get("/widgets/weather?lat=40.1201&lon=-75.4599&units=c");
+    expect(second.status).toBe(200);
+    expect(second.body.temp).toBe(21);
+    expect(cloudGet).toHaveBeenCalledTimes(2);
+
+    // Different units → separate forecast entry, but the reverse-geocode
+    // (units-independent) is still cached.
+    const third = await request(app).get("/widgets/weather?lat=40.123&lon=-75.456&units=f");
+    expect(third.status).toBe(200);
+    expect(cloudGet).toHaveBeenCalledTimes(3);
+  });
+
+  it("dedupes concurrent requests into a single upstream call", async () => {
+    invalidateFetchCache("weather:");
+    let forecastCalls = 0;
+    cloudGet.mockImplementation(async (url: string) => {
+      if (url.includes("bigdatacloud")) return { data: { city: "Springfield" } };
+      forecastCalls += 1;
+      await new Promise((r) => setTimeout(r, 20));
+      return {
+        data: {
+          current: { temperature_2m: 18, apparent_temperature: 17, weather_code: 2, is_day: 0 },
+          daily: { time: [], weather_code: [], temperature_2m_max: [], temperature_2m_min: [] },
+        },
+      };
+    });
+
+    const [a, b, c] = await Promise.all([
+      request(app).get("/widgets/weather?lat=51.5&lon=-0.12&units=c"),
+      request(app).get("/widgets/weather?lat=51.5&lon=-0.12&units=c"),
+      request(app).get("/widgets/weather?lat=51.5&lon=-0.12&units=c"),
+    ]);
+    expect(a.status).toBe(200);
+    expect(b.status).toBe(200);
+    expect(c.status).toBe(200);
+    expect(forecastCalls).toBe(1);
+  });
+
+  it("does not cache failures — a transient outage recovers on the next poll", async () => {
+    invalidateFetchCache("weather:");
+    cloudGet.mockImplementation(async (url: string) => {
+      if (url.includes("bigdatacloud")) return { data: { city: "Springfield" } };
+      throw httpError(503);
+    });
+
+    const failed = await request(app).get("/widgets/weather?lat=10&lon=20&units=c");
+    expect(failed.status).toBe(502);
+
+    cloudGet.mockImplementation(async (url: string) => {
+      if (url.includes("bigdatacloud")) return { data: { city: "Springfield" } };
+      return {
+        data: {
+          current: { temperature_2m: 30, apparent_temperature: 32, weather_code: 0, is_day: 1 },
+          daily: { time: [], weather_code: [], temperature_2m_max: [], temperature_2m_min: [] },
+        },
+      };
+    });
+    const recovered = await request(app).get("/widgets/weather?lat=10&lon=20&units=c");
+    expect(recovered.status).toBe(200);
+    expect(recovered.body.temp).toBe(30);
+  });
+
+  it("caches city geocoding so repeat city lookups skip the geocoder", async () => {
+    invalidateFetchCache("weather:");
+    let geocodeCalls = 0;
+    cloudGet.mockImplementation(async (url: string) => {
+      if (url.includes("geocoding-api")) {
+        geocodeCalls += 1;
+        return {
+          data: { results: [{ latitude: 48.85, longitude: 2.35, name: "Paris", country: "France" }] },
+        };
+      }
+      return {
+        data: {
+          current: { temperature_2m: 19, apparent_temperature: 18, weather_code: 3, is_day: 1 },
+          daily: { time: [], weather_code: [], temperature_2m_max: [], temperature_2m_min: [] },
+        },
+      };
+    });
+
+    const first = await request(app).get("/widgets/weather?city=Paris&units=c");
+    expect(first.status).toBe(200);
+    expect(first.body.name).toBe("Paris, France");
+    expect(geocodeCalls).toBe(1);
+
+    // Same city with different casing hits the cached geocode entry.
+    const second = await request(app).get("/widgets/weather?city=paris&units=c");
+    expect(second.status).toBe(200);
+    expect(geocodeCalls).toBe(1);
   });
 });
