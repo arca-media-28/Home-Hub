@@ -3974,6 +3974,7 @@ router.get("/gmail/auth", (req, res) => {
   }
   const redirectUri = `${hostOrigin.replace(/\/+$/, "")}${GMAIL_CALLBACK_PATH}`;
   const returnTo = `${base.replace(/\/+$/, "")}/settings`;
+  logger.info({ redirectUri }, "Google OAuth start");
   const state = createGooglePendingAuth(redirectUri, returnTo);
   res.redirect(buildGoogleAuthUrl(redirectUri, state));
 });
