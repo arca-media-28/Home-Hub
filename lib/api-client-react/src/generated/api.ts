@@ -45,6 +45,7 @@ import type {
   GetTilesParams,
   GetTruenasDiagnostics200,
   GetTruenasDiagnostics409,
+  GetWeatherWidgetParams,
   GoogleAuthIntent,
   GoogleCredentialsInput,
   GoogleDisconnectInput,
@@ -89,7 +90,8 @@ import type {
   TileUpdate,
   TruenasMetrics,
   UploadedFile,
-  UserProfile
+  UserProfile,
+  WeatherWidgetData
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -3408,6 +3410,90 @@ export function useSearchStocks<TData = Awaited<ReturnType<typeof searchStocks>>
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getSearchStocksQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetWeatherWidgetUrl = (params?: GetWeatherWidgetParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/widgets/weather?${stringifiedParams}` : `/api/widgets/weather`
+}
+
+/**
+ * @summary Get current conditions and a multi-day forecast for either browser coordinates or a typed city name. Geocoding, reverse geocoding, and the Open-Meteo forecast call all happen server-side so the browser never talks to third-party APIs directly.
+ */
+export const getWeatherWidget = async (params?: GetWeatherWidgetParams, options?: RequestInit): Promise<WeatherWidgetData> => {
+
+  return customFetch<WeatherWidgetData>(getGetWeatherWidgetUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetWeatherWidgetQueryKey = (params?: GetWeatherWidgetParams,) => {
+    return [
+    `/api/widgets/weather`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetWeatherWidgetQueryOptions = <TData = Awaited<ReturnType<typeof getWeatherWidget>>, TError = ErrorType<ErrorResponse>>(params?: GetWeatherWidgetParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getWeatherWidget>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetWeatherWidgetQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getWeatherWidget>>> = ({ signal }) => getWeatherWidget(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getWeatherWidget>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetWeatherWidgetQueryResult = NonNullable<Awaited<ReturnType<typeof getWeatherWidget>>>
+export type GetWeatherWidgetQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Get current conditions and a multi-day forecast for either browser coordinates or a typed city name. Geocoding, reverse geocoding, and the Open-Meteo forecast call all happen server-side so the browser never talks to third-party APIs directly.
+ */
+
+export function useGetWeatherWidget<TData = Awaited<ReturnType<typeof getWeatherWidget>>, TError = ErrorType<ErrorResponse>>(
+ params?: GetWeatherWidgetParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getWeatherWidget>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetWeatherWidgetQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

@@ -987,6 +987,48 @@ export interface StockCandlesData {
   sample: boolean;
 }
 
+export interface WeatherDailyForecast {
+  /** Forecast date as YYYY-MM-DD (in the location's timezone). */
+  date: string;
+  /** WMO weather code for the day's dominant conditions. */
+  code: number;
+  /**
+     * Daily high temperature in the requested units.
+     * @nullable
+     */
+  high?: number | null;
+  /**
+     * Daily low temperature in the requested units.
+     * @nullable
+     */
+  low?: number | null;
+}
+
+export interface WeatherWidgetData {
+  /** Resolved place name — reverse-geocoded for coordinates, or the geocoded match ("City, Country") for a typed city. */
+  name: string;
+  /** Current temperature in the requested units. */
+  temp: number;
+  /** Current apparent ("feels like") temperature. */
+  feels: number;
+  /** Current WMO weather code. */
+  code: number;
+  /** True when it is currently daytime at the location. */
+  isDay: boolean;
+  /**
+     * Today's high temperature.
+     * @nullable
+     */
+  high?: number | null;
+  /**
+     * Today's low temperature.
+     * @nullable
+     */
+  low?: number | null;
+  /** Daily forecast entries in chronological order, starting with today. */
+  forecast: WeatherDailyForecast[];
+}
+
 export interface LayoutItem {
   id: number;
   gridX: number;
@@ -1964,4 +2006,31 @@ export type SearchStocksParams = {
  */
 q: string;
 };
+
+export type GetWeatherWidgetParams = {
+/**
+ * Latitude from browser geolocation. Must be paired with lon; takes precedence over city when both are provided.
+ */
+lat?: number;
+/**
+ * Longitude from browser geolocation. Must be paired with lat.
+ */
+lon?: number;
+/**
+ * City/place name to geocode when coordinates are not provided.
+ */
+city?: string;
+/**
+ * Temperature units: "c" for Celsius (default), "f" for Fahrenheit.
+ */
+units?: GetWeatherWidgetUnits;
+};
+
+export type GetWeatherWidgetUnits = typeof GetWeatherWidgetUnits[keyof typeof GetWeatherWidgetUnits];
+
+
+export const GetWeatherWidgetUnits = {
+  c: 'c',
+  f: 'f',
+} as const;
 

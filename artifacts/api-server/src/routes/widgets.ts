@@ -3924,6 +3924,143 @@ router.get("/stocks/search", requireAuth, async (req, res) => {
   }
 });
 
+// ── Weather (Open-Meteo, no saved connection needed) ─────────────────────────
+
+interface WeatherDailyOut {
+  date: string;
+  code: number;
+  high: number | null;
+  low: number | null;
+}
+
+// Best-effort reverse geocode via Open-Meteo-adjacent BigDataCloud. The name is
+// a nicety — any failure just yields a generic label rather than an error.
+async function reverseGeocodeName(lat: number, lon: number): Promise<string> {
+  try {
+    const res = await cloudHttpClient.get(
+      "https://api.bigdatacloud.net/data/reverse-geocode-client",
+      { params: { latitude: lat, longitude: lon, localityLanguage: "en" } },
+    );
+    const j = (res.data ?? {}) as {
+      city?: string;
+      locality?: string;
+      principalSubdivision?: string;
+    };
+    return j.city || j.locality || j.principalSubdivision || "Current location";
+  } catch (err) {
+    logger.warn({ reason: normalizeHttpError(err) }, "Weather reverse geocode failed");
+    return "Current location";
+  }
+}
+
+router.get("/weather", requireAuth, async (req, res) => {
+  const latRaw = typeof req.query["lat"] === "string" ? Number(req.query["lat"]) : NaN;
+  const lonRaw = typeof req.query["lon"] === "string" ? Number(req.query["lon"]) : NaN;
+  const city = typeof req.query["city"] === "string" ? req.query["city"].trim() : "";
+  const units = req.query["units"] === "f" ? "f" : "c";
+  const hasCoords = Number.isFinite(latRaw) && Number.isFinite(lonRaw);
+
+  if (!hasCoords && !city) {
+    res.status(400).json({ error: "Provide either lat/lon coordinates or a city name" });
+    return;
+  }
+
+  let lat: number;
+  let lon: number;
+  let name: string;
+
+  if (hasCoords) {
+    lat = latRaw;
+    lon = lonRaw;
+    name = await reverseGeocodeName(lat, lon);
+  } else {
+    // Geocode the typed city name via Open-Meteo's geocoding API.
+    let first:
+      | { latitude: number; longitude: number; name: string; country?: string }
+      | undefined;
+    try {
+      const geoRes = await cloudHttpClient.get(
+        "https://geocoding-api.open-meteo.com/v1/search",
+        { params: { name: city, count: 1, language: "en", format: "json" } },
+      );
+      const j = (geoRes.data ?? {}) as {
+        results?: Array<{
+          latitude: number;
+          longitude: number;
+          name: string;
+          country?: string;
+        }>;
+      };
+      first = j.results?.[0];
+    } catch (err) {
+      logger.error({ reason: normalizeHttpError(err) }, "Weather geocoding error");
+      res.status(502).json({ error: "Weather service unreachable — could not look up that city" });
+      return;
+    }
+    if (!first) {
+      res.status(404).json({ error: `Couldn't find "${city}" — check the city name in this tile's settings` });
+      return;
+    }
+    lat = first.latitude;
+    lon = first.longitude;
+    name = [first.name, first.country].filter(Boolean).join(", ");
+  }
+
+  try {
+    const fcRes = await cloudHttpClient.get("https://api.open-meteo.com/v1/forecast", {
+      params: {
+        latitude: lat,
+        longitude: lon,
+        current: "temperature_2m,apparent_temperature,weather_code,is_day",
+        daily: "weather_code,temperature_2m_max,temperature_2m_min",
+        forecast_days: 6,
+        temperature_unit: units === "f" ? "fahrenheit" : "celsius",
+        timezone: "auto",
+      },
+    });
+    const j = (fcRes.data ?? {}) as {
+      current?: {
+        temperature_2m: number;
+        apparent_temperature: number;
+        weather_code: number;
+        is_day: number;
+      };
+      daily?: {
+        time?: string[];
+        weather_code?: number[];
+        temperature_2m_max?: number[];
+        temperature_2m_min?: number[];
+      };
+    };
+    if (!j.current) {
+      res.status(502).json({ error: "Weather service returned no current conditions" });
+      return;
+    }
+
+    const days = j.daily?.time ?? [];
+    const forecast: WeatherDailyOut[] = days.map((date, i) => ({
+      date,
+      code: j.daily?.weather_code?.[i] ?? 0,
+      high: j.daily?.temperature_2m_max?.[i] ?? null,
+      low: j.daily?.temperature_2m_min?.[i] ?? null,
+    }));
+
+    res.json({
+      name,
+      temp: j.current.temperature_2m,
+      feels: j.current.apparent_temperature,
+      code: j.current.weather_code,
+      isDay: j.current.is_day === 1,
+      high: j.daily?.temperature_2m_max?.[0] ?? null,
+      low: j.daily?.temperature_2m_min?.[0] ?? null,
+      forecast,
+    });
+  } catch (err) {
+    logger.error({ reason: normalizeHttpError(err) }, "Weather forecast error");
+    res.status(502).json({ error: "Weather service unreachable — could not load the forecast" });
+  }
+});
+
 // ── Email + Calendar (Gmail / IMAP / Google Calendar / CalDAV) ────────────────
 
 // Derive the browser-facing origin from the (proxied) request so the OAuth

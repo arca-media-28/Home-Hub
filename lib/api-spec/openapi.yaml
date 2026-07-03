@@ -1088,6 +1088,72 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /widgets/weather:
+    get:
+      operationId: getWeatherWidget
+      tags: [widgets]
+      summary: >-
+        Get current conditions and a multi-day forecast for either browser
+        coordinates or a typed city name. Geocoding, reverse geocoding, and the
+        Open-Meteo forecast call all happen server-side so the browser never
+        talks to third-party APIs directly.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: lat
+          in: query
+          required: false
+          description: >-
+            Latitude from browser geolocation. Must be paired with lon; takes
+            precedence over city when both are provided.
+          schema:
+            type: number
+        - name: lon
+          in: query
+          required: false
+          description: Longitude from browser geolocation. Must be paired with lat.
+          schema:
+            type: number
+        - name: city
+          in: query
+          required: false
+          description: >-
+            City/place name to geocode when coordinates are not provided.
+          schema:
+            type: string
+        - name: units
+          in: query
+          required: false
+          description: 'Temperature units: "c" for Celsius (default), "f" for Fahrenheit.'
+          schema:
+            type: string
+            enum: [c, f]
+      responses:
+        "200":
+          description: Current conditions plus a multi-day forecast
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WeatherWidgetData"
+        "400":
+          description: Neither coordinates nor a city name were provided
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: The city name could not be geocoded to a location
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "502":
+          description: The upstream weather service could not be reached
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /connections:
     get:
       operationId: getConnections
@@ -2697,6 +2763,57 @@ components:
             True when the series are built-in sample data (no provider API key
             configured), so the tile can label them as not-live.
           type: boolean
+
+    WeatherDailyForecast:
+      type: object
+      required: [date, code]
+      properties:
+        date:
+          description: Forecast date as YYYY-MM-DD (in the location's timezone).
+          type: string
+        code:
+          description: WMO weather code for the day's dominant conditions.
+          type: integer
+        high:
+          description: Daily high temperature in the requested units.
+          type: ["number", "null"]
+        low:
+          description: Daily low temperature in the requested units.
+          type: ["number", "null"]
+
+    WeatherWidgetData:
+      type: object
+      required: [name, temp, feels, code, isDay, forecast]
+      properties:
+        name:
+          description: >-
+            Resolved place name — reverse-geocoded for coordinates, or the
+            geocoded match ("City, Country") for a typed city.
+          type: string
+        temp:
+          description: Current temperature in the requested units.
+          type: number
+        feels:
+          description: Current apparent ("feels like") temperature.
+          type: number
+        code:
+          description: Current WMO weather code.
+          type: integer
+        isDay:
+          description: True when it is currently daytime at the location.
+          type: boolean
+        high:
+          description: Today's high temperature.
+          type: ["number", "null"]
+        low:
+          description: Today's low temperature.
+          type: ["number", "null"]
+        forecast:
+          description: >-
+            Daily forecast entries in chronological order, starting with today.
+          type: array
+          items:
+            $ref: "#/components/schemas/WeatherDailyForecast"
 
     LayoutItem:
       type: object

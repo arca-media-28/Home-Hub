@@ -1,5 +1,10 @@
 import { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import {
+  useGetWeatherWidget,
+  getGetWeatherWidgetQueryKey,
+  ApiError,
+  type GetWeatherWidgetParams,
+} from "@workspace/api-client-react";
 import {
   Sun,
   Moon,
@@ -67,123 +72,19 @@ function weatherInfo(code: number, isDay: boolean): { label: string; Icon: Lucid
   }
 }
 
-interface DailyForecast {
-  date: string;
-  code: number;
-  high: number | null;
-  low: number | null;
-}
-
-interface WeatherData {
-  name: string;
-  temp: number;
-  feels: number;
-  code: number;
-  isDay: boolean;
-  high: number | null;
-  low: number | null;
-  forecast: DailyForecast[];
-}
-
 type Target =
   | { kind: "coords"; lat: number; lon: number }
   | { kind: "city"; name: string };
 
-// Best-effort reverse geocode to name a browser-detected location. Falls back
-// to a generic label so the tile never breaks when the lookup is unavailable.
-async function reverseName(lat: number, lon: number): Promise<string> {
-  try {
-    const res = await fetch(
-      `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`,
-    );
-    if (res.ok) {
-      const j = (await res.json()) as {
-        city?: string;
-        locality?: string;
-        principalSubdivision?: string;
-      };
-      return j.city || j.locality || j.principalSubdivision || "Current location";
-    }
-  } catch {
-    // Ignore — the name is a nicety, not essential.
+// Pull the server's specific error message out of a failed request. The API
+// returns { error: "..." } bodies; fall back to a generic label otherwise.
+function errorMessage(err: unknown): string {
+  if (err instanceof ApiError) {
+    const data = err.data as { error?: string } | null;
+    if (data && typeof data.error === "string" && data.error.trim()) return data.error;
   }
-  return "Current location";
-}
-
-async function fetchWeather(target: Target, units: "c" | "f"): Promise<WeatherData> {
-  let lat: number;
-  let lon: number;
-  let name: string;
-
-  if (target.kind === "coords") {
-    lat = target.lat;
-    lon = target.lon;
-    name = await reverseName(lat, lon);
-  } else {
-    const res = await fetch(
-      `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(
-        target.name,
-      )}&count=1&language=en&format=json`,
-    );
-    if (!res.ok) throw new Error("Could not look up that city");
-    const j = (await res.json()) as {
-      results?: Array<{
-        latitude: number;
-        longitude: number;
-        name: string;
-        country?: string;
-        admin1?: string;
-      }>;
-    };
-    const first = j.results?.[0];
-    if (!first) throw new Error(`Couldn't find "${target.name}"`);
-    lat = first.latitude;
-    lon = first.longitude;
-    name = [first.name, first.country].filter(Boolean).join(", ");
-  }
-
-  const tempUnit = units === "f" ? "fahrenheit" : "celsius";
-  const res = await fetch(
-    `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
-      `&current=temperature_2m,apparent_temperature,weather_code,is_day` +
-      `&daily=weather_code,temperature_2m_max,temperature_2m_min` +
-      `&forecast_days=6&temperature_unit=${tempUnit}&timezone=auto`,
-  );
-  if (!res.ok) throw new Error("Could not load weather");
-  const j = (await res.json()) as {
-    current?: {
-      temperature_2m: number;
-      apparent_temperature: number;
-      weather_code: number;
-      is_day: number;
-    };
-    daily?: {
-      time?: string[];
-      weather_code?: number[];
-      temperature_2m_max?: number[];
-      temperature_2m_min?: number[];
-    };
-  };
-  if (!j.current) throw new Error("Could not load weather");
-
-  const days = j.daily?.time ?? [];
-  const forecast: DailyForecast[] = days.map((date, i) => ({
-    date,
-    code: j.daily?.weather_code?.[i] ?? 0,
-    high: j.daily?.temperature_2m_max?.[i] ?? null,
-    low: j.daily?.temperature_2m_min?.[i] ?? null,
-  }));
-
-  return {
-    name,
-    temp: j.current.temperature_2m,
-    feels: j.current.apparent_temperature,
-    code: j.current.weather_code,
-    isDay: j.current.is_day === 1,
-    high: j.daily?.temperature_2m_max?.[0] ?? null,
-    low: j.daily?.temperature_2m_min?.[0] ?? null,
-    forecast,
-  };
+  if (err instanceof Error && err.message) return err.message;
+  return "Weather unavailable";
 }
 
 // Short weekday label for a YYYY-MM-DD date string (parsed as local time).
@@ -254,13 +155,24 @@ export default function WeatherTile({ density, tileSettings }: WidgetProps) {
   const needCity =
     (!autoLocate && !cityAvailable) || (autoLocate && geoDenied && !cityAvailable);
 
-  const query = useQuery({
-    queryKey: ["weather", target, units],
-    queryFn: () => fetchWeather(target!, units),
-    enabled: target !== null,
-    refetchInterval: 600_000,
-    staleTime: 300_000,
-    retry: 1,
+  // Fetch through the app's own API — the server does geocoding, reverse
+  // geocoding, and the forecast call, so the browser never hits third parties.
+  const params: GetWeatherWidgetParams = { units };
+  if (target?.kind === "coords") {
+    params.lat = target.lat;
+    params.lon = target.lon;
+  } else if (target?.kind === "city") {
+    params.city = target.name;
+  }
+
+  const query = useGetWeatherWidget(params, {
+    query: {
+      queryKey: getGetWeatherWidgetQueryKey(params),
+      enabled: target !== null,
+      refetchInterval: 600_000,
+      staleTime: 300_000,
+      retry: 1,
+    },
   });
 
   if (needCity) {
@@ -282,8 +194,7 @@ export default function WeatherTile({ density, tileSettings }: WidgetProps) {
   }
 
   if (query.isError || !query.data) {
-    const msg = query.error instanceof Error ? query.error.message : "Weather unavailable";
-    return <Prompt>{msg}</Prompt>;
+    return <Prompt>{errorMessage(query.error)}</Prompt>;
   }
 
   const data = query.data;

@@ -1739,6 +1739,33 @@ export const SearchStocksResponse = zod.object({
 
 
 /**
+ * @summary Get current conditions and a multi-day forecast for either browser coordinates or a typed city name. Geocoding, reverse geocoding, and the Open-Meteo forecast call all happen server-side so the browser never talks to third-party APIs directly.
+ */
+export const GetWeatherWidgetQueryParams = zod.object({
+  "lat": zod.coerce.number().optional().describe('Latitude from browser geolocation. Must be paired with lon; takes precedence over city when both are provided.'),
+  "lon": zod.coerce.number().optional().describe('Longitude from browser geolocation. Must be paired with lat.'),
+  "city": zod.coerce.string().optional().describe('City\/place name to geocode when coordinates are not provided.'),
+  "units": zod.enum(['c', 'f']).optional().describe('Temperature units: \"c\" for Celsius (default), \"f\" for Fahrenheit.')
+})
+
+export const GetWeatherWidgetResponse = zod.object({
+  "name": zod.string().describe('Resolved place name — reverse-geocoded for coordinates, or the geocoded match (\"City, Country\") for a typed city.'),
+  "temp": zod.number().describe('Current temperature in the requested units.'),
+  "feels": zod.number().describe('Current apparent (\"feels like\") temperature.'),
+  "code": zod.number().describe('Current WMO weather code.'),
+  "isDay": zod.boolean().describe('True when it is currently daytime at the location.'),
+  "high": zod.number().nullish().describe('Today\'s high temperature.'),
+  "low": zod.number().nullish().describe('Today\'s low temperature.'),
+  "forecast": zod.array(zod.object({
+  "date": zod.string().describe('Forecast date as YYYY-MM-DD (in the location\'s timezone).'),
+  "code": zod.number().describe('WMO weather code for the day\'s dominant conditions.'),
+  "high": zod.number().nullish().describe('Daily high temperature in the requested units.'),
+  "low": zod.number().nullish().describe('Daily low temperature in the requested units.')
+})).describe('Daily forecast entries in chronological order, starting with today.')
+})
+
+
+/**
  * @summary List saved service connection settings
  */
 export const GetConnectionsResponseItem = zod.object({
