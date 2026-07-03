@@ -5,7 +5,7 @@ import { httpClient } from "./http.js";
 // Airsonic, Gonic, etc.) and old enough that every modern server accepts it.
 const SUBSONIC_VERSION = "1.16.1";
 // Client identifier sent on every request (Subsonic requires a `c` param).
-const SUBSONIC_CLIENT = "homehub";
+const SUBSONIC_CLIENT = "tachboard";
 
 // Salted-token auth params for a single request. Subsonic's recommended auth is
 // token = md5(password + salt) with a fresh random salt, so the plaintext

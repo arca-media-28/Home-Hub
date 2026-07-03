@@ -24,12 +24,12 @@ structural knobs, and upload it back; it shows in the theme picker like a built-
 ## Where each piece lives (three mirrors — keep in sync)
 - `src/lib/customThemes.ts` — the tested pure spec (schema, validation, persistence,
   id gen, `customThemeMeta`, `serializeTemplate`, `shadeHex`).
-- `index.html` before-paint IIFE — `window.__homehubApplyTheme(theme, colors, customThemes)`
+- `index.html` before-paint IIFE — `window.__tachboardApplyTheme(theme, colors, customThemes)`
   now takes a 3rd arg. Custom branch sets colors via the SAME hexToHsl math, sets
   `--radius`/`--app-font-*`/outline+elevate vars inline, and sets data-* attributes
   (`data-shadow/-pattern/-uppercase/-heading`) on `<html data-theme="custom">`.
   `clearOverrides` wipes both built-in override vars AND the custom vars+attrs on every
-  switch so nothing leaks across themes. A `<link id="homehub-custom-font">` carries fontUrl.
+  switch so nothing leaks across themes. A `<link id="tachboard-custom-font">` carries fontUrl.
 - `src/index.css` — all structural variation for custom lives in
   `[data-theme="custom"][data-shadow=…]` / `[data-pattern=…] .bg-dot-pattern` /
   `[data-uppercase="off"] .uppercase` / `[data-heading="serif"] h1,h2,h3` rules.

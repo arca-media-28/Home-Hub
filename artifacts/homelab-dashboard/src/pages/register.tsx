@@ -45,7 +45,7 @@ export default function Register() {
             </h1>
           </div>
           <p className="text-sm text-muted-foreground">
-            Get started with HomeHub
+            Get started with Tachboard
           </p>
         </div>
 

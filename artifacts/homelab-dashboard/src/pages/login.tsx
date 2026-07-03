@@ -45,7 +45,7 @@ export default function Login() {
             </h1>
           </div>
           <p className="text-sm text-muted-foreground">
-            Sign in to HomeHub
+            Sign in to Tachboard
           </p>
         </div>
 

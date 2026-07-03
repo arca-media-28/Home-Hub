@@ -1,6 +1,6 @@
 # Local Development Guide
 
-This dashboard is a **self-hosted** app. Its API Server makes the real requests
+Tachboard is a **self-hosted** dashboard app. Its API Server makes the real requests
 to your homelab services (TrueNAS, Sonarr, Radarr, qBittorrent, Jellyfin, …).
 Those services live on LAN addresses (`192.168.x.x`, `10.x.x.x`, Tailscale /
 MagicDNS names) that **Replit's cloud cannot route to** — so on Replit every
@@ -44,8 +44,8 @@ Replit shell.)
 
 ### c. Clone onto the local box
 ```bash
-git clone <your-remote-url> homelab-dashboard
-cd homelab-dashboard
+git clone <your-remote-url> tachboard
+cd tachboard
 pnpm install
 ```
 

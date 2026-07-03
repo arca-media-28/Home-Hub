@@ -461,7 +461,7 @@
 /* ============================================================
  * CUSTOM (user-uploaded) themes. A custom theme sets data-theme="custom" plus a
  * fixed set of data-* attributes; all color/font/radius tokens are applied inline
- * by window.__homehubApplyTheme. These rules turn the validated, enumerated
+ * by window.__tachboardApplyTheme. These rules turn the validated, enumerated
  * structural knobs (shadow / backgroundPattern / uppercase / headingFont) into
  * real CSS WITHOUT ever consuming raw CSS from the uploaded file. Color-derived
  * tokens (--destructive, --chart-2..5) fall through to :root, which is fine.

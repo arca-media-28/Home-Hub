@@ -227,7 +227,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     const t = getThemeMeta(theme as ThemeId);
     const tpl = t.template;
     const template: ThemeTemplateFile = {
-      format: "homehub-theme",
+      format: "tachboard-theme",
       version: 1,
       name: t.name,
       dark: t.dark,

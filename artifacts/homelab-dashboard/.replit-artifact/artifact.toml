@@ -1,6 +1,6 @@
 kind = "web"
 previewPath = "/"
-title = "Homelab Dashboard"
+title = "Tachboard"
 version = "1.0.0"
 id = "artifacts/homelab-dashboard"
 router = "path"

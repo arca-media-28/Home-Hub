@@ -74,7 +74,7 @@ const svg = `<?xml version="1.0" encoding="UTF-8"?>
   <!-- wordmark -->
   <text x="${W / 2}" y="430" text-anchor="middle"
         font-family="DejaVu Sans" font-weight="bold" font-size="108"
-        letter-spacing="-2" fill="${WHITE}">HomeHub</text>
+        letter-spacing="-2" fill="${WHITE}">Tachboard</text>
 
   <!-- red accent divider -->
   <rect x="${W / 2 - 48}" y="468" width="96" height="6" rx="3" fill="${RED}"/>

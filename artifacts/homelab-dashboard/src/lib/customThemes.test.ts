@@ -33,7 +33,7 @@ function installLocalStorage() {
 }
 
 const validTemplate: ThemeTemplateFile = {
-  format: "homehub-theme",
+  format: "tachboard-theme",
   version: 1,
   name: "Midnight",
   dark: true,
@@ -110,6 +110,12 @@ describe("validateCustomTheme — rejection modes", () => {
   it("rejects the wrong format/version", () => {
     expectError({ ...validTemplate, format: "something-else" }, "format");
     expectError({ ...validTemplate, version: 2 }, "version");
+  });
+
+  it("accepts the legacy homehub-theme format marker and normalises it", () => {
+    const result = validateCustomTheme({ ...validTemplate, format: "homehub-theme" });
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value.format).toBe("tachboard-theme");
   });
 
   it("rejects a missing or empty name", () => {

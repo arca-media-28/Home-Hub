@@ -3,16 +3,16 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
-    <title>HomeHub</title>
-    <meta name="description" content="HomeHub — one calm dashboard for every service on your home network." />
+    <title>Tachboard</title>
+    <meta name="description" content="Tachboard — one calm dashboard for every service on your home network." />
     <meta name="robots" content="index, follow" />
-    <meta property="og:title" content="HomeHub" />
-    <meta property="og:description" content="HomeHub — one calm dashboard for every service on your home network." />
+    <meta property="og:title" content="Tachboard" />
+    <meta property="og:description" content="Tachboard — one calm dashboard for every service on your home network." />
     <meta property="og:type" content="website" />
     <meta property="og:image" content="/opengraph.jpg" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="HomeHub" />
-    <meta name="twitter:description" content="HomeHub — one calm dashboard for every service on your home network." />
+    <meta name="twitter:title" content="Tachboard" />
+    <meta name="twitter:description" content="Tachboard — one calm dashboard for every service on your home network." />
     <meta name="twitter:image" content="/opengraph.jpg" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -20,10 +20,12 @@
     <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Space+Grotesk:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=DM+Sans:wght@400;500;600;700&family=Outfit:wght@300;400;500;600;700&family=Nunito+Sans:wght@400;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script>
       /*
-       * Applies the saved HomeHub theme + per-theme custom color overrides
+       * Applies the saved Tachboard theme + per-theme custom color overrides
        * synchronously, before first paint, to avoid a flash of the wrong theme.
-       * Exposed as window.__homehubApplyTheme so the React layer reuses the exact
+       * Exposed as window.__tachboardApplyTheme so the React layer reuses the exact
        * same color-derivation math for live updates (single source of truth).
+       * The localStorage keys intentionally keep the legacy "homehub:" prefix so
+       * existing users' saved theme/colors survive the rebrand.
        */
       (function () {
         var THEME_KEY = "homehub:theme";
@@ -32,7 +34,7 @@
         var DEFAULT_THEME = "friction";
         var KNOWN = ["friction", "hearth", "nebula", "rack", "workshop", "pebble"];
         var CUSTOM_PREFIX = "custom:";
-        var CUSTOM_FONT_LINK_ID = "homehub-custom-font";
+        var CUSTOM_FONT_LINK_ID = "tachboard-custom-font";
 
         // Inline overrides we set / clear so re-applying never leaves stale vars.
         var OVERRIDE_VARS = [
@@ -178,7 +180,7 @@
           setCustomFont(def.fontUrl);
         }
 
-        window.__homehubApplyTheme = function (theme, colors, customThemes) {
+        window.__tachboardApplyTheme = function (theme, colors, customThemes) {
           var root = document.documentElement;
           clearOverrides(root);
           customThemes = customThemes || {};
@@ -208,7 +210,7 @@
           try { all = JSON.parse(localStorage.getItem(COLORS_KEY) || "{}") || {}; } catch (e) { all = {}; }
           var custom = {};
           try { custom = JSON.parse(localStorage.getItem(CUSTOM_THEMES_KEY) || "{}") || {}; } catch (e) { custom = {}; }
-          window.__homehubApplyTheme(theme, all[theme], custom);
+          window.__tachboardApplyTheme(theme, all[theme], custom);
         } catch (e) {
           document.documentElement.setAttribute("data-theme", DEFAULT_THEME);
         }

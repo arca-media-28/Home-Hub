@@ -1,5 +1,5 @@
-// HomeHub theme system. The actual color application (including custom-color
-// derivation) is implemented once as window.__homehubApplyTheme in index.html so
+// Tachboard theme system. The actual color application (including custom-color
+// derivation) is implemented once as window.__tachboardApplyTheme in index.html so
 // it can run before first paint. This module owns the theme metadata, the React
 // state, and persistence, and delegates the DOM work to that global.
 
@@ -153,6 +153,8 @@ export const THEMES: ThemeMeta[] = [
 ];
 
 export const DEFAULT_THEME: ThemeId = "friction";
+// localStorage keys intentionally keep the legacy "homehub:" prefix so existing
+// users' saved theme and color overrides survive the Tachboard rebrand.
 export const THEME_KEY = "homehub:theme";
 export const COLORS_KEY = "homehub:colors";
 
@@ -166,7 +168,7 @@ export type ColorOverrides = Partial<Record<ThemeId, CustomColors>>;
 
 declare global {
   interface Window {
-    __homehubApplyTheme?: (
+    __tachboardApplyTheme?: (
       theme: string,
       colors?: CustomColors,
       customThemes?: CustomThemeMap,
@@ -250,8 +252,8 @@ export function applyThemeToDom(
   colors?: CustomColors,
   customThemes?: CustomThemeMap,
 ): void {
-  if (typeof window !== "undefined" && window.__homehubApplyTheme) {
-    window.__homehubApplyTheme(theme, colors, customThemes);
+  if (typeof window !== "undefined" && window.__tachboardApplyTheme) {
+    window.__tachboardApplyTheme(theme, colors, customThemes);
   } else if (typeof document !== "undefined") {
     document.documentElement.setAttribute("data-theme", theme);
   }

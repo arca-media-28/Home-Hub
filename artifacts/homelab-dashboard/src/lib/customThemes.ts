@@ -3,13 +3,20 @@
 // validated JSON definition (colors + structural style only — never raw CSS) that
 // the theming engine turns into CSS variables + data-* attributes at runtime.
 //
-// The actual DOM application lives in window.__homehubApplyTheme (index.html) so it
+// The actual DOM application lives in window.__tachboardApplyTheme (index.html) so it
 // can run before first paint. This module owns the FORMAT, VALIDATION, PERSISTENCE,
 // EXPORT, and picker-preview derivation — all pure and unit-testable.
 
 import type { ThemeMeta } from "./theme";
 
+// localStorage key intentionally keeps the legacy "homehub:" prefix so existing
+// users' saved custom themes survive the Tachboard rebrand.
 export const CUSTOM_THEMES_KEY = "homehub:customThemes";
+
+/** Format discriminator written into newly exported theme files. */
+export const THEME_FILE_FORMAT = "tachboard-theme";
+/** Legacy discriminator from before the rebrand; still accepted on import. */
+export const LEGACY_THEME_FILE_FORMAT = "homehub-theme";
 
 /** Marker prefix for custom theme ids, so they never collide with built-ins. */
 export const CUSTOM_THEME_PREFIX = "custom:";
@@ -24,8 +31,12 @@ export type HeadingFont = (typeof HEADING_FONTS)[number];
 
 /** The on-disk template file format users download, edit, and upload. */
 export interface ThemeTemplateFile {
-  /** Fixed discriminator so we can recognise our own files. */
-  format: "homehub-theme";
+  /**
+   * Fixed discriminator so we can recognise our own files. New exports always
+   * use "tachboard-theme"; "homehub-theme" is the pre-rebrand marker and is
+   * still accepted (and normalised) on import.
+   */
+  format: "tachboard-theme" | "homehub-theme";
   version: 1;
   /** Human-readable name shown in the theme picker. */
   name: string;
@@ -102,8 +113,8 @@ export function validateCustomTheme(raw: unknown): ValidationResult {
     return { ok: false, error: "Theme file must be a JSON object." };
   }
 
-  if (raw.format !== "homehub-theme") {
-    return { ok: false, error: 'Not a HomeHub theme file (missing format: "homehub-theme").' };
+  if (raw.format !== THEME_FILE_FORMAT && raw.format !== LEGACY_THEME_FILE_FORMAT) {
+    return { ok: false, error: 'Not a Tachboard theme file (missing format: "tachboard-theme").' };
   }
   if (raw.version !== 1) {
     return { ok: false, error: "Unsupported theme version (expected version 1)." };
@@ -215,7 +226,7 @@ export function validateCustomTheme(raw: unknown): ValidationResult {
   }
 
   const value: ThemeTemplateFile = {
-    format: "homehub-theme",
+    format: THEME_FILE_FORMAT,
     version: 1,
     name,
     dark: raw.dark,
@@ -322,7 +333,7 @@ export function customThemeMeta(def: CustomThemeDefinition): ThemeMeta {
 export function serializeTemplate(template: ThemeTemplateFile): string {
   // Stable key order so a downloaded file reads predictably top-to-bottom.
   const ordered: ThemeTemplateFile = {
-    format: "homehub-theme",
+    format: THEME_FILE_FORMAT,
     version: 1,
     name: template.name,
     dark: template.dark,
