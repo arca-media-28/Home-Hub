@@ -52,3 +52,24 @@ sensor → null/[]. Both additive (never 502). Surfaced as a dedicated tile metr
 amber /≥85 red) — auto-appears in the picker via TRUENAS_METRIC_VARIANTS, but
 still needs the `cputemp` literal added to pickTileSettings whitelist, the
 tiles.ts local TileSettings union, and the openapi truenasMetric enum.
+
+**Newer SCALE (25.x, e.g. box sapientia.coruh.online): disk temps need the
+disktemp graph BY IDENTIFIER.** On this middleware version three things break at
+once and all degrade to "--": (1) `POST /disk/temperatures` returns **400**
+"attributes are not expected: names, powermode" (the `{names,powermode}` body is
+rejected outright); (2) a NAME-ONLY `{name:"disktemp"}` reporting request returns
+NO graph at all — this version's disktemp is PER-IDENTIFIER; (3) `GET
+/smart/test/results` returns **404** (left to degrade to null). `cputemp`
+reporting still WORKS here (proven), so the reliable disk-temp source is the
+disktemp graph requested per identifier. `/reporting/graphs` lists the disktemp
+`identifiers` as full strings like `"sdk | Type: HDD | Model: ST20000NM004E-3H |
+Serial: ZX213D0Z"`; the disk NAME is the first `|`-separated token ("sdk"). Fix
+(additive, best-effort, only runs when identifiers exist AND some disk temp is
+still missing): after the graphs call resolves, POST
+`get_data {graphs: ids.map(identifier=>({name:"disktemp",identifier}))}` (same
+past-ending window), then for each ECHOED-back entry map `identifier`→name and
+take the max positive non-"time" value (single value column beside "time",
+whatever its label). Merge precedence: /disk/temperatures → name-only disktemp
+graph (old boxes) → identifier disktemp (new boxes). A blank CPU-temp tile on a
+box where cputemp reporting works ⇒ user's local Docker build is STALE, not a
+code bug — advise `git pull && docker compose up -d --build`.

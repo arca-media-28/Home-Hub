@@ -572,6 +572,53 @@ function parseTruenasDiskTempGraph(reportData: unknown): Map<string, number> {
   return byDisk;
 }
 
+// Parse the disk device name out of a TrueNAS reporting `disktemp` identifier.
+// The reporting/graphs list exposes identifiers like
+// "sdk | Type: HDD | Model: ST20000NM004E-3H | Serial: ZX213D0Z" — the device
+// name is the first "|"-separated token. Newer SCALE versions only return
+// disktemp data when the graph is requested PER identifier (a name-only request
+// yields an empty graph), and the response is keyed by these identifiers.
+function diskNameFromDiskTempIdentifier(identifier: string): string {
+  return identifier.split("|")[0]?.trim() || identifier.trim();
+}
+
+// The disktemp identifiers this SCALE version exposes (one per disk), read from a
+// GET /reporting/graphs payload. Empty when the graph is absent or carries no
+// identifiers (older versions that accept a name-only disktemp request).
+function diskTempIdentifiersFrom(graphsData: unknown): string[] {
+  const graphs = (graphsData ?? []) as Array<{ name?: string; identifiers?: unknown }>;
+  const dt = graphs.find((g) => g.name === "disktemp");
+  const ids = dt?.identifiers;
+  if (!Array.isArray(ids)) return [];
+  return ids.filter((id): id is string => typeof id === "string");
+}
+
+// Build a `name → temperature(°C)` map from an IDENTIFIER-scoped `disktemp`
+// reporting response — one graph entry per requested disk identifier, each with
+// a single value column beside "time". The disk name comes from the echoed
+// identifier. This is the reliable disk-temperature source on newer SCALE boxes
+// where POST /disk/temperatures 400s and a name-only disktemp request is empty.
+// Best-effort: absent/non-positive readings are skipped (→ unknown).
+function parseTruenasDiskTempByIdentifier(reportData: unknown): Map<string, number> {
+  const byDisk = new Map<string, number>();
+  const graphs = (reportData ?? []) as Array<{ name?: string; identifier?: string }>;
+  for (const graph of graphs) {
+    if (graph.name !== "disktemp" || typeof graph.identifier !== "string") continue;
+    const name = diskNameFromDiskTempIdentifier(graph.identifier);
+    if (!name) continue;
+    const latest = latestByLegend(graph);
+    let temp: number | null = null;
+    for (const [key, value] of Object.entries(latest)) {
+      if (key === "time") continue;
+      if (Number.isFinite(value) && value > 0) {
+        temp = temp == null ? value : Math.max(temp, value);
+      }
+    }
+    if (temp != null) byDisk.set(name, Number(temp.toFixed(1)));
+  }
+  return byDisk;
+}
+
 // Reduce a TrueNAS `cputemp` reporting graph into a current CPU temperature. The
 // graph reports one column per core (legend like `["time","cpu0","cpu1",…]`) in
 // °C — there is no single "package" column — so the headline value is the
@@ -857,6 +904,44 @@ router.get("/truenas", requireAuth, async (_req, res) => {
       "TrueNAS widget: cputemp/disktemp reporting call failed (CPU/disk temperatures unavailable)",
     );
   }
+
+  // If disk temperatures are STILL missing (the dedicated POST /disk/temperatures
+  // 400s on newer SCALE — "attributes are not expected: names, powermode" — and a
+  // name-only disktemp reporting request returns nothing when the graph is
+  // per-identifier), fetch the disktemp graph explicitly BY identifier. The
+  // identifiers come from the reporting/graphs list already fetched above, and the
+  // reporting mechanism that powers cputemp works reliably here. Best-effort: a
+  // rejection or empty result just leaves temperatures unknown ("--").
+  const diskTempIds =
+    graphsResult.status === "fulfilled" ? diskTempIdentifiersFrom(graphsResult.value.data) : [];
+  const missingDiskTemps = diskNames.some((n) => !tempByDisk.has(n));
+  if (diskTempIds.length > 0 && missingDiskTemps) {
+    const diskTempBody = {
+      graphs: diskTempIds.map((identifier) => ({ name: "disktemp", identifier })),
+      query: reportingQuery,
+    };
+    try {
+      const dtRes = await httpClient.post(
+        `${baseUrl}/api/v2.0/reporting/get_data`,
+        diskTempBody,
+        { headers },
+      );
+      const byId = parseTruenasDiskTempByIdentifier(dtRes.data);
+      for (const [name, temp] of byId) {
+        if (!tempByDisk.has(name)) tempByDisk.set(name, temp);
+      }
+    } catch (err) {
+      logger.error(
+        {
+          reason: normalizeHttpError(err),
+          detail: describeHttpError(err),
+          request: diskTempBody,
+        },
+        "TrueNAS widget: disktemp-by-identifier reporting call failed (disk temperatures unavailable)",
+      );
+    }
+  }
+
   const disks = parseTruenasDisks(diskData, smartData, tempByDisk);
 
   // Network + ARC extras: additive. They ride a SEPARATE reporting call so a

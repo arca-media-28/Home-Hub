@@ -535,6 +535,59 @@ describe("GET /widgets/truenas", () => {
     ]);
   });
 
+  it("fetches disk temperatures BY identifier when the endpoint 400s and the name-only graph is empty (newer SCALE)", async () => {
+    findByService.mockReturnValue(
+      connRow({ service: "truenas", url: "https://nas.local", api_key: "key" }),
+    );
+    mockTruenasReporting({
+      core: [{ name: "cpu", legend: ["time", "idle"], data: [[1000, 80]] }],
+      // Newer SCALE rejects the dedicated endpoint outright...
+      diskTempsError: Object.assign(new Error("400"), {
+        response: { status: 400, data: "attributes are not expected: names, powermode" },
+      }),
+      // ...and a name-only disktemp reporting request returns nothing.
+      cpuDiskTemp: [{ name: "cputemp", legend: ["time", "cpu0"], data: [[1000, 61]] }],
+      // The identifier-scoped disktemp call is the reliable source. Each entry
+      // echoes its identifier and carries one value column beside "time".
+      diskTempById: [
+        {
+          name: "disktemp",
+          identifier: "sda | Type: HDD | Model: X | Serial: A1",
+          legend: ["time", "temperature"],
+          data: [[1000, 36]],
+        },
+        {
+          name: "disktemp",
+          identifier: "sdb | Type: SSD | Model: Y | Serial: B2",
+          legend: ["time", "temperature"],
+          data: [[1000, 44]],
+        },
+      ],
+    });
+    mockTruenasGets({
+      pool: [],
+      disk: [{ name: "sda" }, { name: "sdb" }],
+      // reporting/graphs advertises the per-disk disktemp identifiers.
+      graphs: [
+        {
+          name: "disktemp",
+          identifiers: [
+            "sda | Type: HDD | Model: X | Serial: A1",
+            "sdb | Type: SSD | Model: Y | Serial: B2",
+          ],
+        },
+      ],
+      smart: [],
+    });
+
+    const res = await request(app).get("/widgets/truenas");
+    expect(res.status).toBe(200);
+    expect(res.body.disks).toEqual([
+      { name: "sda", temperatureC: 36, smartPassed: null },
+      { name: "sdb", temperatureC: 44, smartPassed: null },
+    ]);
+  });
+
   it("coerces numeric-string and nested-object disk temperature shapes", async () => {
     findByService.mockReturnValue(
       connRow({ service: "truenas", url: "https://nas.local", api_key: "key" }),
@@ -596,21 +649,33 @@ describe("GET /widgets/truenas", () => {
     cpuDiskTempError?: Error;
     diskTemps?: unknown;
     diskTempsError?: Error;
+    diskTempById?: unknown;
+    diskTempByIdError?: Error;
   }) {
-    httpPost.mockImplementation((url: string, body: { graphs?: Array<{ name?: string }> }) => {
-      // The dedicated disk-temperature endpoint is a POST too (no `graphs` body).
-      if (url.endsWith("/api/v2.0/disk/temperatures")) {
-        return opts.diskTempsError
-          ? Promise.reject(opts.diskTempsError)
-          : Promise.resolve({ data: opts.diskTemps ?? {} });
-      }
-      const names = (body.graphs ?? []).map((g) => g.name);
-      // cputemp/disktemp ride their own isolated POST (see widgets.ts).
-      if (names.includes("cputemp") || names.includes("disktemp")) {
-        return opts.cpuDiskTempError
-          ? Promise.reject(opts.cpuDiskTempError)
-          : Promise.resolve({ data: opts.cpuDiskTemp ?? [] });
-      }
+    httpPost.mockImplementation(
+      (url: string, body: { graphs?: Array<{ name?: string; identifier?: string }> }) => {
+        // The dedicated disk-temperature endpoint is a POST too (no `graphs` body).
+        if (url.endsWith("/api/v2.0/disk/temperatures")) {
+          return opts.diskTempsError
+            ? Promise.reject(opts.diskTempsError)
+            : Promise.resolve({ data: opts.diskTemps ?? {} });
+        }
+        const graphs = body.graphs ?? [];
+        const names = graphs.map((g) => g.name);
+        // The identifier-scoped disktemp fallback: every graph is disktemp AND
+        // carries an identifier. Route it apart from the name-only cputemp/disktemp
+        // call so a test can assert the two independently.
+        if (graphs.length > 0 && graphs.every((g) => g.name === "disktemp" && g.identifier)) {
+          return opts.diskTempByIdError
+            ? Promise.reject(opts.diskTempByIdError)
+            : Promise.resolve({ data: opts.diskTempById ?? [] });
+        }
+        // cputemp/disktemp (name-only) ride their own isolated POST (see widgets.ts).
+        if (names.includes("cputemp") || names.includes("disktemp")) {
+          return opts.cpuDiskTempError
+            ? Promise.reject(opts.cpuDiskTempError)
+            : Promise.resolve({ data: opts.cpuDiskTemp ?? [] });
+        }
       if (names.some((n) => ARC_HIT_NAMES.includes(n ?? ""))) {
         return opts.arcHitError ? Promise.reject(opts.arcHitError) : Promise.resolve({ data: opts.arcHit ?? [] });
       }
