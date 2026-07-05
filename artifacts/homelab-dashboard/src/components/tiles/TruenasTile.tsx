@@ -110,7 +110,7 @@ export default function TruenasTile({ enabled, density, tileSettings }: WidgetPr
   // Otherwise fall through to the combined multi-section view below.
   switch (tileSettings?.truenasMetric) {
     case "cpuram":
-      return <CpuRamView data={data} density={density} />;
+      return <CpuRamView data={data} density={density} enabled={enabled} />;
     case "network":
       return <NetworkView data={data} density={density} />;
     case "arc":

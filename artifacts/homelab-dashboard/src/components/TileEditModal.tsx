@@ -2158,6 +2158,34 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
             </div>
           )}
 
+          {isTruenas && truenasMetric === "cpuram" && (
+            <div className="space-y-2 border-t border-border pt-4">
+              <Label>Gauges shown</Label>
+              <p className="text-xs text-muted-foreground">
+                Turn either off to show just CPU usage or just RAM usage.
+              </p>
+              <div className="space-y-2 pt-1">
+                {[
+                  { key: "cpu", label: "CPU usage" },
+                  { key: "ram", label: "RAM usage" },
+                ].map((m) => (
+                  <label
+                    key={m.key}
+                    htmlFor={`truenas-cpuram-${m.key}`}
+                    className="flex items-center gap-2 cursor-pointer select-none"
+                  >
+                    <Checkbox
+                      id={`truenas-cpuram-${m.key}`}
+                      checked={enabledKeys.has(m.key)}
+                      onCheckedChange={(c) => toggleMetric(m.key, c === true)}
+                    />
+                    <span className="text-sm">{m.label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+
           {isTruenas && truenasMetric === "cputemp" && (
             <div className="space-y-2 border-t border-border pt-4">
               <Label>CPU temperature display</Label>

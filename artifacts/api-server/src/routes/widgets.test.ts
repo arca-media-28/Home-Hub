@@ -62,7 +62,7 @@ vi.mock("../lib/http.js", () => ({
 
 // Keep the logger quiet during tests.
 vi.mock("../lib/logger.js", () => ({
-  logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn() },
+  logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
 }));
 
 // Imported after the mocks are registered (vi.mock is hoisted above imports).

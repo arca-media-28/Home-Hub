@@ -1035,7 +1035,8 @@ router.get("/truenas", requireAuth, async (_req, res) => {
   // all graphs.
   const mergedGraphs: unknown[] = [];
   if (coreExtras.status === "fulfilled") {
-    mergedGraphs.push(...((coreExtras.value.data ?? []) as unknown[]));
+    const d = coreExtras.value.data;
+    if (Array.isArray(d)) mergedGraphs.push(...(d as unknown[]));
   } else {
     logger.error(
       {
@@ -1050,7 +1051,8 @@ router.get("/truenas", requireAuth, async (_req, res) => {
   arcHitResults.forEach((result, i) => {
     const { name, body } = arcHitBodies[i]!;
     if (result.status === "fulfilled") {
-      mergedGraphs.push(...((result.value.data ?? []) as unknown[]));
+      const d = result.value.data;
+      if (Array.isArray(d)) mergedGraphs.push(...(d as unknown[]));
     } else {
       arcHitFailures.push(`${name}: ${normalizeHttpError(result.reason)}`);
       logger.debug(

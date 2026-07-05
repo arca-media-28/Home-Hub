@@ -195,32 +195,54 @@ function formatBytes(bytes: number): string {
 export function CpuRamView({
   data,
   density,
+  enabled,
 }: {
   data: TruenasMetrics;
   density: TileDensity;
+  // Which of the two gauges to show. Driven by the tile's `cpu`/`ram` metric
+  // toggles so the variant can display just CPU, just RAM, or both. Undefined
+  // (older tiles) shows both.
+  enabled?: Set<string>;
 }) {
   const memPct =
     data.memTotalGb > 0 ? (data.memUsedGb / data.memTotalGb) * 100 : 0;
-  // Size the gauges to the smaller of half-width / available height so two sit
-  // side by side without overflowing; cap so they stay tidy on huge tiles.
+  const showCpu = enabled ? enabled.has("cpu") : true;
+  const showRam = enabled ? enabled.has("ram") : true;
+  const count = (showCpu ? 1 : 0) + (showRam ? 1 : 0);
+
+  if (count === 0) {
+    return (
+      <div className="flex h-full w-full items-center justify-center p-3 text-center text-xs text-muted-foreground">
+        Enable CPU or RAM in this tile's settings.
+      </div>
+    );
+  }
+
+  // With both gauges the width is split in half; a lone gauge gets the full
+  // width and can grow larger. Cap so they stay tidy on huge tiles.
+  const widthBudget = count === 2 ? density.bodyWidth / 2 - 24 : density.bodyWidth - 32;
   const gaugeSize = Math.max(
     72,
-    Math.min(180, Math.floor(Math.min(density.bodyWidth / 2 - 24, density.bodyHeight - 56))),
+    Math.min(count === 2 ? 180 : 220, Math.floor(Math.min(widthBudget, density.bodyHeight - 56))),
   );
   return (
     <div className="flex h-full w-full items-center justify-center gap-6 p-3">
-      <Gauge
-        value={data.cpuPercent}
-        size={gaugeSize}
-        label="CPU"
-        caption={`${data.cpuPercent.toFixed(0)}% load`}
-      />
-      <Gauge
-        value={memPct}
-        size={gaugeSize}
-        label="RAM"
-        caption={`${data.memUsedGb.toFixed(1)} / ${data.memTotalGb.toFixed(1)} GB`}
-      />
+      {showCpu && (
+        <Gauge
+          value={data.cpuPercent}
+          size={gaugeSize}
+          label="CPU"
+          caption={`${data.cpuPercent.toFixed(0)}% load`}
+        />
+      )}
+      {showRam && (
+        <Gauge
+          value={memPct}
+          size={gaugeSize}
+          label="RAM"
+          caption={`${data.memUsedGb.toFixed(1)} / ${data.memTotalGb.toFixed(1)} GB`}
+        />
+      )}
     </div>
   );
 }
