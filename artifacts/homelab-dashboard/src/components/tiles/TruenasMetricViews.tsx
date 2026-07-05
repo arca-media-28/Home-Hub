@@ -513,7 +513,13 @@ function TempGauge({
 
 // Dedicated live CPU-temperature view: a large temperature gauge showing the
 // hottest core, plus a compact per-core readout when multiple cores report.
-export function CpuTempView({ data }: { data: TruenasMetrics }) {
+export function CpuTempView({
+  data,
+  showCores = true,
+}: {
+  data: TruenasMetrics;
+  showCores?: boolean;
+}) {
   const tempC = data.cpuTempC;
   const cores = data.cpuTempCoresC ?? [];
   if (tempC == null) {
@@ -527,7 +533,7 @@ export function CpuTempView({ data }: { data: TruenasMetrics }) {
   return (
     <div className="flex h-full w-full flex-col items-center justify-center gap-3 p-3">
       <TempGauge tempC={tempC} size={132} label="CPU Temp" />
-      {cores.length > 1 && (
+      {showCores && cores.length > 1 && (
         <div className="flex w-full flex-wrap items-center justify-center gap-1.5">
           {cores.map((core, i) => (
             <span

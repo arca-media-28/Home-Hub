@@ -305,6 +305,11 @@ export type TileSettings = {
      */
   truenasMetric?: 'cpuram' | 'network' | 'arc' | 'pools' | 'disks' | 'cputemp' | null;
   /**
+     * When true (or absent, the default), the dedicated CPU-temperature TrueNAS tile shows the per-core temperature readout beneath the gauge. Set false for a simpler tile with just the headline gauge.
+     * @nullable
+     */
+  truenasShowCpuCores?: boolean | null;
+  /**
      * Allow-list of TrueNAS ZFS pool (volume) names to show on the tile. Applies to both the dedicated ZFS Pools view and the pools section of the combined view. Null, absent, or empty means show all pools (the default, backward-compatible behavior).
      * @nullable
      */

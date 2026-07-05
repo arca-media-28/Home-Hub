@@ -126,7 +126,12 @@ export default function TruenasTile({ enabled, density, tileSettings }: WidgetPr
     case "disks":
       return <DisksView data={data} />;
     case "cputemp":
-      return <CpuTempView data={data} />;
+      return (
+        <CpuTempView
+          data={data}
+          showCores={tileSettings?.truenasShowCpuCores !== false}
+        />
+      );
   }
 
   const memPct = data.memTotalGb > 0 ? (data.memUsedGb / data.memTotalGb) * 100 : 0;

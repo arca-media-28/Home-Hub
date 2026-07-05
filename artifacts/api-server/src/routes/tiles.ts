@@ -101,6 +101,7 @@ interface TileSettings {
   bonsaiBlossom?: string | null;
   bonsaiStyle?: string | null;
   truenasMetric?: "cpuram" | "network" | "arc" | "pools" | "disks" | "cputemp" | null;
+  truenasShowCpuCores?: boolean | null;
   truenasPools?: string[] | null;
   truenasPoolOrder?: string[] | null;
 }
@@ -354,6 +355,11 @@ function pickTileSettings(obj: Record<string, unknown>): TileSettings {
     result.truenasMetric = obj["truenasMetric"];
   } else if (obj["truenasMetric"] === null) {
     result.truenasMetric = null;
+  }
+  if (typeof obj["truenasShowCpuCores"] === "boolean") {
+    result.truenasShowCpuCores = obj["truenasShowCpuCores"];
+  } else if (obj["truenasShowCpuCores"] === null) {
+    result.truenasShowCpuCores = null;
   }
   if (Array.isArray(obj["truenasPools"])) {
     result.truenasPools = obj["truenasPools"].filter(

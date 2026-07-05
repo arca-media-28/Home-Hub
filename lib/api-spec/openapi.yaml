@@ -2225,6 +2225,12 @@ components:
             multi-section view (the default, backward-compatible behavior).
           type: ["string", "null"]
           enum: ["cpuram", "network", "arc", "pools", "disks", "cputemp", null]
+        truenasShowCpuCores:
+          description: >-
+            When true (or absent, the default), the dedicated CPU-temperature
+            TrueNAS tile shows the per-core temperature readout beneath the
+            gauge. Set false for a simpler tile with just the headline gauge.
+          type: ["boolean", "null"]
         truenasPools:
           description: >-
             Allow-list of TrueNAS ZFS pool (volume) names to show on the tile.

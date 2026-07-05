@@ -258,6 +258,12 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
   const [truenasMetric, setTruenasMetric] = useState<
     NonNullable<TileSettings>["truenasMetric"]
   >(tile?.tileSettings?.truenasMetric ?? null);
+  // Whether the dedicated CPU-temperature tile shows the per-core readout under
+  // the gauge. Absent defaults to true (backward-compatible); false = a simpler
+  // gauge-only tile.
+  const [truenasShowCpuCores, setTruenasShowCpuCores] = useState<boolean>(
+    tile?.tileSettings?.truenasShowCpuCores !== false,
+  );
   // TrueNAS volume (ZFS pool) allow-list. null/empty = "show all volumes"; an
   // explicit array narrows both the dedicated ZFS Pools view and the pools
   // section of the combined view to those volumes.
@@ -526,6 +532,7 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
       setHideTitle(tile?.hideTitle ?? false);
       setMetrics(tile?.metrics ?? null);
       setTruenasMetric(tile?.tileSettings?.truenasMetric ?? null);
+      setTruenasShowCpuCores(tile?.tileSettings?.truenasShowCpuCores !== false);
       setTruenasPools(tile?.tileSettings?.truenasPools ?? null);
       setTruenasPoolOrder(tile?.tileSettings?.truenasPoolOrder ?? null);
       setCategoryFilter(tile?.tileSettings?.categoryFilter ?? null);
@@ -1273,7 +1280,7 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
       // is merged in below regardless of integration.
       tileSettings: (() => {
         const widget = isTruenas
-          ? { truenasMetric, truenasPools, truenasPoolOrder }
+          ? { truenasMetric, truenasShowCpuCores, truenasPools, truenasPoolOrder }
           : isQbittorrent
           ? { categoryFilter, groupByCategory }
           : isClock
@@ -2148,6 +2155,26 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
                   )}
                 </div>
               )}
+            </div>
+          )}
+
+          {isTruenas && truenasMetric === "cputemp" && (
+            <div className="space-y-2 border-t border-border pt-4">
+              <Label>CPU temperature display</Label>
+              <label
+                htmlFor="truenas-show-cpu-cores"
+                className="flex items-center gap-2 cursor-pointer select-none pt-1"
+              >
+                <Checkbox
+                  id="truenas-show-cpu-cores"
+                  checked={truenasShowCpuCores}
+                  onCheckedChange={(c) => setTruenasShowCpuCores(c === true)}
+                />
+                <span className="text-sm">Show per-core temperatures</span>
+              </label>
+              <p className="text-xs text-muted-foreground">
+                Turn off for a simpler tile with just the main gauge.
+              </p>
             </div>
           )}
 
