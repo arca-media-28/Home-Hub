@@ -384,14 +384,27 @@ function downsample(series: number[], max = 30): number[] {
 // Unit assumptions (the same Netdata-based backend that serves CPU/RAM):
 //  - interface throughput is in kilobits/sec → megabits/sec is value / 1000.
 //  - arcsize is in bytes → gigabytes is value / 1e9 (matching the memory graph).
-//  - ARC hit ratio comes from one of the legacy aggregate graphs the get_data
-//    endpoint still accepts (arcactualrate / arcrate / arcresult). The per-demand
-//    percentage graphs that /reporting/graphs advertises (demanddatahitpercentage
-//    et al.) are REJECTED by get_data with HTTP 422 — and a single invalid graph
-//    name 422s the whole batch, which previously took the network + ARC size
-//    numbers down with it. The hit graph either exposes a direct percentage
-//    dimension or hits/misses rates we turn into a percentage.
-const ARC_HIT_GRAPHS = ["arcresult", "arcrate", "arcactualrate"];
+//  - ARC hit ratio is VERSION-DEPENDENT and the two working forms are mutually
+//    exclusive across SCALE releases, so BOTH must be offered:
+//      • Older boxes: get_data accepts the legacy aggregate graphs
+//        (arcresult / arcrate / arcactualrate) even though /reporting/graphs does
+//        NOT list them, and REJECTS the demand* percentage graphs with HTTP 422.
+//      • Newer boxes (SCALE 25.x): the legacy names are GONE — get_data throws
+//        HTTP 500 `KeyError: 'arcresult'` — and the real hit ratio lives in the
+//        demand* percentage graphs (demanddatahitpercentage, vertical_label
+//        "hit%") that /reporting/graphs advertises.
+//    Because one invalid name fails the WHOLE get_data batch, each candidate must
+//    be requested in its OWN call (see the route) and the first that returns data
+//    wins. The hit graph either exposes a direct percentage dimension, a
+//    percentage-style graph whose sole column IS the hit %, or hits/misses rates
+//    we turn into a percentage.
+const ARC_HIT_GRAPHS = [
+  "arcresult",
+  "arcrate",
+  "arcactualrate",
+  "demanddatahitpercentage",
+  "demandmetadatahitpercentage",
+];
 function parseTruenasNetArc(reportData: unknown): {
   netInMbps: number | null;
   netOutMbps: number | null;
@@ -435,6 +448,7 @@ function parseTruenasNetArc(reportData: unknown): {
   const hitKeys = ["hits", "hit", "cache_hits", "arc_hits", "demand_data_hits"];
   const missKeys = ["misses", "miss", "cache_misses", "arc_misses", "demand_data_misses"];
   const arcHitFrom = (graph: unknown): { ratio: number | null; series: number[] } => {
+    const g = graph as { name?: string; legend?: string[] } | undefined;
     const latest = latestByLegend(graph);
     const directPct = pickLegendValue(latest, pctKeys);
     if (directPct != null) {
@@ -442,6 +456,20 @@ function parseTruenasNetArc(reportData: unknown): {
         ratio: clampPct(directPct),
         series: downsample(seriesByLegend(graph, pctKeys).map(clampPct)),
       };
+    }
+    // Percentage-style graph (e.g. SCALE 25.x `demanddatahitpercentage`, vertical
+    // label "hit%") whose sole data column ISN'T a recognised pct key. The graph
+    // has exactly one numeric column beside "time" and it already IS the hit %,
+    // so read it directly by name rather than by legend key.
+    if (/percent/i.test(g?.name ?? "")) {
+      const valueKeys = (g?.legend ?? []).filter((k) => k !== "time");
+      const pct = pickLegendValue(latest, valueKeys);
+      if (pct != null) {
+        return {
+          ratio: clampPct(pct),
+          series: downsample(seriesByLegend(graph, valueKeys).map(clampPct)),
+        };
+      }
     }
     // Derive a percentage from hit/miss rates (latest value and per-sample).
     let ratio: number | null = null;
@@ -916,9 +944,15 @@ router.get("/truenas", requireAuth, async (_req, res) => {
     graphsResult.status === "fulfilled" ? diskTempIdentifiersFrom(graphsResult.value.data) : [];
   const missingDiskTemps = diskNames.some((n) => !tempByDisk.has(n));
   if (diskTempIds.length > 0 && missingDiskTemps) {
+    // Disk temperatures are sampled far less often than CPU temp (minutes, not
+    // seconds), so the short cpu/mem window (now-90s … now-30s) frequently holds
+    // ZERO disktemp samples → an empty graph → no reading. Aggregate a wider
+    // window so a recent sample is always captured; the mean of a slow-moving
+    // temperature over the hour is effectively the current value.
+    const diskTempQuery = { start: nowSec - 3600, end: nowSec - 30, aggregate: true };
     const diskTempBody = {
       graphs: diskTempIds.map((identifier) => ({ name: "disktemp", identifier })),
-      query: reportingQuery,
+      query: diskTempQuery,
     };
     try {
       const dtRes = await httpClient.post(
@@ -981,15 +1015,24 @@ router.get("/truenas", requireAuth, async (_req, res) => {
     ],
     query: extrasQuery,
   };
-  const arcHitBody = {
-    graphs: ARC_HIT_GRAPHS.map((name) => ({ name })),
-    query: extrasQuery,
-  };
-  const [coreExtras, arcHitExtras] = await Promise.allSettled([
+  // Each ARC-hit candidate rides its OWN call: the accepted set differs by SCALE
+  // version (legacy arc* vs demand* percentage graphs) and get_data fails the
+  // ENTIRE batch on any single unknown name (HTTP 422 on older boxes, HTTP 500
+  // `KeyError` on newer ones). Isolating them means the working candidate always
+  // gets through regardless of which others the box rejects. The parser then picks
+  // the first candidate (in ARC_HIT_GRAPHS priority order) that returned data.
+  const arcHitBodies = ARC_HIT_GRAPHS.map((name) => ({
+    name,
+    body: { graphs: [{ name }], query: extrasQuery },
+  }));
+  const [coreExtras, ...arcHitResults] = await Promise.allSettled([
     httpClient.post(`${baseUrl}/api/v2.0/reporting/get_data`, coreExtrasBody, { headers }),
-    httpClient.post(`${baseUrl}/api/v2.0/reporting/get_data`, arcHitBody, { headers }),
+    ...arcHitBodies.map(({ body }) =>
+      httpClient.post(`${baseUrl}/api/v2.0/reporting/get_data`, body, { headers }),
+    ),
   ]);
-  // Merge both responses before parsing so a single parser pass sees every graph.
+  // Merge every successful response before parsing so a single parser pass sees
+  // all graphs.
   const mergedGraphs: unknown[] = [];
   if (coreExtras.status === "fulfilled") {
     mergedGraphs.push(...((coreExtras.value.data ?? []) as unknown[]));
@@ -1003,16 +1046,25 @@ router.get("/truenas", requireAuth, async (_req, res) => {
       "TrueNAS widget: network/ARC-size reporting call failed (interface + arcsize unavailable)",
     );
   }
-  if (arcHitExtras.status === "fulfilled") {
-    mergedGraphs.push(...((arcHitExtras.value.data ?? []) as unknown[]));
-  } else {
+  const arcHitFailures: string[] = [];
+  arcHitResults.forEach((result, i) => {
+    const { name, body } = arcHitBodies[i]!;
+    if (result.status === "fulfilled") {
+      mergedGraphs.push(...((result.value.data ?? []) as unknown[]));
+    } else {
+      arcHitFailures.push(`${name}: ${normalizeHttpError(result.reason)}`);
+      logger.debug(
+        { reason: describeHttpError(result.reason), request: body },
+        `TrueNAS widget: ARC hit-ratio candidate "${name}" rejected (trying others)`,
+      );
+    }
+  });
+  // Only a concern if EVERY candidate failed — otherwise a rejected legacy/demand
+  // name is expected on this SCALE version and not worth alarming about.
+  if (arcHitFailures.length === ARC_HIT_GRAPHS.length) {
     logger.error(
-      {
-        reason: normalizeHttpError(arcHitExtras.reason),
-        detail: describeHttpError(arcHitExtras.reason),
-        request: arcHitBody,
-      },
-      "TrueNAS widget: ARC hit-ratio reporting call failed (hit ratio unavailable)",
+      { failures: arcHitFailures },
+      "TrueNAS widget: all ARC hit-ratio candidates failed (hit ratio unavailable)",
     );
   }
   netArc = parseTruenasNetArc(mergedGraphs);
@@ -1168,13 +1220,15 @@ router.get("/truenas/diagnostics", requireAuth, async (_req, res) => {
   const coreExtrasLabel = `extras core (interface ${
     ifaceId ? `[${ifaceId}]` : "— no physical NIC resolved, sent without identifier"
   }, arcsize), non-aggregated series — the form the widget uses`;
-  const arcHitBody = {
-    graphs: ARC_HIT_GRAPHS.map((name) => ({ name })),
-    query: extrasQuery,
-  };
-  const arcHitLabel = `extras ARC hit ratio (${ARC_HIT_GRAPHS.join(
-    "/",
-  )}), non-aggregated series — the form the widget uses`;
+  // ARC hit-ratio candidates are probed ONE PER CALL — exactly as the widget now
+  // issues them — because the accepted set is version-specific (legacy arc* vs
+  // demand* percentage graphs) and any single unknown name fails a whole batch
+  // (422 on older boxes, 500 KeyError on newer). Per-name probes reveal precisely
+  // which candidate this box accepts and the legend of the one that works.
+  const arcHitProbes = ARC_HIT_GRAPHS.map((name) => ({
+    label: `extras ARC hit ratio candidate "${name}", non-aggregated series — isolated call (the form the widget uses)`,
+    body: { graphs: [{ name }], query: extrasQuery },
+  }));
   // Temperature probe (cputemp + disktemp), aggregated short window — the form the
   // widget uses. Reveals the exact legend so the per-core CPU temp and per-disk
   // disktemp-fallback parsing can be verified (or shows an empty graph when the
@@ -1245,14 +1299,28 @@ router.get("/truenas/diagnostics", requireAuth, async (_req, res) => {
     powermode: "NEVER",
   });
 
+  // disktemp BY identifier — the disk-temperature source on newer SCALE boxes
+  // where POST /disk/temperatures 400s and a name-only disktemp graph is empty.
+  // Uses a WIDE aggregated window (disk temps sample slowly) so the response shows
+  // the real per-identifier legend + values the fallback parser relies on.
+  const diskTempIdentifiers = diskTempIdentifiersFrom(graphsProbe.response).slice(0, 50);
+  const diskTempByIdLabel = `disktemp BY identifier for ${diskTempIdentifiers.length} disk(s), aggregated wide window (now-3600s … now-30s) — the fallback the widget uses${
+    diskTempIdentifiers.length ? "" : " — no disktemp identifiers advertised"
+  }`;
+  const diskTempByIdBody = {
+    graphs: diskTempIdentifiers.map((identifier) => ({ name: "disktemp", identifier })),
+    query: { start: nowSec - 3600, end: nowSec - 30, aggregate: true },
+  };
+
   const probes = await Promise.all([
     Promise.resolve(graphsProbe),
     ...candidates.map((c) => probePost(c.label, c.body)),
     probePost(coreExtrasLabel, coreExtrasBody),
-    probePost(arcHitLabel, arcHitBody),
+    ...arcHitProbes.map((p) => probePost(p.label, p.body)),
     probePost(cpuDiskTempLabel, cpuDiskTempBody),
     Promise.resolve(diskProbe),
     Promise.resolve(tempProbe),
+    ...(diskTempIdentifiers.length ? [probePost(diskTempByIdLabel, diskTempByIdBody)] : []),
     probeGetUrl("disk SMART test results (GET /smart/test/results)", smartUrl),
   ]);
 

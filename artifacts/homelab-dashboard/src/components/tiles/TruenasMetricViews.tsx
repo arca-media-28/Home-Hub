@@ -306,6 +306,15 @@ export function ArcView({
           caption={data.arcSizeGb != null ? `${data.arcSizeGb.toFixed(1)} GB cache` : undefined}
           color={hit >= 90 ? "#22c55e" : hit >= 70 ? "#f59e0b" : "#ef4444"}
         />
+      ) : data.arcSizeGb != null ? (
+        // Hit ratio can be unavailable on some TrueNAS versions while ARC size
+        // still reports — show the size rather than hiding the whole tile.
+        <div className="flex flex-col items-center gap-1">
+          <div className="text-3xl font-semibold tabular-nums">
+            {data.arcSizeGb.toFixed(1)} GB
+          </div>
+          <div className="text-xs text-muted-foreground">ARC cache size</div>
+        </div>
       ) : (
         <div className="text-sm text-muted-foreground">
           ARC stats unavailable

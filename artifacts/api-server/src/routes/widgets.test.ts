@@ -637,7 +637,13 @@ describe("GET /widgets/truenas", () => {
   // Three POST shapes hit get_data: the core cpu/memory call, the core extras
   // (interface + arcsize), and the ARC hit-ratio call (arcresult/arcrate/...).
   // The latter two ride SEPARATE calls so one cannot 422 the other.
-  const ARC_HIT_NAMES = ["arcresult", "arcrate", "arcactualrate"];
+  const ARC_HIT_NAMES = [
+    "arcresult",
+    "arcrate",
+    "arcactualrate",
+    "demanddatahitpercentage",
+    "demandmetadatahitpercentage",
+  ];
   function mockTruenasReporting(opts: {
     core?: unknown;
     coreError?: Error;
@@ -752,19 +758,23 @@ describe("GET /widgets/truenas", () => {
       { name: "interface", identifier: "enp14s0" },
       { name: "arcsize" },
     ]);
-    // The ARC hit-ratio graphs ride a SEPARATE call so an invalid name can't 422
-    // the interface/arcsize batch.
-    const arcHitCall = httpPost.mock.calls.find(
+    // Each ARC hit-ratio candidate rides its OWN isolated call: one unknown graph
+    // name fails a whole get_data batch, and the accepted set is version-specific
+    // (legacy arc* vs demand* percentage graphs), so every candidate is requested
+    // separately and the first that returns data wins.
+    const arcHitCalls = httpPost.mock.calls.filter(
       ([, body]: [string, { graphs: Array<{ name?: string }> }]) =>
-        body.graphs.some((g) => ARC_HIT_NAMES.includes(g.name ?? "")),
+        body.graphs.length === 1 && ARC_HIT_NAMES.includes(body.graphs[0]!.name ?? ""),
     );
-    expect(arcHitCall).toBeDefined();
-    expect(arcHitCall![1].query?.aggregate).toBe(false);
-    expect(arcHitCall![1].graphs).toEqual([
-      { name: "arcresult" },
-      { name: "arcrate" },
-      { name: "arcactualrate" },
-    ]);
+    expect(
+      arcHitCalls.map(([, body]: [string, { graphs: Array<{ name?: string }> }]) => body.graphs[0]!.name).sort(),
+    ).toEqual([...ARC_HIT_NAMES].sort());
+    for (const [, body] of arcHitCalls as Array<
+      [string, { graphs: Array<{ name?: string }>; query?: { aggregate?: boolean } }]
+    >) {
+      expect(body.query?.aggregate).toBe(false);
+      expect(body.graphs).toHaveLength(1);
+    }
   });
 
   it("nulls net/ARC when the extras call fails but keeps CPU/RAM (additive)", async () => {
