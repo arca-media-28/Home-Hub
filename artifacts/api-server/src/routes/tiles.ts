@@ -100,7 +100,7 @@ interface TileSettings {
   bonsaiLeafColor?: string | null;
   bonsaiBlossom?: string | null;
   bonsaiStyle?: string | null;
-  truenasMetric?: "cpuram" | "network" | "arc" | "pools" | "disks" | null;
+  truenasMetric?: "cpuram" | "network" | "arc" | "pools" | "disks" | "cputemp" | null;
   truenasPools?: string[] | null;
   truenasPoolOrder?: string[] | null;
 }
@@ -348,7 +348,8 @@ function pickTileSettings(obj: Record<string, unknown>): TileSettings {
     obj["truenasMetric"] === "network" ||
     obj["truenasMetric"] === "arc" ||
     obj["truenasMetric"] === "pools" ||
-    obj["truenasMetric"] === "disks"
+    obj["truenasMetric"] === "disks" ||
+    obj["truenasMetric"] === "cputemp"
   ) {
     result.truenasMetric = obj["truenasMetric"];
   } else if (obj["truenasMetric"] === null) {

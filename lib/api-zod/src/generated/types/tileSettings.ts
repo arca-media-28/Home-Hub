@@ -189,10 +189,10 @@ export type TileSettings = {
      */
   scrollable?: boolean | null;
   /**
-     * Which single TrueNAS metric a dedicated TrueNAS tile renders with its bespoke visual: "cpuram", "network", "arc", "pools", or "disks". Null or absent means the tile shows the combined multi-section view (the default, backward-compatible behavior).
+     * Which single TrueNAS metric a dedicated TrueNAS tile renders with its bespoke visual: "cpuram", "network", "arc", "pools", "disks", or "cputemp". Null or absent means the tile shows the combined multi-section view (the default, backward-compatible behavior).
      * @nullable
      */
-  truenasMetric?: 'cpuram' | 'network' | 'arc' | 'pools' | 'disks' | null;
+  truenasMetric?: 'cpuram' | 'network' | 'arc' | 'pools' | 'disks' | 'cputemp' | null;
   /**
      * Allow-list of TrueNAS ZFS pool (volume) names to show on the tile. Applies to both the dedicated ZFS Pools view and the pools section of the combined view. Null, absent, or empty means show all pools (the default, backward-compatible behavior).
      * @nullable

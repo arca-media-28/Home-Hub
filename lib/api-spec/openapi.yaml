@@ -2220,11 +2220,11 @@ components:
         truenasMetric:
           description: >-
             Which single TrueNAS metric a dedicated TrueNAS tile renders with
-            its bespoke visual: "cpuram", "network", "arc", "pools", or "disks".
-            Null or absent means the tile shows the combined multi-section view
-            (the default, backward-compatible behavior).
+            its bespoke visual: "cpuram", "network", "arc", "pools", "disks", or
+            "cputemp". Null or absent means the tile shows the combined
+            multi-section view (the default, backward-compatible behavior).
           type: ["string", "null"]
-          enum: ["cpuram", "network", "arc", "pools", "disks", null]
+          enum: ["cpuram", "network", "arc", "pools", "disks", "cputemp", null]
         truenasPools:
           description: >-
             Allow-list of TrueNAS ZFS pool (volume) names to show on the tile.
@@ -3381,6 +3381,20 @@ components:
           description: >-
             Recent ZFS ARC hit-ratio samples (percent, 0-100), oldest first, for
             an inline sparkline. Empty when the reporting graph is unavailable.
+          type: array
+          items:
+            type: number
+        cpuTempC:
+          description: >-
+            Current CPU temperature in °C (the hottest core), from the cputemp
+            reporting graph; null when the box exposes no CPU temperature sensor
+            or the reporting call is unavailable.
+          type: ["number", "null"]
+        cpuTempCoresC:
+          description: >-
+            Per-core CPU temperatures in °C for the current reading. Empty when
+            no CPU temperature sensor is exposed or the reporting call is
+            unavailable.
           type: array
           items:
             type: number

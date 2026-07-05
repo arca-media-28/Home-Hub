@@ -8,6 +8,7 @@ import {
   ArcView,
   PoolsView,
   DisksView,
+  CpuTempView,
 } from "./TruenasMetricViews";
 
 // Compact inline sparkline. Draws one polyline per series sharing a single
@@ -124,6 +125,8 @@ export default function TruenasTile({ enabled, density, tileSettings }: WidgetPr
       );
     case "disks":
       return <DisksView data={data} />;
+    case "cputemp":
+      return <CpuTempView data={data} />;
   }
 
   const memPct = data.memTotalGb > 0 ? (data.memUsedGb / data.memTotalGb) * 100 : 0;

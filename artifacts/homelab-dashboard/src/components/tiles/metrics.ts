@@ -131,6 +131,12 @@ export const TRUENAS_METRIC_VARIANTS: TruenasMetricVariant[] = [
     description: "Temperature and SMART status per drive",
     metricKeys: ["disks"],
   },
+  {
+    key: "cputemp",
+    label: "CPU Temp",
+    description: "Live processor temperature",
+    metricKeys: ["cputemp"],
+  },
 ];
 
 export const TRUENAS_METRIC_VARIANT_KEYS = TRUENAS_METRIC_VARIANTS.map(

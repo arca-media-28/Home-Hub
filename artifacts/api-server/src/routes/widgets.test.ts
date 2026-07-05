@@ -449,6 +449,117 @@ describe("GET /widgets/truenas", () => {
     ]);
   });
 
+  it("reports live CPU temperature (hottest core) from the cputemp graph", async () => {
+    findByService.mockReturnValue(
+      connRow({ service: "truenas", url: "https://nas.local", api_key: "key" }),
+    );
+    mockTruenasReporting({
+      core: [{ name: "cpu", legend: ["time", "idle"], data: [[1000, 80]] }],
+      cpuDiskTemp: [
+        {
+          name: "cputemp",
+          legend: ["time", "cpu0", "cpu1", "cpu2", "cpu3"],
+          data: [[1000, 45, 47, 44, 46]],
+        },
+      ],
+    });
+    mockTruenasGets({ pool: [], disk: [], smart: [] });
+
+    const res = await request(app).get("/widgets/truenas");
+    expect(res.status).toBe(200);
+    expect(res.body.cpuTempC).toBe(47); // hottest core
+    expect(res.body.cpuTempCoresC).toEqual([45, 47, 44, 46]);
+  });
+
+  it("leaves CPU temperature null when no cputemp sensor is reported (additive, no 502)", async () => {
+    findByService.mockReturnValue(
+      connRow({ service: "truenas", url: "https://nas.local", api_key: "key" }),
+    );
+    mockTruenasReporting({
+      core: [{ name: "cpu", legend: ["time", "idle"], data: [[1000, 80]] }],
+      // Sensorless box: the graph exists but every core reads a non-positive 0.
+      cpuDiskTemp: [
+        { name: "cputemp", legend: ["time", "cpu0", "cpu1"], data: [[1000, 0, 0]] },
+      ],
+    });
+    mockTruenasGets({ pool: [], disk: [], smart: [] });
+
+    const res = await request(app).get("/widgets/truenas");
+    expect(res.status).toBe(200);
+    expect(res.body.cpuTempC).toBeNull();
+    expect(res.body.cpuTempCoresC).toEqual([]);
+  });
+
+  it("leaves CPU temperature null when the cputemp reporting call fails (additive, no 502)", async () => {
+    findByService.mockReturnValue(
+      connRow({ service: "truenas", url: "https://nas.local", api_key: "key" }),
+    );
+    mockTruenasReporting({
+      core: [{ name: "cpu", legend: ["time", "idle"], data: [[1000, 80]] }],
+      cpuDiskTempError: httpError(422), // one bad graph name 422s the whole batch
+    });
+    mockTruenasGets({ pool: [], disk: [], smart: [] });
+
+    const res = await request(app).get("/widgets/truenas");
+    expect(res.status).toBe(200); // temperature failure never blanks the tile
+    expect(res.body.cpuTempC).toBeNull();
+    expect(res.body.cpuTempCoresC).toEqual([]);
+    expect(res.body.cpuPercent).toBe(20); // core CPU/RAM still render
+  });
+
+  it("falls back to the disktemp graph when /disk/temperatures has no value", async () => {
+    findByService.mockReturnValue(
+      connRow({ service: "truenas", url: "https://nas.local", api_key: "key" }),
+    );
+    mockTruenasReporting({
+      core: [{ name: "cpu", legend: ["time", "idle"], data: [[1000, 80]] }],
+      // The dedicated endpoint knows sda but not sdb (null → unknown).
+      diskTemps: { sda: 34, sdb: null },
+      // The disktemp reporting graph fills the gap for sdb.
+      cpuDiskTemp: [
+        { name: "disktemp", legend: ["time", "sda", "sdb"], data: [[1000, 33, 41]] },
+      ],
+    });
+    mockTruenasGets({
+      pool: [],
+      disk: [{ name: "sda" }, { name: "sdb" }],
+      smart: [{ disk: "sda", tests: [{ status: "SUCCESS" }] }],
+    });
+
+    const res = await request(app).get("/widgets/truenas");
+    expect(res.status).toBe(200);
+    expect(res.body.disks).toEqual([
+      // Dedicated endpoint wins for sda; graph fills sdb.
+      { name: "sda", temperatureC: 34, smartPassed: true },
+      { name: "sdb", temperatureC: 41, smartPassed: null },
+    ]);
+  });
+
+  it("coerces numeric-string and nested-object disk temperature shapes", async () => {
+    findByService.mockReturnValue(
+      connRow({ service: "truenas", url: "https://nas.local", api_key: "key" }),
+    );
+    mockTruenasReporting({
+      core: [{ name: "cpu", legend: ["time", "idle"], data: [[1000, 80]] }],
+      // Some SCALE versions return a numeric string or a nested object here.
+      diskTemps: { sda: "34", sdb: { temperature_c: 41 }, sdc: "n/a" },
+    });
+    mockTruenasGets({
+      pool: [],
+      disk: [{ name: "sda" }, { name: "sdb" }, { name: "sdc" }],
+      smart: [],
+    });
+
+    const res = await request(app).get("/widgets/truenas");
+    expect(res.status).toBe(200);
+    expect(res.body.disks).toEqual([
+      { name: "sda", temperatureC: 34, smartPassed: null },
+      { name: "sdb", temperatureC: 41, smartPassed: null },
+      // Non-numeric string → unknown ("--").
+      { name: "sdc", temperatureC: null, smartPassed: null },
+    ]);
+  });
+
   it("returns empty disks when the disk inventory call fails (additive, no 502)", async () => {
     findByService.mockReturnValue(
       connRow({ service: "truenas", url: "https://nas.local", api_key: "key" }),
@@ -481,9 +592,25 @@ describe("GET /widgets/truenas", () => {
     extrasError?: Error;
     arcHit?: unknown;
     arcHitError?: Error;
+    cpuDiskTemp?: unknown;
+    cpuDiskTempError?: Error;
+    diskTemps?: unknown;
+    diskTempsError?: Error;
   }) {
-    httpPost.mockImplementation((_url: string, body: { graphs: Array<{ name?: string }> }) => {
-      const names = body.graphs.map((g) => g.name);
+    httpPost.mockImplementation((url: string, body: { graphs?: Array<{ name?: string }> }) => {
+      // The dedicated disk-temperature endpoint is a POST too (no `graphs` body).
+      if (url.endsWith("/api/v2.0/disk/temperatures")) {
+        return opts.diskTempsError
+          ? Promise.reject(opts.diskTempsError)
+          : Promise.resolve({ data: opts.diskTemps ?? {} });
+      }
+      const names = (body.graphs ?? []).map((g) => g.name);
+      // cputemp/disktemp ride their own isolated POST (see widgets.ts).
+      if (names.includes("cputemp") || names.includes("disktemp")) {
+        return opts.cpuDiskTempError
+          ? Promise.reject(opts.cpuDiskTempError)
+          : Promise.resolve({ data: opts.cpuDiskTemp ?? [] });
+      }
       if (names.some((n) => ARC_HIT_NAMES.includes(n ?? ""))) {
         return opts.arcHitError ? Promise.reject(opts.arcHitError) : Promise.resolve({ data: opts.arcHit ?? [] });
       }

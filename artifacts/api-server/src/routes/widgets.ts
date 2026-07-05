@@ -510,19 +510,90 @@ function parseTruenasPools(poolData: unknown) {
   });
 }
 
+// Coerce a single disk-temperature value into a finite °C number, or null when
+// it is genuinely absent/unknown. TrueNAS SCALE versions have returned this a few
+// different ways for the same endpoint, so tolerate them all:
+//   • a plain number         → 34
+//   • a numeric string       → "34"
+//   • a nested object        → { "temperature_c": 34 } / { "temp": 34 } / …
+// Anything else (null, NaN, non-numeric string, 0-less object) → null.
+function coerceTempValue(value: unknown): number | null {
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  if (typeof value === "string") {
+    const n = Number(value.trim());
+    return Number.isFinite(n) && value.trim() !== "" ? n : null;
+  }
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    const obj = value as Record<string, unknown>;
+    for (const key of ["temperature_c", "temperature", "temp_c", "temp", "celsius", "value"]) {
+      if (key in obj) {
+        const n = coerceTempValue(obj[key]);
+        if (n != null) return n;
+      }
+    }
+  }
+  return null;
+}
+
 // Build a `name → temperature(°C)` map from a TrueNAS `POST /api/v2.0/disk/
 // temperatures` response. That endpoint returns a flat object keyed by disk name
 // (e.g. `{ "sda": 34, "nvme0n1": 41, "sdb": null }`); the live `GET /disk`
 // inventory does NOT carry a temperature, which is why temps showed as "--".
 // Best-effort: a missing/non-numeric value stays out of the map (→ unknown).
+// The value coercion tolerates the numeric-string and nested-object shapes some
+// SCALE versions return (see coerceTempValue), so a shape change no longer blanks
+// every temperature.
 function parseTruenasTemperatures(tempData: unknown): Map<string, number> {
   const byDisk = new Map<string, number>();
   if (tempData && typeof tempData === "object" && !Array.isArray(tempData)) {
     for (const [name, value] of Object.entries(tempData as Record<string, unknown>)) {
-      if (typeof value === "number" && Number.isFinite(value)) byDisk.set(name, value);
+      const n = coerceTempValue(value);
+      if (n != null) byDisk.set(name, n);
     }
   }
   return byDisk;
+}
+
+// Build a `name → temperature(°C)` map from a TrueNAS `disktemp` reporting graph
+// (legend like `["time","sda","sdb",…]`, one column per disk in °C). This is a
+// FALLBACK temperature source for boxes where the dedicated POST /disk/
+// temperatures endpoint no longer returns usable values. Best-effort: absent
+// graph or non-positive readings simply yield an empty map (→ unknown).
+function parseTruenasDiskTempGraph(reportData: unknown): Map<string, number> {
+  const byDisk = new Map<string, number>();
+  const graphs = (reportData ?? []) as Array<{ name?: string }>;
+  const graph = graphs.find((g) => g.name === "disktemp");
+  if (!graph) return byDisk;
+  const latest = latestByLegend(graph);
+  for (const [key, value] of Object.entries(latest)) {
+    if (key === "time") continue;
+    if (Number.isFinite(value) && value > 0) byDisk.set(key, value);
+  }
+  return byDisk;
+}
+
+// Reduce a TrueNAS `cputemp` reporting graph into a current CPU temperature. The
+// graph reports one column per core (legend like `["time","cpu0","cpu1",…]`) in
+// °C — there is no single "package" column — so the headline value is the
+// hottest core (what a temperature warning cares about) and every per-core
+// reading is returned alongside it. Best-effort: a box with no temperature
+// sensor yields an empty graph → null current temp and an empty core list.
+function parseTruenasCpuTemp(reportData: unknown): {
+  cpuTempC: number | null;
+  cpuTempCoresC: number[];
+} {
+  const graphs = (reportData ?? []) as Array<{ name?: string }>;
+  const graph = graphs.find((g) => g.name === "cputemp");
+  if (!graph) return { cpuTempC: null, cpuTempCoresC: [] };
+  const latest = latestByLegend(graph);
+  const cores: number[] = [];
+  for (const [key, value] of Object.entries(latest)) {
+    if (key === "time") continue;
+    // A missing sensor reads 0 (or negative); treat only positive values as real.
+    if (Number.isFinite(value) && value > 0) cores.push(Number(value.toFixed(1)));
+  }
+  if (cores.length === 0) return { cpuTempC: null, cpuTempCoresC: [] };
+  return { cpuTempC: Number(Math.max(...cores).toFixed(1)), cpuTempCoresC: cores };
 }
 
 // Merge a TrueNAS `GET /api/v2.0/disk` inventory (disk names), the live
@@ -598,6 +669,8 @@ router.get("/truenas", requireAuth, async (_req, res) => {
       netInSeries: sampleSeries(184.6, 45, 90, 300),
       netOutSeries: sampleSeries(42.3, 18, 5, 200),
       arcHitSeries: sampleSeries(98.7, 1.2, 80, 100),
+      cpuTempC: 47,
+      cpuTempCoresC: [45, 47, 44, 46],
       pools: [
         { name: "tank", status: "ONLINE", usedBytes: 2.1e12, totalBytes: 10e12 },
         { name: "backup", status: "ONLINE", usedBytes: 500e9, totalBytes: 4e12 },
@@ -630,14 +703,26 @@ router.get("/truenas", requireAuth, async (_req, res) => {
     graphs: [{ name: "cpu" }, { name: "memory" }],
     query: reportingQuery,
   };
+  // CPU + disk TEMPERATURES ride a SEPARATE reporting/get_data POST from the core
+  // cpu/memory call. `cputemp` (per-core CPU temperature) and `disktemp` (per-disk
+  // temperature) are both in the get_data accepted enum, but a box with no sensor
+  // returns an empty graph — keeping them isolated means their absence can never
+  // regress the core CPU/RAM numbers (and get_data 422s an ENTIRE batch on one
+  // bad name). `disktemp` is a FALLBACK temperature source used when the dedicated
+  // POST /disk/temperatures endpoint stops returning usable values on a version.
+  const cpuDiskTempBody = {
+    graphs: [{ name: "cputemp" }, { name: "disktemp" }],
+    query: reportingQuery,
+  };
   // The reporting (CPU/RAM), pool (storage), disk-health (temperature + SMART),
-  // system-info (total RAM) and reporting/graphs (interface identifiers) calls
-  // are all independent. Settle them separately so one failing source no longer
-  // blanks the whole tile — whatever data is available still renders. The disk,
-  // SMART, system-info and graphs calls are purely additive: they never count
-  // toward the 502 "unavailable" decision, which is reserved for a fully
-  // unreachable server (both the reporting and pool calls failing).
-  const [reportResult, poolResult, diskResult, smartResult, sysInfoResult, graphsResult] =
+  // system-info (total RAM), reporting/graphs (interface identifiers) and the
+  // temperature (cputemp/disktemp) calls are all independent. Settle them
+  // separately so one failing source no longer blanks the whole tile — whatever
+  // data is available still renders. The disk, SMART, system-info, graphs and
+  // temperature calls are purely additive: they never count toward the 502
+  // "unavailable" decision, which is reserved for a fully unreachable server
+  // (both the reporting and pool calls failing).
+  const [reportResult, poolResult, diskResult, smartResult, sysInfoResult, graphsResult, cpuDiskTempResult] =
     await Promise.allSettled([
       httpClient.post(`${baseUrl}/api/v2.0/reporting/get_data`, reportingBody, { headers }),
       httpClient.get(`${baseUrl}/api/v2.0/pool`, { headers }),
@@ -645,6 +730,7 @@ router.get("/truenas", requireAuth, async (_req, res) => {
       httpClient.get(`${baseUrl}/api/v2.0/smart/test/results`, { headers }),
       httpClient.get(`${baseUrl}/api/v2.0/system/info`, { headers }),
       httpClient.get(`${baseUrl}/api/v2.0/reporting/graphs`, { headers }),
+      httpClient.post(`${baseUrl}/api/v2.0/reporting/get_data`, cpuDiskTempBody, { headers }),
     ]);
 
   if (reportResult.status === "rejected" && poolResult.status === "rejected") {
@@ -730,13 +816,46 @@ router.get("/truenas", requireAuth, async (_req, res) => {
         { names: diskNames, powermode: "NEVER" },
         { headers },
       );
-      tempByDisk = parseTruenasTemperatures(tempRes.data);
+      // A non-object response (e.g. a bare job-id number) means this SCALE
+      // version no longer returns the flat name→°C map here; log it so the shape
+      // is visible, and fall back to the disktemp reporting graph below.
+      if (tempRes.data && typeof tempRes.data === "object" && !Array.isArray(tempRes.data)) {
+        tempByDisk = parseTruenasTemperatures(tempRes.data);
+      } else {
+        logger.warn(
+          { received: typeof tempRes.data },
+          "TrueNAS widget: disk/temperatures returned a non-map payload (falling back to disktemp graph)",
+        );
+      }
     } catch (err) {
       logger.error(
         { reason: normalizeHttpError(err), detail: describeHttpError(err) },
         "TrueNAS widget: disk/temperatures call failed (temperatures unavailable)",
       );
     }
+  }
+
+  // CPU temperature + a per-disk temperature FALLBACK from the isolated
+  // cputemp/disktemp reporting call. Additive: a rejection or an empty sensor
+  // just leaves the CPU temp null and adds no disk temps.
+  let cpuTemp = { cpuTempC: null as number | null, cpuTempCoresC: [] as number[] };
+  if (cpuDiskTempResult.status === "fulfilled") {
+    cpuTemp = parseTruenasCpuTemp(cpuDiskTempResult.value.data);
+    // Fill any disk whose live-endpoint temperature is missing from the reporting
+    // graph so temps still show when POST /disk/temperatures stops working.
+    const diskTempGraph = parseTruenasDiskTempGraph(cpuDiskTempResult.value.data);
+    for (const [name, temp] of diskTempGraph) {
+      if (!tempByDisk.has(name)) tempByDisk.set(name, temp);
+    }
+  } else {
+    logger.error(
+      {
+        reason: normalizeHttpError(cpuDiskTempResult.reason),
+        detail: describeHttpError(cpuDiskTempResult.reason),
+        request: cpuDiskTempBody,
+      },
+      "TrueNAS widget: cputemp/disktemp reporting call failed (CPU/disk temperatures unavailable)",
+    );
   }
   const disks = parseTruenasDisks(diskData, smartData, tempByDisk);
 
@@ -813,7 +932,7 @@ router.get("/truenas", requireAuth, async (_req, res) => {
   }
   netArc = parseTruenasNetArc(mergedGraphs);
 
-  res.json({ ...reporting, ...netArc, pools, disks });
+  res.json({ ...reporting, ...netArc, ...cpuTemp, pools, disks });
 });
 
 // ────────────────────────────────────────────────
@@ -971,6 +1090,16 @@ router.get("/truenas/diagnostics", requireAuth, async (_req, res) => {
   const arcHitLabel = `extras ARC hit ratio (${ARC_HIT_GRAPHS.join(
     "/",
   )}), non-aggregated series — the form the widget uses`;
+  // Temperature probe (cputemp + disktemp), aggregated short window — the form the
+  // widget uses. Reveals the exact legend so the per-core CPU temp and per-disk
+  // disktemp-fallback parsing can be verified (or shows an empty graph when the
+  // box has no temperature sensor / needs a per-disk identifier).
+  const cpuDiskTempBody = {
+    graphs: [{ name: "cputemp" }, { name: "disktemp" }],
+    query: { start: nowSec - 90, end: nowSec - 30, aggregate: true },
+  };
+  const cpuDiskTempLabel =
+    "temperatures (cputemp + disktemp), aggregated window in the past — the form the widget uses";
 
   // Disk-health probes. The TrueNAS tile's per-disk temperature + SMART grid is
   // built from three calls; probe each so a "--" (unknown) cell is explainable:
@@ -1036,6 +1165,7 @@ router.get("/truenas/diagnostics", requireAuth, async (_req, res) => {
     ...candidates.map((c) => probePost(c.label, c.body)),
     probePost(coreExtrasLabel, coreExtrasBody),
     probePost(arcHitLabel, arcHitBody),
+    probePost(cpuDiskTempLabel, cpuDiskTempBody),
     Promise.resolve(diskProbe),
     Promise.resolve(tempProbe),
     probeGetUrl("disk SMART test results (GET /smart/test/results)", smartUrl),

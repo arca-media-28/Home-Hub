@@ -300,10 +300,10 @@ export type TileSettings = {
      */
   scrollable?: boolean | null;
   /**
-     * Which single TrueNAS metric a dedicated TrueNAS tile renders with its bespoke visual: "cpuram", "network", "arc", "pools", or "disks". Null or absent means the tile shows the combined multi-section view (the default, backward-compatible behavior).
+     * Which single TrueNAS metric a dedicated TrueNAS tile renders with its bespoke visual: "cpuram", "network", "arc", "pools", "disks", or "cputemp". Null or absent means the tile shows the combined multi-section view (the default, backward-compatible behavior).
      * @nullable
      */
-  truenasMetric?: 'cpuram' | 'network' | 'arc' | 'pools' | 'disks' | null;
+  truenasMetric?: 'cpuram' | 'network' | 'arc' | 'pools' | 'disks' | 'cputemp' | null;
   /**
      * Allow-list of TrueNAS ZFS pool (volume) names to show on the tile. Applies to both the dedicated ZFS Pools view and the pools section of the combined view. Null, absent, or empty means show all pools (the default, backward-compatible behavior).
      * @nullable
@@ -1416,6 +1416,13 @@ export interface TruenasMetrics {
   netOutSeries?: number[];
   /** Recent ZFS ARC hit-ratio samples (percent, 0-100), oldest first, for an inline sparkline. Empty when the reporting graph is unavailable. */
   arcHitSeries?: number[];
+  /**
+     * Current CPU temperature in °C (the hottest core), from the cputemp reporting graph; null when the box exposes no CPU temperature sensor or the reporting call is unavailable.
+     * @nullable
+     */
+  cpuTempC?: number | null;
+  /** Per-core CPU temperatures in °C for the current reading. Empty when no CPU temperature sensor is exposed or the reporting call is unavailable. */
+  cpuTempCoresC?: number[];
   pools: ZfsPool[];
   disks: TruenasDisk[];
 }

@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowUp, HardDrive } from "lucide-react";
+import { ArrowDown, ArrowUp, HardDrive, Thermometer } from "lucide-react";
 import type { TruenasMetrics } from "@workspace/api-client-react";
 import type { TileDensity } from "./metrics";
 import { filterTruenasPools } from "./metrics";
@@ -432,6 +432,114 @@ export function DisksView({ data }: { data: TruenasMetrics }) {
           </div>
         );
       })}
+    </div>
+  );
+}
+
+// CPU temperature thresholds (°C): calm below 70, warm 70-84, hot at/above 85.
+function tempToneColor(tempC: number): string {
+  return tempC >= 85 ? "#ef4444" : tempC >= 70 ? "#f59e0b" : "#22c55e";
+}
+
+// A radial gauge tuned for temperature: the ring fills against a 0-100°C scale
+// and the center reads the value in °C rather than a percentage.
+function TempGauge({
+  tempC,
+  size,
+  label,
+}: {
+  tempC: number;
+  size: number;
+  label: string;
+}) {
+  const pct = Math.min(100, Math.max(0, tempC));
+  const stroke = Math.max(6, Math.round(size * 0.09));
+  const r = (size - stroke) / 2;
+  const cx = size / 2;
+  const cy = size / 2;
+  const startAngle = 135;
+  const sweep = 270;
+  const circumference = 2 * Math.PI * r;
+  const arcLen = (sweep / 360) * circumference;
+  const dash = (pct / 100) * arcLen;
+  const c = tempToneColor(tempC);
+  return (
+    <div className="flex flex-col items-center justify-center">
+      <svg
+        width={size}
+        height={size}
+        viewBox={`0 0 ${size} ${size}`}
+        aria-hidden="true"
+      >
+        <g transform={`rotate(${startAngle} ${cx} ${cy})`}>
+          <circle
+            cx={cx}
+            cy={cy}
+            r={r}
+            fill="none"
+            stroke="currentColor"
+            className="text-muted"
+            strokeWidth={stroke}
+            strokeLinecap="round"
+            strokeDasharray={`${arcLen} ${circumference}`}
+          />
+          <circle
+            cx={cx}
+            cy={cy}
+            r={r}
+            fill="none"
+            stroke={c}
+            strokeWidth={stroke}
+            strokeLinecap="round"
+            strokeDasharray={`${dash} ${circumference}`}
+            className="transition-all duration-700"
+          />
+        </g>
+        <text
+          x={cx}
+          y={cy}
+          textAnchor="middle"
+          dominantBaseline="central"
+          className="fill-foreground font-semibold"
+          style={{ fontSize: size * 0.24 }}
+        >
+          {tempC.toFixed(0)}°C
+        </text>
+      </svg>
+      <span className="mt-1 text-sm font-medium text-foreground">{label}</span>
+    </div>
+  );
+}
+
+// Dedicated live CPU-temperature view: a large temperature gauge showing the
+// hottest core, plus a compact per-core readout when multiple cores report.
+export function CpuTempView({ data }: { data: TruenasMetrics }) {
+  const tempC = data.cpuTempC;
+  const cores = data.cpuTempCoresC ?? [];
+  if (tempC == null) {
+    return (
+      <div className="flex h-full w-full flex-col items-center justify-center gap-1 text-sm text-muted-foreground">
+        <Thermometer className="h-5 w-5 opacity-50" />
+        <span>No CPU temperature sensor</span>
+      </div>
+    );
+  }
+  return (
+    <div className="flex h-full w-full flex-col items-center justify-center gap-3 p-3">
+      <TempGauge tempC={tempC} size={132} label="CPU Temp" />
+      {cores.length > 1 && (
+        <div className="flex w-full flex-wrap items-center justify-center gap-1.5">
+          {cores.map((core, i) => (
+            <span
+              key={i}
+              className="rounded border border-border px-1.5 py-0.5 text-xs font-medium tabular-nums"
+              style={{ color: tempToneColor(core) }}
+            >
+              {core.toFixed(0)}°
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
