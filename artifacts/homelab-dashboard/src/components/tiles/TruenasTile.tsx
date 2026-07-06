@@ -129,6 +129,7 @@ export default function TruenasTile({ enabled, density, tileSettings }: WidgetPr
       return (
         <CpuTempView
           data={data}
+          density={density}
           showCores={tileSettings?.truenasShowCpuCores !== false}
         />
       );

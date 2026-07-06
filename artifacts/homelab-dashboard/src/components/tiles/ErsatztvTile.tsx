@@ -2,6 +2,7 @@ import { useGetErsatzTvWidget, getGetErsatzTvWidgetQueryKey } from "@workspace/a
 import { Tv2, Radio } from "lucide-react";
 import type { WidgetProps } from "./IntegrationTile";
 import { tileBudget, STAT_ROW_PX, ROW_PX, SECTION_PX, TWO_LINE_ROW_PX, listColumnClass, listColumnStyle } from "./metrics";
+import { CenteredTileBody } from "./TileBody";
 
 export default function ErsatztvTile({ enabled, density }: WidgetProps) {
   const { data, isLoading, isError } = useGetErsatzTvWidget({
@@ -45,7 +46,7 @@ export default function ErsatztvTile({ enabled, density }: WidgetProps) {
   const nothingToShow = !showHealth && !showStreams && channelRows === 0;
 
   return (
-    <div className="w-full h-full p-3 flex flex-col gap-3">
+    <CenteredTileBody>
       {showHealth && (
         <div className="flex items-center justify-around text-center">
           <div>
@@ -114,6 +115,6 @@ export default function ErsatztvTile({ enabled, density }: WidgetProps) {
           No metrics selected
         </div>
       )}
-    </div>
+    </CenteredTileBody>
   );
 }

@@ -6,6 +6,7 @@ import { Radar, AlertTriangle } from "lucide-react";
 import type { WidgetProps } from "./IntegrationTile";
 import { resolveProwlarrLayout } from "./prowlarrLayout";
 import { tileColumns, listColumnClass, listColumnStyle } from "./metrics";
+import { CenteredTileBody } from "./TileBody";
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
@@ -60,7 +61,7 @@ export default function ProwlarrTile({ enabled, density }: WidgetProps) {
   }
 
   return (
-    <div className="w-full h-full p-3 flex flex-col gap-2 min-h-0">
+    <CenteredTileBody gap="gap-2">
       {layout.showStats && (
         <div className="flex items-stretch gap-1 flex-shrink-0">
           {layout.showSummary && <Stat label="Online" value={`${healthy} / ${total}`} />}
@@ -112,6 +113,6 @@ export default function ProwlarrTile({ enabled, density }: WidgetProps) {
           ))}
         </div>
       )}
-    </div>
+    </CenteredTileBody>
   );
 }

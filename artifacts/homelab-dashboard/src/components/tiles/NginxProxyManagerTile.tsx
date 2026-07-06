@@ -5,6 +5,7 @@ import {
 import { Network, Lock, LockOpen, ShieldAlert } from "lucide-react";
 import type { WidgetProps } from "./IntegrationTile";
 import { tileBudget, STAT_ROW_PX, SECTION_PX, ROW_PX, listColumnClass, listColumnStyle } from "./metrics";
+import { CenteredTileBody } from "./TileBody";
 
 function Stat({
   label,
@@ -68,7 +69,7 @@ export default function NginxProxyManagerTile({ enabled, density }: WidgetProps)
   const hosts = data.proxyHosts.slice(0, hostCount);
 
   return (
-    <div className="w-full h-full p-3 flex flex-col gap-2">
+    <CenteredTileBody gap="gap-2">
       {showStats ? (
         <div className="flex items-stretch gap-1">
           {showHosts && <Stat label="Enabled" value={data.enabled} tone="default" />}
@@ -83,7 +84,7 @@ export default function NginxProxyManagerTile({ enabled, density }: WidgetProps)
 
       {showList && (
         <div
-          className={`${listColumnClass(budget.columns, "space-y-1")} border-t border-border pt-2 mt-auto`}
+          className={`${listColumnClass(budget.columns, "space-y-1")} border-t border-border pt-2`}
           style={listColumnStyle(budget.columns)}
         >
           {hosts.map((host) => {
@@ -112,6 +113,6 @@ export default function NginxProxyManagerTile({ enabled, density }: WidgetProps)
           })}
         </div>
       )}
-    </div>
+    </CenteredTileBody>
   );
 }

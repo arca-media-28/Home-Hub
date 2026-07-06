@@ -546,9 +546,11 @@ function TempGauge({
 // hottest core, plus a compact per-core readout when multiple cores report.
 export function CpuTempView({
   data,
+  density,
   showCores = true,
 }: {
   data: TruenasMetrics;
+  density: TileDensity;
   showCores?: boolean;
 }) {
   const tempC = data.cpuTempC;
@@ -561,10 +563,22 @@ export function CpuTempView({
       </div>
     );
   }
+  // Scale the gauge to the measured body like the other TrueNAS gauge views,
+  // reserving room for the "CPU Temp" caption and, when shown, the per-core
+  // chips so the gauge grows and shrinks with the tile instead of a fixed size.
+  const showCoresRow = showCores && cores.length > 1;
+  const reserveH = 56 + (showCoresRow ? 40 : 0);
+  const gaugeSize = Math.max(
+    72,
+    Math.min(
+      220,
+      Math.floor(Math.min(density.bodyWidth - 32, density.bodyHeight - reserveH)),
+    ),
+  );
   return (
     <div className="flex h-full w-full flex-col items-center justify-center gap-3 p-3">
-      <TempGauge tempC={tempC} size={132} label="CPU Temp" />
-      {showCores && cores.length > 1 && (
+      <TempGauge tempC={tempC} size={gaugeSize} label="CPU Temp" />
+      {showCoresRow && (
         <div className="flex w-full flex-wrap items-center justify-center gap-1.5">
           {cores.map((core, i) => (
             <span

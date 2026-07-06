@@ -3,6 +3,7 @@ import { useGetTailscaleStatus, getGetTailscaleStatusQueryKey } from "@workspace
 import { Network, ArrowUpRight, Copy, Check, KeyRound, AlertTriangle } from "lucide-react";
 import type { WidgetProps } from "./IntegrationTile";
 import { tileBudget, STAT_ROW_PX, ROW_PX, SECTION_PX, TWO_LINE_ROW_PX, listColumnClass, listColumnStyle } from "./metrics";
+import { CenteredTileBody } from "./TileBody";
 
 // The first tailnet IPv4 (100.x) address is what users almost always want to
 // grab; fall back to the first address of any kind when no IPv4 is present.
@@ -103,7 +104,7 @@ export default function TailscaleTile({ enabled, density }: WidgetProps) {
   const visibleDevices = sortedDevices.slice(0, deviceRows);
 
   return (
-    <div className="w-full h-full p-3 flex flex-col gap-3">
+    <CenteredTileBody>
       {showSummary && (
         <div className="flex items-center justify-around text-center">
           <div>
@@ -227,6 +228,6 @@ export default function TailscaleTile({ enabled, density }: WidgetProps) {
           No metrics selected
         </div>
       )}
-    </div>
+    </CenteredTileBody>
   );
 }
