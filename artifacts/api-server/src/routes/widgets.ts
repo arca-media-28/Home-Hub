@@ -3914,6 +3914,10 @@ router.get("/news", requireAuth, async (req, res) => {
       responseType: "text",
       // Some feeds gate on a browser-y UA and reject the default axios one.
       headers: { Accept: "application/rss+xml, application/atom+xml, application/xml, text/xml, */*" },
+      // This proxies arbitrary user-supplied URLs to fetch public RSS/Atom
+      // feeds, not a homelab device — refuse private/loopback/link-local
+      // destinations so it can't be used to probe the internal network.
+      ssrfPublicOnly: true,
     });
     const feed = await rssParser.parseString(String(r.data ?? ""));
     const feedTitle = feed.title?.trim() || null;
