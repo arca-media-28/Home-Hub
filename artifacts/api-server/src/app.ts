@@ -35,8 +35,29 @@ app.use(cors());
 app.use(express.json({ limit: "5mb" }));
 app.use(express.urlencoded({ extended: true }));
 
-// Serve uploaded files
-app.use("/api/uploads/files", express.static(path.join(dataDir, "uploads")));
+// Serve uploaded files.
+//
+// Defense in depth: uploads are validated/sanitized server-side (see
+// routes/uploads.ts) so nothing script-bearing should ever land here, but we
+// still serve them with headers that prevent this route from ever being
+// usable as a same-origin script execution vector even if that validation is
+// ever bypassed or weakened in the future:
+//  - X-Content-Type-Options: nosniff stops browsers from MIME-sniffing a
+//    file into something more dangerous than its declared Content-Type.
+//  - A strict per-response CSP (script-src 'none'; sandbox) means that even
+//    an SVG containing a <script> tag cannot execute if it's navigated to
+//    directly, because the CSP applies to the response itself.
+//  - Content-Disposition stays inline so normal image rendering (avatars,
+//    tile backgrounds, etc.) is unaffected.
+app.use(
+  "/api/uploads/files",
+  express.static(path.join(dataDir, "uploads"), {
+    setHeaders: (res) => {
+      res.setHeader("X-Content-Type-Options", "nosniff");
+      res.setHeader("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; sandbox");
+    },
+  }),
+);
 
 // API routes
 app.use("/api", router);

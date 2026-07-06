@@ -3,6 +3,8 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import sharp from "sharp";
+import { fileTypeFromBuffer } from "file-type";
+import DOMPurify from "isomorphic-dompurify";
 import { requireAuth, type AuthRequest } from "../lib/auth.js";
 import { uploadStmts } from "../lib/db.js";
 import { logger } from "../lib/logger.js";
@@ -31,35 +33,107 @@ const upload = multer({
 // downscaling large photos here keeps the dashboard payloads light.
 const MAX_EDGE = 1024;
 
-// Optimize a raster image buffer: downscale to MAX_EDGE (never upscale) and
-// re-encode with sensible compression while preserving the original format.
-// SVG (vector) and GIF (often animated) are passed through untouched.
-async function optimizeImage(
-  buffer: Buffer,
-  mimetype: string,
-): Promise<{ buffer: Buffer; ext: string }> {
-  if (mimetype === "image/svg+xml") return { buffer, ext: ".svg" };
-  if (mimetype === "image/gif") return { buffer, ext: ".gif" };
+// The client-supplied MIME type (and original filename/extension) is
+// completely untrustworthy — it is just a form field an attacker controls.
+// We only ever decide what to do with a file, and what extension to save it
+// with, based on the *actual bytes* we received. Raster formats are verified
+// via magic-number sniffing (file-type); anything that doesn't sniff as one
+// of our allowed raster formats is only accepted as SVG if it truly parses as
+// one, and even then it is sanitized to strip any script content before it
+// ever touches disk. There is no "store the original bytes as a fallback"
+// path — if we can't positively identify and safely handle the content, the
+// upload is rejected outright.
+class UnsupportedUploadError extends Error {}
 
-  const pipeline = sharp(buffer, { failOn: "none" }).rotate().resize({
-    width: MAX_EDGE,
-    height: MAX_EDGE,
-    fit: "inside",
-    withoutEnlargement: true,
+const RASTER_EXT: Record<string, string> = {
+  "image/png": ".png",
+  "image/jpeg": ".jpg",
+  "image/gif": ".gif",
+  "image/webp": ".webp",
+};
+
+// Inverse lookup used when recording the (server-determined) mimetype for a
+// stored file, plus the SVG case which isn't produced by RASTER_EXT.
+const EXT_MIME: Record<string, string> = {
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".gif": "image/gif",
+  ".webp": "image/webp",
+  ".svg": "image/svg+xml",
+};
+
+// SVGs are plain XML text, so magic-number sniffing (file-type) can't detect
+// them — we look for the root <svg> element ourselves. This is only used to
+// decide "does this look like SVG at all", never to trust the content is
+// safe; DOMPurify does that below.
+function looksLikeSvg(buffer: Buffer): boolean {
+  const head = buffer.toString("utf8", 0, Math.min(buffer.length, 4096));
+  return /<svg[\s>]/i.test(head);
+}
+
+// Strip any script-capable content (<script>, event handler attributes,
+// javascript: URIs, <foreignObject>, external references, etc.) from an SVG
+// before we ever store or serve it. DOMPurify's SVG profile is the
+// battle-tested way to do this rather than hand-rolled regexes.
+function sanitizeSvg(buffer: Buffer): Buffer {
+  const clean = DOMPurify.sanitize(buffer.toString("utf8"), {
+    USE_PROFILES: { svg: true, svgFilters: true },
   });
-
-  switch (mimetype) {
-    case "image/png":
-      return { buffer: await pipeline.png({ compressionLevel: 9 }).toBuffer(), ext: ".png" };
-    case "image/webp":
-      return { buffer: await pipeline.webp({ quality: 82 }).toBuffer(), ext: ".webp" };
-    case "image/jpeg":
-    default:
-      return {
-        buffer: await pipeline.jpeg({ quality: 82, mozjpeg: true }).toBuffer(),
-        ext: ".jpg",
-      };
+  if (!clean || !/<svg[\s>]/i.test(clean)) {
+    throw new UnsupportedUploadError("Invalid SVG file");
   }
+  return Buffer.from(clean, "utf8");
+}
+
+// Determine what a file *actually* is from its bytes, and produce the final
+// (possibly re-encoded/sanitized) buffer + a server-chosen extension. Throws
+// UnsupportedUploadError if the content can't be safely handled.
+async function processUpload(buffer: Buffer): Promise<{ buffer: Buffer; ext: string }> {
+  const detected = await fileTypeFromBuffer(buffer);
+
+  if (detected && detected.mime in RASTER_EXT) {
+    if (detected.mime === "image/gif") {
+      // GIFs (often animated) are passed through untouched once verified.
+      return { buffer, ext: ".gif" };
+    }
+
+    try {
+      const pipeline = sharp(buffer, { failOn: "error" }).rotate().resize({
+        width: MAX_EDGE,
+        height: MAX_EDGE,
+        fit: "inside",
+        withoutEnlargement: true,
+      });
+
+      switch (detected.mime) {
+        case "image/png":
+          return { buffer: await pipeline.png({ compressionLevel: 9 }).toBuffer(), ext: ".png" };
+        case "image/webp":
+          return { buffer: await pipeline.webp({ quality: 82 }).toBuffer(), ext: ".webp" };
+        case "image/jpeg":
+        default:
+          return {
+            buffer: await pipeline.jpeg({ quality: 82, mozjpeg: true }).toBuffer(),
+            ext: ".jpg",
+          };
+      }
+    } catch (err) {
+      // The bytes claimed to be a raster image (per magic number) but sharp
+      // couldn't actually decode them — reject rather than ever writing
+      // unverified bytes to disk with a trusted-looking extension.
+      throw new UnsupportedUploadError(
+        err instanceof Error ? err.message : "Unsupported or corrupt image file",
+      );
+    }
+  }
+
+  // file-type can't sniff text formats like SVG by magic number, so fall
+  // back to a content check — but only ever store the *sanitized* result.
+  if (looksLikeSvg(buffer)) {
+    return { buffer: sanitizeSvg(buffer), ext: ".svg" };
+  }
+
+  throw new UnsupportedUploadError("Unsupported or unrecognized image file");
 }
 
 // POST /api/uploads — upload + optimize a single image
@@ -70,31 +144,34 @@ router.post("/", requireAuth, upload.single("file"), async (req: AuthRequest, re
       return;
     }
 
-    let optimized: { buffer: Buffer; ext: string };
+    let processed: { buffer: Buffer; ext: string };
     try {
-      optimized = await optimizeImage(req.file.buffer, req.file.mimetype);
+      processed = await processUpload(req.file.buffer);
     } catch (err) {
-      // If sharp can't process the image (corrupt/unsupported variant), fall
-      // back to storing the original bytes so the upload still succeeds.
-      logger.warn({ err }, "image optimization failed; storing original");
-      optimized = {
-        buffer: req.file.buffer,
-        ext: path.extname(req.file.originalname).toLowerCase() || ".img",
-      };
+      if (err instanceof UnsupportedUploadError) {
+        logger.warn({ err }, "rejected upload: unrecognized or unsafe file content");
+        res.status(400).json({ error: "Unsupported or invalid image file" });
+        return;
+      }
+      throw err;
     }
 
-    const filename = `${Date.now()}-${Math.random().toString(36).slice(2)}${optimized.ext}`;
+    const filename = `${Date.now()}-${Math.random().toString(36).slice(2)}${processed.ext}`;
     fs.mkdirSync(uploadsDir, { recursive: true });
-    fs.writeFileSync(path.join(uploadsDir, filename), optimized.buffer);
+    fs.writeFileSync(path.join(uploadsDir, filename), processed.buffer);
 
     const url = `/api/uploads/files/${filename}`;
+
+    // Store the mimetype we determined from the actual bytes (never the
+    // client-supplied one) so downstream consumers can't be misled either.
+    const storedMimetype = EXT_MIME[processed.ext] ?? "application/octet-stream";
 
     const row = uploadStmts.create.get(
       req.user!.userId,
       filename,
       req.file.originalname,
-      req.file.mimetype,
-      optimized.buffer.length,
+      storedMimetype,
+      processed.buffer.length,
       url,
     );
 

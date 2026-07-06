@@ -89,7 +89,7 @@ describe("POST /uploads (optimization)", () => {
 });
 
 describe("POST /uploads (passthrough formats)", () => {
-  it("stores an SVG untouched", async () => {
+  it("stores a benign SVG, sanitized but visually intact", async () => {
     const svg = Buffer.from(
       '<svg xmlns="http://www.w3.org/2000/svg" width="500" height="500"><rect width="500" height="500" fill="red"/></svg>',
     );
@@ -101,8 +101,13 @@ describe("POST /uploads (passthrough formats)", () => {
     expect(res.status).toBe(201);
     const stored = diskPathFromUrl(res.body.url);
     expect(stored.endsWith(".svg")).toBe(true);
-    // Bytes are stored exactly as uploaded (no re-encoding).
-    expect(fs.readFileSync(stored).equals(svg)).toBe(true);
+    // SVGs are run through a sanitizer (DOMPurify) before being written to
+    // disk, so bytes are not guaranteed to be byte-for-byte identical — but
+    // the visual content (the rect) must survive.
+    const storedContents = fs.readFileSync(stored, "utf8");
+    expect(storedContents).toMatch(/<svg/i);
+    expect(storedContents).toMatch(/<rect/i);
+    expect(storedContents).toMatch(/fill="red"/i);
   });
 
   it("stores a GIF untouched", async () => {
@@ -123,21 +128,47 @@ describe("POST /uploads (passthrough formats)", () => {
   });
 });
 
-describe("POST /uploads (corrupt input fallback)", () => {
-  it("falls back to storing the original bytes when optimization fails", async () => {
-    // Not a real image — sharp cannot decode it, so the route should store it as-is.
+describe("POST /uploads (corrupt / spoofed input rejection)", () => {
+  it("rejects garbage bytes claiming to be a PNG instead of storing them", async () => {
+    // Not a real image — sharp cannot decode it. The old (vulnerable) behavior
+    // stored these bytes verbatim under the claimed extension; the fix must
+    // reject the upload outright instead of trusting the client-supplied
+    // mimetype/extension.
     const garbage = Buffer.from("this is definitely not a valid PNG payload");
 
     const res = await request(app)
       .post("/uploads")
       .attach("file", garbage, { filename: "broken.png", contentType: "image/png" });
 
+    expect(res.status).toBe(400);
+    expect(res.body.url).toBeUndefined();
+  });
+
+  it("rejects HTML mislabeled as an image, even with an image extension", async () => {
+    const html = Buffer.from("<html><body><script>alert(document.cookie)</script></body></html>");
+
+    const res = await request(app)
+      .post("/uploads")
+      .attach("file", html, { filename: "avatar.png", contentType: "image/png" });
+
+    expect(res.status).toBe(400);
+  });
+
+  it("sanitizes an uploaded SVG, stripping embedded <script> tags", async () => {
+    const maliciousSvg = Buffer.from(
+      '<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)"><script>alert(document.cookie)</script><rect width="10" height="10" fill="red"/></svg>',
+    );
+
+    const res = await request(app)
+      .post("/uploads")
+      .attach("file", maliciousSvg, { filename: "evil.svg", contentType: "image/svg+xml" });
+
     expect(res.status).toBe(201);
     const stored = diskPathFromUrl(res.body.url);
-    expect(fs.existsSync(stored)).toBe(true);
-    // Original bytes preserved (extension taken from the original name).
-    expect(stored.endsWith(".png")).toBe(true);
-    expect(fs.readFileSync(stored).equals(garbage)).toBe(true);
+    const storedContents = fs.readFileSync(stored, "utf8");
+    expect(storedContents).not.toMatch(/<script/i);
+    expect(storedContents).not.toMatch(/onload/i);
+    expect(storedContents).toMatch(/<svg/i);
   });
 });
 
