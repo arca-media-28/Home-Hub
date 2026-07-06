@@ -1,10 +1,10 @@
 ---
-name: service_connections is global, not per-user
-description: The service_connections table is keyed by service alone (no userId); rows are shared across all users.
+name: service_connections is per-user (migrated from global)
+description: The service_connections and service_health tables were migrated from a single global row per service to per-user rows keyed by (user_id, service).
 ---
 
-The `service_connections` table is keyed by `service` alone — there is no `userId` column. `connectionStmts.findAll` selects every row, and `upsert` uses `ON CONFLICT(service)`.
+`service_connections` and `service_health` used to be keyed by `service` alone (no `userId`), meaning every authenticated user shared — and could read/tamper with — the same Google, IMAP, CalDAV, Spotify, and generic service (TrueNAS/Plex/Sonarr/etc.) credentials. This was a security hardening fix (2026-07-06): both tables now have a `user_id` column, `UNIQUE(user_id, service)`, and every read/write path (`connectionStmts`, `healthStmts`, `lib/google.ts`, `lib/spotify.ts`, `lib/mailAccounts.ts`, `lib/email.ts`, `lib/calendar.ts`, `lib/healthCheck.ts`, and every route in `routes/widgets.ts`/`routes/connections.ts`/`routes/google.ts`/`routes/spotify.ts`) takes an explicit `userId` and scopes queries to it.
 
-**Why:** Connection settings are intentionally host-wide ("stored on the host and shared across all browsers pointing to this dashboard" — see Settings page copy). Any authenticated user reads/writes the same shared rows.
+**Why:** Any authenticated user could previously read/write another user's saved integration credentials and OAuth tokens because the schema had no per-user isolation.
 
-**How to apply:** A `PUT /connections/:service` overwrites the single global row for that service — never use it for throwaway test data against a live instance, it will clobber real settings. The reachability status endpoint (`GET /connections/status`) pings these shared rows, so status is the same for every user. A row with empty URL/credentials still counts as a row, so it reports `configured: true` with an `ok: false` validation message rather than being treated as absent.
+**How to apply:** Any new saved-connection lookup or write MUST take `userId` as an explicit parameter (never read from a module-level `req` closure — that was a bug caught mid-migration where a helper function referenced `req.user` outside any request handler). `healthCheck.ts` now loops over all users (`SELECT id FROM users`) and checks connections per user, since health checks can no longer be done once globally. New users get seeded empty connection rows via `createDefaultServiceConnections(userId)` on signup. Existing test mocks for `connectionStmts.findByService`/`upsert` must accept `(userId, service, ...)` in that order, not `(service, ...)`.

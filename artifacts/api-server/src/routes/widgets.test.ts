@@ -6,7 +6,10 @@ import request from "supertest";
 // Replace the auth middleware with a pass-through so we can exercise the routes
 // without minting a real JWT.
 vi.mock("../lib/auth.js", () => ({
-  requireAuth: (_req: unknown, _res: unknown, next: () => void) => next(),
+  requireAuth: (req: { user?: { userId: number } }, _res: unknown, next: () => void) => {
+    req.user = { userId: 1 };
+    next();
+  },
 }));
 
 // Stub the DB layer so no real SQLite file is opened and we can dictate, per
@@ -2042,7 +2045,7 @@ describe("GET /widgets/email/inbox", () => {
   it("returns empty live data (not sample) when an account exists but the filter matches none", async () => {
     // An IMAP account is configured, but the tile's filter names a stale id —
     // the route must NOT fall back to demo data (that would look like real mail).
-    findByService.mockImplementation((service: string) =>
+    findByService.mockImplementation((_userId: number, service: string) =>
       service === "imap"
         ? connRow({
             service: "imap",
@@ -2147,7 +2150,7 @@ describe("GET /widgets/calendar/events", () => {
   });
 
   it("returns empty live data (not sample) when an account exists but the filter matches none", async () => {
-    findByService.mockImplementation((service: string) =>
+    findByService.mockImplementation((_userId: number, service: string) =>
       service === "caldav"
         ? connRow({
             service: "caldav",
@@ -2181,7 +2184,7 @@ describe("GET /widgets/gmail/auth", () => {
 
   it("accepts a freshly minted intent exactly once", async () => {
     const { createGoogleAuthIntent } = await import("../lib/google.js");
-    const intent = createGoogleAuthIntent();
+    const intent = createGoogleAuthIntent(1);
     // Env vars are unset in tests, so a valid intent proceeds past the guard
     // and fails on the "not configured" check (400), NOT the 403 guard.
     const first = await request(app).get(`/widgets/gmail/auth?intent=${intent}`);

@@ -1,6 +1,6 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
-import { db, userStmts, createDefaultPage, type DbUser } from "../lib/db.js";
+import { db, userStmts, createDefaultPage, createDefaultServiceConnections, type DbUser } from "../lib/db.js";
 import { signToken, requireAuth, type AuthRequest } from "../lib/auth.js";
 
 const router = Router();
@@ -41,6 +41,10 @@ router.post("/register", async (req, res) => {
     // Every new user starts with a single default page so the dashboard always
     // has at least one page to render and drop tiles onto.
     createDefaultPage(user.id);
+    // Every new user starts with their own empty service connection rows
+    // (never shared with other users) so Settings always has something to
+    // render for them.
+    createDefaultServiceConnections(user.id);
     const token = signToken({ userId: user.id, username: user.username });
     res.status(201).json({ token, user: formatUser(user) });
   } catch (err) {

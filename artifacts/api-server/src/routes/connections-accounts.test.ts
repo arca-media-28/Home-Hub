@@ -4,15 +4,20 @@ import request from "supertest";
 
 // Pass-through auth so routes can be exercised without a real JWT.
 vi.mock("../lib/auth.js", () => ({
-  requireAuth: (_req: unknown, _res: unknown, next: () => void) => next(),
+  requireAuth: (req: { user?: { userId: number } }, _res: unknown, next: () => void) => {
+    req.user = { userId: 1 };
+    next();
+  },
 }));
 
 // In-memory stand-in for the service_connections table: findByService reads
 // the row that upsert last wrote, so add/list round-trips work like the real DB.
+// Keyed by `${userId}:${service}` now that connections are per-user.
 const rows = new Map<string, { service: string; extra: string | null }>();
-const findByService = vi.fn((service: string) => rows.get(service));
+const findByService = vi.fn((userId: number, service: string) => rows.get(`${userId}:${service}`));
 const upsertRun = vi.fn(
   (
+    userId: number,
     service: string,
     _url: unknown,
     _apiKey: unknown,
@@ -20,16 +25,16 @@ const upsertRun = vi.fn(
     _password: unknown,
     extra: string | null,
   ) => {
-    rows.set(service, { service, extra });
+    rows.set(`${userId}:${service}`, { service, extra });
   },
 );
 vi.mock("../lib/db.js", () => ({
   connectionStmts: {
-    findByService: { get: (...args: unknown[]) => findByService(...(args as [string])) },
+    findByService: { get: (...args: unknown[]) => findByService(...(args as [number, string])) },
     upsert: {
       run: (...args: unknown[]) =>
         upsertRun(
-          ...(args as [string, unknown, unknown, unknown, unknown, string | null]),
+          ...(args as [number, string, unknown, unknown, unknown, unknown, string | null]),
         ),
     },
   },
@@ -86,7 +91,7 @@ describe("POST /connections/imap/accounts", () => {
     expect(res.body[0]).not.toHaveProperty("password");
     // The persisted row must carry secure:false too (it drives the imapflow
     // connection options later).
-    const stored = JSON.parse(rows.get("imap")?.extra ?? "[]");
+    const stored = JSON.parse(rows.get("1:imap")?.extra ?? "[]");
     expect(stored[0].secure).toBe(false);
     expect(stored[0].password).toBe("pw");
   });
@@ -117,7 +122,7 @@ describe("POST /connections/imap/accounts", () => {
     });
     expect(res.status).toBe(200);
     expect(res.body[0].webmailUrl).toBe("https://mail.example.com/inbox");
-    const stored = JSON.parse(rows.get("imap")?.extra ?? "[]");
+    const stored = JSON.parse(rows.get("1:imap")?.extra ?? "[]");
     expect(stored[0].webmailUrl).toBe("https://mail.example.com/inbox");
   });
 
@@ -167,7 +172,7 @@ describe("PUT/DELETE /connections/google/credentials", () => {
     });
     expect(JSON.stringify(res.body)).not.toContain("GOCSPX-secret");
     // Persisted (trimmed) in the dedicated "google" row.
-    const stored = JSON.parse(rows.get("google")?.extra ?? "{}");
+    const stored = JSON.parse(rows.get("1:google")?.extra ?? "{}");
     expect(stored).toEqual({
       clientId: "abc.apps.googleusercontent.com",
       clientSecret: "GOCSPX-secret",
@@ -175,8 +180,8 @@ describe("PUT/DELETE /connections/google/credentials", () => {
   });
 
   it("clears any existing account link when credentials change", async () => {
-    rows.set("gmail", { service: "gmail", extra: JSON.stringify({ refreshToken: "r1" }) });
-    rows.set("google_calendar", {
+    rows.set("1:gmail", { service: "gmail", extra: JSON.stringify({ refreshToken: "r1" }) });
+    rows.set("1:google_calendar", {
       service: "google_calendar",
       extra: JSON.stringify({ refreshToken: "r1" }),
     });
@@ -185,8 +190,8 @@ describe("PUT/DELETE /connections/google/credentials", () => {
       .send({ clientId: "new-id", clientSecret: "new-secret" });
     expect(res.status).toBe(200);
     // Old tokens are bound to the old OAuth client — both mirrored rows reset.
-    expect(JSON.parse(rows.get("gmail")?.extra ?? "null")).toBeNull();
-    expect(JSON.parse(rows.get("google_calendar")?.extra ?? "null")).toBeNull();
+    expect(JSON.parse(rows.get("1:gmail")?.extra ?? "null")).toBeNull();
+    expect(JSON.parse(rows.get("1:google_calendar")?.extra ?? "null")).toBeNull();
   });
 
   it("removes stored credentials and reports unconfigured", async () => {
@@ -200,7 +205,7 @@ describe("PUT/DELETE /connections/google/credentials", () => {
       credentialSource: null,
       clientId: null,
     });
-    expect(rows.get("google")?.extra ?? null).toBeNull();
+    expect(rows.get("1:google")?.extra ?? null).toBeNull();
   });
 
   it("migrates a legacy single-token blob and lists it as one account", async () => {
@@ -209,7 +214,7 @@ describe("PUT/DELETE /connections/google/credentials", () => {
       .send({ clientId: "id", clientSecret: "sec" });
     // Pre-multi-account shape: a single token blob at the top level. A fresh
     // (unexpired) access token means status can validate without a refresh.
-    rows.set("gmail", {
+    rows.set("1:gmail", {
       service: "gmail",
       extra: JSON.stringify({
         refreshToken: "r1",
@@ -237,7 +242,7 @@ describe("PUT/DELETE /connections/google/credentials", () => {
       accessToken: `a-${id}`,
       expiresAt: Date.now() + 3_600_000,
     });
-    rows.set("gmail", {
+    rows.set("1:gmail", {
       service: "gmail",
       extra: JSON.stringify({
         accounts: [account("acc1", "one@gmail.com"), account("acc2", "two@gmail.com")],
@@ -260,7 +265,7 @@ describe("PUT/DELETE /connections/google/credentials", () => {
       { id: "acc2", email: "two@gmail.com", connected: true },
     ]);
     // The mirrored calendar row tracks the same remaining account.
-    const mirrored = JSON.parse(rows.get("google_calendar")?.extra ?? "{}");
+    const mirrored = JSON.parse(rows.get("1:google_calendar")?.extra ?? "{}");
     expect(mirrored.accounts).toHaveLength(1);
     expect(mirrored.accounts[0].id).toBe("acc2");
 
@@ -268,7 +273,7 @@ describe("PUT/DELETE /connections/google/credentials", () => {
     const all = await request(app).post("/connections/google/disconnect").send();
     expect(all.status).toBe(200);
     expect(all.body).toMatchObject({ connected: false, accounts: [] });
-    expect(rows.get("gmail")?.extra ?? null).toBeNull();
+    expect(rows.get("1:gmail")?.extra ?? null).toBeNull();
   });
 
   it("returns 409 when credentials come from environment variables", async () => {

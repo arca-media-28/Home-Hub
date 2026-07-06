@@ -1,6 +1,6 @@
 import { Router } from "express";
 import Parser from "rss-parser";
-import { requireAuth } from "../lib/auth.js";
+import { requireAuth, type AuthRequest } from "../lib/auth.js";
 import { connectionStmts } from "../lib/db.js";
 import { httpClient, cloudHttpClient, normalizeBaseUrl, normalizeHttpError, describeHttpError } from "../lib/http.js";
 import { fetchPiholeData } from "../lib/pihole.js";
@@ -65,8 +65,8 @@ function trimSlash(url: string): string {
 // Read a service's saved connection from the DB. Returns an empty object when
 // the service has no row or no values stored. The `extra` column holds a JSON
 // blob that may carry a Plex token.
-function getSavedConnection(service: string): SavedConnection {
-  const row = connectionStmts.findByService.get(service);
+function getSavedConnection(userId: number, service: string): SavedConnection {
+  const row = connectionStmts.findByService.get(userId, service);
   if (!row) return {};
 
   let token: string | undefined;
@@ -726,8 +726,8 @@ function diskNamesFrom(diskData: unknown): string[] {
     .filter((n): n is string => Boolean(n));
 }
 
-router.get("/truenas", requireAuth, async (_req, res) => {
-  const saved = getSavedConnection("truenas");
+router.get("/truenas", requireAuth, async (req: AuthRequest, res) => {
+  const saved = getSavedConnection(req.user!.userId, "truenas");
   const baseUrl = saved.url || process.env["TRUENAS_URL"];
   const apiKey = saved.apiKey || process.env["TRUENAS_API_KEY"];
 
@@ -1104,8 +1104,8 @@ function capDiagnosticBody(body: unknown): unknown {
   return body;
 }
 
-router.get("/truenas/diagnostics", requireAuth, async (_req, res) => {
-  const saved = getSavedConnection("truenas");
+router.get("/truenas/diagnostics", requireAuth, async (req: AuthRequest, res) => {
+  const saved = getSavedConnection(req.user!.userId, "truenas");
   const baseUrl = saved.url || process.env["TRUENAS_URL"];
   const apiKey = saved.apiKey || process.env["TRUENAS_API_KEY"];
 
@@ -1332,7 +1332,7 @@ router.get("/truenas/diagnostics", requireAuth, async (_req, res) => {
 // ────────────────────────────────────────────────
 // Media Server Widget (Plex or Jellyfin)
 // ────────────────────────────────────────────────
-router.get("/media", requireAuth, async (req, res) => {
+router.get("/media", requireAuth, async (req: AuthRequest, res) => {
   // Which media server backs this tile. "jellyfin" reads the saved Jellyfin
   // connection; anything else (the default) reads the saved Plex connection.
   const server = req.query["server"] === "jellyfin" ? "jellyfin" : "plex";
@@ -1345,7 +1345,7 @@ router.get("/media", requireAuth, async (req, res) => {
     // Jellyfin uses a base URL + API key, both stored on the jellyfin
     // connection. Fall back to the env-configured media server only when no
     // Jellyfin connection is saved.
-    const saved = getSavedConnection("jellyfin");
+    const saved = getSavedConnection(req.user!.userId, "jellyfin");
     serverType = "jellyfin";
     baseUrl = saved.url;
     apiKey = saved.apiKey;
@@ -1359,7 +1359,7 @@ router.get("/media", requireAuth, async (req, res) => {
   } else {
     // Plex uses a base URL + token (the token may be stored under `token` or
     // `apiKey`). Fall back to a Plex-typed env media server when unsaved.
-    const saved = getSavedConnection("plex");
+    const saved = getSavedConnection(req.user!.userId, "plex");
     const savedToken = saved.token || saved.apiKey;
     serverType = "plex";
     if (saved.url && savedToken) {
@@ -1493,7 +1493,7 @@ router.get("/media", requireAuth, async (req, res) => {
 // ────────────────────────────────────────────────
 // Continue Watching Widget (Plex On Deck)
 // ────────────────────────────────────────────────
-router.get("/media/continue", requireAuth, async (req, res) => {
+router.get("/media/continue", requireAuth, async (req: AuthRequest, res) => {
   // Which media server backs this tile. "jellyfin" reads the saved Jellyfin
   // connection (Resume items); anything else (the default) reads the saved Plex
   // connection (On Deck).
@@ -1507,7 +1507,7 @@ router.get("/media/continue", requireAuth, async (req, res) => {
     // Jellyfin uses a base URL + API key, both stored on the jellyfin
     // connection. Fall back to the env-configured media server only when no
     // Jellyfin connection is saved.
-    const saved = getSavedConnection("jellyfin");
+    const saved = getSavedConnection(req.user!.userId, "jellyfin");
     serverType = "jellyfin";
     baseUrl = saved.url;
     apiKey = saved.apiKey;
@@ -1521,7 +1521,7 @@ router.get("/media/continue", requireAuth, async (req, res) => {
   } else {
     // Plex uses a base URL + token (stored under `token` or `apiKey`). Fall back
     // to a Plex-typed env media server when unsaved.
-    const saved = getSavedConnection("plex");
+    const saved = getSavedConnection(req.user!.userId, "plex");
     const savedToken = saved.token || saved.apiKey;
     serverType = "plex";
     if (saved.url && savedToken) {
@@ -1781,11 +1781,11 @@ function mapJellyfinTrack(
 
 // Resolve the saved Jellyfin connection (base URL + API key), falling back to a
 // Jellyfin-typed env media server when none is saved — mirrors the /media route.
-function resolveJellyfinAudioConnection(): {
+function resolveJellyfinAudioConnection(userId: number): {
   baseUrl: string | undefined;
   apiKey: string | undefined;
 } {
-  const saved = getSavedConnection("jellyfin");
+  const saved = getSavedConnection(userId, "jellyfin");
   let baseUrl = saved.url;
   let apiKey = saved.apiKey;
   if (!baseUrl || !apiKey) {
@@ -1802,8 +1802,8 @@ function resolveJellyfinAudioConnection(): {
 // the current music session (with progress) when one is playing, otherwise the
 // most recently added music tracks. Each real track carries an authenticated,
 // browser-playable .mp3 stream URL so the shared <audio> engine can play it.
-async function handleJellyfinAudio(res: import("express").Response): Promise<void> {
-  const { baseUrl, apiKey } = resolveJellyfinAudioConnection();
+async function handleJellyfinAudio(userId: number, res: import("express").Response): Promise<void> {
+  const { baseUrl, apiKey } = resolveJellyfinAudioConnection(userId);
 
   // Unconfigured → built-in demo content (sample:true). streamUrl stays null so
   // the tile labels it not-live and disables in-browser streaming.
@@ -1917,8 +1917,8 @@ function mapSpotifyTrack(item: SpotifyTrackObject, playback: SpotifyPlayback | n
   };
 }
 
-async function handleSpotifyAudio(res: import("express").Response): Promise<void> {
-  const conn = getSpotifyConnection();
+async function handleSpotifyAudio(userId: number, res: import("express").Response): Promise<void> {
+  const conn = getSpotifyConnection(userId);
   const linked = Boolean(conn.clientId && conn.clientSecret && conn.tokens.refreshToken);
 
   // Not linked → an actionable "connect" state rather than demo content, so the
@@ -1938,7 +1938,7 @@ async function handleSpotifyAudio(res: import("express").Response): Promise<void
   }
 
   try {
-    const token = await getValidAccessToken();
+    const token = await getValidAccessToken(userId);
     // Premium gates in-browser playback; failure here shouldn't break the tile.
     let premium: boolean | null = null;
     try {
@@ -2054,8 +2054,8 @@ function estimateSubsonicProgressMs(song: SubsonicSong): number | null {
 // most recent now-playing entry when one exists, otherwise the newest album's
 // tracks. Each real track carries an authenticated, browser-playable .mp3 stream
 // URL so the shared <audio> engine can play it.
-async function handleSubsonicAudio(res: import("express").Response): Promise<void> {
-  const saved = getSavedConnection("subsonic");
+async function handleSubsonicAudio(userId: number, res: import("express").Response): Promise<void> {
+  const saved = getSavedConnection(userId, "subsonic");
   const baseUrl = saved.url;
   const username = saved.username;
   const password = saved.password;
@@ -2145,7 +2145,7 @@ async function handleSubsonicAudio(res: import("express").Response): Promise<voi
 // with the read-only progress the tile already surfaces. Reuses the saved
 // `subsonic` connection + salted-token auth. Failures are surfaced as errors but
 // the caller treats them as non-fatal so playback never breaks.
-router.post("/subsonic/scrobble", requireAuth, async (req, res) => {
+router.post("/subsonic/scrobble", requireAuth, async (req: AuthRequest, res) => {
   const body = (req.body ?? {}) as { id?: unknown; submission?: unknown };
   const id = typeof body.id === "string" ? body.id : "";
   if (!id) {
@@ -2154,7 +2154,7 @@ router.post("/subsonic/scrobble", requireAuth, async (req, res) => {
   }
   const submission = body.submission === true;
 
-  const saved = getSavedConnection("subsonic");
+  const saved = getSavedConnection(req.user!.userId, "subsonic");
   const baseUrl = saved.url;
   const username = saved.username;
   const password = saved.password;
@@ -2181,27 +2181,27 @@ router.post("/subsonic/scrobble", requireAuth, async (req, res) => {
   }
 });
 
-router.get("/audioplayer", requireAuth, async (req, res) => {
+router.get("/audioplayer", requireAuth, async (req: AuthRequest, res) => {
   // Source selects the music backend. Spotify uses the linked OAuth account;
   // anything else resolves to Plex (the original/default source).
   const requested = String(req.query["source"] ?? "plex");
   if (requested === "spotify") {
-    await handleSpotifyAudio(res);
+    await handleSpotifyAudio(req.user!.userId, res);
     return;
   }
   if (requested === "jellyfin") {
-    await handleJellyfinAudio(res);
+    await handleJellyfinAudio(req.user!.userId, res);
     return;
   }
   if (requested === "subsonic") {
-    await handleSubsonicAudio(res);
+    await handleSubsonicAudio(req.user!.userId, res);
     return;
   }
   const source = "plex";
 
   // Plex stores the token under `token` or `apiKey`. Fall back to a Plex-typed
   // env media server when no Plex connection is saved (mirrors /media).
-  const saved = getSavedConnection("plex");
+  const saved = getSavedConnection(req.user!.userId, "plex");
   const savedToken = saved.token || saved.apiKey;
   let baseUrl: string | undefined;
   let token: string | undefined;
@@ -2333,8 +2333,8 @@ interface PlexDirRow {
 // Resolve the Plex base URL + token for music browsing, mirroring the
 // /audioplayer route: prefer the saved Plex connection, fall back to a
 // Plex-typed env media server. Returns null when neither is configured.
-function resolvePlexAudioConnection(): { baseUrl: string; token: string } | null {
-  const saved = getSavedConnection("plex");
+function resolvePlexAudioConnection(userId: number): { baseUrl: string; token: string } | null {
+  const saved = getSavedConnection(userId, "plex");
   const savedToken = saved.token || saved.apiKey;
   if (saved.url && savedToken) return { baseUrl: saved.url, token: savedToken };
   const envType = process.env["MEDIA_SERVER_TYPE"] || "jellyfin";
@@ -2533,10 +2533,11 @@ function demoBrowseResult(source: string, kind: string) {
 
 // ── Plex search / browse handlers ────────────────────────────────────────────
 async function plexSearchLibrary(
+  userId: number,
   res: import("express").Response,
   query: string,
 ): Promise<void> {
-  const conn = resolvePlexAudioConnection();
+  const conn = resolvePlexAudioConnection(userId);
   if (!conn) {
     res.json(demoSearchResult("plex"));
     return;
@@ -2583,11 +2584,12 @@ async function plexSearchLibrary(
 }
 
 async function plexBrowseLibrary(
+  userId: number,
   res: import("express").Response,
   kind: string,
   id: string,
 ): Promise<void> {
-  const conn = resolvePlexAudioConnection();
+  const conn = resolvePlexAudioConnection(userId);
   if (!conn) {
     res.json(demoBrowseResult("plex", kind));
     return;
@@ -2654,17 +2656,18 @@ async function plexBrowseLibrary(
 }
 
 // ── Subsonic search / browse handlers ────────────────────────────────────────
-function subsonicConn() {
-  const saved = getSavedConnection("subsonic");
+function subsonicConn(userId: number) {
+  const saved = getSavedConnection(userId, "subsonic");
   if (!saved.url || !saved.username || !saved.password) return null;
   return { baseUrl: saved.url, username: saved.username, password: saved.password };
 }
 
 async function subsonicSearchLibrary(
+  userId: number,
   res: import("express").Response,
   query: string,
 ): Promise<void> {
-  const conn = subsonicConn();
+  const conn = subsonicConn(userId);
   if (!conn) {
     res.json(demoSearchResult("subsonic"));
     return;
@@ -2701,11 +2704,12 @@ async function subsonicSearchLibrary(
 }
 
 async function subsonicBrowseLibrary(
+  userId: number,
   res: import("express").Response,
   kind: string,
   id: string,
 ): Promise<void> {
-  const conn = subsonicConn();
+  const conn = subsonicConn(userId);
   if (!conn) {
     res.json(demoBrowseResult("subsonic", kind));
     return;
@@ -2766,21 +2770,21 @@ async function subsonicBrowseLibrary(
 
 // GET /widgets/audioplayer/search — search a source's library by name. Returns
 // artists, albums, and playable tracks for the pop-out music browser.
-router.get("/audioplayer/search", requireAuth, async (req, res) => {
+router.get("/audioplayer/search", requireAuth, async (req: AuthRequest, res) => {
   const source = String(req.query["source"] ?? "plex");
   const query = String(req.query["query"] ?? "").trim();
   if (source === "subsonic") {
-    await subsonicSearchLibrary(res, query);
+    await subsonicSearchLibrary(req.user!.userId, res, query);
     return;
   }
-  await plexSearchLibrary(res, query);
+  await plexSearchLibrary(req.user!.userId, res, query);
 });
 
 // GET /widgets/audioplayer/browse — list a source's library / playlists, with
 // drill-down (artist→albums, album→tracks, playlist→tracks).
 const BROWSE_KINDS = ["recent", "albums", "artists", "artist", "album", "playlists", "playlist", "random"];
 const BROWSE_KINDS_NEEDING_ID = ["artist", "album", "playlist"];
-router.get("/audioplayer/browse", requireAuth, async (req, res) => {
+router.get("/audioplayer/browse", requireAuth, async (req: AuthRequest, res) => {
   const source = String(req.query["source"] ?? "plex");
   const kind = String(req.query["kind"] ?? "");
   const id = String(req.query["id"] ?? "").trim();
@@ -2793,10 +2797,10 @@ router.get("/audioplayer/browse", requireAuth, async (req, res) => {
     return;
   }
   if (source === "subsonic") {
-    await subsonicBrowseLibrary(res, kind, id);
+    await subsonicBrowseLibrary(req.user!.userId, res, kind, id);
     return;
   }
-  await plexBrowseLibrary(res, kind, id);
+  await plexBrowseLibrary(req.user!.userId, res, kind, id);
 });
 
 // POST /widgets/spotify/command — remote-control the active Spotify device.
@@ -2804,7 +2808,7 @@ router.get("/audioplayer/browse", requireAuth, async (req, res) => {
 // action that hands playback to the in-browser Web Playback SDK device.
 const SPOTIFY_ACTIONS: SpotifyCommand[] = ["play", "pause", "next", "previous", "transfer"];
 
-router.post("/spotify/command", requireAuth, async (req, res) => {
+router.post("/spotify/command", requireAuth, async (req: AuthRequest, res) => {
   const body = (req.body ?? {}) as { action?: string; deviceId?: string | null };
   const action = body.action as SpotifyCommand | undefined;
   if (!action || !SPOTIFY_ACTIONS.includes(action)) {
@@ -2816,14 +2820,14 @@ router.post("/spotify/command", requireAuth, async (req, res) => {
     return;
   }
 
-  const conn = getSpotifyConnection();
+  const conn = getSpotifyConnection(req.user!.userId);
   if (!conn.clientId || !conn.clientSecret || !conn.tokens.refreshToken) {
     res.status(404).json({ error: "Spotify account is not linked" });
     return;
   }
 
   try {
-    const token = await getValidAccessToken();
+    const token = await getValidAccessToken(req.user!.userId);
     const result = await sendCommand(token, action, body.deviceId ?? undefined);
     if (result === "no-device") {
       res.status(404).json({ error: "No active Spotify device" });
@@ -2839,8 +2843,8 @@ router.post("/spotify/command", requireAuth, async (req, res) => {
 // ────────────────────────────────────────────────
 // Sonarr Widget
 // ────────────────────────────────────────────────
-router.get("/sonarr", requireAuth, async (_req, res) => {
-  const saved = getSavedConnection("sonarr");
+router.get("/sonarr", requireAuth, async (req: AuthRequest, res) => {
+  const saved = getSavedConnection(req.user!.userId, "sonarr");
   const baseUrl = saved.url || process.env["SONARR_URL"];
   const apiKey = saved.apiKey || process.env["SONARR_API_KEY"];
 
@@ -2911,8 +2915,8 @@ router.get("/sonarr", requireAuth, async (_req, res) => {
 // ────────────────────────────────────────────────
 // Radarr Widget
 // ────────────────────────────────────────────────
-router.get("/radarr", requireAuth, async (_req, res) => {
-  const saved = getSavedConnection("radarr");
+router.get("/radarr", requireAuth, async (req: AuthRequest, res) => {
+  const saved = getSavedConnection(req.user!.userId, "radarr");
   const baseUrl = saved.url || process.env["RADARR_URL"];
   const apiKey = saved.apiKey || process.env["RADARR_API_KEY"];
 
@@ -2983,8 +2987,8 @@ router.get("/radarr", requireAuth, async (_req, res) => {
 // ────────────────────────────────────────────────
 // Lidarr Widget
 // ────────────────────────────────────────────────
-router.get("/lidarr", requireAuth, async (_req, res) => {
-  const saved = getSavedConnection("lidarr");
+router.get("/lidarr", requireAuth, async (req: AuthRequest, res) => {
+  const saved = getSavedConnection(req.user!.userId, "lidarr");
   const baseUrl = saved.url || process.env["LIDARR_URL"];
   const apiKey = saved.apiKey || process.env["LIDARR_API_KEY"];
 
@@ -3106,8 +3110,8 @@ function isAuthError(err: unknown): boolean {
   );
 }
 
-router.get("/qbittorrent", requireAuth, async (_req, res) => {
-  const saved = getSavedConnection("qbittorrent");
+router.get("/qbittorrent", requireAuth, async (req: AuthRequest, res) => {
+  const saved = getSavedConnection(req.user!.userId, "qbittorrent");
   const baseUrl = normalizeBaseUrl(saved.url || process.env["QBITTORRENT_URL"]);
   const username = saved.username || process.env["QBITTORRENT_USERNAME"];
   const password = saved.password ?? process.env["QBITTORRENT_PASSWORD"];
@@ -3228,8 +3232,8 @@ router.get("/qbittorrent", requireAuth, async (_req, res) => {
 // at `/api/auth`, stats at `/api/...`) first and falls back to the legacy v5
 // `admin/api.php` endpoint, so one saved connection works for both. See
 // lib/pihole.ts for the detection + mapping details.
-router.get("/pihole", requireAuth, async (_req, res) => {
-  const saved = getSavedConnection("pihole");
+router.get("/pihole", requireAuth, async (req: AuthRequest, res) => {
+  const saved = getSavedConnection(req.user!.userId, "pihole");
   const baseUrl = normalizeBaseUrl(saved.url || process.env["PIHOLE_URL"]);
   const apiKey = saved.apiKey || process.env["PIHOLE_API_KEY"];
 
@@ -3305,8 +3309,8 @@ function isUnauthorized(err: unknown): boolean {
   return status === 401 || status === 403;
 }
 
-router.get("/nginx-proxy-manager", requireAuth, async (_req, res) => {
-  const saved = getSavedConnection("nginx-proxy-manager");
+router.get("/nginx-proxy-manager", requireAuth, async (req: AuthRequest, res) => {
+  const saved = getSavedConnection(req.user!.userId, "nginx-proxy-manager");
   const baseUrl = normalizeBaseUrl(saved.url || process.env["NPM_URL"]);
   // The NPM connection stores the login email in the `username` field.
   const email = saved.username || process.env["NPM_EMAIL"];
@@ -3436,8 +3440,8 @@ router.get("/nginx-proxy-manager", requireAuth, async (_req, res) => {
 // state from the health feed: Prowlarr surfaces unreachable indexers as a
 // health issue whose message names the affected indexers, so an enabled indexer
 // counts as failing when its name appears in any health message.
-router.get("/prowlarr", requireAuth, async (_req, res) => {
-  const saved = getSavedConnection("prowlarr");
+router.get("/prowlarr", requireAuth, async (req: AuthRequest, res) => {
+  const saved = getSavedConnection(req.user!.userId, "prowlarr");
   const baseUrl = saved.url || process.env["PROWLARR_URL"];
   const apiKey = saved.apiKey || process.env["PROWLARR_API_KEY"];
 
@@ -3571,8 +3575,8 @@ function keyExpiryStatus(
   };
 }
 
-router.get("/tailscale", requireAuth, async (_req, res) => {
-  const saved = getSavedConnection("tailscale");
+router.get("/tailscale", requireAuth, async (req: AuthRequest, res) => {
+  const saved = getSavedConnection(req.user!.userId, "tailscale");
   const tailnet = saved.url || process.env["TAILSCALE_TAILNET"];
   const apiKey = saved.apiKey || process.env["TAILSCALE_API_KEY"];
 
@@ -3780,8 +3784,8 @@ async function fetchErsatzActiveStreams(base: string): Promise<number | null> {
   }
 }
 
-router.get("/ersatztv", requireAuth, async (_req, res) => {
-  const saved = getSavedConnection("ersatztv");
+router.get("/ersatztv", requireAuth, async (req: AuthRequest, res) => {
+  const saved = getSavedConnection(req.user!.userId, "ersatztv");
   const baseUrl = saved.url || process.env["ERSATZTV_URL"];
 
   if (!baseUrl) {
@@ -3961,8 +3965,8 @@ const FINNHUB_BASE = "https://finnhub.io/api/v1";
 // Settings page), falling back to the server secrets so existing deployments
 // keep working. Finnhub is the chosen free provider (simple per-symbol /quote
 // endpoint + /search on the free tier).
-function getStocksApiKey(): string | undefined {
-  const saved = getSavedConnection("stocks");
+function getStocksApiKey(userId: number): string | undefined {
+  const saved = getSavedConnection(userId, "stocks");
   return (
     saved.apiKey ||
     process.env["FINNHUB_API_KEY"]?.trim() ||
@@ -4030,9 +4034,9 @@ function parseSymbols(raw: unknown): string[] {
   return out;
 }
 
-router.get("/stocks", requireAuth, async (req, res) => {
+router.get("/stocks", requireAuth, async (req: AuthRequest, res) => {
   const symbols = parseSymbols(req.query["symbols"]);
-  const apiKey = getStocksApiKey();
+  const apiKey = getStocksApiKey(req.user!.userId);
 
   // Unconfigured (no provider key): return clearly-labeled sample quotes. When
   // no symbols were requested either, seed with a representative default set so
@@ -4127,9 +4131,9 @@ function sampleCandleSeries(symbol: string): StockCandleSeriesOut {
   return { symbol, closes };
 }
 
-router.get("/stocks/candles", requireAuth, async (req, res) => {
+router.get("/stocks/candles", requireAuth, async (req: AuthRequest, res) => {
   const symbols = parseSymbols(req.query["symbols"]);
-  const apiKey = getStocksApiKey();
+  const apiKey = getStocksApiKey(req.user!.userId);
 
   // Unconfigured: return clearly-labeled sample series so the tile still renders.
   if (!apiKey) {
@@ -4175,9 +4179,9 @@ router.get("/stocks/candles", requireAuth, async (req, res) => {
   }
 });
 
-router.get("/stocks/search", requireAuth, async (req, res) => {
+router.get("/stocks/search", requireAuth, async (req: AuthRequest, res) => {
   const q = typeof req.query["q"] === "string" ? req.query["q"].trim() : "";
-  const apiKey = getStocksApiKey();
+  const apiKey = getStocksApiKey(req.user!.userId);
 
   if (!q) {
     res.json({ results: [], sample: !apiKey });
@@ -4416,11 +4420,12 @@ function originFromRequest(req: {
 // post-auth return URL.
 router.get("/gmail/auth", (req, res) => {
   const intent = typeof req.query["intent"] === "string" ? req.query["intent"] : "";
-  if (!intent || !consumeGoogleAuthIntent(intent)) {
+  const userId = intent ? consumeGoogleAuthIntent(intent) : null;
+  if (!userId) {
     res.status(403).send("Missing or expired authorization. Start the flow from Settings.");
     return;
   }
-  if (!isGoogleConfigured()) {
+  if (!isGoogleConfigured(userId)) {
     res
       .status(400)
       .send("Google OAuth is not configured. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET.");
@@ -4438,8 +4443,8 @@ router.get("/gmail/auth", (req, res) => {
   const redirectUri = `${hostOrigin.replace(/\/+$/, "")}${GMAIL_CALLBACK_PATH}`;
   const returnTo = `${base.replace(/\/+$/, "")}/settings`;
   logger.info({ redirectUri }, "Google OAuth start");
-  const state = createGooglePendingAuth(redirectUri, returnTo);
-  res.redirect(buildGoogleAuthUrl(redirectUri, state));
+  const state = createGooglePendingAuth(userId, redirectUri, returnTo);
+  res.redirect(buildGoogleAuthUrl(userId, redirectUri, state));
 });
 
 // GET /api/widgets/gmail/callback — Google redirects the browser here.
@@ -4478,7 +4483,7 @@ router.get("/gmail/callback", async (req, res) => {
   }
 
   try {
-    await exchangeGoogleCode(code, pending.redirectUri);
+    await exchangeGoogleCode(pending.userId, code, pending.redirectUri);
     res.redirect(settingsUrl("connected"));
   } catch (err) {
     const detail = describeHttpError(err);
@@ -4515,19 +4520,22 @@ function errMessage(err: unknown): string {
 // Shared aggregation for /email/inbox (and the per-provider variants). Returns
 // mock data only when NO mail account is configured; when accounts are
 // configured but every one of them fails, the caller answers 502.
-async function collectEmail(opts: {
-  accountsFilter: string[] | null;
-  max: number;
-  unreadOnly: boolean;
-  include: "all" | "gmail" | "imap";
-  fresh: boolean;
-}): Promise<
+async function collectEmail(
+  userId: number,
+  opts: {
+    accountsFilter: string[] | null;
+    max: number;
+    unreadOnly: boolean;
+    include: "all" | "gmail" | "imap";
+    fresh: boolean;
+  },
+): Promise<
   | { kind: "sample"; messages: EmailMessage[] }
   | { kind: "data"; messages: EmailMessage[]; unreadTotal: number | null; errors: AccountError[] }
   | { kind: "all-failed"; errors: AccountError[] }
 > {
-  const googleAccounts = isGoogleLinked() ? listGoogleAccounts() : [];
-  const imapAccounts = listImapAccounts();
+  const googleAccounts = isGoogleLinked(userId) ? listGoogleAccounts(userId) : [];
+  const imapAccounts = listImapAccounts(userId);
 
   // Filter matches a specific Google account id; the legacy "gmail" key (from
   // tiles saved before multi-account support) selects every Google account.
@@ -4565,7 +4573,7 @@ async function collectEmail(opts: {
   for (const account of wantGmail) {
     const label = account.email ?? "Gmail";
     tasks.push(
-      fetchGmailMessages({
+      fetchGmailMessages(userId, {
         accountId: account.id,
         accountLabel: label,
         max: opts.max,
@@ -4610,6 +4618,7 @@ async function collectEmail(opts: {
 }
 
 async function handleEmailRequest(
+  userId: number,
   req: { query: Record<string, unknown> },
   res: { json: (b: unknown) => void; status: (c: number) => { json: (b: unknown) => void } },
   include: "all" | "gmail" | "imap",
@@ -4625,7 +4634,7 @@ async function handleEmailRequest(
   const fresh = req.query["fresh"] === "true";
 
   try {
-    const result = await collectEmail({ accountsFilter, max, unreadOnly, include, fresh });
+    const result = await collectEmail(userId, { accountsFilter, max, unreadOnly, include, fresh });
     if (result.kind === "sample") {
       res.json({ messages: result.messages, unreadTotal: 2, errors: null, sample: true });
       return;
@@ -4647,23 +4656,24 @@ async function handleEmailRequest(
 }
 
 // GET /api/widgets/email/inbox — aggregated recent messages across accounts.
-router.get("/email/inbox", requireAuth, async (req, res) => {
-  await handleEmailRequest(req, res, "all");
+router.get("/email/inbox", requireAuth, async (req: AuthRequest, res) => {
+  await handleEmailRequest(req.user!.userId, req, res, "all");
 });
 
 // Per-provider variants (same shape, narrowed to one provider).
-router.get("/email/gmail", requireAuth, async (req, res) => {
-  await handleEmailRequest(req, res, "gmail");
+router.get("/email/gmail", requireAuth, async (req: AuthRequest, res) => {
+  await handleEmailRequest(req.user!.userId, req, res, "gmail");
 });
-router.get("/email/imap", requireAuth, async (req, res) => {
-  await handleEmailRequest(req, res, "imap");
+router.get("/email/imap", requireAuth, async (req: AuthRequest, res) => {
+  await handleEmailRequest(req.user!.userId, req, res, "imap");
 });
 
 // POST /api/widgets/email/archive — archive one message. The body carries the
 // EmailMessage.id, whose prefix encodes the provider: "gmail:<acct>:<msgId>"
 // removes the INBOX label via the Gmail API; "<imapAcct>:<uid>" moves the
 // message to the server's Archive mailbox. Demo rows are rejected up front.
-router.post("/email/archive", requireAuth, async (req, res) => {
+router.post("/email/archive", requireAuth, async (req: AuthRequest, res) => {
+  const userId = req.user!.userId;
   const body = req.body as { id?: unknown } | undefined;
   const id = typeof body?.id === "string" ? body.id : "";
   if (!id) {
@@ -4684,11 +4694,11 @@ router.post("/email/archive", requireAuth, async (req, res) => {
         return;
       }
       const accountId = rest.slice(0, sep);
-      if (!listGoogleAccounts().some((a) => a.id === accountId)) {
+      if (!listGoogleAccounts(userId).some((a) => a.id === accountId)) {
         res.status(404).json({ error: "Unknown Google account" });
         return;
       }
-      await archiveGmailMessage(accountId, rest.slice(sep + 1));
+      await archiveGmailMessage(userId, accountId, rest.slice(sep + 1));
     } else {
       const sep = id.lastIndexOf(":");
       const uid = sep > 0 ? Number(id.slice(sep + 1)) : NaN;
@@ -4696,7 +4706,7 @@ router.post("/email/archive", requireAuth, async (req, res) => {
         res.status(400).json({ error: "Malformed message id" });
         return;
       }
-      const account = listImapAccounts().find((a) => a.id === id.slice(0, sep));
+      const account = listImapAccounts(userId).find((a) => a.id === id.slice(0, sep));
       if (!account) {
         res.status(404).json({ error: "Unknown mail account" });
         return;
@@ -4724,7 +4734,8 @@ router.post("/email/archive", requireAuth, async (req, res) => {
 // id, whose prefix encodes the provider (same convention as /email/archive):
 // "gmail:<acct>:<msgId>" pulls format=full from the Gmail API, "<imapAcct>:<uid>"
 // fetches the text body part over IMAP. Demo rows are rejected up front.
-router.get("/email/message", requireAuth, async (req, res) => {
+router.get("/email/message", requireAuth, async (req: AuthRequest, res) => {
+  const userId = req.user!.userId;
   const id = typeof req.query["id"] === "string" ? req.query["id"] : "";
   if (!id) {
     res.status(400).json({ error: "Message id is required" });
@@ -4745,11 +4756,11 @@ router.get("/email/message", requireAuth, async (req, res) => {
         return;
       }
       const accountId = rest.slice(0, sep);
-      if (!listGoogleAccounts().some((a) => a.id === accountId)) {
+      if (!listGoogleAccounts(userId).some((a) => a.id === accountId)) {
         res.status(404).json({ error: "Unknown Google account" });
         return;
       }
-      body = await fetchGmailMessageBody(accountId, rest.slice(sep + 1));
+      body = await fetchGmailMessageBody(userId, accountId, rest.slice(sep + 1));
     } else {
       const sep = id.lastIndexOf(":");
       const uid = sep > 0 ? Number(id.slice(sep + 1)) : NaN;
@@ -4757,7 +4768,7 @@ router.get("/email/message", requireAuth, async (req, res) => {
         res.status(400).json({ error: "Malformed message id" });
         return;
       }
-      const account = listImapAccounts().find((a) => a.id === id.slice(0, sep));
+      const account = listImapAccounts(userId).find((a) => a.id === id.slice(0, sep));
       if (!account) {
         res.status(404).json({ error: "Unknown mail account" });
         return;
@@ -4772,19 +4783,22 @@ router.get("/email/message", requireAuth, async (req, res) => {
 });
 
 // Shared aggregation for /calendar/events (and the per-provider variants).
-async function collectCalendar(opts: {
-  accountsFilter: string[] | null;
-  days: number;
-  max: number;
-  include: "all" | "google" | "caldav";
-  fresh: boolean;
-}): Promise<
+async function collectCalendar(
+  userId: number,
+  opts: {
+    accountsFilter: string[] | null;
+    days: number;
+    max: number;
+    include: "all" | "google" | "caldav";
+    fresh: boolean;
+  },
+): Promise<
   | { kind: "sample"; events: CalendarEvent[] }
   | { kind: "data"; events: CalendarEvent[]; errors: AccountError[] }
   | { kind: "all-failed"; errors: AccountError[] }
 > {
-  const googleAccounts = isGoogleLinked() ? listGoogleAccounts() : [];
-  const caldavAccounts = listCalDavAccounts();
+  const googleAccounts = isGoogleLinked(userId) ? listGoogleAccounts(userId) : [];
+  const caldavAccounts = listCalDavAccounts(userId);
 
   // Filter matches a specific Google account id; the legacy "google" key (from
   // tiles saved before multi-account support) selects every Google account.
@@ -4818,7 +4832,7 @@ async function collectCalendar(opts: {
   for (const account of wantGoogle) {
     const label = account.email ?? "Google Calendar";
     tasks.push(
-      fetchGoogleCalendarEvents({
+      fetchGoogleCalendarEvents(userId, {
         accountId: account.id,
         accountLabel: label,
         daysAhead: opts.days,
@@ -4863,6 +4877,7 @@ async function collectCalendar(opts: {
 }
 
 async function handleCalendarRequest(
+  userId: number,
   req: { query: Record<string, unknown> },
   res: { json: (b: unknown) => void; status: (c: number) => { json: (b: unknown) => void } },
   include: "all" | "google" | "caldav",
@@ -4878,7 +4893,7 @@ async function handleCalendarRequest(
   const fresh = req.query["fresh"] === "true";
 
   try {
-    const result = await collectCalendar({ accountsFilter, days, max, include, fresh });
+    const result = await collectCalendar(userId, { accountsFilter, days, max, include, fresh });
     if (result.kind === "sample") {
       res.json({ events: result.events, errors: null, sample: true });
       return;
@@ -4899,16 +4914,16 @@ async function handleCalendarRequest(
 }
 
 // GET /api/widgets/calendar/events — aggregated upcoming events across accounts.
-router.get("/calendar/events", requireAuth, async (req, res) => {
-  await handleCalendarRequest(req, res, "all");
+router.get("/calendar/events", requireAuth, async (req: AuthRequest, res) => {
+  await handleCalendarRequest(req.user!.userId, req, res, "all");
 });
 
 // Per-provider variants (same shape, narrowed to one provider).
-router.get("/calendar/google", requireAuth, async (req, res) => {
-  await handleCalendarRequest(req, res, "google");
+router.get("/calendar/google", requireAuth, async (req: AuthRequest, res) => {
+  await handleCalendarRequest(req.user!.userId, req, res, "google");
 });
-router.get("/calendar/caldav", requireAuth, async (req, res) => {
-  await handleCalendarRequest(req, res, "caldav");
+router.get("/calendar/caldav", requireAuth, async (req: AuthRequest, res) => {
+  await handleCalendarRequest(req.user!.userId, req, res, "caldav");
 });
 
 export default router;

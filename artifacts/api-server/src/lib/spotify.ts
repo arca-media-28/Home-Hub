@@ -4,13 +4,13 @@ import { connectionStmts } from "./db.js";
 import { logger } from "./logger.js";
 
 // ── Spotify OAuth + Web API helper ────────────────────────────────────────────
-// Spotify has no Replit integration, so the user supplies their own app
+// Spotify has no Replit integration, so each user supplies their own app
 // credentials (Client ID + Secret) and links their account via the Authorization
-// Code flow. Everything is stored in the shared `service_connections` row keyed
-// "spotify": api_key = clientId, password = clientSecret, and the OAuth tokens
-// live in the JSON `extra` blob. All Spotify calls go over the TLS-verifying
-// `cloudHttpClient` (never the self-signed-tolerant LAN client) because they
-// carry bearer tokens over the public internet.
+// Code flow. Everything is stored in that user's `service_connections` row
+// keyed "spotify": api_key = clientId, password = clientSecret, and the OAuth
+// tokens live in the JSON `extra` blob. All Spotify calls go over the
+// TLS-verifying `cloudHttpClient` (never the self-signed-tolerant LAN client)
+// because they carry bearer tokens over the public internet.
 
 const ACCOUNTS_BASE = "https://accounts.spotify.com";
 const API_BASE = "https://api.spotify.com/v1";
@@ -46,9 +46,11 @@ export interface SpotifyConnection {
 // Short-lived CSRF `state` values issued by /authorize and consumed by
 // /callback. Kept in-process: the OAuth round-trip is seconds long and a server
 // restart simply means the user clicks "Connect" again. Each entry carries the
-// exact redirect URI used (so the token exchange matches byte-for-byte) and the
-// base-path-aware page to send the browser back to afterwards.
+// exact redirect URI used (so the token exchange matches byte-for-byte), the
+// base-path-aware page to send the browser back to afterwards, and which user
+// started the flow so the callback links the account to the right owner.
 interface PendingAuth {
+  userId: number;
   redirectUri: string;
   returnTo: string;
   createdAt: number;
@@ -63,10 +65,10 @@ function prunePending(): void {
   }
 }
 
-export function createPendingAuth(redirectUri: string, returnTo: string): string {
+export function createPendingAuth(userId: number, redirectUri: string, returnTo: string): string {
   prunePending();
   const state = randomBytes(16).toString("hex");
-  pendingAuth.set(state, { redirectUri, returnTo, createdAt: Date.now() });
+  pendingAuth.set(state, { userId, redirectUri, returnTo, createdAt: Date.now() });
   return state;
 }
 
@@ -80,8 +82,8 @@ export function consumePendingAuth(state: string): PendingAuth | null {
 
 // ── Persistence ───────────────────────────────────────────────────────────────
 
-export function getSpotifyConnection(): SpotifyConnection {
-  const row = connectionStmts.findByService.get("spotify");
+export function getSpotifyConnection(userId: number): SpotifyConnection {
+  const row = connectionStmts.findByService.get(userId, "spotify");
   let tokens: SpotifyTokens = {};
   if (row?.extra) {
     try {
@@ -97,8 +99,14 @@ export function getSpotifyConnection(): SpotifyConnection {
   };
 }
 
-function persist(clientId: string | null, clientSecret: string | null, tokens: SpotifyTokens): void {
+function persist(
+  userId: number,
+  clientId: string | null,
+  clientSecret: string | null,
+  tokens: SpotifyTokens,
+): void {
   connectionStmts.upsert.run(
+    userId,
     "spotify",
     null,
     clientId,
@@ -108,19 +116,19 @@ function persist(clientId: string | null, clientSecret: string | null, tokens: S
   );
 }
 
-export function saveSpotifyCredentials(clientId: string, clientSecret: string): void {
+export function saveSpotifyCredentials(userId: number, clientId: string, clientSecret: string): void {
   // Changing app credentials invalidates any existing tokens, so clear them.
-  persist(clientId, clientSecret, {});
+  persist(userId, clientId, clientSecret, {});
 }
 
-export function saveSpotifyTokens(tokens: SpotifyTokens): void {
-  const conn = getSpotifyConnection();
-  persist(conn.clientId, conn.clientSecret, { ...conn.tokens, ...tokens });
+export function saveSpotifyTokens(userId: number, tokens: SpotifyTokens): void {
+  const conn = getSpotifyConnection(userId);
+  persist(userId, conn.clientId, conn.clientSecret, { ...conn.tokens, ...tokens });
 }
 
-export function clearSpotifyTokens(): void {
-  const conn = getSpotifyConnection();
-  persist(conn.clientId, conn.clientSecret, {});
+export function clearSpotifyTokens(userId: number): void {
+  const conn = getSpotifyConnection(userId);
+  persist(userId, conn.clientId, conn.clientSecret, {});
 }
 
 // ── OAuth ──────────────────────────────────────────────────────────────────────
@@ -151,6 +159,7 @@ interface TokenResponse {
 
 // Exchange an authorization code for tokens and persist them.
 export async function exchangeCode(
+  userId: number,
   clientId: string,
   clientSecret: string,
   code: string,
@@ -168,7 +177,7 @@ export async function exchangeCode(
     },
   });
   const data = r.data;
-  saveSpotifyTokens({
+  saveSpotifyTokens(userId, {
     accessToken: data.access_token,
     refreshToken: data.refresh_token,
     expiresAt: Date.now() + data.expires_in * 1000,
@@ -178,8 +187,8 @@ export async function exchangeCode(
 
 // Return a valid access token, refreshing it when expired. Throws when Spotify
 // is not fully linked (no credentials or no refresh token).
-export async function getValidAccessToken(): Promise<string> {
-  const conn = getSpotifyConnection();
+export async function getValidAccessToken(userId: number): Promise<string> {
+  const conn = getSpotifyConnection(userId);
   if (!conn.clientId || !conn.clientSecret) {
     throw new Error("Spotify is not configured");
   }
@@ -202,7 +211,7 @@ export async function getValidAccessToken(): Promise<string> {
     },
   });
   const data = r.data;
-  saveSpotifyTokens({
+  saveSpotifyTokens(userId, {
     accessToken: data.access_token,
     // Spotify only sometimes returns a new refresh token; keep the old one
     // otherwise so the link survives.

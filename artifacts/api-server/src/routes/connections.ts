@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { connectionStmts, healthStmts, type DbServiceConnection } from "../lib/db.js";
-import { requireAuth } from "../lib/auth.js";
+import { requireAuth, type AuthRequest } from "../lib/auth.js";
 import {
   listImapAccounts,
   addImapAccount,
@@ -44,16 +44,17 @@ function formatConnection(c: DbServiceConnection) {
   };
 }
 
-// GET /api/connections — list all saved service connections
-router.get("/", requireAuth, (_req, res) => {
-  const rows = connectionStmts.findAll.all();
+// GET /api/connections — list the caller's own saved service connections
+router.get("/", requireAuth, (req: AuthRequest, res) => {
+  const rows = connectionStmts.findAllByUser.all(req.user!.userId);
   res.json(rows.map(formatConnection));
 });
 
-// GET /api/connections/health — last-known health of each checked connection,
-// produced by the background scheduler and polled by the dashboard.
-router.get("/health", requireAuth, (_req, res) => {
-  const rows = healthStmts.findAll.all();
+// GET /api/connections/health — last-known health of each of the caller's own
+// checked connections, produced by the background scheduler and polled by the
+// dashboard.
+router.get("/health", requireAuth, (req: AuthRequest, res) => {
+  const rows = healthStmts.findAllByUser.all(req.user!.userId);
   res.json(
     rows.map((r) => ({
       service: r.service,
@@ -64,11 +65,12 @@ router.get("/health", requireAuth, (_req, res) => {
   );
 });
 
-// GET /api/connections/status — ping every saved connection right now and report
-// whether each backing service is currently reachable. Reuses runPing so the
-// dashboard badges show the same status the on-demand test would.
-router.get("/status", requireAuth, async (_req, res) => {
-  const rows = connectionStmts.findAll.all();
+// GET /api/connections/status — ping every one of the caller's saved
+// connections right now and report whether each backing service is currently
+// reachable. Reuses runPing so the dashboard badges show the same status the
+// on-demand test would.
+router.get("/status", requireAuth, async (req: AuthRequest, res) => {
+  const rows = connectionStmts.findAllByUser.all(req.user!.userId);
   const bySaved = new Map(rows.map((r) => [r.service, r]));
 
   const statuses = await Promise.all(
@@ -87,9 +89,10 @@ router.get("/status", requireAuth, async (_req, res) => {
 });
 
 // ── IMAP / CalDAV multi-account management ────────────────────────────────────
-// These lists live in the `extra` JSON of the "imap"/"caldav" rows and support
-// several accounts each, so they get dedicated add/remove routes instead of
-// the single-connection PUT below. Passwords never leave the server.
+// These lists live in the `extra` JSON of the caller's own "imap"/"caldav"
+// rows and support several accounts each, so they get dedicated add/remove
+// routes instead of the single-connection PUT below. Passwords never leave
+// the server.
 
 function sanitizeImap(a: ImapAccount) {
   return {
@@ -107,12 +110,12 @@ function sanitizeCalDav(a: CalDavAccount) {
 }
 
 // GET /api/connections/imap/accounts
-router.get("/imap/accounts", requireAuth, (_req, res) => {
-  res.json(listImapAccounts().map(sanitizeImap));
+router.get("/imap/accounts", requireAuth, (req: AuthRequest, res) => {
+  res.json(listImapAccounts(req.user!.userId).map(sanitizeImap));
 });
 
 // POST /api/connections/imap/accounts
-router.post("/imap/accounts", requireAuth, (req, res) => {
+router.post("/imap/accounts", requireAuth, (req: AuthRequest, res) => {
   const body = (req.body ?? {}) as {
     label?: string | null;
     host?: string;
@@ -126,7 +129,7 @@ router.post("/imap/accounts", requireAuth, (req, res) => {
     res.status(400).json({ error: "host, username and password are required" });
     return;
   }
-  const accounts = addImapAccount({
+  const accounts = addImapAccount(req.user!.userId, {
     label: body.label ?? null,
     host: body.host,
     port: typeof body.port === "number" ? body.port : null,
@@ -139,8 +142,8 @@ router.post("/imap/accounts", requireAuth, (req, res) => {
 });
 
 // DELETE /api/connections/imap/accounts/:id
-router.delete("/imap/accounts/:id", requireAuth, (req, res) => {
-  const next = removeImapAccount(String(req.params["id"]));
+router.delete("/imap/accounts/:id", requireAuth, (req: AuthRequest, res) => {
+  const next = removeImapAccount(req.user!.userId, String(req.params["id"]));
   if (next === null) {
     res.status(404).json({ error: "No IMAP account with that id" });
     return;
@@ -149,12 +152,12 @@ router.delete("/imap/accounts/:id", requireAuth, (req, res) => {
 });
 
 // GET /api/connections/caldav/accounts
-router.get("/caldav/accounts", requireAuth, (_req, res) => {
-  res.json(listCalDavAccounts().map(sanitizeCalDav));
+router.get("/caldav/accounts", requireAuth, (req: AuthRequest, res) => {
+  res.json(listCalDavAccounts(req.user!.userId).map(sanitizeCalDav));
 });
 
 // POST /api/connections/caldav/accounts
-router.post("/caldav/accounts", requireAuth, (req, res) => {
+router.post("/caldav/accounts", requireAuth, (req: AuthRequest, res) => {
   const body = (req.body ?? {}) as {
     label?: string | null;
     url?: string;
@@ -165,7 +168,7 @@ router.post("/caldav/accounts", requireAuth, (req, res) => {
     res.status(400).json({ error: "url, username and password are required" });
     return;
   }
-  const accounts = addCalDavAccount({
+  const accounts = addCalDavAccount(req.user!.userId, {
     label: body.label ?? null,
     url: body.url,
     username: body.username,
@@ -175,8 +178,8 @@ router.post("/caldav/accounts", requireAuth, (req, res) => {
 });
 
 // DELETE /api/connections/caldav/accounts/:id
-router.delete("/caldav/accounts/:id", requireAuth, (req, res) => {
-  const next = removeCalDavAccount(String(req.params["id"]));
+router.delete("/caldav/accounts/:id", requireAuth, (req: AuthRequest, res) => {
+  const next = removeCalDavAccount(req.user!.userId, String(req.params["id"]));
   if (next === null) {
     res.status(404).json({ error: "No CalDAV account with that id" });
     return;
@@ -184,8 +187,9 @@ router.delete("/caldav/accounts/:id", requireAuth, (req, res) => {
   res.json(next.map(sanitizeCalDav));
 });
 
-// PUT /api/connections/:service — upsert a single service's connection
-router.put("/:service", requireAuth, (req, res) => {
+// PUT /api/connections/:service — upsert the caller's own connection for a
+// single service
+router.put("/:service", requireAuth, (req: AuthRequest, res) => {
   const service = String(req.params["service"]);
 
   if (!SUPPORTED_SERVICES.includes(service)) {
@@ -204,6 +208,7 @@ router.put("/:service", requireAuth, (req, res) => {
   const extra = body.token !== undefined ? JSON.stringify({ token: body.token }) : null;
 
   connectionStmts.upsert.run(
+    req.user!.userId,
     service,
     body.url ?? null,
     body.apiKey ?? null,
@@ -212,7 +217,7 @@ router.put("/:service", requireAuth, (req, res) => {
     extra
   );
 
-  const updated = connectionStmts.findByService.get(service)!;
+  const updated = connectionStmts.findByService.get(req.user!.userId, service)!;
   res.json(formatConnection(updated));
 });
 

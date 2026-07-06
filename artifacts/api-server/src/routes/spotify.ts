@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { requireAuth } from "../lib/auth.js";
+import { requireAuth, type AuthRequest } from "../lib/auth.js";
 import { logger } from "../lib/logger.js";
 import { normalizeHttpError } from "../lib/http.js";
 import {
@@ -30,8 +30,8 @@ function redirectUriFor(origin: string): string {
   return `${origin.replace(/\/+$/, "")}${CALLBACK_PATH}`;
 }
 
-async function buildStatus(redirectUri: string) {
-  const conn = getSpotifyConnection();
+async function buildStatus(userId: number, redirectUri: string) {
+  const conn = getSpotifyConnection(userId);
   const configured = Boolean(conn.clientId && conn.clientSecret);
   const linked = configured && Boolean(conn.tokens.refreshToken);
 
@@ -41,7 +41,7 @@ async function buildStatus(redirectUri: string) {
 
   if (linked) {
     try {
-      const token = await getValidAccessToken();
+      const token = await getValidAccessToken(userId);
       const profile = await getProfile(token);
       connected = true;
       premium = profile.premium;
@@ -58,7 +58,7 @@ async function buildStatus(redirectUri: string) {
 }
 
 // POST /api/connections/spotify/credentials — save app Client ID + Secret.
-router.post("/credentials", requireAuth, async (req, res) => {
+router.post("/credentials", requireAuth, async (req: AuthRequest, res) => {
   const body = (req.body ?? {}) as { clientId?: string; clientSecret?: string };
   const clientId = body.clientId?.trim();
   const clientSecret = body.clientSecret?.trim();
@@ -66,13 +66,14 @@ router.post("/credentials", requireAuth, async (req, res) => {
     res.status(400).json({ error: "clientId and clientSecret are required" });
     return;
   }
-  saveSpotifyCredentials(clientId, clientSecret);
-  res.json(await buildStatus(redirectUriFor(originFromRequest(req))));
+  const userId = req.user!.userId;
+  saveSpotifyCredentials(userId, clientId, clientSecret);
+  res.json(await buildStatus(userId, redirectUriFor(originFromRequest(req))));
 });
 
 // GET /api/connections/spotify/status — configured/connected + profile.
-router.get("/status", requireAuth, async (req, res) => {
-  res.json(await buildStatus(redirectUriFor(originFromRequest(req))));
+router.get("/status", requireAuth, async (req: AuthRequest, res) => {
+  res.json(await buildStatus(req.user!.userId, redirectUriFor(originFromRequest(req))));
 });
 
 // POST /api/connections/spotify/authorize — begin OAuth, return the authorize URL.
@@ -80,8 +81,9 @@ router.get("/status", requireAuth, async (req, res) => {
 // "https://host/homelab-dashboard/"). The OAuth redirect URI hangs off the host
 // root (/api is proxied there), while the post-auth return must respect the SPA
 // base path — so we derive both from the supplied base URL.
-router.post("/authorize", requireAuth, (req, res) => {
-  const conn = getSpotifyConnection();
+router.post("/authorize", requireAuth, (req: AuthRequest, res) => {
+  const userId = req.user!.userId;
+  const conn = getSpotifyConnection(userId);
   if (!conn.clientId || !conn.clientSecret) {
     res.status(400).json({ error: "Save your Spotify Client ID and Secret first." });
     return;
@@ -96,13 +98,14 @@ router.post("/authorize", requireAuth, (req, res) => {
   }
   const redirectUri = redirectUriFor(hostOrigin);
   const returnTo = `${base.replace(/\/+$/, "")}/settings`;
-  const state = createPendingAuth(redirectUri, returnTo);
+  const state = createPendingAuth(userId, redirectUri, returnTo);
   res.json({ url: buildAuthorizeUrl(conn.clientId, redirectUri, state) });
 });
 
 // GET /api/connections/spotify/callback — Spotify redirects the browser here.
 // Unauthenticated by necessity (top-level navigation can't carry the bearer
-// token); protected by the single-use `state` value instead.
+// token); protected by the single-use `state` value instead, which also
+// carries the userId that started the flow.
 router.get("/callback", async (req, res) => {
   const code = typeof req.query["code"] === "string" ? req.query["code"] : null;
   const state = typeof req.query["state"] === "string" ? req.query["state"] : null;
@@ -119,14 +122,14 @@ router.get("/callback", async (req, res) => {
     return;
   }
 
-  const conn = getSpotifyConnection();
+  const conn = getSpotifyConnection(pending.userId);
   if (!conn.clientId || !conn.clientSecret) {
     res.redirect(settingsUrl("error"));
     return;
   }
 
   try {
-    await exchangeCode(conn.clientId, conn.clientSecret, code, pending.redirectUri);
+    await exchangeCode(pending.userId, conn.clientId, conn.clientSecret, code, pending.redirectUri);
     res.redirect(settingsUrl("connected"));
   } catch (err) {
     logger.error({ reason: normalizeHttpError(err) }, "Spotify token exchange failed");
@@ -135,21 +138,23 @@ router.get("/callback", async (req, res) => {
 });
 
 // POST /api/connections/spotify/disconnect — clear stored OAuth tokens.
-router.post("/disconnect", requireAuth, async (req, res) => {
-  clearSpotifyTokens();
-  res.json(await buildStatus(redirectUriFor(originFromRequest(req))));
+router.post("/disconnect", requireAuth, async (req: AuthRequest, res) => {
+  const userId = req.user!.userId;
+  clearSpotifyTokens(userId);
+  res.json(await buildStatus(userId, redirectUriFor(originFromRequest(req))));
 });
 
 // GET /api/connections/spotify/token — fresh access token for the Web Playback SDK.
-router.get("/token", requireAuth, async (_req, res) => {
-  const conn = getSpotifyConnection();
+router.get("/token", requireAuth, async (req: AuthRequest, res) => {
+  const userId = req.user!.userId;
+  const conn = getSpotifyConnection(userId);
   if (!conn.clientId || !conn.clientSecret || !conn.tokens.refreshToken) {
     res.json({ accessToken: null, expiresAt: null });
     return;
   }
   try {
-    const accessToken = await getValidAccessToken();
-    const expiresAt = getSpotifyConnection().tokens.expiresAt ?? null;
+    const accessToken = await getValidAccessToken(userId);
+    const expiresAt = getSpotifyConnection(userId).tokens.expiresAt ?? null;
     res.json({ accessToken, expiresAt });
   } catch (err) {
     logger.warn({ reason: normalizeHttpError(err) }, "Spotify token mint failed");

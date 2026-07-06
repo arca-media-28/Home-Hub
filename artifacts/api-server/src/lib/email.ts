@@ -49,28 +49,34 @@ function displayFrom(raw: string): string {
 
 // Cached wrapper — tiles poll frequently, so identical per-account requests
 // within the TTL share one upstream fetch (see fetchCache.ts).
-export function fetchGmailMessages(opts: {
-  accountId: string;
-  accountLabel: string;
-  max: number;
-  unreadOnly: boolean;
-  fresh?: boolean;
-}): Promise<{ messages: EmailMessage[]; unread: number | null }> {
+export function fetchGmailMessages(
+  userId: number,
+  opts: {
+    accountId: string;
+    accountLabel: string;
+    max: number;
+    unreadOnly: boolean;
+    fresh?: boolean;
+  },
+): Promise<{ messages: EmailMessage[]; unread: number | null }> {
   return cachedFetch(
-    `mail:gmail:${opts.accountId}:${opts.max}:${opts.unreadOnly}`,
-    () => fetchGmailMessagesUncached(opts),
+    `mail:gmail:${userId}:${opts.accountId}:${opts.max}:${opts.unreadOnly}`,
+    () => fetchGmailMessagesUncached(userId, opts),
     undefined,
     { fresh: opts.fresh ?? false },
   );
 }
 
-async function fetchGmailMessagesUncached(opts: {
-  accountId: string;
-  accountLabel: string;
-  max: number;
-  unreadOnly: boolean;
-}): Promise<{ messages: EmailMessage[]; unread: number | null }> {
-  const token = await getGoogleAccessToken(opts.accountId);
+async function fetchGmailMessagesUncached(
+  userId: number,
+  opts: {
+    accountId: string;
+    accountLabel: string;
+    max: number;
+    unreadOnly: boolean;
+  },
+): Promise<{ messages: EmailMessage[]; unread: number | null }> {
+  const token = await getGoogleAccessToken(userId, opts.accountId);
   const headers = { Authorization: `Bearer ${token}` };
 
   const listParams = new URLSearchParams({
@@ -191,9 +197,13 @@ function decodeBase64Url(data: string): string {
 
 // Fetch one Gmail message's plain-text body (format=full). Prefers text/plain;
 // falls back to a stripped text/html part; falls back to the snippet.
-export function fetchGmailMessageBody(accountId: string, messageId: string): Promise<string | null> {
-  return cachedFetch(`mail:gmail:${accountId}:body:${messageId}`, async () => {
-    const token = await getGoogleAccessToken(accountId);
+export function fetchGmailMessageBody(
+  userId: number,
+  accountId: string,
+  messageId: string,
+): Promise<string | null> {
+  return cachedFetch(`mail:gmail:${userId}:${accountId}:body:${messageId}`, async () => {
+    const token = await getGoogleAccessToken(userId, accountId);
     const res = await cloudHttpClient.get<GmailBodyPart & { snippet?: string; payload?: GmailBodyPart }>(
       `${GMAIL_BASE}/messages/${encodeURIComponent(messageId)}?format=full`,
       { headers: { Authorization: `Bearer ${token}` } },
@@ -307,8 +317,12 @@ async function fetchImapMessageBodyUncached(
 // Archive one Gmail message by removing its INBOX label (the Gmail UI's
 // definition of "archive"). Requires the gmail.modify scope — accounts linked
 // before that scope was requested fail with 403 until re-linked.
-export async function archiveGmailMessage(accountId: string, messageId: string): Promise<void> {
-  const token = await getGoogleAccessToken(accountId);
+export async function archiveGmailMessage(
+  userId: number,
+  accountId: string,
+  messageId: string,
+): Promise<void> {
+  const token = await getGoogleAccessToken(userId, accountId);
   await cloudHttpClient.post(
     `${GMAIL_BASE}/messages/${encodeURIComponent(messageId)}/modify`,
     { removeLabelIds: ["INBOX"] },
@@ -316,7 +330,7 @@ export async function archiveGmailMessage(accountId: string, messageId: string):
   );
   // The inbox listing for this account is now stale — drop the cached fetch so
   // the tile's next poll reflects the archive immediately.
-  invalidateFetchCache(`mail:gmail:${accountId}`);
+  invalidateFetchCache(`mail:gmail:${userId}:${accountId}`);
 }
 
 // Hard cap on how long a single IMAP round-trip may take — a wedged server

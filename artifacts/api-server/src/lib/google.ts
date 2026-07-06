@@ -6,20 +6,20 @@ import { invalidateFetchCache } from "./fetchCache.js";
 
 // The linked-account list changed (link/unlink/re-link) — drop cached Gmail
 // inbox and Google Calendar responses so tiles reflect it immediately.
-function invalidateGoogleWidgetCaches(): void {
-  invalidateFetchCache("mail:gmail:");
-  invalidateFetchCache("mail:gcal:");
+function invalidateGoogleWidgetCaches(userId: number): void {
+  invalidateFetchCache(`mail:gmail:${userId}:`);
+  invalidateFetchCache(`mail:gcal:${userId}:`);
 }
 
 // ── Google OAuth helper (Gmail + Google Calendar) ────────────────────────────
 // The app credentials (OAuth client ID/secret) come from either the
 // GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET environment variables or, more
-// commonly, from Settings: they're stored in the shared `service_connections`
-// table under a dedicated "google" row's JSON `extra` blob. Env vars take
+// commonly, from Settings: they're stored per-user in the `service_connections`
+// table under that user's "google" row's JSON `extra` blob. Env vars take
 // precedence when both are present. The linked account's OAuth tokens are
-// persisted under the "gmail" row's `extra` blob (the "google_calendar" row
-// mirrors it so both features read the same link). All Google calls go over
-// the TLS-verifying `cloudHttpClient`.
+// persisted under the user's "gmail" row's `extra` blob (the "google_calendar"
+// row mirrors it so both features read the same link). All Google calls go
+// over the TLS-verifying `cloudHttpClient`.
 
 const AUTH_BASE = "https://accounts.google.com/o/oauth2/v2/auth";
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
@@ -44,8 +44,8 @@ interface StoredGoogleCredentials {
   clientSecret?: string;
 }
 
-export function getStoredGoogleCredentials(): StoredGoogleCredentials {
-  const row = connectionStmts.findByService.get("google");
+export function getStoredGoogleCredentials(userId: number): StoredGoogleCredentials {
+  const row = connectionStmts.findByService.get(userId, "google");
   if (!row?.extra) return {};
   try {
     return JSON.parse(row.extra) as StoredGoogleCredentials;
@@ -56,37 +56,41 @@ export function getStoredGoogleCredentials(): StoredGoogleCredentials {
 
 // Saving new credentials also clears any linked account: existing refresh
 // tokens are bound to the old OAuth client and would fail to refresh anyway.
-export function setGoogleCredentials(clientId: string, clientSecret: string): void {
+export function setGoogleCredentials(userId: number, clientId: string, clientSecret: string): void {
   const extra = JSON.stringify({ clientId: clientId.trim(), clientSecret: clientSecret.trim() });
-  connectionStmts.upsert.run("google", null, null, null, null, extra);
-  clearGoogleTokens();
+  connectionStmts.upsert.run(userId, "google", null, null, null, null, extra);
+  clearGoogleTokens(userId);
 }
 
-export function clearGoogleCredentials(): void {
-  connectionStmts.upsert.run("google", null, null, null, null, null);
-  clearGoogleTokens();
+export function clearGoogleCredentials(userId: number): void {
+  connectionStmts.upsert.run(userId, "google", null, null, null, null, null);
+  clearGoogleTokens(userId);
 }
 
-export function getGoogleClientId(): string | null {
-  return process.env["GOOGLE_CLIENT_ID"]?.trim() || getStoredGoogleCredentials().clientId?.trim() || null;
-}
-export function getGoogleClientSecret(): string | null {
+export function getGoogleClientId(userId: number): string | null {
   return (
-    process.env["GOOGLE_CLIENT_SECRET"]?.trim() ||
-    getStoredGoogleCredentials().clientSecret?.trim() ||
+    process.env["GOOGLE_CLIENT_ID"]?.trim() ||
+    getStoredGoogleCredentials(userId).clientId?.trim() ||
     null
   );
 }
-export function isGoogleConfigured(): boolean {
-  return Boolean(getGoogleClientId() && getGoogleClientSecret());
+export function getGoogleClientSecret(userId: number): string | null {
+  return (
+    process.env["GOOGLE_CLIENT_SECRET"]?.trim() ||
+    getStoredGoogleCredentials(userId).clientSecret?.trim() ||
+    null
+  );
+}
+export function isGoogleConfigured(userId: number): boolean {
+  return Boolean(getGoogleClientId(userId) && getGoogleClientSecret(userId));
 }
 // Where the active credentials come from — drives the Settings UI (env-provided
 // credentials cannot be edited in the app).
-export function getGoogleCredentialSource(): "env" | "stored" | null {
+export function getGoogleCredentialSource(userId: number): "env" | "stored" | null {
   if (process.env["GOOGLE_CLIENT_ID"]?.trim() && process.env["GOOGLE_CLIENT_SECRET"]?.trim()) {
     return "env";
   }
-  const stored = getStoredGoogleCredentials();
+  const stored = getStoredGoogleCredentials(userId);
   if (stored.clientId?.trim() && stored.clientSecret?.trim()) return "stored";
   return null;
 }
@@ -101,8 +105,10 @@ interface GoogleTokens {
 
 // Short-lived CSRF `state` values issued by /auth and consumed by /callback.
 // Kept in-process — the OAuth round-trip is seconds long and a server restart
-// simply means the user clicks "Connect" again.
+// simply means the user clicks "Connect" again. Each entry remembers which
+// user started the flow so the callback links the account to the right owner.
 interface PendingAuth {
+  userId: number;
   redirectUri: string;
   returnTo: string;
   createdAt: number;
@@ -117,10 +123,10 @@ function prunePending(): void {
   }
 }
 
-export function createGooglePendingAuth(redirectUri: string, returnTo: string): string {
+export function createGooglePendingAuth(userId: number, redirectUri: string, returnTo: string): string {
   prunePending();
   const state = randomBytes(16).toString("hex");
-  pendingAuth.set(state, { redirectUri, returnTo, createdAt: Date.now() });
+  pendingAuth.set(state, { userId, redirectUri, returnTo, createdAt: Date.now() });
   return state;
 }
 
@@ -135,39 +141,42 @@ export function consumeGooglePendingAuth(state: string): PendingAuth | null {
 // ── Auth intents ──────────────────────────────────────────────────────────────
 // /widgets/gmail/auth is a top-level popup navigation, so it cannot carry the
 // bearer token. Without a guard, ANY unauthenticated visitor could start the
-// OAuth flow and bind their own Google account to this instance (the link is
-// app-wide). Settings therefore first calls the authenticated
-// POST /connections/google/auth-intent to mint a short-lived single-use token,
-// which the popup URL must present before the flow may begin.
-const authIntents = new Map<string, number>(); // token → createdAt
+// OAuth flow and bind their own Google account to another user's link.
+// Settings therefore first calls the authenticated
+// POST /connections/google/auth-intent to mint a short-lived single-use token
+// bound to the caller's userId, which the popup URL must present before the
+// flow may begin.
+const authIntents = new Map<string, { userId: number; createdAt: number }>();
 const INTENT_TTL_MS = 5 * 60_000;
 
 function pruneIntents(): void {
   const now = Date.now();
-  for (const [token, createdAt] of authIntents) {
-    if (now - createdAt > INTENT_TTL_MS) authIntents.delete(token);
+  for (const [token, entry] of authIntents) {
+    if (now - entry.createdAt > INTENT_TTL_MS) authIntents.delete(token);
   }
 }
 
-export function createGoogleAuthIntent(): string {
+export function createGoogleAuthIntent(userId: number): string {
   pruneIntents();
   const token = randomBytes(24).toString("hex");
-  authIntents.set(token, Date.now());
+  authIntents.set(token, { userId, createdAt: Date.now() });
   return token;
 }
 
-export function consumeGoogleAuthIntent(token: string): boolean {
+// Returns the userId the intent was minted for, or null if invalid/expired.
+export function consumeGoogleAuthIntent(token: string): number | null {
   pruneIntents();
-  if (!authIntents.has(token)) return false;
+  const entry = authIntents.get(token);
+  if (!entry) return null;
   authIntents.delete(token);
-  return true;
+  return entry.userId;
 }
 
 // ── Persistence ───────────────────────────────────────────────────────────────
-// Multiple Google accounts can be linked; each carries its own token set.
-// Stored as { accounts: GoogleAccount[] } in the "gmail" row's extra blob
-// (mirrored into "google_calendar"). A legacy single-token blob (pre
-// multi-account) is migrated on read into a one-element accounts array.
+// Multiple Google accounts can be linked per user; each carries its own token
+// set. Stored as { accounts: GoogleAccount[] } in that user's "gmail" row's
+// extra blob (mirrored into "google_calendar"). A legacy single-token blob
+// (pre multi-account) is migrated on read into a one-element accounts array.
 
 export interface GoogleAccount extends GoogleTokens {
   id: string;
@@ -196,78 +205,81 @@ function parseStore(raw: string | null | undefined): GoogleStore {
   }
 }
 
-function getStore(): GoogleStore {
-  return parseStore(connectionStmts.findByService.get("gmail")?.extra);
+function getStore(userId: number): GoogleStore {
+  return parseStore(connectionStmts.findByService.get(userId, "gmail")?.extra);
 }
 
-function persistStore(store: GoogleStore): void {
+function persistStore(userId: number, store: GoogleStore): void {
   const extra = store.accounts.length > 0 ? JSON.stringify(store) : null;
   // Both the Email and Calendar features read the same Google links; mirror
   // into both service rows so either can be inspected independently.
-  connectionStmts.upsert.run("gmail", null, null, null, null, extra);
-  connectionStmts.upsert.run("google_calendar", null, null, null, null, extra);
+  connectionStmts.upsert.run(userId, "gmail", null, null, null, null, extra);
+  connectionStmts.upsert.run(userId, "google_calendar", null, null, null, null, extra);
 }
 
 // Linked Google accounts (only those with a usable refresh token).
-export function listGoogleAccounts(): GoogleAccount[] {
-  return getStore().accounts.filter((a) => Boolean(a.refreshToken));
+export function listGoogleAccounts(userId: number): GoogleAccount[] {
+  return getStore(userId).accounts.filter((a) => Boolean(a.refreshToken));
 }
 
-export function getGoogleAccount(id: string): GoogleAccount | null {
-  return getStore().accounts.find((a) => a.id === id) ?? null;
+export function getGoogleAccount(userId: number, id: string): GoogleAccount | null {
+  return getStore(userId).accounts.find((a) => a.id === id) ?? null;
 }
 
 // Add or replace (matched by email — re-linking the same address refreshes it
 // in place rather than duplicating). Returns the stored account.
-export function upsertGoogleAccount(tokens: GoogleTokens & { email?: string }): GoogleAccount {
-  const store = getStore();
+export function upsertGoogleAccount(
+  userId: number,
+  tokens: GoogleTokens & { email?: string },
+): GoogleAccount {
+  const store = getStore(userId);
   const existing = tokens.email
     ? store.accounts.find((a) => a.email?.toLowerCase() === tokens.email?.toLowerCase())
     : undefined;
   if (existing) {
     Object.assign(existing, tokens);
-    persistStore(store);
-    invalidateGoogleWidgetCaches();
+    persistStore(userId, store);
+    invalidateGoogleWidgetCaches(userId);
     return existing;
   }
   const account: GoogleAccount = { id: randomBytes(6).toString("hex"), ...tokens };
   store.accounts.push(account);
-  persistStore(store);
-  invalidateGoogleWidgetCaches();
+  persistStore(userId, store);
+  invalidateGoogleWidgetCaches(userId);
   return account;
 }
 
-function updateGoogleAccount(id: string, tokens: GoogleTokens): void {
-  const store = getStore();
+function updateGoogleAccount(userId: number, id: string, tokens: GoogleTokens): void {
+  const store = getStore(userId);
   const account = store.accounts.find((a) => a.id === id);
   if (!account) return;
   Object.assign(account, tokens);
-  persistStore(store);
+  persistStore(userId, store);
 }
 
-export function removeGoogleAccount(id: string): boolean {
-  const store = getStore();
+export function removeGoogleAccount(userId: number, id: string): boolean {
+  const store = getStore(userId);
   const before = store.accounts.length;
   store.accounts = store.accounts.filter((a) => a.id !== id);
-  persistStore(store);
-  invalidateGoogleWidgetCaches();
+  persistStore(userId, store);
+  invalidateGoogleWidgetCaches(userId);
   return store.accounts.length < before;
 }
 
-export function clearGoogleTokens(): void {
-  persistStore({ accounts: [] });
-  invalidateGoogleWidgetCaches();
+export function clearGoogleTokens(userId: number): void {
+  persistStore(userId, { accounts: [] });
+  invalidateGoogleWidgetCaches(userId);
 }
 
-export function isGoogleLinked(): boolean {
-  return isGoogleConfigured() && listGoogleAccounts().length > 0;
+export function isGoogleLinked(userId: number): boolean {
+  return isGoogleConfigured(userId) && listGoogleAccounts(userId).length > 0;
 }
 
 // ── OAuth ─────────────────────────────────────────────────────────────────────
 
-export function buildGoogleAuthUrl(redirectUri: string, state: string): string {
+export function buildGoogleAuthUrl(userId: number, redirectUri: string, state: string): string {
   const params = new URLSearchParams({
-    client_id: getGoogleClientId() ?? "",
+    client_id: getGoogleClientId(userId) ?? "",
     response_type: "code",
     redirect_uri: redirectUri,
     scope: GOOGLE_SCOPES,
@@ -288,9 +300,9 @@ interface TokenResponse {
   scope?: string;
 }
 
-export async function exchangeGoogleCode(code: string, redirectUri: string): Promise<void> {
-  const clientId = getGoogleClientId();
-  const clientSecret = getGoogleClientSecret();
+export async function exchangeGoogleCode(userId: number, code: string, redirectUri: string): Promise<void> {
+  const clientId = getGoogleClientId(userId);
+  const clientSecret = getGoogleClientSecret(userId);
   if (!clientId || !clientSecret) throw new Error("Google OAuth is not configured");
   const body = new URLSearchParams({
     grant_type: "authorization_code",
@@ -316,7 +328,7 @@ export async function exchangeGoogleCode(code: string, redirectUri: string): Pro
     logger.warn({ err }, "Google userinfo fetch failed");
   }
 
-  upsertGoogleAccount({
+  upsertGoogleAccount(userId, {
     accessToken: data.access_token,
     refreshToken: data.refresh_token,
     expiresAt: Date.now() + data.expires_in * 1000,
@@ -327,11 +339,11 @@ export async function exchangeGoogleCode(code: string, redirectUri: string): Pro
 
 // Return a valid access token for one linked account, refreshing when expired.
 // Throws when Google is not configured or the account is not linked.
-export async function getGoogleAccessToken(accountId: string): Promise<string> {
-  const clientId = getGoogleClientId();
-  const clientSecret = getGoogleClientSecret();
+export async function getGoogleAccessToken(userId: number, accountId: string): Promise<string> {
+  const clientId = getGoogleClientId(userId);
+  const clientSecret = getGoogleClientSecret(userId);
   if (!clientId || !clientSecret) throw new Error("Google OAuth is not configured");
-  const account = getGoogleAccount(accountId);
+  const account = getGoogleAccount(userId, accountId);
   if (!account?.refreshToken) throw new Error("Google account is not linked");
   if (
     account.accessToken &&
@@ -351,7 +363,7 @@ export async function getGoogleAccessToken(accountId: string): Promise<string> {
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
   });
   const data = r.data;
-  updateGoogleAccount(account.id, {
+  updateGoogleAccount(userId, account.id, {
     accessToken: data.access_token,
     // Google only returns a refresh token on the initial consent; keep ours.
     refreshToken: data.refresh_token ?? account.refreshToken,

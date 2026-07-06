@@ -1,4 +1,4 @@
-import { connectionStmts, healthStmts } from "./db.js";
+import { db, connectionStmts, healthStmts } from "./db.js";
 import { runPing, connectionToValues, isConfigured } from "./ping.js";
 import { logger } from "./logger.js";
 
@@ -13,23 +13,32 @@ function resolveInterval(): number {
   return parsed;
 }
 
-// Ping every configured connection once and persist the outcome. Unconfigured
-// services (no base URL) are skipped and any stale health row is cleared so the
-// dashboard never reports a service the user has removed.
+const listUserIds = db.prepare("SELECT id FROM users").pluck();
+
+// Ping every configured connection once (per user) and persist the outcome.
+// Connections are scoped per-user, so health is checked and stored per-user
+// too — one user's service reachability/status is never visible to another.
+// Unconfigured services (no base URL) are skipped and any stale health row is
+// cleared so the dashboard never reports a service the user has removed.
 export async function runHealthChecks(): Promise<void> {
-  const connections = connectionStmts.findAll.all();
+  const userIds = listUserIds.all() as number[];
 
   await Promise.all(
-    connections.map(async (conn) => {
-      const values = connectionToValues(conn);
+    userIds.map(async (userId) => {
+      const connections = connectionStmts.findAllByUser.all(userId);
+      await Promise.all(
+        connections.map(async (conn) => {
+          const values = connectionToValues(conn);
 
-      if (!isConfigured(values)) {
-        healthStmts.delete.run(conn.service);
-        return;
-      }
+          if (!isConfigured(values)) {
+            healthStmts.delete.run(userId, conn.service);
+            return;
+          }
 
-      const result = await runPing(conn.service, values);
-      healthStmts.upsert.run(conn.service, result.ok ? 1 : 0, result.message);
+          const result = await runPing(conn.service, values);
+          healthStmts.upsert.run(userId, conn.service, result.ok ? 1 : 0, result.message);
+        }),
+      );
     }),
   );
 }

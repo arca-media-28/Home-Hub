@@ -63,22 +63,113 @@ db.exec(`
   );
 
   CREATE TABLE IF NOT EXISTS service_connections (
-    service TEXT PRIMARY KEY,
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    service TEXT NOT NULL,
     url TEXT,
     api_key TEXT,
     username TEXT,
     password TEXT,
     extra TEXT,
-    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(user_id, service)
   );
 
   CREATE TABLE IF NOT EXISTS service_health (
-    service TEXT PRIMARY KEY,
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    service TEXT NOT NULL,
     ok INTEGER NOT NULL,
     message TEXT NOT NULL,
-    checked_at TEXT NOT NULL DEFAULT (datetime('now'))
+    checked_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(user_id, service)
   );
 `);
+
+// ── One-time structural migration: service_connections / service_health used
+// to be instance-global (keyed only by `service`, no owner). Any authenticated
+// user could read/tamper with every other user's saved credentials and linked
+// mail/calendar/Spotify accounts through these shared rows. Both tables are
+// now scoped per-user (composite UNIQUE(user_id, service)); this block
+// rebuilds pre-existing tables that still have the old single-column PK,
+// assigning any orphaned global rows to the lowest-id ("first"/owner) user so
+// existing self-hosted instances keep their configured connections instead of
+// losing them outright. Guarded so it runs exactly once per table.
+function migrateGlobalTableToPerUser(table: "service_connections" | "service_health"): void {
+  const cols = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string; pk: number }[];
+  const hasUserId = cols.some((c) => c.name === "user_id");
+  if (hasUserId) return;
+
+  const firstUser = db.prepare("SELECT id FROM users ORDER BY id ASC LIMIT 1").get() as
+    | { id: number }
+    | undefined;
+
+  const legacyRows = db.prepare(`SELECT * FROM ${table}`).all() as Record<string, unknown>[];
+
+  db.exec(`ALTER TABLE ${table} RENAME TO ${table}_legacy`);
+
+  if (table === "service_connections") {
+    db.exec(`
+      CREATE TABLE service_connections (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        service TEXT NOT NULL,
+        url TEXT,
+        api_key TEXT,
+        username TEXT,
+        password TEXT,
+        extra TEXT,
+        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+        UNIQUE(user_id, service)
+      )
+    `);
+  } else {
+    db.exec(`
+      CREATE TABLE service_health (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        service TEXT NOT NULL,
+        ok INTEGER NOT NULL,
+        message TEXT NOT NULL,
+        checked_at TEXT NOT NULL DEFAULT (datetime('now')),
+        UNIQUE(user_id, service)
+      )
+    `);
+  }
+
+  if (firstUser) {
+    if (table === "service_connections") {
+      const insert = db.prepare(
+        `INSERT OR IGNORE INTO service_connections (user_id, service, url, api_key, username, password, extra, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      );
+      for (const row of legacyRows) {
+        insert.run(
+          firstUser.id,
+          row["service"],
+          row["url"] ?? null,
+          row["api_key"] ?? null,
+          row["username"] ?? null,
+          row["password"] ?? null,
+          row["extra"] ?? null,
+          row["updated_at"] ?? new Date().toISOString(),
+        );
+      }
+    } else {
+      const insert = db.prepare(
+        `INSERT OR IGNORE INTO service_health (user_id, service, ok, message, checked_at)
+         VALUES (?, ?, ?, ?, ?)`
+      );
+      for (const row of legacyRows) {
+        insert.run(firstUser.id, row["service"], row["ok"], row["message"], row["checked_at"]);
+      }
+    }
+  }
+
+  db.exec(`DROP TABLE ${table}_legacy`);
+}
+migrateGlobalTableToPerUser("service_connections");
+migrateGlobalTableToPerUser("service_health");
 
 // ── Migrations ────────────────────────────────────────────────────────────────
 // Every tile is now stored as an app/link with an optional `integration`.
@@ -207,15 +298,20 @@ db.exec(`
     AND integration IS NULL
 `);
 
-// Instance-wide connection settings for the supported services. Seed an empty
-// row for each on first run so the settings page always has something to render.
+// Per-user connection settings for the supported services. Seed an empty row
+// for each on registration (see createDefaultServiceConnections below) so the
+// settings page always has something to render for that user — and, for
+// installs that predate per-user connections, backfill any user who has none.
 const SERVICE_CONNECTION_KEYS = ["truenas", "plex", "sonarr", "radarr", "qbittorrent"] as const;
 
 const seedConnection = db.prepare(
-  "INSERT OR IGNORE INTO service_connections (service) VALUES (?)"
+  "INSERT OR IGNORE INTO service_connections (user_id, service) VALUES (?, ?)"
 );
-for (const service of SERVICE_CONNECTION_KEYS) {
-  seedConnection.run(service);
+const allUserIds = db.prepare("SELECT id FROM users").all() as { id: number }[];
+for (const u of allUserIds) {
+  for (const service of SERVICE_CONNECTION_KEYS) {
+    seedConnection.run(u.id, service);
+  }
 }
 
 // ── Helper types ──────────────────────────────────────────────────────────────
@@ -360,6 +456,8 @@ export function createDefaultPage(userId: number): number {
 }
 
 export interface DbServiceConnection {
+  id: number;
+  user_id: number;
   service: string;
   url: string | null;
   api_key: string | null;
@@ -369,20 +467,23 @@ export interface DbServiceConnection {
   updated_at: string;
 }
 
+// All connection reads/writes are scoped by user_id so one authenticated user
+// can never see or overwrite another user's saved service credentials, mail
+// accounts, or linked Google/Spotify tokens.
 export const connectionStmts = {
-  findAll: db.prepare<[], DbServiceConnection>(
-    "SELECT * FROM service_connections ORDER BY service ASC"
+  findAllByUser: db.prepare<[number], DbServiceConnection>(
+    "SELECT * FROM service_connections WHERE user_id = ? ORDER BY service ASC"
   ),
-  findByService: db.prepare<[string], DbServiceConnection>(
-    "SELECT * FROM service_connections WHERE service = ?"
+  findByService: db.prepare<[number, string], DbServiceConnection>(
+    "SELECT * FROM service_connections WHERE user_id = ? AND service = ?"
   ),
   upsert: db.prepare<
-    [string, string | null, string | null, string | null, string | null, string | null],
+    [number, string, string | null, string | null, string | null, string | null, string | null],
     void
   >(
-    `INSERT INTO service_connections (service, url, api_key, username, password, extra, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
-     ON CONFLICT(service) DO UPDATE SET
+    `INSERT INTO service_connections (user_id, service, url, api_key, username, password, extra, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+     ON CONFLICT(user_id, service) DO UPDATE SET
        url = excluded.url,
        api_key = excluded.api_key,
        username = excluded.username,
@@ -392,7 +493,18 @@ export const connectionStmts = {
   ),
 };
 
+// Seed empty rows for the single-value connection services so a brand-new
+// user's settings page always has something to render. Called on signup and
+// during the legacy-data backfill above.
+export function createDefaultServiceConnections(userId: number): void {
+  for (const service of SERVICE_CONNECTION_KEYS) {
+    seedConnection.run(userId, service);
+  }
+}
+
 export interface DbServiceHealth {
+  id: number;
+  user_id: number;
   service: string;
   ok: number;
   message: string;
@@ -400,18 +512,18 @@ export interface DbServiceHealth {
 }
 
 export const healthStmts = {
-  findAll: db.prepare<[], DbServiceHealth>(
-    "SELECT * FROM service_health ORDER BY service ASC"
+  findAllByUser: db.prepare<[number], DbServiceHealth>(
+    "SELECT * FROM service_health WHERE user_id = ? ORDER BY service ASC"
   ),
-  upsert: db.prepare<[string, number, string], void>(
-    `INSERT INTO service_health (service, ok, message, checked_at)
-     VALUES (?, ?, ?, datetime('now'))
-     ON CONFLICT(service) DO UPDATE SET
+  upsert: db.prepare<[number, string, number, string], void>(
+    `INSERT INTO service_health (user_id, service, ok, message, checked_at)
+     VALUES (?, ?, ?, ?, datetime('now'))
+     ON CONFLICT(user_id, service) DO UPDATE SET
        ok = excluded.ok,
        message = excluded.message,
        checked_at = datetime('now')`
   ),
-  delete: db.prepare<[string], void>(
-    "DELETE FROM service_health WHERE service = ?"
+  delete: db.prepare<[number, string], void>(
+    "DELETE FROM service_health WHERE user_id = ? AND service = ?"
   ),
 };

@@ -37,28 +37,34 @@ interface GoogleEvent {
 
 // Cached wrapper — tiles poll frequently, so identical per-account requests
 // within the TTL share one upstream fetch (see fetchCache.ts).
-export function fetchGoogleCalendarEvents(opts: {
-  accountId: string;
-  accountLabel: string;
-  daysAhead: number;
-  max: number;
-  fresh?: boolean;
-}): Promise<CalendarEvent[]> {
+export function fetchGoogleCalendarEvents(
+  userId: number,
+  opts: {
+    accountId: string;
+    accountLabel: string;
+    daysAhead: number;
+    max: number;
+    fresh?: boolean;
+  },
+): Promise<CalendarEvent[]> {
   return cachedFetch(
-    `mail:gcal:${opts.accountId}:${opts.daysAhead}:${opts.max}`,
-    () => fetchGoogleCalendarEventsUncached(opts),
+    `mail:gcal:${userId}:${opts.accountId}:${opts.daysAhead}:${opts.max}`,
+    () => fetchGoogleCalendarEventsUncached(userId, opts),
     undefined,
     { fresh: opts.fresh ?? false },
   );
 }
 
-async function fetchGoogleCalendarEventsUncached(opts: {
-  accountId: string;
-  accountLabel: string;
-  daysAhead: number;
-  max: number;
-}): Promise<CalendarEvent[]> {
-  const token = await getGoogleAccessToken(opts.accountId);
+async function fetchGoogleCalendarEventsUncached(
+  userId: number,
+  opts: {
+    accountId: string;
+    accountLabel: string;
+    daysAhead: number;
+    max: number;
+  },
+): Promise<CalendarEvent[]> {
+  const token = await getGoogleAccessToken(userId, opts.accountId);
   const headers = { Authorization: `Bearer ${token}` };
 
   const now = new Date();
