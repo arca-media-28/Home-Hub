@@ -80,7 +80,11 @@ export default function RadarrTile({ enabled, density }: WidgetProps) {
       )}
 
       {hasUpcoming && (
-        <div className="space-y-1 border-t border-border pt-2 mt-auto">
+        <div
+          className={
+            hasQueue ? "space-y-1 border-t border-border pt-2 mt-auto" : "space-y-1"
+          }
+        >
           <p className="text-xs text-muted-foreground">Upcoming</p>
           <div
             className={listColumnClass(budget.columns, "space-y-1")}
