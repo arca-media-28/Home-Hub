@@ -80,6 +80,8 @@ onlyBuiltDependencies:
 overrides:
   # Security: force patched form-data (CVE-2026-12143)
   form-data: "^4.0.6"
+  # Security: force patched linkify-it (GHSA-22p9-wv53-3rq4)
+  linkify-it: ">=5.0.1"
   # replit uses linux-x64 only, we can exclude all other platforms
   "esbuild>@esbuild/darwin-arm64": "-"
   "esbuild>@esbuild/darwin-x64": "-"
