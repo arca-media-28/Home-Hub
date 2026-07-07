@@ -67,6 +67,11 @@ async function buildAll() {
     external: [
       "*.node",
       "sharp",
+      // jsdom (pulled in by isomorphic-dompurify) reads asset files such as
+      // browser/default-stylesheet.css via __dirname-relative path traversal,
+      // which breaks once bundled. Externalize isomorphic-dompurify so it (and
+      // its nested jsdom) load from node_modules at runtime instead.
+      "isomorphic-dompurify",
       "better-sqlite3",
       "sqlite3",
       "canvas",
