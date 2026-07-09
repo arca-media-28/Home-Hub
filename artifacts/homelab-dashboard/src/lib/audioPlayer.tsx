@@ -176,10 +176,41 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
   const enableVisualizer = useCallback(() => {
     if (visualizerRequestedRef.current) return;
     visualizerRequestedRef.current = true;
-    // Set crossOrigin BEFORE the next load so CORS-capable servers stay audible
+    const el = getAudio();
+    // Set crossOrigin BEFORE (re)loading so CORS-capable servers stay audible
     // once routed through the graph. Only applied now that a visualizer exists.
-    getAudio().crossOrigin = "anonymous";
-  }, [getAudio]);
+    el.crossOrigin = "anonymous";
+    // Build the analyser graph *now*, not just on the next play/pause. This is
+    // what makes a visualizer tile added mid-playback react to the live audio:
+    // without it, `analyser` stays null until the next explicit play/pause and
+    // the tile is stuck on its idle animation while sound is audible. resumeGraph
+    // covers the context starting suspended (it may be created outside a gesture).
+    ensureGraph();
+    resumeGraph();
+    // If a track was already loaded before the visualizer existed, its stream was
+    // fetched WITHOUT crossOrigin, so routing it through the freshly-built graph
+    // would analyse (and play) silence for cross-origin sources (Plex/Jellyfin/
+    // Subsonic). Reload the current src — now that crossOrigin is set — and
+    // restore the playback position so the swap is as seamless as possible. This
+    // is a deliberate, one-time re-buffer: the tradeoff for making an already-
+    // playing cross-origin stream analysable. Gated on the graph actually being
+    // built, so a browser without Web Audio never takes an audible glitch.
+    if (analyserRef.current && el.src) {
+      const wasPlaying = !el.paused;
+      const resumeAt = el.currentTime;
+      const onLoaded = () => {
+        el.removeEventListener("loadedmetadata", onLoaded);
+        try {
+          if (resumeAt > 0) el.currentTime = resumeAt;
+        } catch {
+          // Not seekable yet on some streams — accept starting from the top.
+        }
+      };
+      el.addEventListener("loadedmetadata", onLoaded);
+      el.load();
+      if (wasPlaying) void el.play().catch(() => setIsPlaying(false));
+    }
+  }, [getAudio, ensureGraph, resumeGraph]);
 
   const currentTrack = queue[index] ?? null;
 
