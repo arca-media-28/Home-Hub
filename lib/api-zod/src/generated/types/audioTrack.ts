@@ -46,4 +46,9 @@ export interface AudioTrack {
      * @nullable
      */
   streamUrl?: string | null;
+  /**
+     * Whether the track is currently marked as a favorite on the source (Plex user rating, Navidrome/Subsonic star, Jellyfin favorite). True when favorited, false when not. Null when the source doesn't report it or favoriting isn't supported (e.g. Spotify, demo content).
+     * @nullable
+     */
+  liked?: boolean | null;
 }

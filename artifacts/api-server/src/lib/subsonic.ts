@@ -43,6 +43,10 @@ export interface SubsonicSong {
   albumId?: string;
   coverArt?: string;
   duration?: number; // seconds
+  // ISO timestamp the track was starred by the user; present only when the track
+  // is a favorite. Absent/undefined means not starred. Used to report the liked
+  // state on the Audio Player tile.
+  starred?: string;
   // Only present on getNowPlaying entries: how many minutes ago the server last
   // registered this track as playing. It's the only live-session signal Subsonic
   // exposes (whole minutes, no sub-minute offset), so we estimate the playback

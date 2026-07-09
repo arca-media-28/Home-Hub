@@ -1513,7 +1513,8 @@ export const GetAudioPlayerNowPlayingResponse = zod.object({
   "durationMs": zod.number().nullish().describe('Track length in milliseconds. Null when the source omits it.'),
   "progressMs": zod.number().nullish().describe('Playback offset in milliseconds for the source\'s current session (Plex viewOffset). Only set on the now-playing track of an active remote session; null otherwise.'),
   "state": zod.string().nullish().describe('Remote playback state reported by the source for an active session: \"playing\", \"paused\", or \"stopped\". Null when there is no active session (the track is a queue\/last-played entry, not live).'),
-  "streamUrl": zod.string().nullish().describe('Fully-qualified, authenticated audio stream URL an HTML audio element can play directly (Plex part key + token). Null when the source does not expose an in-browser-playable stream (remote-control-only).')
+  "streamUrl": zod.string().nullish().describe('Fully-qualified, authenticated audio stream URL an HTML audio element can play directly (Plex part key + token). Null when the source does not expose an in-browser-playable stream (remote-control-only).'),
+  "liked": zod.boolean().nullish().describe('Whether the track is currently marked as a favorite on the source (Plex user rating, Navidrome\/Subsonic star, Jellyfin favorite). True when favorited, false when not. Null when the source doesn\'t report it or favoriting isn\'t supported (e.g. Spotify, demo content).')
 }),zod.null()]).describe('The source\'s current or last music track. For Plex this is the active music session when one exists, otherwise the most recently added\/played track. Null when nothing is available.'),
   "queue": zod.array(zod.object({
   "id": zod.string().describe('Stable identifier for the track within its source.'),
@@ -1524,7 +1525,8 @@ export const GetAudioPlayerNowPlayingResponse = zod.object({
   "durationMs": zod.number().nullish().describe('Track length in milliseconds. Null when the source omits it.'),
   "progressMs": zod.number().nullish().describe('Playback offset in milliseconds for the source\'s current session (Plex viewOffset). Only set on the now-playing track of an active remote session; null otherwise.'),
   "state": zod.string().nullish().describe('Remote playback state reported by the source for an active session: \"playing\", \"paused\", or \"stopped\". Null when there is no active session (the track is a queue\/last-played entry, not live).'),
-  "streamUrl": zod.string().nullish().describe('Fully-qualified, authenticated audio stream URL an HTML audio element can play directly (Plex part key + token). Null when the source does not expose an in-browser-playable stream (remote-control-only).')
+  "streamUrl": zod.string().nullish().describe('Fully-qualified, authenticated audio stream URL an HTML audio element can play directly (Plex part key + token). Null when the source does not expose an in-browser-playable stream (remote-control-only).'),
+  "liked": zod.boolean().nullish().describe('Whether the track is currently marked as a favorite on the source (Plex user rating, Navidrome\/Subsonic star, Jellyfin favorite). True when favorited, false when not. Null when the source doesn\'t report it or favoriting isn\'t supported (e.g. Spotify, demo content).')
 })).describe('Ordered list of browser-playable tracks the shared player can step through (skip next\/previous). For Plex this is the now-playing track\'s album, or recent tracks when no session is active.'),
   "auth": zod.union([zod.literal('connected'),zod.literal('needed'),zod.literal(null)]).nullish().describe('Authorization state for sources that require OAuth (Spotify): \"connected\" when a valid linked account exists, \"needed\" when the user must link their account in Settings first. Null for sources that need no per-user OAuth (e.g. Plex).'),
   "premium": zod.boolean().nullish().describe('Whether the linked account supports in-browser playback via the Spotify Web Playback SDK (Premium). True enables in-dashboard streaming; false degrades to remote control of an external device. Null when not applicable (non-OAuth sources or not connected).'),
@@ -1579,7 +1581,8 @@ export const SearchAudioLibraryResponse = zod.object({
   "durationMs": zod.number().nullish().describe('Track length in milliseconds. Null when the source omits it.'),
   "progressMs": zod.number().nullish().describe('Playback offset in milliseconds for the source\'s current session (Plex viewOffset). Only set on the now-playing track of an active remote session; null otherwise.'),
   "state": zod.string().nullish().describe('Remote playback state reported by the source for an active session: \"playing\", \"paused\", or \"stopped\". Null when there is no active session (the track is a queue\/last-played entry, not live).'),
-  "streamUrl": zod.string().nullish().describe('Fully-qualified, authenticated audio stream URL an HTML audio element can play directly (Plex part key + token). Null when the source does not expose an in-browser-playable stream (remote-control-only).')
+  "streamUrl": zod.string().nullish().describe('Fully-qualified, authenticated audio stream URL an HTML audio element can play directly (Plex part key + token). Null when the source does not expose an in-browser-playable stream (remote-control-only).'),
+  "liked": zod.boolean().nullish().describe('Whether the track is currently marked as a favorite on the source (Plex user rating, Navidrome\/Subsonic star, Jellyfin favorite). True when favorited, false when not. Null when the source doesn\'t report it or favoriting isn\'t supported (e.g. Spotify, demo content).')
 })).optional().describe('Playable tracks (search results, an album\'s tracks, or a playlist\'s tracks). Each carries a browser-playable streamUrl for the shared engine. Absent when not applicable to the request.')
 })
 
@@ -1626,7 +1629,8 @@ export const BrowseAudioLibraryResponse = zod.object({
   "durationMs": zod.number().nullish().describe('Track length in milliseconds. Null when the source omits it.'),
   "progressMs": zod.number().nullish().describe('Playback offset in milliseconds for the source\'s current session (Plex viewOffset). Only set on the now-playing track of an active remote session; null otherwise.'),
   "state": zod.string().nullish().describe('Remote playback state reported by the source for an active session: \"playing\", \"paused\", or \"stopped\". Null when there is no active session (the track is a queue\/last-played entry, not live).'),
-  "streamUrl": zod.string().nullish().describe('Fully-qualified, authenticated audio stream URL an HTML audio element can play directly (Plex part key + token). Null when the source does not expose an in-browser-playable stream (remote-control-only).')
+  "streamUrl": zod.string().nullish().describe('Fully-qualified, authenticated audio stream URL an HTML audio element can play directly (Plex part key + token). Null when the source does not expose an in-browser-playable stream (remote-control-only).'),
+  "liked": zod.boolean().nullish().describe('Whether the track is currently marked as a favorite on the source (Plex user rating, Navidrome\/Subsonic star, Jellyfin favorite). True when favorited, false when not. Null when the source doesn\'t report it or favoriting isn\'t supported (e.g. Spotify, demo content).')
 })).optional().describe('Playable tracks (search results, an album\'s tracks, or a playlist\'s tracks). Each carries a browser-playable streamUrl for the shared engine. Absent when not applicable to the request.')
 })
 
@@ -1644,6 +1648,24 @@ export const ScrobbleSubsonicBody = zod.object({
 
 export const ScrobbleSubsonicResponse = zod.object({
   "ok": zod.boolean()
+})
+
+
+/**
+ * Toggles a track's favorite/like state on the source and returns the new state. Dispatches by "source": Plex sets the track's user rating, Navidrome/Subsonic stars/unstars it, and Jellyfin adds/removes it from favorites. Spotify is not yet supported.
+ * @summary Mark the currently playing track as a favorite (or remove it) on the connected music source
+ */
+
+
+
+export const SetAudioFavoriteBody = zod.object({
+  "source": zod.enum(['plex', 'subsonic', 'jellyfin']).optional().describe('Which music source the track belongs to. \"plex\" sets the track\'s user rating, \"subsonic\" stars\/unstars it on Navidrome\/Subsonic, and \"jellyfin\" adds\/removes it from favorites. Defaults to \"plex\".'),
+  "id": zod.string().min(1).describe('The source track id to favorite or unfavorite.'),
+  "liked": zod.boolean().describe('true to mark the track as a favorite on the source, false to remove the favorite.')
+})
+
+export const SetAudioFavoriteResponse = zod.object({
+  "liked": zod.boolean().describe('The track\'s favorite state after the change was applied.')
 })
 
 

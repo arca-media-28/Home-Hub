@@ -1390,6 +1390,35 @@ export interface SubsonicScrobbleResult {
   ok: boolean;
 }
 
+/**
+ * Which music source the track belongs to. "plex" sets the track's user rating, "subsonic" stars/unstars it on Navidrome/Subsonic, and "jellyfin" adds/removes it from favorites. Defaults to "plex".
+ */
+export type AudioFavoriteInputSource = typeof AudioFavoriteInputSource[keyof typeof AudioFavoriteInputSource];
+
+
+export const AudioFavoriteInputSource = {
+  plex: 'plex',
+  subsonic: 'subsonic',
+  jellyfin: 'jellyfin',
+} as const;
+
+export interface AudioFavoriteInput {
+  /** Which music source the track belongs to. "plex" sets the track's user rating, "subsonic" stars/unstars it on Navidrome/Subsonic, and "jellyfin" adds/removes it from favorites. Defaults to "plex". */
+  source?: AudioFavoriteInputSource;
+  /**
+     * The source track id to favorite or unfavorite.
+     * @minLength 1
+     */
+  id: string;
+  /** true to mark the track as a favorite on the source, false to remove the favorite. */
+  liked: boolean;
+}
+
+export interface AudioFavoriteResult {
+  /** The track's favorite state after the change was applied. */
+  liked: boolean;
+}
+
 export interface ServiceStatus {
   service: string;
   configured: boolean;
@@ -1764,6 +1793,11 @@ export interface AudioTrack {
      * @nullable
      */
   streamUrl?: string | null;
+  /**
+     * Whether the track is currently marked as a favorite on the source (Plex user rating, Navidrome/Subsonic star, Jellyfin favorite). True when favorited, false when not. Null when the source doesn't report it or favoriting isn't supported (e.g. Spotify, demo content).
+     * @nullable
+     */
+  liked?: boolean | null;
 }
 
 /**

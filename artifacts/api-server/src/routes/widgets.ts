@@ -1696,8 +1696,17 @@ interface PlexTrackRow {
   grandparentThumb?: string;
   duration?: number;
   viewOffset?: number;
+  userRating?: number;
   Player?: { state?: string };
   Media?: { Part?: { key?: string }[] }[];
+}
+
+// Plex has no boolean "favorite" for tracks — it exposes a 0–10 `userRating`
+// (the old thumbs-up mapped to 10). We treat a high rating as "liked" so the
+// heart toggle round-trips with the rating we write when a user likes a track.
+const PLEX_LIKE_THRESHOLD = 8;
+function plexLiked(userRating: number | undefined): boolean | null {
+  return typeof userRating === "number" ? userRating >= PLEX_LIKE_THRESHOLD : null;
 }
 
 function mapPlexTrack(
@@ -1718,6 +1727,7 @@ function mapPlexTrack(
     progressMs: live && typeof item.viewOffset === "number" ? item.viewOffset : null,
     state: live ? item.Player?.state ?? null : null,
     streamUrl: partKey ? `${baseUrl}${partKey}?X-Plex-Token=${token}` : null,
+    liked: plexLiked(item.userRating),
   };
 }
 
@@ -1735,6 +1745,7 @@ interface JellyfinAudioItem {
   RunTimeTicks?: number;
   ImageTags?: { Primary?: string };
   AlbumPrimaryImageTag?: string;
+  UserData?: { IsFavorite?: boolean };
 }
 
 // Map a Jellyfin audio item to the shared AudioTrack shape. Jellyfin reports
@@ -1778,7 +1789,34 @@ function mapJellyfinTrack(
     streamUrl: id
       ? `${baseUrl}/Audio/${id}/stream.mp3?api_key=${apiKey}&audioCodec=mp3`
       : null,
+    liked:
+      typeof item.UserData?.IsFavorite === "boolean" ? item.UserData.IsFavorite : null,
   };
+}
+
+// Resolve a Jellyfin user id for favorite reads/writes. The favorite endpoints
+// are user-scoped (/Users/{userId}/FavoriteItems/...) and UserData.IsFavorite
+// only populates when a userId accompanies item requests. The API key acts on
+// behalf of the server, so pick the first user from /Users. Cached briefly per
+// base URL to avoid an extra round-trip on every poll. Returns undefined on any
+// failure so callers degrade to unknown liked state (never a 502 on read).
+const jellyfinUserIdCache = new Map<string, { id: string; at: number }>();
+const JELLYFIN_USER_TTL_MS = 5 * 60_000;
+async function fetchJellyfinUserId(baseUrl: string, apiKey: string): Promise<string | undefined> {
+  const cached = jellyfinUserIdCache.get(baseUrl);
+  if (cached && Date.now() - cached.at < JELLYFIN_USER_TTL_MS) return cached.id;
+  try {
+    const r = await httpClient.get(`${baseUrl}/Users`, { params: { api_key: apiKey } });
+    const users = (r.data ?? []) as Array<{ Id?: string }>;
+    const id = users[0]?.Id;
+    if (id) {
+      jellyfinUserIdCache.set(baseUrl, { id, at: Date.now() });
+      return id;
+    }
+  } catch {
+    // Ignore — caller falls back to unknown liked state; favoriting will 502.
+  }
+  return undefined;
 }
 
 // Resolve the saved Jellyfin connection (base URL + API key), falling back to a
@@ -1820,6 +1858,10 @@ async function handleJellyfinAudio(userId: number, res: import("express").Respon
   }
 
   try {
+    // Resolve the Jellyfin user so item requests carry UserData.IsFavorite (the
+    // like state). Best-effort — undefined just leaves liked unknown/null.
+    const jfUserId = await fetchJellyfinUserId(baseUrl, apiKey);
+
     // Prefer the active music session: /Sessions lists everything playing now;
     // pick the first whose NowPlayingItem is an Audio track. Its album becomes
     // the queue so skip next/previous works.
@@ -1855,6 +1897,7 @@ async function handleJellyfinAudio(userId: number, res: import("express").Respon
               Recursive: true,
               SortBy: "ParentIndexNumber,IndexNumber,SortName",
               api_key: apiKey,
+              ...(jfUserId ? { userId: jfUserId } : {}),
             },
           });
           const tracks = (album.data?.Items ?? []) as JellyfinAudioItem[];
@@ -1864,6 +1907,12 @@ async function handleJellyfinAudio(userId: number, res: import("express").Respon
         } catch (err) {
           logger.warn({ reason: normalizeHttpError(err) }, "Jellyfin album queue fetch failed — using now-playing only");
         }
+      }
+      // The session's NowPlayingItem rarely carries UserData, so backfill the
+      // now-playing like state from the (userId-scoped) album queue entry.
+      if (nowPlaying.liked == null) {
+        const match = queue.find((t) => t.id === nowPlaying.id);
+        if (match) nowPlaying.liked = match.liked;
       }
       res.json({ source: "jellyfin", sample: false, nowPlaying, queue });
       return;
@@ -1878,6 +1927,7 @@ async function handleJellyfinAudio(userId: number, res: import("express").Respon
         Recursive: true,
         Limit: 25,
         api_key: apiKey,
+        ...(jfUserId ? { userId: jfUserId } : {}),
       },
     });
     const tracks = (recent.data?.Items ?? []) as JellyfinAudioItem[];
@@ -2033,6 +2083,9 @@ function mapSubsonicTrack(
     streamUrl: id
       ? `${baseUrl}/rest/stream.view?id=${encodeURIComponent(id)}&format=mp3&${mediaQuery}`
       : null,
+    // `starred` is an ISO date present only when the track is a favorite; treat
+    // any non-empty value as liked. Never absent-but-typed, so default to false.
+    liked: Boolean(song.starred),
   };
 }
 
@@ -2180,6 +2233,97 @@ router.post("/subsonic/scrobble", requireAuth, async (req: AuthRequest, res) => 
       "Subsonic scrobble failed",
     );
     res.status(502).json({ error: "Failed to report play to Subsonic" });
+  }
+});
+
+// ────────────────────────────────────────────────
+// Audio Player — favorite / like toggling
+// ────────────────────────────────────────────────
+// Backs the heart button on the Audio Player tile. Each per-source setter writes
+// the track's favorite state on the linked server and returns "ok" on success or
+// "unconfigured" when that source has no saved connection (→ 404). Real API
+// failures throw so the route answers 502 and the button can surface an error.
+// Spotify is intentionally omitted: liking a track needs the user-library-modify
+// OAuth scope, which the app doesn't currently request, so it would force every
+// linked user to re-authorize — tracked as a fast-follow.
+type FavoriteOutcome = "ok" | "unconfigured";
+
+async function setPlexFavorite(userId: number, id: string, liked: boolean): Promise<FavoriteOutcome> {
+  const conn = resolvePlexAudioConnection(userId);
+  if (!conn) return "unconfigured";
+  // Plex has no boolean favorite for tracks — write a user rating instead. 10 =
+  // liked; -1 is Plex's "remove rating" sentinel used to unlike. Reads then map
+  // a high rating back to liked (see plexLiked), so the toggle round-trips.
+  await httpClient.put(`${conn.baseUrl}/:/rate`, null, {
+    headers: { "X-Plex-Token": conn.token, Accept: "application/json" },
+    params: {
+      key: id,
+      identifier: "com.plexapp.plugins.library",
+      rating: liked ? 10 : -1,
+    },
+  });
+  return "ok";
+}
+
+async function setSubsonicFavorite(userId: number, id: string, liked: boolean): Promise<FavoriteOutcome> {
+  const saved = getSavedConnection(userId, "subsonic");
+  if (!saved.url || !saved.username || !saved.password) return "unconfigured";
+  const auth = subsonicAuthParams(saved.username, saved.password);
+  // star.view / unstar.view toggle the track's starred state. subsonicGet throws
+  // on a failed envelope, so any rejection surfaces as a 502 to the caller.
+  await subsonicGet(saved.url, liked ? "star.view" : "unstar.view", auth, { id });
+  return "ok";
+}
+
+async function setJellyfinFavorite(userId: number, id: string, liked: boolean): Promise<FavoriteOutcome> {
+  const { baseUrl, apiKey } = resolveJellyfinAudioConnection(userId);
+  if (!baseUrl || !apiKey) return "unconfigured";
+  const jfUserId = await fetchJellyfinUserId(baseUrl, apiKey);
+  if (!jfUserId) throw new Error("Could not resolve a Jellyfin user for favoriting");
+  const url = `${baseUrl}/Users/${jfUserId}/FavoriteItems/${encodeURIComponent(id)}`;
+  if (liked) {
+    await httpClient.post(url, null, { params: { api_key: apiKey } });
+  } else {
+    await httpClient.delete(url, { params: { api_key: apiKey } });
+  }
+  return "ok";
+}
+
+// POST /widgets/audioplayer/favorite — mark the currently playing track as a
+// favorite (liked=true) or remove it (liked=false) on the connected source.
+// Dispatches by `source`, mirroring the now-playing route. Returns the new liked
+// state so the tile can settle its optimistic UI to the confirmed value.
+router.post("/audioplayer/favorite", requireAuth, async (req: AuthRequest, res) => {
+  const body = (req.body ?? {}) as { source?: unknown; id?: unknown; liked?: unknown };
+  const source = typeof body.source === "string" ? body.source : "plex";
+  const id = typeof body.id === "string" ? body.id : "";
+  const liked = body.liked === true;
+  if (!id) {
+    res.status(400).json({ error: "A track id is required" });
+    return;
+  }
+
+  const userId = req.user!.userId;
+  try {
+    let outcome: FavoriteOutcome;
+    if (source === "subsonic") {
+      outcome = await setSubsonicFavorite(userId, id, liked);
+    } else if (source === "jellyfin") {
+      outcome = await setJellyfinFavorite(userId, id, liked);
+    } else if (source === "plex") {
+      outcome = await setPlexFavorite(userId, id, liked);
+    } else {
+      res.status(400).json({ error: `Favoriting is not supported for source "${source}"` });
+      return;
+    }
+    if (outcome === "unconfigured") {
+      res.status(404).json({ error: `No ${source} connection is configured` });
+      return;
+    }
+    res.json({ liked });
+  } catch (err) {
+    logger.error({ reason: describeHttpError(err), source }, "Audio favorite toggle failed");
+    res.status(502).json({ error: "Failed to update the favorite on the music source" });
   }
 });
 

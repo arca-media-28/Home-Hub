@@ -874,6 +874,52 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /widgets/audioplayer/favorite:
+    post:
+      operationId: setAudioFavorite
+      tags: [widgets]
+      summary: >-
+        Mark the currently playing track as a favorite (or remove it) on the
+        connected music source
+      description: >-
+        Toggles a track's favorite/like state on the source and returns the new
+        state. Dispatches by "source": Plex sets the track's user rating,
+        Navidrome/Subsonic stars/unstars it, and Jellyfin adds/removes it from
+        favorites. Spotify is not yet supported.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AudioFavoriteInput"
+      responses:
+        "200":
+          description: The new favorite state after the toggle was applied
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AudioFavoriteResult"
+        "400":
+          description: Missing/invalid track id or an unsupported source
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: No connection is configured for the requested source
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "502":
+          description: The music source could not be reached or rejected the change
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /widgets/news:
     get:
       operationId: getNewsWidget
@@ -3406,6 +3452,35 @@ components:
         ok:
           type: boolean
 
+    AudioFavoriteInput:
+      type: object
+      required: [id, liked]
+      properties:
+        source:
+          description: >-
+            Which music source the track belongs to. "plex" sets the track's
+            user rating, "subsonic" stars/unstars it on Navidrome/Subsonic, and
+            "jellyfin" adds/removes it from favorites. Defaults to "plex".
+          type: string
+          enum: [plex, subsonic, jellyfin]
+        id:
+          description: The source track id to favorite or unfavorite.
+          type: string
+          minLength: 1
+        liked:
+          description: >-
+            true to mark the track as a favorite on the source, false to remove
+            the favorite.
+          type: boolean
+
+    AudioFavoriteResult:
+      type: object
+      required: [liked]
+      properties:
+        liked:
+          description: The track's favorite state after the change was applied.
+          type: boolean
+
     ServiceStatus:
       type: object
       required: [service, configured, ok, message]
@@ -3999,6 +4074,13 @@ components:
             can play directly (Plex part key + token). Null when the source does
             not expose an in-browser-playable stream (remote-control-only).
           type: ["string", "null"]
+        liked:
+          description: >-
+            Whether the track is currently marked as a favorite on the source
+            (Plex user rating, Navidrome/Subsonic star, Jellyfin favorite). True
+            when favorited, false when not. Null when the source doesn't report
+            it or favoriting isn't supported (e.g. Spotify, demo content).
+          type: ["boolean", "null"]
 
     AudioContainer:
       type: object

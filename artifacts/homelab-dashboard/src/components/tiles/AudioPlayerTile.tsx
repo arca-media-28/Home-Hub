@@ -2,10 +2,12 @@ import {
   useGetAudioPlayerNowPlaying,
   getGetAudioPlayerNowPlayingQueryKey,
   browseAudioLibrary,
+  useSetAudioFavorite,
 } from "@workspace/api-client-react";
 import type { AudioTrack, BrowseAudioLibrarySource } from "@workspace/api-client-react";
 import { useState } from "react";
-import { Music, Play, Pause, SkipBack, SkipForward, Volume2, Library, Dices } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { Music, Play, Pause, SkipBack, SkipForward, Volume2, Library, Dices, Heart } from "lucide-react";
 import type { WidgetProps } from "./IntegrationTile";
 import { useAudioPlayer } from "@/lib/audioPlayer";
 import { tileBudget, SECTION_PX, MEDIA_ROW_PX } from "./metrics";
@@ -47,6 +49,17 @@ function StreamAudioPlayer({ enabled, density, tileSettings }: WidgetProps) {
   const ownerId = `audioplayer:${source}`;
   const player = useAudioPlayer();
   const isOurs = player.ownerId === ownerId && player.currentTrack != null;
+
+  // Like / favorite toggling. The heart writes the favorite state on the linked
+  // source (Plex rating, Subsonic star, Jellyfin favorite) and mirrors it in the
+  // UI optimistically. The override is keyed by track id so it applies only to
+  // the track the user acted on; a real track's `liked` field takes over again
+  // when the queue advances. On failure we clear the override (reverting to the
+  // server's real state) and surface an error affordance on the button.
+  const queryClient = useQueryClient();
+  const favoriteMutation = useSetAudioFavorite();
+  const [likeOverride, setLikeOverride] = useState<{ id: string; liked: boolean } | null>(null);
+  const [likeError, setLikeError] = useState(false);
 
   // The pop-out music browser (search / browse / playlists) is only available
   // for the library sources that back it; its tabs are per-tile toggles that
@@ -220,6 +233,34 @@ function StreamAudioPlayer({ enabled, density, tileSettings }: WidgetProps) {
     }
   };
 
+  // Effective like state: the pending optimistic value for this exact track wins,
+  // otherwise the track's server-reported `liked` (null → treated as not liked).
+  const likedState =
+    likeOverride && likeOverride.id === displayTrack.id
+      ? likeOverride.liked
+      : displayTrack.liked ?? false;
+
+  const toggleLike = async () => {
+    // Demo payloads have no real backend to write to; skip.
+    if (sample || favoriteMutation.isPending) return;
+    const next = !likedState;
+    setLikeOverride({ id: displayTrack.id, liked: next });
+    setLikeError(false);
+    try {
+      await favoriteMutation.mutateAsync({
+        data: { source, id: displayTrack.id, liked: next },
+      });
+      // Re-pull now-playing so the confirmed server state backs the UI.
+      await queryClient.invalidateQueries({
+        queryKey: getGetAudioPlayerNowPlayingQueryKey(params),
+      });
+    } catch {
+      // Revert to the real state and flag the error on the button.
+      setLikeOverride(null);
+      setLikeError(true);
+    }
+  };
+
   const seekFromClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!isOurs || liveDuration <= 0) return;
     const rect = e.currentTarget.getBoundingClientRect();
@@ -280,25 +321,51 @@ function StreamAudioPlayer({ enabled, density, tileSettings }: WidgetProps) {
             </div>
           )}
         </div>
-        {!pillAtControls && (showBrowser || showDice) && (
-          <div className="flex shrink-0 items-center gap-1.5">
-            {showBrowser && (
-              <button
-                type="button"
-                onClick={() => setBrowserOpen(true)}
-                className="flex items-center justify-center rounded-full border border-border p-1.5 text-foreground transition-colors hover:bg-muted"
-                aria-label="Find music"
-                title="Find music"
-              >
-                <Library size={14} aria-hidden="true" />
-              </button>
-            )}
-            {diceButton({
+        <div className="flex shrink-0 items-center gap-1.5">
+          <button
+            type="button"
+            onClick={toggleLike}
+            disabled={sample || favoriteMutation.isPending}
+            className={`flex items-center justify-center rounded-full border p-1.5 transition-colors disabled:opacity-50 ${
+              likeError
+                ? "border-destructive text-destructive hover:bg-destructive/10"
+                : likedState
+                  ? "border-primary/40 bg-primary/10 text-primary hover:bg-primary/20"
+                  : "border-border text-foreground hover:bg-muted"
+            }`}
+            aria-label={likedState ? "Remove from favorites" : "Add to favorites"}
+            aria-pressed={likedState}
+            title={
+              likeError
+                ? "Couldn’t update favorite — try again"
+                : likedState
+                  ? "Liked"
+                  : "Like"
+            }
+          >
+            <Heart
+              size={14}
+              aria-hidden="true"
+              className={likedState ? "fill-current" : undefined}
+            />
+          </button>
+          {!pillAtControls && showBrowser && (
+            <button
+              type="button"
+              onClick={() => setBrowserOpen(true)}
+              className="flex items-center justify-center rounded-full border border-border p-1.5 text-foreground transition-colors hover:bg-muted"
+              aria-label="Find music"
+              title="Find music"
+            >
+              <Library size={14} aria-hidden="true" />
+            </button>
+          )}
+          {!pillAtControls &&
+            diceButton({
               className:
                 "flex items-center justify-center rounded-full border border-border p-1.5 text-foreground transition-colors hover:bg-muted disabled:opacity-50",
             })}
-          </div>
-        )}
+        </div>
       </div>
 
       {/* Progress bar */}

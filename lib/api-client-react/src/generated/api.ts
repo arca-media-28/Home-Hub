@@ -21,6 +21,8 @@ import type {
 
 import type {
   AudioBrowseResult,
+  AudioFavoriteInput,
+  AudioFavoriteResult,
   AudioPlayerData,
   AuthCredentials,
   AuthResponse,
@@ -2922,6 +2924,78 @@ export const useScrobbleSubsonic = <TError = ErrorType<ErrorResponse>,
         TContext
       > => {
       return useMutation(getScrobbleSubsonicMutationOptions(options));
+    }
+
+export const getSetAudioFavoriteUrl = () => {
+
+
+
+
+  return `/api/widgets/audioplayer/favorite`
+}
+
+/**
+ * Toggles a track's favorite/like state on the source and returns the new state. Dispatches by "source": Plex sets the track's user rating, Navidrome/Subsonic stars/unstars it, and Jellyfin adds/removes it from favorites. Spotify is not yet supported.
+ * @summary Mark the currently playing track as a favorite (or remove it) on the connected music source
+ */
+export const setAudioFavorite = async (audioFavoriteInput: AudioFavoriteInput, options?: RequestInit): Promise<AudioFavoriteResult> => {
+
+  return customFetch<AudioFavoriteResult>(getSetAudioFavoriteUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      audioFavoriteInput,)
+  }
+);}
+
+
+
+
+export const getSetAudioFavoriteMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setAudioFavorite>>, TError,{data: BodyType<AudioFavoriteInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof setAudioFavorite>>, TError,{data: BodyType<AudioFavoriteInput>}, TContext> => {
+
+const mutationKey = ['setAudioFavorite'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof setAudioFavorite>>, {data: BodyType<AudioFavoriteInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  setAudioFavorite(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SetAudioFavoriteMutationResult = NonNullable<Awaited<ReturnType<typeof setAudioFavorite>>>
+    export type SetAudioFavoriteMutationBody = BodyType<AudioFavoriteInput>
+    export type SetAudioFavoriteMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Mark the currently playing track as a favorite (or remove it) on the connected music source
+ */
+export const useSetAudioFavorite = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setAudioFavorite>>, TError,{data: BodyType<AudioFavoriteInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof setAudioFavorite>>,
+        TError,
+        {data: BodyType<AudioFavoriteInput>},
+        TContext
+      > => {
+      return useMutation(getSetAudioFavoriteMutationOptions(options));
     }
 
 export const getGetNewsWidgetUrl = (params?: GetNewsWidgetParams,) => {
