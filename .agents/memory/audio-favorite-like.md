@@ -10,9 +10,11 @@ connected source. One endpoint `POST /widgets/audioplayer/favorite`
 Per-source mapping (the non-obvious part):
 - **Plex** has NO boolean track favorite. Use the user rating: write via
   `PUT /:/rate?key=<id>&identifier=com.plexapp.plugins.library&rating=<n>` with
-  `X-Plex-Token`. Like = rating 10; unlike = rating **-1** (Plex's "remove
-  rating" sentinel). Reads map a high rating back to liked via a threshold
-  (`PLEX_LIKE_THRESHOLD=8`), so the toggle round-trips.
+  `X-Plex-Token`. Like = rating 10; unlike = rating **0**. Plex validates
+  `rating` to 0–10 and **rejects the negative "clear" sentinel (-1) with HTTP
+  400** — that was the original unlike bug. Reads map a rating >=
+  `PLEX_LIKE_THRESHOLD` (8) back to liked, and 0 is under it, so the toggle still
+  round-trips.
 - **Subsonic/Navidrome**: `star.view` / `unstar.view` with `{id}`. Read state
   from the song's `starred` field (an ISO date present only when starred → treat
   any value as liked).

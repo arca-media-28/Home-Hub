@@ -2252,14 +2252,16 @@ async function setPlexFavorite(userId: number, id: string, liked: boolean): Prom
   const conn = resolvePlexAudioConnection(userId);
   if (!conn) return "unconfigured";
   // Plex has no boolean favorite for tracks — write a user rating instead. 10 =
-  // liked; -1 is Plex's "remove rating" sentinel used to unlike. Reads then map
-  // a high rating back to liked (see plexLiked), so the toggle round-trips.
+  // liked; 0 unlikes. Plex Media Server validates `rating` to the 0–10 range and
+  // rejects the negative "clear" sentinel (-1) with HTTP 400, so unlike must send
+  // 0. Reads map a rating >= PLEX_LIKE_THRESHOLD (8) back to liked (see
+  // plexLiked); 0 falls under that threshold, so the toggle still round-trips.
   await httpClient.put(`${conn.baseUrl}/:/rate`, null, {
     headers: { "X-Plex-Token": conn.token, Accept: "application/json" },
     params: {
       key: id,
       identifier: "com.plexapp.plugins.library",
-      rating: liked ? 10 : -1,
+      rating: liked ? 10 : 0,
     },
   });
   return "ok";
@@ -2322,8 +2324,24 @@ router.post("/audioplayer/favorite", requireAuth, async (req: AuthRequest, res) 
     }
     res.json({ liked });
   } catch (err) {
-    logger.error({ reason: describeHttpError(err), source }, "Audio favorite toggle failed");
-    res.status(502).json({ error: "Failed to update the favorite on the music source" });
+    // Surface the REAL upstream reason (status + response body), not a flat
+    // generic message — Plex and Navidrome fail for different reasons and future
+    // failures must be diagnosable. describeHttpError keeps the status/body that
+    // normalizeHttpError discards; Subsonic throws a plain Error whose message is
+    // the server's own `error.message`, so that comes through the message field.
+    const detail = describeHttpError(err);
+    logger.error({ reason: detail, source }, "Audio favorite toggle failed");
+    const bodyText =
+      typeof detail.body === "string"
+        ? detail.body
+        : detail.body != null
+          ? JSON.stringify(detail.body)
+          : "";
+    const statusPart = detail.status ? `HTTP ${detail.status}` : detail.message;
+    const reason = bodyText ? `${statusPart}: ${bodyText.slice(0, 300)}` : statusPart;
+    res.status(502).json({
+      error: `Failed to update the favorite on the music source (${reason})`,
+    });
   }
 });
 
