@@ -10,6 +10,14 @@ interface Props {
   height: number;
 }
 
+// Each dial is drawn as a self-contained unit whose intrinsic footprint is a box
+// of DIAL_W × DIAL_H "radius units" (the arc sits in the top r, the LED row and
+// label in the ~1r below the pivot). The whole meter picks the biggest radius
+// that fits both dials — side by side or, on tall/narrow tiles, stacked — so
+// nothing ever overflows or bunches up regardless of the tile's aspect ratio.
+const DIAL_W = 1.5; // cell width  = DIAL_W * radius
+const DIAL_H = 2.0; // cell height = DIAL_H * radius
+
 // A retro pair of analog VU meters — a left and a right dial, each with a swept
 // arc scale, a spring-loaded needle (fast attack, slow release, the classic
 // ballistic feel), and a row of LED segments underneath that light up to the
@@ -33,18 +41,17 @@ export default function VisualizerVuMeter({ sample, primary, background, width, 
     canvas.height = Math.round(height * dpr);
     ctx.scale(dpr, dpr);
 
+    // Draw one dial whose geometry is fully derived from (cx, pivotY, radius),
+    // so it stays correctly proportioned at any scale.
     const drawDial = (
       cx: number,
-      cyArea: number,
-      dialW: number,
-      dialH: number,
+      pivotY: number,
+      radius: number,
       value: number,
       label: string,
       trip: string,
       rgb: [number, number, number],
     ) => {
-      const pivotY = cyArea + dialH * 0.86;
-      const radius = Math.min(dialW * 0.42, dialH * 0.72);
       const minA = -Math.PI * 0.72;
       const maxA = -Math.PI * 0.28;
 
@@ -94,14 +101,14 @@ export default function VisualizerVuMeter({ sample, primary, background, width, 
       ctx.arc(cx, pivotY, Math.max(2, radius * 0.05), 0, Math.PI * 2);
       ctx.fill();
 
-      // LED segment row beneath the dial.
+      // LED segment row beneath the pivot.
       const segCount = 12;
-      const segGap = dialW * 0.02;
-      const rowW = dialW * 0.8;
+      const rowW = radius * 1.1;
+      const segGap = rowW * 0.02;
       const segW = (rowW - segGap * (segCount - 1)) / segCount;
-      const segH = Math.max(3, dialH * 0.08);
+      const segH = Math.max(3, radius * 0.2);
       const rowX = cx - rowW / 2;
-      const rowY = pivotY + radius * 0.16;
+      const rowY = pivotY + radius * 0.14;
       const lit = Math.round(value * segCount);
       for (let i = 0; i < segCount; i++) {
         const on = i < lit;
@@ -111,10 +118,10 @@ export default function VisualizerVuMeter({ sample, primary, background, width, 
 
       // Channel label.
       ctx.fillStyle = `rgba(${trip}, 0.75)`;
-      ctx.font = `600 ${Math.max(9, Math.round(radius * 0.18))}px system-ui, sans-serif`;
+      ctx.font = `600 ${Math.max(9, Math.round(radius * 0.26))}px system-ui, sans-serif`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText(label, cx, rowY + segH + Math.max(8, radius * 0.16));
+      ctx.fillText(label, cx, rowY + segH + Math.max(8, radius * 0.2));
     };
 
     let raf = 0;
@@ -142,8 +149,27 @@ export default function VisualizerVuMeter({ sample, primary, background, width, 
       ctx.fillStyle = bg;
       ctx.fillRect(0, 0, width, height);
 
-      drawDial(width * 0.25, 0, width * 0.5, height, needlesRef.current[0], "L", trip, rgb);
-      drawDial(width * 0.75, 0, width * 0.5, height, needlesRef.current[1], "R", trip, rgb);
+      // Choose the arrangement (side-by-side vs stacked) that yields the largest
+      // radius, so the dials are as big as possible while always fitting.
+      const rSide = Math.min(width / 2 / DIAL_W, height / DIAL_H);
+      const rStack = Math.min(width / DIAL_W, height / 2 / DIAL_H);
+      const stacked = rStack > rSide;
+      const r = Math.max(1, stacked ? rStack : rSide);
+
+      if (stacked) {
+        // One dial per horizontal half-height band, centered in each band.
+        const bandH = height / 2;
+        const cx = width / 2;
+        const pivot0 = (bandH - DIAL_H * r) / 2 + r;
+        drawDial(cx, pivot0, r, needlesRef.current[0], "L", trip, rgb);
+        drawDial(cx, bandH + pivot0, r, needlesRef.current[1], "R", trip, rgb);
+      } else {
+        // One dial per vertical half-width column, centered in each column.
+        const colW = width / 2;
+        const pivotY = (height - DIAL_H * r) / 2 + r;
+        drawDial(colW * 0.5, pivotY, r, needlesRef.current[0], "L", trip, rgb);
+        drawDial(colW * 1.5, pivotY, r, needlesRef.current[1], "R", trip, rgb);
+      }
 
       raf = requestAnimationFrame(draw);
     };

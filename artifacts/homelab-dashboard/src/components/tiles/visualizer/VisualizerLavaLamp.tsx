@@ -25,6 +25,11 @@ interface Blob {
 export default function VisualizerLavaLamp({ sample, primary, background, width, height }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const blobsRef = useRef<Blob[]>([]);
+  // Beat-detection envelopes: `bassEnv` punches up instantly on a bass hit and
+  // decays slowly; `bassAvg` tracks the slow-moving average. Their difference is
+  // the transient "punch" above the baseline, which is what a beat feels like.
+  const bassEnvRef = useRef(0);
+  const bassAvgRef = useRef(0);
   const paletteRef = useRef({ primary, background });
   paletteRef.current = { primary, background };
   const sampleRef = useRef(sample);
@@ -57,8 +62,17 @@ export default function VisualizerLavaLamp({ sample, primary, background, width,
       last = now;
       const { primary: pc, background: bg } = paletteRef.current;
       const [r, g, b] = hexToRgb(pc);
-      const { level, bass } = sampleRef.current(16);
+      const { level, bass, idle } = sampleRef.current(16);
       const energy = Math.max(level, bass);
+
+      // Fast-attack / slow-decay bass envelope + slow average → transient punch.
+      const env = bassEnvRef.current;
+      bassEnvRef.current = bass > env ? env + (bass - env) * 0.6 : env + (bass - env) * 0.08;
+      bassAvgRef.current += (bass - bassAvgRef.current) * 0.03;
+      let punch = Math.max(0, bassEnvRef.current - bassAvgRef.current) * 3.2;
+      // Silence idle drift so the lamp only truly kicks to live beats.
+      if (idle) punch *= 0.12;
+      punch = Math.min(1, punch);
 
       // Background with a subtle vertical darkening for depth.
       const bgGrad = ctx.createLinearGradient(0, 0, 0, height);
@@ -70,15 +84,20 @@ export default function VisualizerLavaLamp({ sample, primary, background, width,
       ctx.fillRect(0, 0, width, height);
 
       ctx.globalCompositeOperation = "lighter";
+      // On a bass hit blobs punch outward and glow brighter; the effect decays
+      // with the envelope, so each beat lands as a visible pop.
+      const core = Math.min(1, 0.9 + punch * 0.45);
+      const mid = Math.min(0.85, 0.35 + punch * 0.4);
       for (const blob of blobsRef.current) {
-        blob.phase += dt * blob.speed * (0.6 + energy * 1.8) * blob.wobble;
+        blob.phase += dt * blob.speed * (0.6 + energy * 1.8 + punch * 2.2) * blob.wobble;
         const y = height * 0.5 + Math.sin(blob.phase) * height * 0.42;
         const x = blob.x + Math.cos(blob.phase * 0.6) * width * 0.05;
-        const rad = blob.radius * (0.85 + energy * 0.5 + 0.1 * Math.sin(blob.phase * 1.7));
+        const rad =
+          blob.radius * (0.85 + energy * 0.5 + punch * 0.9 + 0.1 * Math.sin(blob.phase * 1.7));
 
         const grad = ctx.createRadialGradient(x, y, 0, x, y, rad);
-        grad.addColorStop(0, `rgba(${r}, ${g}, ${b}, 0.9)`);
-        grad.addColorStop(0.45, `rgba(${r}, ${g}, ${b}, 0.35)`);
+        grad.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${core})`);
+        grad.addColorStop(0.45, `rgba(${r}, ${g}, ${b}, ${mid})`);
         grad.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
         ctx.fillStyle = grad;
         ctx.beginPath();
