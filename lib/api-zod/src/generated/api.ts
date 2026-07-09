@@ -1724,6 +1724,19 @@ export const ArchiveEmailMessageResponse = zod.object({
 
 
 /**
+ * Marks the message identified by its EmailMessage id as read. Gmail messages have the UNREAD label removed (requires the account to be linked with modify access); IMAP messages get the \Seen flag added and stay in the inbox. Demo messages are rejected.
+ * @summary Mark one email message as read
+ */
+export const MarkEmailMessageReadBody = zod.object({
+  "id": zod.string().describe('The EmailMessage id of the message to mark as read.')
+})
+
+export const MarkEmailMessageReadResponse = zod.object({
+  "ok": zod.boolean().describe('True when the message was marked read.')
+})
+
+
+/**
  * @summary Aggregated upcoming events across the configured calendar accounts
  */
 export const GetCalendarEventsQueryParams = zod.object({

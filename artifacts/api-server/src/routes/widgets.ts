@@ -37,6 +37,8 @@ import {
   fetchImapMessageBody,
   archiveGmailMessage,
   archiveImapMessage,
+  markGmailMessageRead,
+  markImapMessageRead,
   demoEmailMessages,
   type EmailMessage,
 } from "../lib/email.js";
@@ -4725,6 +4727,68 @@ router.post("/email/archive", requireAuth, async (req: AuthRequest, res) => {
       return;
     }
     logger.error({ reason: detail, id }, "Email archive error");
+    res.status(502).json({ error: normalizeHttpError(err) });
+  }
+});
+
+// POST /api/widgets/email/mark-read — mark one message as read. The body
+// carries the EmailMessage.id, whose prefix encodes the provider (same
+// convention as /email/archive): "gmail:<acct>:<msgId>" removes the UNREAD
+// label via the Gmail API; "<imapAcct>:<uid>" adds the \Seen flag over IMAP.
+// Demo rows are rejected up front.
+router.post("/email/mark-read", requireAuth, async (req: AuthRequest, res) => {
+  const userId = req.user!.userId;
+  const body = req.body as { id?: unknown } | undefined;
+  const id = typeof body?.id === "string" ? body.id : "";
+  if (!id) {
+    res.status(400).json({ error: "Message id is required" });
+    return;
+  }
+  if (id.startsWith("demo:")) {
+    res.status(400).json({ error: "Demo messages can't be marked read" });
+    return;
+  }
+
+  try {
+    if (id.startsWith("gmail:")) {
+      const rest = id.slice("gmail:".length);
+      const sep = rest.lastIndexOf(":");
+      if (sep <= 0 || sep === rest.length - 1) {
+        res.status(400).json({ error: "Malformed message id" });
+        return;
+      }
+      const accountId = rest.slice(0, sep);
+      if (!listGoogleAccounts(userId).some((a) => a.id === accountId)) {
+        res.status(404).json({ error: "Unknown Google account" });
+        return;
+      }
+      await markGmailMessageRead(userId, accountId, rest.slice(sep + 1));
+    } else {
+      const sep = id.lastIndexOf(":");
+      const uid = sep > 0 ? Number(id.slice(sep + 1)) : NaN;
+      if (!Number.isInteger(uid) || uid <= 0) {
+        res.status(400).json({ error: "Malformed message id" });
+        return;
+      }
+      const account = listImapAccounts(userId).find((a) => a.id === id.slice(0, sep));
+      if (!account) {
+        res.status(404).json({ error: "Unknown mail account" });
+        return;
+      }
+      await markImapMessageRead(account, uid);
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    const detail = describeHttpError(err);
+    // Gmail returns 403 when the token predates the gmail.modify scope.
+    if (id.startsWith("gmail:") && detail.status === 403) {
+      res.status(403).json({
+        error:
+          "This Google account was linked with read-only access. Disconnect and re-link it in Settings to allow marking messages read.",
+      });
+      return;
+    }
+    logger.error({ reason: detail, id }, "Email mark-read error");
     res.status(502).json({ error: normalizeHttpError(err) });
   }
 });

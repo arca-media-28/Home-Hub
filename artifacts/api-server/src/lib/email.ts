@@ -333,6 +333,25 @@ export async function archiveGmailMessage(
   invalidateFetchCache(`mail:gmail:${userId}:${accountId}`);
 }
 
+// Mark one Gmail message as read by removing its UNREAD label. Requires the
+// gmail.modify scope — accounts linked before that scope was requested fail
+// with 403 until re-linked (same as archive).
+export async function markGmailMessageRead(
+  userId: number,
+  accountId: string,
+  messageId: string,
+): Promise<void> {
+  const token = await getGoogleAccessToken(userId, accountId);
+  await cloudHttpClient.post(
+    `${GMAIL_BASE}/messages/${encodeURIComponent(messageId)}/modify`,
+    { removeLabelIds: ["UNREAD"] },
+    { headers: { Authorization: `Bearer ${token}` } },
+  );
+  // The inbox listing for this account is now stale (unread count/flags
+  // changed) — drop the cached fetch so the tile's next poll reflects it.
+  invalidateFetchCache(`mail:gmail:${userId}:${accountId}`);
+}
+
 // Hard cap on how long a single IMAP round-trip may take — a wedged server
 // must not hang the whole aggregated inbox request.
 const IMAP_TIMEOUT_MS = 15_000;
@@ -463,6 +482,38 @@ export async function archiveImapMessage(account: ImapAccount, uid: number): Pro
     }
     // Drop every cached inbox listing for this account (all max/unreadOnly
     // variants) so the tile's next poll reflects the move immediately.
+    invalidateFetchCache(`mail:imap:${account.id}`);
+  } finally {
+    // logout() can hang on broken servers; close() force-drops the socket.
+    await client.logout().catch(() => client.close());
+  }
+}
+
+// Mark one IMAP message as read by adding the \Seen flag. Additive (unlike the
+// archive move) — the message stays in INBOX, just flagged read.
+export async function markImapMessageRead(account: ImapAccount, uid: number): Promise<void> {
+  const { ImapFlow } = await import("imapflow");
+  const client = new ImapFlow({
+    host: account.host,
+    port: account.port,
+    secure: account.secure,
+    auth: { user: account.username, pass: account.password },
+    logger: false,
+    socketTimeout: IMAP_TIMEOUT_MS,
+    greetingTimeout: IMAP_TIMEOUT_MS,
+    connectionTimeout: IMAP_TIMEOUT_MS,
+  });
+
+  await client.connect();
+  try {
+    const lock = await client.getMailboxLock("INBOX");
+    try {
+      await client.messageFlagsAdd(String(uid), ["\\Seen"], { uid: true });
+    } finally {
+      lock.release();
+    }
+    // Drop every cached inbox listing for this account (all max/unreadOnly
+    // variants) so the tile's next poll reflects the read flag immediately.
     invalidateFetchCache(`mail:imap:${account.id}`);
   } finally {
     // logout() can hang on broken servers; close() force-drops the socket.

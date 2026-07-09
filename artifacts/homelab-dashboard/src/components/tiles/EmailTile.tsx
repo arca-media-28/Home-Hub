@@ -7,6 +7,7 @@ import {
   useGetEmailMessageBody,
   getGetEmailMessageBodyQueryKey,
   useArchiveEmailMessage,
+  useMarkEmailMessageRead,
 } from "@workspace/api-client-react";
 import type { EmailMessage } from "@workspace/api-client-react";
 import { Mail, AlertTriangle, Archive, ExternalLink, RefreshCw, Loader2 } from "lucide-react";
@@ -132,14 +133,17 @@ function MessageDetailDialog({
     setArchiveError(null);
   }, [msg?.id]);
 
+  // Refresh every email tile variant (each tile config caches under its own
+  // params) so unread badges/counts and archived rows update immediately.
+  const invalidateEmailTiles = () =>
+    queryClient.invalidateQueries({
+      predicate: (q) => String(q.queryKey[0]).includes("/widgets/email/"),
+    });
+
   const archive = useArchiveEmailMessage({
     mutation: {
       onSuccess: () => {
-        // Refresh every email tile variant (each tile config caches under its
-        // own params) so the archived message disappears immediately.
-        void queryClient.invalidateQueries({
-          predicate: (q) => String(q.queryKey[0]).includes("/widgets/email/"),
-        });
+        void invalidateEmailTiles();
         onClose();
       },
       onError: (err) => {
@@ -147,6 +151,27 @@ function MessageDetailDialog({
       },
     },
   });
+
+  const markRead = useMarkEmailMessageRead({
+    mutation: {
+      onSuccess: () => {
+        // The message is now read on the server — refresh the tile so its
+        // unread dot and the header unread count drop right away.
+        void invalidateEmailTiles();
+      },
+    },
+  });
+
+  // Mark a real, unread message read the moment its detail pop-out opens, so
+  // the unread badge stays honest — mirroring how mail clients behave. Demo
+  // rows and already-read messages are left untouched. Keyed on the message id
+  // so re-renders (e.g. body load) don't fire it twice for the same message.
+  const markReadMutate = markRead.mutate;
+  useEffect(() => {
+    if (msg && !sample && msg.unread) {
+      markReadMutate({ data: { id: msg.id } });
+    }
+  }, [msg?.id, sample, msg?.unread, markReadMutate]);
 
   const isGmail = msg?.id.startsWith("gmail:") ?? false;
 

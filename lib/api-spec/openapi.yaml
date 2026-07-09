@@ -1062,6 +1062,58 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /widgets/email/mark-read:
+    post:
+      operationId: markEmailMessageRead
+      tags: [widgets]
+      summary: Mark one email message as read
+      description: >-
+        Marks the message identified by its EmailMessage id as read. Gmail
+        messages have the UNREAD label removed (requires the account to be
+        linked with modify access); IMAP messages get the \Seen flag added and
+        stay in the inbox. Demo messages are rejected.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EmailMarkReadRequest"
+      responses:
+        "200":
+          description: The message was marked read
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmailMarkReadResponse"
+        "400":
+          description: Missing/malformed message id, or a demo message
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: >-
+            The Google account was linked with read-only access and must be
+            re-linked before marking messages read works
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: The message references an account that no longer exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "502":
+          description: The mail provider rejected or failed the mark-read request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /widgets/calendar/events:
     get:
       operationId: getCalendarEvents
@@ -2582,6 +2634,22 @@ components:
       properties:
         ok:
           description: True when the message was archived.
+          type: boolean
+
+    EmailMarkReadRequest:
+      type: object
+      required: [id]
+      properties:
+        id:
+          description: The EmailMessage id of the message to mark as read.
+          type: string
+
+    EmailMarkReadResponse:
+      type: object
+      required: [ok]
+      properties:
+        ok:
+          description: True when the message was marked read.
           type: boolean
 
     EmailAccountError:

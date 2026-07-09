@@ -781,6 +781,16 @@ export interface EmailArchiveResponse {
   ok: boolean;
 }
 
+export interface EmailMarkReadRequest {
+  /** The EmailMessage id of the message to mark as read. */
+  id: string;
+}
+
+export interface EmailMarkReadResponse {
+  /** True when the message was marked read. */
+  ok: boolean;
+}
+
 /**
  * A configured account that failed to respond during the fetch.
  */

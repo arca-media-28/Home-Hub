@@ -34,6 +34,8 @@ import type {
   EmailArchiveRequest,
   EmailArchiveResponse,
   EmailInboxData,
+  EmailMarkReadRequest,
+  EmailMarkReadResponse,
   EmailMessageBodyData,
   ErrorResponse,
   ErsatzTvData,
@@ -3245,6 +3247,78 @@ export const useArchiveEmailMessage = <TError = ErrorType<ErrorResponse>,
         TContext
       > => {
       return useMutation(getArchiveEmailMessageMutationOptions(options));
+    }
+
+export const getMarkEmailMessageReadUrl = () => {
+
+
+
+
+  return `/api/widgets/email/mark-read`
+}
+
+/**
+ * Marks the message identified by its EmailMessage id as read. Gmail messages have the UNREAD label removed (requires the account to be linked with modify access); IMAP messages get the \Seen flag added and stay in the inbox. Demo messages are rejected.
+ * @summary Mark one email message as read
+ */
+export const markEmailMessageRead = async (emailMarkReadRequest: EmailMarkReadRequest, options?: RequestInit): Promise<EmailMarkReadResponse> => {
+
+  return customFetch<EmailMarkReadResponse>(getMarkEmailMessageReadUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      emailMarkReadRequest,)
+  }
+);}
+
+
+
+
+export const getMarkEmailMessageReadMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof markEmailMessageRead>>, TError,{data: BodyType<EmailMarkReadRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof markEmailMessageRead>>, TError,{data: BodyType<EmailMarkReadRequest>}, TContext> => {
+
+const mutationKey = ['markEmailMessageRead'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof markEmailMessageRead>>, {data: BodyType<EmailMarkReadRequest>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  markEmailMessageRead(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type MarkEmailMessageReadMutationResult = NonNullable<Awaited<ReturnType<typeof markEmailMessageRead>>>
+    export type MarkEmailMessageReadMutationBody = BodyType<EmailMarkReadRequest>
+    export type MarkEmailMessageReadMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Mark one email message as read
+ */
+export const useMarkEmailMessageRead = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof markEmailMessageRead>>, TError,{data: BodyType<EmailMarkReadRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof markEmailMessageRead>>,
+        TError,
+        {data: BodyType<EmailMarkReadRequest>},
+        TContext
+      > => {
+      return useMutation(getMarkEmailMessageReadMutationOptions(options));
     }
 
 export const getGetCalendarEventsUrl = (params?: GetCalendarEventsParams,) => {

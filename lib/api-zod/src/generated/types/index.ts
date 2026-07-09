@@ -29,6 +29,8 @@ export * from './emailAccountError';
 export * from './emailArchiveRequest';
 export * from './emailArchiveResponse';
 export * from './emailInboxData';
+export * from './emailMarkReadRequest';
+export * from './emailMarkReadResponse';
 export * from './emailMessage';
 export * from './emailMessageBodyData';
 export * from './errorResponse';
