@@ -33,6 +33,7 @@ import {
   Cookie,
   PawPrint,
   Sprout,
+  AudioLines,
   StickyNote,
   SquareDashed,
   Heading,
@@ -165,6 +166,10 @@ export const INTEGRATION_META: Record<string, IntegrationMeta> = {
   [TileIntegration.bonsai]: {
     icon: Sprout,
     description: "Grow and tend a living bonsai tree.",
+  },
+  [TileIntegration.visualizer]: {
+    icon: AudioLines,
+    description: "Live audio visualizer for the music player.",
   },
   [TileIntegration.note]: {
     icon: StickyNote,

@@ -35,6 +35,11 @@ export interface AudioPlayerState {
   // The opaque owner id of whatever tile last started playback. Tiles compare it
   // to their own id to know whether the global player is "theirs" right now.
   ownerId: string | null;
+  // The Web Audio graph tapping the element for visualizers. Both are null until
+  // a visualizer tile calls enableVisualizer() — see that method for why the
+  // graph is built lazily rather than always-on.
+  audioContext: AudioContext | null;
+  analyser: AnalyserNode | null;
 }
 
 export interface AudioPlayerControls extends AudioPlayerState {
@@ -55,6 +60,10 @@ export interface AudioPlayerControls extends AudioPlayerState {
   // Seek to an absolute position in seconds.
   seek: (seconds: number) => void;
   setVolume: (v: number) => void;
+  // Lazily build the Web Audio analyser graph so visualizer tiles can read live
+  // frequency data. Called by a visualizer tile on mount. Safe to call many
+  // times — the graph is only ever created once.
+  enableVisualizer: () => void;
 }
 
 const AudioPlayerContext = createContext<AudioPlayerControls | null>(null);
@@ -109,6 +118,69 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
   const [volume, setVolumeState] = useState<number>(readStoredVolume);
   const [ownerId, setOwnerId] = useState<string | null>(null);
 
+  // ── Visualizer Web Audio tap ───────────────────────────────────────────────
+  // A single AudioContext + AnalyserNode taps the element so visualizer tiles can
+  // read live frequency data. The graph is built *lazily* (only once a visualizer
+  // tile calls enableVisualizer) rather than always-on, and this is deliberate:
+  //
+  //   createMediaElementSource() permanently reroutes the element's audio through
+  //   the Web Audio graph, and a cross-origin media stream WITHOUT CORS headers
+  //   produces silence once routed. Our stream URLs point straight at the user's
+  //   media servers (Plex/Jellyfin/Subsonic), which are cross-origin. So building
+  //   the graph unconditionally would risk silencing playback for everyone. By
+  //   building it only when a visualizer exists — and setting crossOrigin so
+  //   CORS-capable servers stay audible + analysable — the default experience is
+  //   untouched, and the tradeoff is limited to users who add a visualizer.
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const sourceRef = useRef<MediaElementAudioSourceNode | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const visualizerRequestedRef = useRef(false);
+  const [analyser, setAnalyser] = useState<AnalyserNode | null>(null);
+  const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
+
+  // Build the analyser graph exactly once. No-op if unsupported or already built.
+  const ensureGraph = useCallback(() => {
+    if (analyserRef.current || !visualizerRequestedRef.current) return;
+    const Ctx: typeof AudioContext | undefined =
+      window.AudioContext ??
+      (window as unknown as { webkitAudioContext?: typeof AudioContext })
+        .webkitAudioContext;
+    if (!Ctx) return;
+    try {
+      const el = getAudio();
+      const ctx = new Ctx();
+      const source = ctx.createMediaElementSource(el);
+      const node = ctx.createAnalyser();
+      node.fftSize = 256;
+      node.smoothingTimeConstant = 0.82;
+      source.connect(node);
+      node.connect(ctx.destination);
+      audioCtxRef.current = ctx;
+      sourceRef.current = source;
+      analyserRef.current = node;
+      setAnalyser(node);
+      setAudioContext(ctx);
+    } catch {
+      // MediaElementSource can only be created once per element and can throw in
+      // rare states; leave the element on its normal (non-graph) output so audio
+      // keeps working even if the analyser can't be built.
+    }
+  }, [getAudio]);
+
+  // Resume a suspended context (autoplay policy) — safe to call on every gesture.
+  const resumeGraph = useCallback(() => {
+    const ctx = audioCtxRef.current;
+    if (ctx && ctx.state === "suspended") void ctx.resume().catch(() => {});
+  }, []);
+
+  const enableVisualizer = useCallback(() => {
+    if (visualizerRequestedRef.current) return;
+    visualizerRequestedRef.current = true;
+    // Set crossOrigin BEFORE the next load so CORS-capable servers stay audible
+    // once routed through the graph. Only applied now that a visualizer exists.
+    getAudio().crossOrigin = "anonymous";
+  }, [getAudio]);
+
   const currentTrack = queue[index] ?? null;
 
   // Mirror queue/index into refs so the (stable) element event handlers can read
@@ -135,6 +207,11 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       const el = getAudio();
       el.src = track.streamUrl;
       el.currentTime = 0;
+      // Build/resume the analyser graph on this user-initiated play so the
+      // context isn't created before a gesture (autoplay policy). No-op unless a
+      // visualizer tile has requested it.
+      ensureGraph();
+      resumeGraph();
       void el.play().catch(() => {
         // Autoplay or network failure — reflect the not-playing state instead of
         // throwing; the user can retry via the play button.
@@ -186,11 +263,13 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
     const el = audioRef.current;
     if (!el || !currentTrack) return;
     if (el.paused) {
+      ensureGraph();
+      resumeGraph();
       void el.play().catch(() => setIsPlaying(false));
     } else {
       el.pause();
     }
-  }, [currentTrack]);
+  }, [currentTrack, ensureGraph, resumeGraph]);
 
   const pause = useCallback(() => {
     const el = audioRef.current;
@@ -311,6 +390,8 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       duration,
       volume,
       ownerId,
+      audioContext,
+      analyser,
       playQueue,
       enqueue,
       togglePlay,
@@ -319,6 +400,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       prev,
       seek,
       setVolume,
+      enableVisualizer,
     }),
     [
       currentTrack,
@@ -329,6 +411,8 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       duration,
       volume,
       ownerId,
+      audioContext,
+      analyser,
       playQueue,
       enqueue,
       togglePlay,
@@ -337,6 +421,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       prev,
       seek,
       setVolume,
+      enableVisualizer,
     ],
   );
 

@@ -104,6 +104,14 @@ import {
   BonsaiPreview,
   type BonsaiStyle,
 } from "@/components/tiles/BonsaiTile";
+import {
+  VISUALIZER_STYLE_OPTIONS,
+  DEFAULT_VISUALIZER_STYLE,
+  DEFAULT_VISUALIZER_PRIMARY,
+  DEFAULT_VISUALIZER_BACKGROUND,
+  normalizeVisualizerStyle,
+  type VisualizerStyle,
+} from "@/components/tiles/VisualizerTile";
 import { SPORTS_LEAGUES, getLeagueTeams } from "@/lib/sports";
 import {
   fetchSleeperUser,
@@ -204,6 +212,7 @@ const INTEGRATIONS = [
   { value: TileIntegration.fortune, label: "Fortune" },
   { value: TileIntegration.tamagotchi, label: "Tamagotchi" },
   { value: TileIntegration.bonsai, label: "Bonsai" },
+  { value: TileIntegration.visualizer, label: "Audio Visualizer" },
   { value: TileIntegration.note, label: "Note" },
   { value: TileIntegration.spacer, label: "Spacer" },
   { value: TileIntegration.divider, label: "Section Label" },
@@ -514,6 +523,18 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
   const [showBonsaiPotPicker, setShowBonsaiPotPicker] = useState(false);
   const [showBonsaiLeafPicker, setShowBonsaiLeafPicker] = useState(false);
 
+  // Audio Visualizer look. Style + the two colors are the only editable state;
+  // the tile itself reads the live audio player, so nothing else is persisted.
+  const [visualizerStyle, setVisualizerStyle] = useState<VisualizerStyle>(
+    normalizeVisualizerStyle(tile?.tileSettings?.visualizerStyle),
+  );
+  const [visualizerPrimary, setVisualizerPrimary] = useState<string>(
+    tile?.tileSettings?.visualizerPrimary ?? DEFAULT_VISUALIZER_PRIMARY,
+  );
+  const [visualizerBackground, setVisualizerBackground] = useState<string>(
+    tile?.tileSettings?.visualizerBackground ?? DEFAULT_VISUALIZER_BACKGROUND,
+  );
+
   useEffect(() => {
     if (open) {
       const placement = normalizePlacement(tile ?? {});
@@ -624,6 +645,9 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
       setBonsaiStyle((tile?.tileSettings?.bonsaiStyle as BonsaiStyle) ?? DEFAULT_STYLE);
       setShowBonsaiPotPicker(false);
       setShowBonsaiLeafPicker(false);
+      setVisualizerStyle(normalizeVisualizerStyle(tile?.tileSettings?.visualizerStyle));
+      setVisualizerPrimary(tile?.tileSettings?.visualizerPrimary ?? DEFAULT_VISUALIZER_PRIMARY);
+      setVisualizerBackground(tile?.tileSettings?.visualizerBackground ?? DEFAULT_VISUALIZER_BACKGROUND);
       setShowPetColorPicker(false);
       setShowNoteColorPicker(false);
       setShowNoteTextColorPicker(false);
@@ -698,6 +722,11 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
   // name/URL/image/background/metrics and instead exposes its cosmetic look
   // (pot color, foliage color, blossoms, tree style).
   const isBonsai = integration === TileIntegration.bonsai;
+  // The Audio Visualizer is a self-contained toy that paints a live,
+  // sound-reactive canvas from the app's own audio player. Like the bonsai it
+  // has no header and no backing service, so the editor strips
+  // name/URL/image/background/metrics and exposes only its style + two colors.
+  const isVisualizer = integration === TileIntegration.visualizer;
   // The spacer is a layout-only tile: an invisible gap with no name, URL,
   // image, background, or live data. Only its size/position matter, so the
   // editor strips every content field and shows a short description instead.
@@ -721,7 +750,7 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
   // Tiles that carry no link/image/background content: layout helpers plus the
   // note and timer, which paint their own surface.
   const isContentless =
-    isLayoutTile || isNote || isTimer || isEightball || isDice || isCoinFlip || isFortune || isTamagotchi || isBonsai;
+    isLayoutTile || isNote || isTimer || isEightball || isDice || isCoinFlip || isFortune || isTamagotchi || isBonsai || isVisualizer;
 
   // Teams for the chosen leagues, for the dependent team multi-select. Sourced
   // from the baked-in catalog (ESPN's /teams endpoint isn't CORS-enabled), so
@@ -1252,7 +1281,7 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
       // A spacer carries no content at all; a divider keeps only its label
       // (name). Both clear url/background/image so converting an existing tile
       // into a layout tile leaves nothing behind.
-      name: isSpacer || isNote || isTimer || isTamagotchi || isBonsai ? "" : name || undefined,
+      name: isSpacer || isNote || isTimer || isTamagotchi || isBonsai || isVisualizer ? "" : name || undefined,
       url: isContentless ? "" : url || undefined,
       // Send the raw value so clearing (null) reaches the body and the server
       // writes NULL; otherwise an undefined field is dropped and the old color
@@ -1412,7 +1441,13 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
                                     bonsaiGrowth: tile?.tileSettings?.bonsaiGrowth ?? null,
                                     bonsaiUpdatedAt: tile?.tileSettings?.bonsaiUpdatedAt ?? null,
                                   }
-                                : null;
+                                : isVisualizer
+                                  ? {
+                                      visualizerStyle,
+                                      visualizerPrimary,
+                                      visualizerBackground,
+                                    }
+                                  : null;
         // Only emit a settings object when there is something to store; an
         // un-scrolled plain tile keeps tileSettings null as before.
         if (!widget && !scrollable) return null;
@@ -1924,6 +1959,139 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
                       ))}
                     </SelectContent>
                   </Select>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {isVisualizer && (
+            <div className="space-y-4 border-t border-border pt-4">
+              <p className="text-sm text-muted-foreground">
+                A live audio visualizer that reacts to whatever is playing in the
+                music player. When nothing is playing it drifts through a calm
+                idle animation. Pick a style and its colors.
+              </p>
+
+              <div className="space-y-1.5">
+                <Label>Style</Label>
+                <div className="grid grid-cols-3 gap-2">
+                  {VISUALIZER_STYLE_OPTIONS.map((o) => (
+                    <button
+                      key={o.value}
+                      type="button"
+                      onClick={() => setVisualizerStyle(o.value)}
+                      aria-pressed={visualizerStyle === o.value}
+                      className={`flex flex-col items-center gap-2 rounded-lg border p-3 text-center transition-colors ${
+                        visualizerStyle === o.value
+                          ? "border-primary bg-primary/10 ring-2 ring-ring ring-offset-2 ring-offset-background"
+                          : "border-border hover:bg-accent"
+                      }`}
+                    >
+                      <span
+                        className="h-10 w-full overflow-hidden rounded-md"
+                        style={{ background: visualizerBackground }}
+                        aria-hidden
+                      >
+                        <span className="flex h-full w-full items-end justify-center gap-[3px] px-2 pb-1.5">
+                          {o.value === "bars" &&
+                            [0.5, 0.85, 0.35, 0.7, 0.55, 0.9, 0.4].map((h, i) => (
+                              <span
+                                key={i}
+                                className="w-full rounded-sm"
+                                style={{ height: `${h * 100}%`, background: visualizerPrimary }}
+                              />
+                            ))}
+                          {o.value === "lava" && (
+                            <span className="flex h-full w-full items-center justify-center gap-1">
+                              <span
+                                className="h-5 w-5 rounded-full blur-[2px]"
+                                style={{ background: visualizerPrimary }}
+                              />
+                              <span
+                                className="h-7 w-7 rounded-full blur-[2px]"
+                                style={{ background: visualizerPrimary }}
+                              />
+                              <span
+                                className="h-4 w-4 rounded-full blur-[2px]"
+                                style={{ background: visualizerPrimary }}
+                              />
+                            </span>
+                          )}
+                          {o.value === "vu" && (
+                            <span className="flex h-full w-full items-center justify-center gap-3">
+                              {[-0.5, 0.4].map((r, i) => (
+                                <span
+                                  key={i}
+                                  className="block h-4 w-[2px] origin-bottom rounded"
+                                  style={{
+                                    background: visualizerPrimary,
+                                    transform: `rotate(${r}rad)`,
+                                  }}
+                                />
+                              ))}
+                            </span>
+                          )}
+                        </span>
+                      </span>
+                      <span className="text-xs font-medium">{o.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="visualizer-primary">Primary color</Label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      id="visualizer-primary"
+                      type="color"
+                      value={visualizerPrimary}
+                      onChange={(e) => setVisualizerPrimary(e.target.value)}
+                      className="h-9 w-12 cursor-pointer rounded border border-border bg-transparent p-0.5"
+                    />
+                    <Input
+                      value={visualizerPrimary}
+                      onChange={(e) => setVisualizerPrimary(e.target.value)}
+                      className="font-mono"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setVisualizerPrimary(DEFAULT_VISUALIZER_PRIMARY)}
+                      disabled={visualizerPrimary === DEFAULT_VISUALIZER_PRIMARY}
+                    >
+                      Reset
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="visualizer-background">Glow / background</Label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      id="visualizer-background"
+                      type="color"
+                      value={visualizerBackground}
+                      onChange={(e) => setVisualizerBackground(e.target.value)}
+                      className="h-9 w-12 cursor-pointer rounded border border-border bg-transparent p-0.5"
+                    />
+                    <Input
+                      value={visualizerBackground}
+                      onChange={(e) => setVisualizerBackground(e.target.value)}
+                      className="font-mono"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setVisualizerBackground(DEFAULT_VISUALIZER_BACKGROUND)}
+                      disabled={visualizerBackground === DEFAULT_VISUALIZER_BACKGROUND}
+                    >
+                      Reset
+                    </Button>
+                  </div>
                 </div>
               </div>
             </div>

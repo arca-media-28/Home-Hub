@@ -1837,7 +1837,7 @@ components:
           enum: [app, truenas, media, sonarr, radarr, lidarr, qbittorrent]
         integration:
           type: ["string", "null"]
-          enum: [truenas, media, jellyfin, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, audioplayer, clock, timer, weather, sports, news, stocks, sleeper, email, calendar, note, spacer, divider, eightball, dice, coinflip, fortune, tamagotchi, bonsai, null]
+          enum: [truenas, media, jellyfin, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, audioplayer, clock, timer, weather, sports, news, stocks, sleeper, email, calendar, note, spacer, divider, eightball, dice, coinflip, fortune, tamagotchi, bonsai, visualizer, null]
         gridX:
           type: integer
         gridY:
@@ -1921,7 +1921,7 @@ components:
           enum: [app, truenas, media, sonarr, radarr, lidarr, qbittorrent]
         integration:
           type: ["string", "null"]
-          enum: [truenas, media, jellyfin, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, audioplayer, clock, timer, weather, sports, news, stocks, sleeper, email, calendar, note, spacer, divider, eightball, dice, coinflip, fortune, tamagotchi, bonsai, null]
+          enum: [truenas, media, jellyfin, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, audioplayer, clock, timer, weather, sports, news, stocks, sleeper, email, calendar, note, spacer, divider, eightball, dice, coinflip, fortune, tamagotchi, bonsai, visualizer, null]
         gridX:
           type: integer
         gridY:
@@ -1964,7 +1964,7 @@ components:
       properties:
         integration:
           type: ["string", "null"]
-          enum: [truenas, media, jellyfin, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, audioplayer, clock, timer, weather, sports, news, stocks, sleeper, email, calendar, note, spacer, divider, eightball, dice, coinflip, fortune, tamagotchi, bonsai, null]
+          enum: [truenas, media, jellyfin, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, audioplayer, clock, timer, weather, sports, news, stocks, sleeper, email, calendar, note, spacer, divider, eightball, dice, coinflip, fortune, tamagotchi, bonsai, visualizer, null]
         gridX:
           type: integer
         gridY:
@@ -2469,6 +2469,23 @@ components:
             A Bonsai tile's tree shape/style (e.g. "upright", "slanted",
             "windswept", "cascade"). Cosmetic only. Null or absent uses the
             default upright style.
+          type: ["string", "null"]
+        visualizerStyle:
+          description: >-
+            An Audio Visualizer tile's render style: "bars" (frequency bar
+            graph), "lava" (morphing lava-lamp blobs), or "vu" (retro VU
+            meter). Null or absent defaults to "bars".
+          type: ["string", "null"]
+          enum: ["bars", "lava", "vu", null]
+        visualizerPrimary:
+          description: >-
+            An Audio Visualizer tile's primary accent color as a #hex value —
+            the bars/blobs/needles/lit LEDs. Null or absent uses the default.
+          type: ["string", "null"]
+        visualizerBackground:
+          description: >-
+            An Audio Visualizer tile's background / glow color as a #hex value —
+            the canvas backdrop and halo glow. Null or absent uses the default.
           type: ["string", "null"]
 
     NoteChecklistItem:

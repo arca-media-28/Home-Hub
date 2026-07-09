@@ -36,6 +36,7 @@ import NoteTile from "@/components/tiles/NoteTile";
 import TimerTile from "@/components/tiles/TimerTile";
 import TamagotchiTile from "@/components/tiles/TamagotchiTile";
 import BonsaiTile from "@/components/tiles/BonsaiTile";
+import VisualizerTile from "@/components/tiles/VisualizerTile";
 import TileEditModal, { type EditMode } from "@/components/TileEditModal";
 import { INTEGRATION_SERVICE, CONNECTION_BACKED_INTEGRATIONS } from "@/lib/integrationMeta";
 import { ToastAction } from "@/components/ui/toast";
@@ -236,6 +237,13 @@ function renderTileContent(tile: Tile, status: ServiceStatus | undefined, editMo
   // tamagotchi/note/timer, bypassing the standard integration header.
   if (tile.integration === "bonsai") {
     return <BonsaiTile tile={tile} editMode={editMode} />;
+  }
+  // The Audio Visualizer is a self-contained toy that taps the app's own audio
+  // player and paints a live, sound-reactive canvas (bars / lava lamp / VU
+  // meter), or a calm idle animation when nothing is playing. It renders its own
+  // surface like the bonsai/tamagotchi, bypassing the integration header.
+  if (tile.integration === "visualizer") {
+    return <VisualizerTile tile={tile} editMode={editMode} />;
   }
   // Every tile renders as a styled app/link card. When an integration is
   // attached it also shows a compact live-status section from that service.

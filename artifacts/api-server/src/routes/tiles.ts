@@ -100,6 +100,9 @@ interface TileSettings {
   bonsaiLeafColor?: string | null;
   bonsaiBlossom?: string | null;
   bonsaiStyle?: string | null;
+  visualizerStyle?: string | null;
+  visualizerPrimary?: string | null;
+  visualizerBackground?: string | null;
   truenasMetric?: "cpuram" | "network" | "arc" | "pools" | "disks" | "cputemp" | null;
   truenasShowCpuCores?: boolean | null;
   truenasPools?: string[] | null;
@@ -570,6 +573,21 @@ function pickTileSettings(obj: Record<string, unknown>): TileSettings {
     result.bonsaiStyle = obj["bonsaiStyle"];
   } else if (obj["bonsaiStyle"] === null) {
     result.bonsaiStyle = null;
+  }
+  if (typeof obj["visualizerStyle"] === "string") {
+    result.visualizerStyle = obj["visualizerStyle"];
+  } else if (obj["visualizerStyle"] === null) {
+    result.visualizerStyle = null;
+  }
+  if (typeof obj["visualizerPrimary"] === "string") {
+    result.visualizerPrimary = obj["visualizerPrimary"];
+  } else if (obj["visualizerPrimary"] === null) {
+    result.visualizerPrimary = null;
+  }
+  if (typeof obj["visualizerBackground"] === "string") {
+    result.visualizerBackground = obj["visualizerBackground"];
+  } else if (obj["visualizerBackground"] === null) {
+    result.visualizerBackground = null;
   }
   return result;
 }

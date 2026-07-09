@@ -81,6 +81,7 @@ export const TileIntegration = {
   fortune: 'fortune',
   tamagotchi: 'tamagotchi',
   bonsai: 'bonsai',
+  visualizer: 'visualizer',
 } as const;
 
 /**
@@ -499,6 +500,21 @@ export type TileSettings = {
      * @nullable
      */
   bonsaiStyle?: string | null;
+  /**
+     * An Audio Visualizer tile's render style: "bars" (frequency bar graph), "lava" (morphing lava-lamp blobs), or "vu" (retro VU meter). Null or absent defaults to "bars".
+     * @nullable
+     */
+  visualizerStyle?: 'bars' | 'lava' | 'vu' | null;
+  /**
+     * An Audio Visualizer tile's primary accent color as a #hex value — the bars/blobs/needles/lit LEDs. Null or absent uses the default.
+     * @nullable
+     */
+  visualizerPrimary?: string | null;
+  /**
+     * An Audio Visualizer tile's background / glow color as a #hex value — the canvas backdrop and halo glow. Null or absent uses the default.
+     * @nullable
+     */
+  visualizerBackground?: string | null;
 } | null | null;
 
 export interface Tile {
@@ -613,6 +629,7 @@ export const TileInputIntegration = {
   fortune: 'fortune',
   tamagotchi: 'tamagotchi',
   bonsai: 'bonsai',
+  visualizer: 'visualizer',
 } as const;
 
 export interface TileInput {
@@ -686,6 +703,7 @@ export const TileUpdateIntegration = {
   fortune: 'fortune',
   tamagotchi: 'tamagotchi',
   bonsai: 'bonsai',
+  visualizer: 'visualizer',
 } as const;
 
 export interface TileUpdate {
