@@ -1,0 +1,52 @@
+# npm install -g pnpm
+
+added 1 package in 977ms
+
+1 package is looking for funding
+  run `npm fund` for details
+npm notice
+npm notice New major version of npm available! 11.16.0 -> 12.0.0
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.0
+npm notice To update run: npm install -g npm@12.0.0
+npm notice
+# npm install -g npm@12.0.0
+
+removed 16 packages, and changed 65 packages in 34s
+
+15 packages are looking for funding
+  run `npm fund` for details
+# cd /workspace/artifacts/api-server
+# PORT=3000 pnpm run dev
+Scope: all 9 workspace projects
+✓ Lockfile passes supply-chain policies (732 entries in 2.6s)
+../..                                    |  +25   -9 +++-
+../..                                    | Progress: resolved 25, reused 10, downloaded 15, added 19, done
+
+dependencies:
++ file-type 22.0.1
++ isomorphic-dompurify 3.18.0
+- multer 2.1.1
++ multer 2.2.0
+
+devDependencies:
++ vite 7.3.6
+
+../.. preinstall$ sh -c 'rm -f package-lock.json yarn.lock; case "$npm_config_user_agent" in pnpm/*) ;; *) echo "Use pnpm instead" >&2; exit 1 ;; esac'
+└─ Done in 12ms
+[ERR_PNPM_IGNORED_BUILDS] Ignored build scripts: better-sqlite3@12.10.0, esbuild@0.27.3
+
+Run "pnpm approve-builds" to pick which dependencies should be allowed to run scripts.
+[ERROR] Command failed with exit code 1: pnpm install
+
+pnpm: Command failed with exit code 1: pnpm install
+    at getFinalError (file:///usr/local/lib/node_modules/pnpm/dist/pnpm.mjs:36339:14)
+    at makeError (file:///usr/local/lib/node_modules/pnpm/dist/pnpm.mjs:38646:21)
+    at getSyncResult (file:///usr/local/lib/node_modules/pnpm/dist/pnpm.mjs:40490:10)
+    at spawnSubprocessSync (file:///usr/local/lib/node_modules/pnpm/dist/pnpm.mjs:40450:14)
+    at execaCoreSync (file:///usr/local/lib/node_modules/pnpm/dist/pnpm.mjs:40380:23)
+    at callBoundExeca (file:///usr/local/lib/node_modules/pnpm/dist/pnpm.mjs:42908:23)
+    at boundExeca (file:///usr/local/lib/node_modules/pnpm/dist/pnpm.mjs:42885:49)
+    at sync (file:///usr/local/lib/node_modules/pnpm/dist/pnpm.mjs:43040:14)
+    at runPnpmCli (file:///usr/local/lib/node_modules/pnpm/dist/pnpm.mjs:247665:5)
+    at runDepsStatusCheck (file:///usr/local/lib/node_modules/pnpm/dist/pnpm.mjs:249406:7)
+# 
