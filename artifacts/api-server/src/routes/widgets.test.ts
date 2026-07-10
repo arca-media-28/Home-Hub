@@ -27,6 +27,7 @@ vi.mock("../lib/db.js", () => ({
 // never hit the network.
 const httpGet = vi.fn();
 const httpPost = vi.fn();
+const httpPut = vi.fn();
 const httpDelete = vi.fn();
 // Tailscale (and other cloud-only services) use the TLS-verifying cloud client.
 const cloudGet = vi.fn();
@@ -35,6 +36,7 @@ vi.mock("../lib/http.js", () => ({
   httpClient: {
     get: (...args: unknown[]) => httpGet(...args),
     post: (...args: unknown[]) => httpPost(...args),
+    put: (...args: unknown[]) => httpPut(...args),
     delete: (...args: unknown[]) => httpDelete(...args),
   },
   cloudHttpClient: {
@@ -109,6 +111,7 @@ beforeEach(() => {
   upsertRun.mockReset();
   httpGet.mockReset();
   httpPost.mockReset();
+  httpPut.mockReset();
   httpDelete.mockReset();
   cloudGet.mockReset();
   cloudPost.mockReset();
@@ -2360,5 +2363,148 @@ describe("GET /widgets/weather", () => {
     const second = await request(app).get("/widgets/weather?city=paris&units=c");
     expect(second.status).toBe(200);
     expect(geocodeCalls).toBe(1);
+  });
+});
+
+// ── Audio Player favorite / like toggling ─────────────────────────────────────
+describe("POST /widgets/audioplayer/favorite", () => {
+  // An axios-style error carrying an HTTP status AND a response body, so we can
+  // assert the 502 reason surfaces the server's real rejection (status + body),
+  // not a flat generic string.
+  function axiosErrorWithBody(status: number, body: unknown): Error {
+    return Object.assign(new Error(`status ${status}`), {
+      isAxiosError: true,
+      code: "ERR_BAD_REQUEST",
+      response: { status, data: body },
+    });
+  }
+
+  // Wrap a Subsonic REST payload in the standard envelope the server unwraps.
+  function subsonicOk(): { data: { "subsonic-response": { status: string } } } {
+    return { data: { "subsonic-response": { status: "ok" } } };
+  }
+
+  it("Plex like writes rating=10 to /:/rate and returns liked", async () => {
+    findByService.mockReturnValue(
+      connRow({ service: "plex", url: "https://plex.local", extra: JSON.stringify({ token: "plex-token" }) }),
+    );
+    httpPut.mockResolvedValue({ data: {} });
+
+    const res = await request(app)
+      .post("/widgets/audioplayer/favorite")
+      .send({ source: "plex", id: "/library/metadata/123", liked: true });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ liked: true });
+    const [url, payload, opts] = httpPut.mock.calls[0];
+    expect(url).toBe("https://plex.local/:/rate");
+    expect(payload).toBeNull();
+    expect(opts.headers["X-Plex-Token"]).toBe("plex-token");
+    expect(opts.params.key).toBe("/library/metadata/123");
+    expect(opts.params.rating).toBe(10);
+  });
+
+  it("Plex unlike writes rating=0 (not the -1 clear sentinel Plex rejects)", async () => {
+    findByService.mockReturnValue(
+      connRow({ service: "plex", url: "https://plex.local", extra: JSON.stringify({ token: "plex-token" }) }),
+    );
+    httpPut.mockResolvedValue({ data: {} });
+
+    const res = await request(app)
+      .post("/widgets/audioplayer/favorite")
+      .send({ source: "plex", id: "/library/metadata/123", liked: false });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ liked: false });
+    const [, , opts] = httpPut.mock.calls[0];
+    expect(opts.params.rating).toBe(0);
+  });
+
+  it("Subsonic like calls star.view with the track id", async () => {
+    findByService.mockReturnValue(
+      connRow({ service: "subsonic", url: "https://nav.local", username: "u", password: "p" }),
+    );
+    httpGet.mockResolvedValue(subsonicOk());
+
+    const res = await request(app)
+      .post("/widgets/audioplayer/favorite")
+      .send({ source: "subsonic", id: "song-1", liked: true });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ liked: true });
+    const [url, config] = httpGet.mock.calls[0];
+    expect(url).toBe("https://nav.local/rest/star.view");
+    expect(config.params.id).toBe("song-1");
+  });
+
+  it("Subsonic unlike calls unstar.view with the track id", async () => {
+    findByService.mockReturnValue(
+      connRow({ service: "subsonic", url: "https://nav.local", username: "u", password: "p" }),
+    );
+    httpGet.mockResolvedValue(subsonicOk());
+
+    const res = await request(app)
+      .post("/widgets/audioplayer/favorite")
+      .send({ source: "subsonic", id: "song-1", liked: false });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ liked: false });
+    const [url, config] = httpGet.mock.calls[0];
+    expect(url).toBe("https://nav.local/rest/unstar.view");
+    expect(config.params.id).toBe("song-1");
+  });
+
+  it("returns 404 when Plex is unconfigured (no upstream call)", async () => {
+    // findByService defaults to undefined → no saved connection.
+    const res = await request(app)
+      .post("/widgets/audioplayer/favorite")
+      .send({ source: "plex", id: "/library/metadata/123", liked: true });
+
+    expect(res.status).toBe(404);
+    expect(res.body.error).toMatch(/no plex connection/i);
+    expect(httpPut).not.toHaveBeenCalled();
+  });
+
+  it("returns 404 when Subsonic is unconfigured (no upstream call)", async () => {
+    const res = await request(app)
+      .post("/widgets/audioplayer/favorite")
+      .send({ source: "subsonic", id: "song-1", liked: true });
+
+    expect(res.status).toBe(404);
+    expect(res.body.error).toMatch(/no subsonic connection/i);
+    expect(httpGet).not.toHaveBeenCalled();
+  });
+
+  it("returns 502 with the real Plex status+body on upstream failure", async () => {
+    findByService.mockReturnValue(
+      connRow({ service: "plex", url: "https://plex.local", extra: JSON.stringify({ token: "plex-token" }) }),
+    );
+    httpPut.mockRejectedValue(axiosErrorWithBody(400, "rating out of range"));
+
+    const res = await request(app)
+      .post("/widgets/audioplayer/favorite")
+      .send({ source: "plex", id: "/library/metadata/123", liked: false });
+
+    expect(res.status).toBe(502);
+    // The message must carry the actual status AND body, not a flat generic string.
+    expect(res.body.error).toContain("HTTP 400");
+    expect(res.body.error).toContain("rating out of range");
+  });
+
+  it("returns 502 with the real Subsonic error message on a failed envelope", async () => {
+    findByService.mockReturnValue(
+      connRow({ service: "subsonic", url: "https://nav.local", username: "u", password: "p" }),
+    );
+    // Subsonic always answers HTTP 200; the real failure lives in the envelope.
+    httpGet.mockResolvedValue({
+      data: { "subsonic-response": { status: "failed", error: { message: "Wrong username or password" } } },
+    });
+
+    const res = await request(app)
+      .post("/widgets/audioplayer/favorite")
+      .send({ source: "subsonic", id: "song-1", liked: true });
+
+    expect(res.status).toBe(502);
+    expect(res.body.error).toContain("Wrong username or password");
   });
 });
