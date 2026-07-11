@@ -3,6 +3,7 @@ import {
   getGetAudioPlayerNowPlayingQueryKey,
   browseAudioLibrary,
   useSetAudioFavorite,
+  ApiError,
 } from "@workspace/api-client-react";
 import type { AudioTrack, BrowseAudioLibrarySource } from "@workspace/api-client-react";
 import { useState } from "react";
@@ -15,6 +16,37 @@ import { Artwork, fmtTime } from "./audioShared";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import MusicBrowser from "./MusicBrowser";
 import SpotifyAudioPlayer from "./SpotifyAudioPlayer";
+
+// Turn a failed favorite-write into a short, human-readable reason for the heart
+// button's tooltip. The server returns the real upstream cause in the JSON
+// `error` field (e.g. "HTTP 401: ..." when the source login expired, or "No plex
+// connection is configured"); we prefer that and map the most common upstream
+// status codes to friendlier phrasing so users can self-diagnose rather than
+// blindly retrying.
+function favoriteErrorMessage(err: unknown): string {
+  const fallback = "Couldn’t update favorite — try again";
+  let reason = "";
+  if (err instanceof ApiError) {
+    const data = err.data as { error?: unknown } | null;
+    reason =
+      (typeof data?.error === "string" && data.error.trim()) || err.message || "";
+  } else if (err instanceof Error) {
+    reason = err.message;
+  }
+  if (!reason) return fallback;
+
+  // Authentication / permission failures from the upstream music source: the
+  // saved login is no longer valid, so retrying won't help — reconnecting will.
+  if (/\b(401|403)\b|unauthorized|forbidden/i.test(reason)) {
+    return "Couldn’t update favorite — the music source login expired. Reconnect it in Settings.";
+  }
+  // No connection saved for this source.
+  if (/no .* connection is configured/i.test(reason)) {
+    return "Couldn’t update favorite — no music source is connected. Add one in Settings.";
+  }
+
+  return `Couldn’t update favorite — ${reason}`;
+}
 
 // Audio Player tile. Branches on the configured source: Spotify (OAuth + remote
 // control / Web Playback SDK) renders a dedicated component, while Plex and
@@ -59,7 +91,7 @@ function StreamAudioPlayer({ enabled, density, tileSettings }: WidgetProps) {
   const queryClient = useQueryClient();
   const favoriteMutation = useSetAudioFavorite();
   const [likeOverride, setLikeOverride] = useState<{ id: string; liked: boolean } | null>(null);
-  const [likeError, setLikeError] = useState(false);
+  const [likeError, setLikeError] = useState<string | null>(null);
 
   // The pop-out music browser (search / browse / playlists) is only available
   // for the library sources that back it; its tabs are per-tile toggles that
@@ -245,7 +277,7 @@ function StreamAudioPlayer({ enabled, density, tileSettings }: WidgetProps) {
     if (sample || favoriteMutation.isPending) return;
     const next = !likedState;
     setLikeOverride({ id: displayTrack.id, liked: next });
-    setLikeError(false);
+    setLikeError(null);
     try {
       await favoriteMutation.mutateAsync({
         data: { source, id: displayTrack.id, liked: next },
@@ -254,10 +286,12 @@ function StreamAudioPlayer({ enabled, density, tileSettings }: WidgetProps) {
       await queryClient.invalidateQueries({
         queryKey: getGetAudioPlayerNowPlayingQueryKey(params),
       });
-    } catch {
-      // Revert to the real state and flag the error on the button.
+    } catch (err) {
+      // Revert to the real state and surface the actual reason on the button so
+      // the user can self-diagnose (auth expired vs. server rejected) instead of
+      // blindly retrying.
       setLikeOverride(null);
-      setLikeError(true);
+      setLikeError(favoriteErrorMessage(err));
     }
   };
 
@@ -335,13 +369,7 @@ function StreamAudioPlayer({ enabled, density, tileSettings }: WidgetProps) {
             }`}
             aria-label={likedState ? "Remove from favorites" : "Add to favorites"}
             aria-pressed={likedState}
-            title={
-              likeError
-                ? "Couldn’t update favorite — try again"
-                : likedState
-                  ? "Liked"
-                  : "Like"
-            }
+            title={likeError ?? (likedState ? "Liked" : "Like")}
           >
             <Heart
               size={14}
