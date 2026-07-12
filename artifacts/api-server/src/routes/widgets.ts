@@ -4504,7 +4504,7 @@ router.get("/weather", requireAuth, async (req, res) => {
             longitude: lon,
             current: "temperature_2m,apparent_temperature,weather_code,is_day",
             daily: "weather_code,temperature_2m_max,temperature_2m_min",
-            forecast_days: 6,
+            forecast_days: 7,
             temperature_unit: units === "f" ? "fahrenheit" : "celsius",
             timezone: "auto",
           },

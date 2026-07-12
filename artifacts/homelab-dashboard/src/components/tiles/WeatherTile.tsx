@@ -207,33 +207,83 @@ export default function WeatherTile({ density, tileSettings }: WidgetProps) {
   // tile fills its space without ever overflowing.
   const showDetail = density.bodyHeight >= 122;
 
-  // On larger tiles, show a multi-day outlook below the current conditions. The
-  // number of days shown adapts to the tile's width (3–5 days), and the strip is
-  // only revealed when there's enough height to fit it without overflowing.
   const upcoming = data.forecast.slice(1);
-  const fitDays = Math.floor((density.bodyWidth - 8) / 54);
-  const numDays = Math.max(3, Math.min(5, fitDays));
-  const days = upcoming.slice(0, numDays);
-  const showForecast =
-    density.bodyHeight >= 210 && density.bodyWidth >= 200 && days.length >= 3;
 
-  return (
-    <div className="w-full h-full flex flex-col justify-center p-3 gap-1 text-foreground">
-      <div className="flex items-center gap-3">
-        <Icon className="w-9 h-9 flex-shrink-0 text-primary" />
+  // Layout mode is threshold-based on the measured body:
+  //   - "row":  clearly wide → forecast is a vertical day list BESIDE the
+  //             current conditions, each side filling half the tile.
+  //   - "list": clearly tall → forecast is a vertical day list BELOW the
+  //             current conditions, spreading to fill the remaining height
+  //             (works even on narrow tiles where the strip can't fit).
+  //   - "col":  everything else → the original horizontal strip below.
+  let layoutMode: "row" | "list" | "col";
+  if (density.bodyWidth >= 340 && density.bodyWidth > density.bodyHeight * 1.2) {
+    layoutMode = "row";
+  } else if (
+    density.bodyHeight >= 280 &&
+    density.bodyHeight > density.bodyWidth * 0.9 &&
+    density.bodyWidth >= 140
+  ) {
+    layoutMode = "list";
+  } else {
+    layoutMode = "col";
+  }
+
+  // On roomy tiles the whole block scales up so the content fills the space
+  // instead of floating in a corner.
+  const big = density.bodyHeight >= 240 && density.bodyWidth >= 280;
+
+  // Col mode: the number of days shown adapts to the tile's width (3–5 days),
+  // and the strip is only revealed when there's enough height to fit it.
+  const fitDays = Math.floor((density.bodyWidth - 8) / 54);
+  const numColDays = Math.max(3, Math.min(5, fitDays));
+
+  // Row/list modes: days stack vertically, so the count is height-driven and
+  // capped at the API's available days. List mode reserves ~150px for the
+  // current-conditions block above the list.
+  const numRowDays = Math.min(
+    upcoming.length,
+    Math.max(2, Math.floor((density.bodyHeight - 20) / 26)),
+  );
+  const numListDays = Math.min(
+    upcoming.length,
+    Math.max(3, Math.floor((density.bodyHeight - 150) / 30)),
+  );
+
+  const days = upcoming.slice(
+    0,
+    layoutMode === "row" ? numRowDays : layoutMode === "list" ? numListDays : numColDays,
+  );
+  const showForecast =
+    layoutMode === "col"
+      ? density.bodyHeight >= 210 && density.bodyWidth >= 200 && days.length >= 3
+      : days.length >= 2;
+
+  const current = (
+    <>
+      <div className={`flex items-center ${big ? "gap-4" : "gap-3"}`}>
+        <Icon className={`${big ? "w-14 h-14" : "w-9 h-9"} flex-shrink-0 text-primary`} />
         <div className="min-w-0">
-          <div className="text-3xl font-bold leading-none tabular-nums">
+          <div
+            className={`${big ? "text-5xl" : "text-3xl"} font-bold leading-none tabular-nums`}
+          >
             {round(data.temp)}
             {unit}
           </div>
-          <div className="text-xs text-muted-foreground truncate">{label}</div>
+          <div className={`${big ? "text-sm" : "text-xs"} text-muted-foreground truncate`}>
+            {label}
+          </div>
         </div>
       </div>
 
-      <div className="text-sm font-medium truncate">{data.name}</div>
+      <div className={`${big ? "text-base" : "text-sm"} font-medium truncate max-w-full`}>
+        {data.name}
+      </div>
 
       {showDetail && (
-        <div className="flex items-center gap-3 text-xs text-muted-foreground pt-0.5">
+        <div
+          className={`flex items-center gap-3 ${big ? "text-sm" : "text-xs"} text-muted-foreground pt-0.5`}
+        >
           <span className="tabular-nums">Feels {round(data.feels)}{unit}</span>
           {data.high != null && data.low != null && (
             <span className="tabular-nums">
@@ -242,9 +292,83 @@ export default function WeatherTile({ density, tileSettings }: WidgetProps) {
           )}
         </div>
       )}
+    </>
+  );
 
-      {showForecast && (
-        <div className="flex gap-1 pt-2 mt-1 border-t border-border/50">
+  // One forecast day as a horizontal line (day · icon · high/low pushed to the
+  // right edge) — used by both the row and list layouts so the line fills
+  // whatever width its column has.
+  const dayLine = (day: (typeof upcoming)[number], bigRow: boolean) => {
+    const { Icon: DayIcon, label: dayLabel } = weatherInfo(day.code, true);
+    return (
+      <div
+        key={day.date}
+        className={`grid ${bigRow ? "grid-cols-[3rem_1fr_auto]" : "grid-cols-[2rem_1fr_auto]"} items-center gap-2 leading-tight min-w-0`}
+      >
+        <span
+          className={`${bigRow ? "text-sm" : "text-[11px]"} font-medium text-muted-foreground`}
+        >
+          {weekdayLabel(day.date)}
+        </span>
+        <DayIcon
+          className={`${bigRow ? "w-6 h-6" : "w-4 h-4"} justify-self-center text-primary`}
+          aria-label={dayLabel}
+        />
+        <span className={`tabular-nums ${bigRow ? "text-sm" : "text-[11px]"} truncate`}>
+          {day.high != null ? round(day.high) : "—"}°
+          <span className="text-muted-foreground">
+            {" "}
+            {day.low != null ? round(day.low) : "—"}°
+          </span>
+        </span>
+      </div>
+    );
+  };
+
+  if (layoutMode === "row" && showForecast) {
+    // Rows get bigger when each one has generous vertical space.
+    const perRow = (density.bodyHeight - 24) / days.length;
+    const bigRow = big || perRow >= 38;
+    return (
+      <div className="w-full h-full flex flex-row items-stretch p-3 gap-3 text-foreground overflow-hidden">
+        <div className="flex-1 min-w-0 flex flex-col justify-center items-center text-center gap-1">
+          {current}
+        </div>
+        <div
+          data-testid="weather-forecast-row"
+          className="flex-1 min-w-0 flex flex-col justify-evenly border-l border-border/50 pl-3"
+        >
+          {days.map((day) => dayLine(day, bigRow))}
+        </div>
+      </div>
+    );
+  }
+
+  if (layoutMode === "list" && showForecast) {
+    const perRow = (density.bodyHeight - 150) / days.length;
+    const bigRow = big || perRow >= 38;
+    return (
+      <div className="w-full h-full flex flex-col p-3 gap-1 text-foreground overflow-hidden">
+        <div className="flex-none flex flex-col gap-1 py-1">{current}</div>
+        <div
+          data-testid="weather-forecast-list"
+          className="flex-1 min-h-0 flex flex-col justify-evenly border-t border-border/50 mt-2 pt-1"
+        >
+          {days.map((day) => dayLine(day, bigRow))}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-full h-full flex flex-col justify-center p-3 gap-1 text-foreground">
+      {current}
+
+      {layoutMode === "col" && showForecast && (
+        <div
+          data-testid="weather-forecast-col"
+          className="flex gap-1 pt-2 mt-1 border-t border-border/50"
+        >
           {days.map((day) => {
             const { Icon: DayIcon, label: dayLabel } = weatherInfo(day.code, true);
             return (
