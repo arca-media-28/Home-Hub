@@ -143,8 +143,10 @@ export default function IntegrationTile({ tile, status }: IntegrationTileProps) 
   const image = resolveImageStyle(tile);
 
   // A small reachability dot in the header. Only shown once a connection has
-  // been saved for the backing service.
-  const showDot = Boolean(status?.configured);
+  // been saved for the backing service, and hidden when the user turned the
+  // indicator off for this tile.
+  const showDot =
+    Boolean(status?.configured) && tile.tileSettings?.hideStatusDot !== true;
   const dotColor = status?.ok ? "bg-green-500" : "bg-red-500";
 
   // Resolve which metrics this tile shows.

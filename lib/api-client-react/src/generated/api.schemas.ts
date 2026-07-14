@@ -301,6 +301,11 @@ export type TileSettings = {
      */
   scrollable?: boolean | null;
   /**
+     * When true, the tile header hides the service-reachability status dot even when the backing connection is configured. Absent or false shows the dot (the default).
+     * @nullable
+     */
+  hideStatusDot?: boolean | null;
+  /**
      * Which single TrueNAS metric a dedicated TrueNAS tile renders with its bespoke visual: "cpuram", "network", "arc", "pools", "disks", or "cputemp". Null or absent means the tile shows the combined multi-section view (the default, backward-compatible behavior).
      * @nullable
      */

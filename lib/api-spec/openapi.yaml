@@ -2315,6 +2315,12 @@ components:
             overflows instead of clipping it at the tile edge. Absent or false
             clips overflowing content (the default).
           type: ["boolean", "null"]
+        hideStatusDot:
+          description: >-
+            When true, the tile header hides the service-reachability status
+            dot even when the backing connection is configured. Absent or
+            false shows the dot (the default).
+          type: ["boolean", "null"]
         truenasMetric:
           description: >-
             Which single TrueNAS metric a dedicated TrueNAS tile renders with

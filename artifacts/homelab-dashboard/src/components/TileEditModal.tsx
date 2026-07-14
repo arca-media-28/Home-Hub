@@ -21,7 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import IntegrationPicker from "@/components/IntegrationPicker";
-import { integrationMeta } from "@/lib/integrationMeta";
+import { integrationMeta, INTEGRATION_SERVICE } from "@/lib/integrationMeta";
 import {
   METRIC_CATALOG,
   allMetricKeys,
@@ -473,6 +473,12 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
     tile?.tileSettings?.scrollable ?? false,
   );
 
+  // Whether the tile hides its service-reachability status dot. Only shown for
+  // connection-backed integrations (those with a reachability dot to hide).
+  const [hideStatusDot, setHideStatusDot] = useState<boolean>(
+    tile?.tileSettings?.hideStatusDot ?? false,
+  );
+
   // Note (post-it) appearance options. The note's content (body + checklist) is
   // edited in-place on the tile, not here, so the modal only owns its look.
   const [noteColor, setNoteColor] = useState<string>(
@@ -639,6 +645,7 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
       setAudioBrowse(tile?.tileSettings?.audioBrowse ?? true);
       setAudioPlaylists(tile?.tileSettings?.audioPlaylists ?? true);
       setScrollable(tile?.tileSettings?.scrollable ?? false);
+      setHideStatusDot(tile?.tileSettings?.hideStatusDot ?? false);
       setNoteColor(tile?.tileSettings?.noteColor ?? DEFAULT_NOTE_COLOR);
       setNoteFontSize((tile?.tileSettings?.noteFontSize as NoteFontSize) ?? "md");
       setNoteTextColor(tile?.tileSettings?.noteTextColor ?? DEFAULT_NOTE_TEXT_COLOR);
@@ -1457,10 +1464,12 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
                                       visualizerBackground: visualizerBackground || null,
                                     }
                                   : null;
+        // The status-dot toggle only applies to connection-backed integrations.
+        const dotHidden = Boolean(INTEGRATION_SERVICE[integration]) && hideStatusDot;
         // Only emit a settings object when there is something to store; an
         // un-scrolled plain tile keeps tileSettings null as before.
-        if (!widget && !scrollable) return null;
-        return { ...(widget ?? {}), scrollable };
+        if (!widget && !scrollable && !dotHidden) return null;
+        return { ...(widget ?? {}), scrollable, hideStatusDot: dotHidden };
       })(),
       gridX: tile?.gridX ?? defaultGridPos?.x ?? 0,
       gridY: tile?.gridY ?? defaultGridPos?.y ?? 0,
@@ -3456,6 +3465,20 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
                 onCheckedChange={(c) => setScrollable(c === true)}
               />
               <span className="text-sm">Scrollable content</span>
+            </label>
+          )}
+
+          {Boolean(INTEGRATION_SERVICE[integration]) && (
+            <label
+              htmlFor="show-status-dot"
+              className="flex items-center gap-2 cursor-pointer select-none"
+            >
+              <Checkbox
+                id="show-status-dot"
+                checked={!hideStatusDot}
+                onCheckedChange={(c) => setHideStatusDot(c !== true)}
+              />
+              <span className="text-sm">Show status indicator</span>
             </label>
           )}
 

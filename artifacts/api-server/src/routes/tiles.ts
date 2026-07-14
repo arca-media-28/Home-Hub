@@ -64,6 +64,7 @@ interface TileSettings {
   audioBrowse?: boolean | null;
   audioPlaylists?: boolean | null;
   scrollable?: boolean | null;
+  hideStatusDot?: boolean | null;
   noteBody?: string | null;
   noteItems?: NoteChecklistItem[] | null;
   noteColor?: string | null;
@@ -346,6 +347,11 @@ function pickTileSettings(obj: Record<string, unknown>): TileSettings {
     result.scrollable = obj["scrollable"];
   } else if (obj["scrollable"] === null) {
     result.scrollable = null;
+  }
+  if (typeof obj["hideStatusDot"] === "boolean") {
+    result.hideStatusDot = obj["hideStatusDot"];
+  } else if (obj["hideStatusDot"] === null) {
+    result.hideStatusDot = null;
   }
   if (
     obj["truenasMetric"] === "cpuram" ||

@@ -202,6 +202,10 @@ export const INTEGRATION_SERVICE: Record<string, string> = {
   [TileIntegration.qbittorrent]: "qbittorrent",
   [TileIntegration.pihole]: "pihole",
   [TileIntegration["nginx-proxy-manager"]]: "nginx-proxy-manager",
+  [TileIntegration.lidarr]: "lidarr",
+  [TileIntegration.prowlarr]: "prowlarr",
+  [TileIntegration.tailscale]: "tailscale",
+  [TileIntegration.ersatztv]: "ersatztv",
 };
 
 // Every integration whose tile depends on a saved service connection, mapped to
