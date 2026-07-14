@@ -19,9 +19,9 @@ real theme picker. History: consolidated from 6 minor recolors to 3 MAJORLY dist
 expanded back to 6 distinct ones (each pushed hard to read as its own product). The six:
 **Rack** (dark terminal — mono, sharp 0-radius, hard grid bg, flat, UPPERCASE wide-tracked labels,
 amber), **Hearth** (warm light editorial — Fraunces serif headings, 1.25rem radius, gradient wash,
-soft diffuse shadows, near-borderless cards, sentence case, burnt orange), **Nebula** (cosmic dark —
-Space Grotesk, glassy translucent `.bg-card` w/ backdrop-blur, violet glow shadows + glow borders,
-radial glow bg no grid, sentence case, violet/cyan), **Friction** (logo-inspired industrial — deep
+soft diffuse shadows, near-borderless cards, sentence case, burnt orange), **Slate** (dark neumorphism — keeps
+legacy id "nebula" so saved prefs survive; Inter, 1rem, charcoal blue-gray, card==background,
+dual dark/light extruded shadows like Pebble, flat bg, no blur/glow), **Friction** (logo-inspired industrial — deep
 royal blue bg + RED primary AND red-family accent + white, Outfit, 0.25rem, KEEPS UPPERCASE caps,
 red-corner-flare + steel grid bg), **Workshop** (skeuomorphism — light brushed-metal, Nunito Sans,
 0.625rem, drops caps; `.bg-card` gets a top-down gloss gradient + inset bevel highlights + realistic
@@ -64,11 +64,11 @@ into the modal's bgColor state — that re-bakes off-theme colors into every new
 `index.css` AFTER the token blocks (unlayered, so it beats Tailwind's `@layer utilities` by source
 order regardless of specificity). Three levers: (1) elevation — Tailwind `shadow-*` is remapped in
 `@theme inline` to runtime `var(--app-shadow-*)`, and each theme defines its own `--app-shadow-*`
-(Rack flat, light themes soft-diffuse, Nebula colored glow); (2) ambient background — per-theme
-`[data-theme=...] .bg-dot-pattern` overrides the default grid (Hearth/Grove gradient wash, Quiet
-bare, Nebula glows+grid, Tide blue grid; only pages use `.bg-dot-pattern`); (3) typographic voice —
-soft themes (hearth/quiet/grove/tide) override `.uppercase`→none and `.tracking-wide(r/st)`→normal
-to drop the terminal label motif, while Rack/Nebula keep it; Hearth also gets serif `h1,h2,h3`.
+(Rack flat, Pebble/Slate neumorphic dual shadows); (2) ambient background — per-theme
+`[data-theme=...] .bg-dot-pattern` overrides the default grid (Hearth gradient wash, Pebble/Slate
+flat color; only pages use `.bg-dot-pattern`); (3) typographic voice —
+soft themes override `.uppercase`→none and `.tracking-wide(r/st)`→normal
+to drop the terminal label motif, while Rack/Friction keep it; Hearth also gets serif `h1,h2,h3`.
 **Why:** the terminal motifs (grid bg, flat surfaces, UPPERCASE wide-tracked labels) live in
 component markup, so without these scoped overrides every theme reads as a recolored "Rack".
 `THEME` metadata carries `radius`+`font` so the Appearance picker previews each theme's own shape
