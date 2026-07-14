@@ -9,7 +9,7 @@ import type { SearchAudioLibrarySource } from './searchAudioLibrarySource';
 
 export type SearchAudioLibraryParams = {
 /**
- * Which music source to search. "plex" resolves the saved Plex connection; "subsonic" the saved Navidrome / Subsonic connection. Defaults to "plex" when omitted.
+ * Which music source to search. "plex" resolves the saved Plex connection; "subsonic" the saved Navidrome / Subsonic connection; "jellyfin" the saved Jellyfin connection. Defaults to "plex" when omitted.
  */
 source?: SearchAudioLibrarySource;
 /**

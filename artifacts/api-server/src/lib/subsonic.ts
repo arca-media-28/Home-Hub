@@ -39,6 +39,7 @@ export interface SubsonicSong {
   id?: string;
   title?: string;
   artist?: string;
+  artistId?: string;
   album?: string;
   albumId?: string;
   coverArt?: string;

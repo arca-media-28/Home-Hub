@@ -22,6 +22,16 @@ export interface AudioTrack {
      */
   album?: string | null;
   /**
+     * Source-side identifier of the track's artist (Plex grandparentRatingKey, Subsonic artistId, Jellyfin ArtistItems[0].Id), usable as a browse-endpoint container id. Null/absent when the source can't resolve it.
+     * @nullable
+     */
+  artistId?: string | null;
+  /**
+     * Source-side identifier of the track's album (Plex parentRatingKey, Subsonic albumId, Jellyfin AlbumId), usable as a browse-endpoint container id. Null/absent when the source can't resolve it.
+     * @nullable
+     */
+  albumId?: string | null;
+  /**
      * Fully-qualified, authenticated album-art URL the browser can load directly (Plex token appended). Null when the source has no artwork.
      * @nullable
      */

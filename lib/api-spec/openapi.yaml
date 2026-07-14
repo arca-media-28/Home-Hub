@@ -750,11 +750,12 @@ paths:
           required: false
           description: >-
             Which music source to search. "plex" resolves the saved Plex
-            connection; "subsonic" the saved Navidrome / Subsonic connection.
-            Defaults to "plex" when omitted.
+            connection; "subsonic" the saved Navidrome / Subsonic connection;
+            "jellyfin" the saved Jellyfin connection. Defaults to "plex" when
+            omitted.
           schema:
             type: string
-            enum: [plex, subsonic]
+            enum: [plex, subsonic, jellyfin]
         - name: query
           in: query
           required: true
@@ -787,11 +788,11 @@ paths:
           in: query
           required: false
           description: >-
-            Which music source to browse. "plex" or "subsonic". Defaults to
-            "plex" when omitted.
+            Which music source to browse. "plex", "subsonic", or "jellyfin".
+            Defaults to "plex" when omitted.
           schema:
             type: string
-            enum: [plex, subsonic]
+            enum: [plex, subsonic, jellyfin]
         - name: kind
           in: query
           required: true
@@ -4056,6 +4057,19 @@ components:
           type: ["string", "null"]
         album:
           description: Album the track belongs to (Plex parentTitle). Null when unknown.
+          type: ["string", "null"]
+        artistId:
+          description: >-
+            Source-side identifier of the track's artist (Plex
+            grandparentRatingKey, Subsonic artistId, Jellyfin ArtistItems[0].Id),
+            usable as a browse-endpoint container id. Null/absent when the
+            source can't resolve it.
+          type: ["string", "null"]
+        albumId:
+          description: >-
+            Source-side identifier of the track's album (Plex parentRatingKey,
+            Subsonic albumId, Jellyfin AlbumId), usable as a browse-endpoint
+            container id. Null/absent when the source can't resolve it.
           type: ["string", "null"]
         artwork:
           description: >-

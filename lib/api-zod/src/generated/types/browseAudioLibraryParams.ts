@@ -10,7 +10,7 @@ import type { BrowseAudioLibrarySource } from './browseAudioLibrarySource';
 
 export type BrowseAudioLibraryParams = {
 /**
- * Which music source to browse. "plex" or "subsonic". Defaults to "plex" when omitted.
+ * Which music source to browse. "plex", "subsonic", or "jellyfin". Defaults to "plex" when omitted.
  */
 source?: BrowseAudioLibrarySource;
 /**

@@ -1688,6 +1688,8 @@ router.get("/media/continue", requireAuth, async (req: AuthRequest, res) => {
 // and progressMs stay null (they are not a live session).
 interface PlexTrackRow {
   ratingKey?: string | number;
+  parentRatingKey?: string | number;
+  grandparentRatingKey?: string | number;
   title?: string;
   grandparentTitle?: string;
   parentTitle?: string;
@@ -1722,6 +1724,8 @@ function mapPlexTrack(
     title: item.title ?? "Unknown track",
     artist: item.grandparentTitle ?? null,
     album: item.parentTitle ?? null,
+    artistId: item.grandparentRatingKey != null ? String(item.grandparentRatingKey) : null,
+    albumId: item.parentRatingKey != null ? String(item.parentRatingKey) : null,
     artwork: thumbPath ? `${baseUrl}${thumbPath}?X-Plex-Token=${token}` : null,
     durationMs: typeof item.duration === "number" ? item.duration : null,
     progressMs: live && typeof item.viewOffset === "number" ? item.viewOffset : null,
@@ -1739,6 +1743,7 @@ interface JellyfinAudioItem {
   Name?: string;
   Type?: string;
   Artists?: string[];
+  ArtistItems?: Array<{ Id?: string; Name?: string }>;
   AlbumArtist?: string;
   Album?: string;
   AlbumId?: string;
@@ -1776,6 +1781,8 @@ function mapJellyfinTrack(
     title: item.Name ?? "Unknown track",
     artist,
     album: item.Album ?? null,
+    artistId: item.ArtistItems?.[0]?.Id ?? null,
+    albumId: item.AlbumId ?? null,
     artwork,
     durationMs:
       typeof item.RunTimeTicks === "number"
@@ -1848,10 +1855,13 @@ async function handleJellyfinAudio(userId: number, res: import("express").Respon
   // Unconfigured → built-in demo content (sample:true). streamUrl stays null so
   // the tile labels it not-live and disables in-browser streaming.
   if (!baseUrl || !apiKey) {
+    // Demo tracks carry artistId/albumId that match the demo browse catalog
+    // (d-artist-1 / d-album-1), so the clickable artist/album deep links can be
+    // exercised (and e2e-tested) without a live Jellyfin server.
     const demo = [
-      { id: "1", title: "Dreams", artist: "Fleetwood Mac", album: "Rumours", artwork: null, durationMs: 257_000, progressMs: 72_000, state: "playing", streamUrl: null },
-      { id: "2", title: "The Chain", artist: "Fleetwood Mac", album: "Rumours", artwork: null, durationMs: 271_000, progressMs: null, state: null, streamUrl: null },
-      { id: "3", title: "Go Your Own Way", artist: "Fleetwood Mac", album: "Rumours", artwork: null, durationMs: 218_000, progressMs: null, state: null, streamUrl: null },
+      { id: "1", title: "Dreams", artist: "Fleetwood Mac", artistId: "d-artist-1", album: "Rumours", albumId: "d-album-1", artwork: null, durationMs: 257_000, progressMs: 72_000, state: "playing", streamUrl: null },
+      { id: "2", title: "The Chain", artist: "Fleetwood Mac", artistId: "d-artist-1", album: "Rumours", albumId: "d-album-1", artwork: null, durationMs: 271_000, progressMs: null, state: null, streamUrl: null },
+      { id: "3", title: "Go Your Own Way", artist: "Fleetwood Mac", artistId: "d-artist-1", album: "Rumours", albumId: "d-album-1", artwork: null, durationMs: 218_000, progressMs: null, state: null, streamUrl: null },
     ];
     res.json({ source: "jellyfin", sample: true, nowPlaying: demo[0], queue: demo });
     return;
@@ -2074,6 +2084,8 @@ function mapSubsonicTrack(
     title: song.title ?? "Unknown track",
     artist: song.artist ?? null,
     album: song.album ?? null,
+    artistId: song.artistId ?? null,
+    albumId: song.albumId ?? null,
     artwork: coverArt
       ? `${baseUrl}/rest/getCoverArt.view?id=${encodeURIComponent(coverArt)}&size=300&${mediaQuery}`
       : null,
@@ -2932,6 +2944,206 @@ async function subsonicBrowseLibrary(
   }
 }
 
+// ── Jellyfin search / browse handlers ────────────────────────────────────────
+// A Jellyfin container row (MusicArtist / MusicAlbum / Playlist item) as
+// returned by /Items or /Artists. Only what the music browser needs.
+interface JellyfinContainerItem {
+  Id?: string;
+  Name?: string;
+  Type?: string;
+  AlbumArtist?: string;
+  ChildCount?: number;
+  SongCount?: number;
+  ImageTags?: { Primary?: string };
+}
+
+function jellyfinContainerArt(
+  item: JellyfinContainerItem,
+  baseUrl: string,
+  apiKey: string,
+): string | null {
+  return item.ImageTags?.Primary && item.Id
+    ? `${baseUrl}/Items/${item.Id}/Images/Primary?api_key=${apiKey}&maxHeight=200`
+    : null;
+}
+
+function mapJellyfinArtist(
+  item: JellyfinContainerItem,
+  baseUrl: string,
+  apiKey: string,
+): AudioContainer {
+  return {
+    id: String(item.Id ?? ""),
+    kind: "artist",
+    title: item.Name ?? "Unknown artist",
+    subtitle: null,
+    artwork: jellyfinContainerArt(item, baseUrl, apiKey),
+  };
+}
+
+function mapJellyfinAlbum(
+  item: JellyfinContainerItem,
+  baseUrl: string,
+  apiKey: string,
+): AudioContainer {
+  return {
+    id: String(item.Id ?? ""),
+    kind: "album",
+    title: item.Name ?? "Unknown album",
+    subtitle: item.AlbumArtist ?? null,
+    artwork: jellyfinContainerArt(item, baseUrl, apiKey),
+  };
+}
+
+function mapJellyfinPlaylist(
+  item: JellyfinContainerItem,
+  baseUrl: string,
+  apiKey: string,
+): AudioContainer {
+  const count = item.SongCount ?? item.ChildCount;
+  return {
+    id: String(item.Id ?? ""),
+    kind: "playlist",
+    title: item.Name ?? "Untitled playlist",
+    subtitle: typeof count === "number" ? `${count} tracks` : null,
+    artwork: jellyfinContainerArt(item, baseUrl, apiKey),
+  };
+}
+
+// GET a Jellyfin /Items listing and return its Items rows (or []). Attaches the
+// resolved Jellyfin user so tracks carry UserData.IsFavorite when possible.
+async function jellyfinItems(
+  baseUrl: string,
+  apiKey: string,
+  params: Record<string, unknown>,
+): Promise<JellyfinAudioItem[]> {
+  const jfUserId = await fetchJellyfinUserId(baseUrl, apiKey);
+  const r = await httpClient.get(`${baseUrl}/Items`, {
+    params: { api_key: apiKey, ...(jfUserId ? { userId: jfUserId } : {}), ...params },
+  });
+  return (r.data?.Items ?? []) as JellyfinAudioItem[];
+}
+
+async function jellyfinSearchLibrary(
+  userId: number,
+  res: import("express").Response,
+  query: string,
+): Promise<void> {
+  const { baseUrl, apiKey } = resolveJellyfinAudioConnection(userId);
+  if (!baseUrl || !apiKey) {
+    res.json(demoSearchResult("jellyfin"));
+    return;
+  }
+  if (!query) {
+    res.json({ source: "jellyfin", sample: false, artists: [], albums: [], tracks: [] });
+    return;
+  }
+  try {
+    const items = (await jellyfinItems(baseUrl, apiKey, {
+      searchTerm: query,
+      IncludeItemTypes: "MusicArtist,MusicAlbum,Audio",
+      Recursive: true,
+      Limit: 70,
+    })) as Array<JellyfinAudioItem & JellyfinContainerItem>;
+    const artists: AudioContainer[] = [];
+    const albums: AudioContainer[] = [];
+    const tracks: ReturnType<typeof mapJellyfinTrack>[] = [];
+    for (const item of items) {
+      if (item.Type === "MusicArtist") artists.push(mapJellyfinArtist(item, baseUrl, apiKey));
+      else if (item.Type === "MusicAlbum") albums.push(mapJellyfinAlbum(item, baseUrl, apiKey));
+      else if (item.Type === "Audio") tracks.push(mapJellyfinTrack(item, baseUrl, apiKey, null));
+    }
+    res.json({
+      source: "jellyfin",
+      sample: false,
+      artists: artists.slice(0, 20),
+      albums: albums.slice(0, 20),
+      tracks: tracks.slice(0, 30),
+    });
+  } catch (err) {
+    logger.error({ reason: normalizeHttpError(err) }, "Jellyfin music search error");
+    res.status(502).json({ error: "Failed to search the music library" });
+  }
+}
+
+async function jellyfinBrowseLibrary(
+  userId: number,
+  res: import("express").Response,
+  kind: string,
+  id: string,
+): Promise<void> {
+  const { baseUrl, apiKey } = resolveJellyfinAudioConnection(userId);
+  if (!baseUrl || !apiKey) {
+    res.json(demoBrowseResult("jellyfin", kind));
+    return;
+  }
+  try {
+    if (kind === "artist") {
+      // An artist's albums. ArtistIds (not ParentId) — Jellyfin artists are not
+      // the filesystem parent of their albums.
+      const rows = await jellyfinItems(baseUrl, apiKey, {
+        ArtistIds: id,
+        IncludeItemTypes: "MusicAlbum",
+        Recursive: true,
+        SortBy: "PremiereDate,SortName",
+      });
+      res.json({ source: "jellyfin", sample: false, albums: rows.map((r) => mapJellyfinAlbum(r, baseUrl, apiKey)) });
+      return;
+    }
+    if (kind === "album" || kind === "playlist") {
+      const rows = await jellyfinItems(baseUrl, apiKey, {
+        ParentId: id,
+        IncludeItemTypes: "Audio",
+        Recursive: true,
+        SortBy: kind === "album" ? "ParentIndexNumber,IndexNumber,SortName" : "ListItemOrder",
+      });
+      res.json({ source: "jellyfin", sample: false, tracks: rows.map((r) => mapJellyfinTrack(r, baseUrl, apiKey, null)) });
+      return;
+    }
+    if (kind === "playlists") {
+      const rows = await jellyfinItems(baseUrl, apiKey, {
+        IncludeItemTypes: "Playlist",
+        Recursive: true,
+        SortBy: "SortName",
+      });
+      res.json({ source: "jellyfin", sample: false, playlists: rows.map((r) => mapJellyfinPlaylist(r, baseUrl, apiKey)) });
+      return;
+    }
+    if (kind === "artists") {
+      const rows = await jellyfinItems(baseUrl, apiKey, {
+        IncludeItemTypes: "MusicArtist",
+        Recursive: true,
+        SortBy: "SortName",
+        Limit: 100,
+      });
+      res.json({ source: "jellyfin", sample: false, artists: rows.map((r) => mapJellyfinArtist(r, baseUrl, apiKey)) });
+      return;
+    }
+    if (kind === "random") {
+      const rows = await jellyfinItems(baseUrl, apiKey, {
+        IncludeItemTypes: "Audio",
+        Recursive: true,
+        SortBy: "Random",
+        Limit: 20,
+      });
+      res.json({ source: "jellyfin", sample: false, tracks: rows.map((r) => mapJellyfinTrack(r, baseUrl, apiKey, null)) });
+      return;
+    }
+    // recent or albums
+    const rows = await jellyfinItems(baseUrl, apiKey, {
+      IncludeItemTypes: "MusicAlbum",
+      Recursive: true,
+      ...(kind === "recent"
+        ? { SortBy: "DateCreated", SortOrder: "Descending", Limit: 40 }
+        : { SortBy: "SortName", Limit: 100 }),
+    });
+    res.json({ source: "jellyfin", sample: false, albums: rows.map((r) => mapJellyfinAlbum(r, baseUrl, apiKey)) });
+  } catch (err) {
+    logger.error({ reason: normalizeHttpError(err), kind }, "Jellyfin music browse error");
+    res.status(502).json({ error: "Failed to browse the music library" });
+  }
+}
+
 // GET /widgets/audioplayer/search — search a source's library by name. Returns
 // artists, albums, and playable tracks for the pop-out music browser.
 router.get("/audioplayer/search", requireAuth, async (req: AuthRequest, res) => {
@@ -2939,6 +3151,10 @@ router.get("/audioplayer/search", requireAuth, async (req: AuthRequest, res) => 
   const query = String(req.query["query"] ?? "").trim();
   if (source === "subsonic") {
     await subsonicSearchLibrary(req.user!.userId, res, query);
+    return;
+  }
+  if (source === "jellyfin") {
+    await jellyfinSearchLibrary(req.user!.userId, res, query);
     return;
   }
   await plexSearchLibrary(req.user!.userId, res, query);
@@ -2962,6 +3178,10 @@ router.get("/audioplayer/browse", requireAuth, async (req: AuthRequest, res) => 
   }
   if (source === "subsonic") {
     await subsonicBrowseLibrary(req.user!.userId, res, kind, id);
+    return;
+  }
+  if (source === "jellyfin") {
+    await jellyfinBrowseLibrary(req.user!.userId, res, kind, id);
     return;
   }
   await plexBrowseLibrary(req.user!.userId, res, kind, id);

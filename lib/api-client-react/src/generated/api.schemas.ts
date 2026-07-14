@@ -1776,6 +1776,16 @@ export interface AudioTrack {
      */
   album?: string | null;
   /**
+     * Source-side identifier of the track's artist (Plex grandparentRatingKey, Subsonic artistId, Jellyfin ArtistItems[0].Id), usable as a browse-endpoint container id. Null/absent when the source can't resolve it.
+     * @nullable
+     */
+  artistId?: string | null;
+  /**
+     * Source-side identifier of the track's album (Plex parentRatingKey, Subsonic albumId, Jellyfin AlbumId), usable as a browse-endpoint container id. Null/absent when the source can't resolve it.
+     * @nullable
+     */
+  albumId?: string | null;
+  /**
      * Fully-qualified, authenticated album-art URL the browser can load directly (Plex token appended). Null when the source has no artwork.
      * @nullable
      */
@@ -2000,7 +2010,7 @@ export const GetAudioPlayerNowPlayingSource = {
 
 export type SearchAudioLibraryParams = {
 /**
- * Which music source to search. "plex" resolves the saved Plex connection; "subsonic" the saved Navidrome / Subsonic connection. Defaults to "plex" when omitted.
+ * Which music source to search. "plex" resolves the saved Plex connection; "subsonic" the saved Navidrome / Subsonic connection; "jellyfin" the saved Jellyfin connection. Defaults to "plex" when omitted.
  */
 source?: SearchAudioLibrarySource;
 /**
@@ -2015,11 +2025,12 @@ export type SearchAudioLibrarySource = typeof SearchAudioLibrarySource[keyof typ
 export const SearchAudioLibrarySource = {
   plex: 'plex',
   subsonic: 'subsonic',
+  jellyfin: 'jellyfin',
 } as const;
 
 export type BrowseAudioLibraryParams = {
 /**
- * Which music source to browse. "plex" or "subsonic". Defaults to "plex" when omitted.
+ * Which music source to browse. "plex", "subsonic", or "jellyfin". Defaults to "plex" when omitted.
  */
 source?: BrowseAudioLibrarySource;
 /**
@@ -2038,6 +2049,7 @@ export type BrowseAudioLibrarySource = typeof BrowseAudioLibrarySource[keyof typ
 export const BrowseAudioLibrarySource = {
   plex: 'plex',
   subsonic: 'subsonic',
+  jellyfin: 'jellyfin',
 } as const;
 
 export type BrowseAudioLibraryKind = typeof BrowseAudioLibraryKind[keyof typeof BrowseAudioLibraryKind];

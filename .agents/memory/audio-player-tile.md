@@ -21,6 +21,7 @@ description: How the Audio Player tile and the shared playback engine are struct
 - Queue = the album's tracks via `GET /Items?ParentId={AlbumId}&IncludeItemTypes=Audio&Recursive=true` (additive, degrades to now-playing only). No session → recently-added audio via `GET /Items?IncludeItemTypes=Audio&SortBy=DateCreated&...`.
 - streamUrl uses the transcode endpoint `${baseUrl}/Audio/{id}/stream.mp3?api_key=KEY&audioCodec=mp3` so the shared `<audio>` engine plays any source codec (FLAC etc.) — `.mp3` suffix forces mp3, avoids HLS/UserId requirements of `/universal`.
 - Frontend: Jellyfin routes to the SAME `StreamAudioPlayer` as Plex (only Spotify gets its own component); source type widened to `"plex"|"jellyfin"`.
+- Music browser (search/browse) supports Jellyfin too: artist drill-down must use `ArtistIds=` (artists are NOT the filesystem parent of albums); albums/playlists drill via `ParentId=`. Jellyfin demo tracks carry `d-artist-1`/`d-album-1` IDs that match the demo browse catalog so deep links are e2e-testable without a live server.
 
 ## Spotify source
 - Manual OAuth (no Replit integration). Creds + tokens live in the `service_connections` row keyed `spotify` (`api_key`=clientId, `password`=clientSecret, `extra`=JSON tokens). Spotify is NOT in the generic SERVICES/health-scheduler — it has its own Settings card and `/connections/spotify/*` routes mounted BEFORE the generic connections router.
@@ -37,3 +38,8 @@ description: How the Audio Player tile and the shared playback engine are struct
 - The volume button shows regardless of playback ownership (demo tiles included) — it sets the app-level player volume, so it's meaningful even before anything streams. An earlier `isOurs` gate made users report the volume "missing" on demo tiles; don't reintroduce it.
 - To e2e-test any `isOurs`-only UI (like the volume slider), point the `subsonic` connection at the public Navidrome demo (real `streamUrl`s) and ALWAYS click the play/pause toggle even if it reads "Pause" — a remote now-playing can make the label "Pause" while the tile doesn't own playback, and clicking while `!isOurs` always starts our own queue.
 - The api-server Replit workflow `dev` script is `build && start` (NO watch). After editing backend routes you MUST restart the `artifacts/api-server: API Server` workflow or requests 404 / hit stale code. (The `--watch` loop only exists under `pnpm run dev:local`.)
+
+## Track-info deep links (artist/album → Music Browser)
+- `AudioTrack` carries optional `artistId`/`albumId` (Plex grandparent/parentRatingKey, Subsonic song artistId/albumId, Jellyfin ArtistItems[0].Id/AlbumId); null when unresolvable.
+- MusicBrowser accepts a `target` prop ({kind:"artist"|"album", id, title}); it seeds the nav stack [root, target] once per open (refs guard the tab-switch effect from clobbering it). Tile renders artist/album lines as buttons (title="Browse <name>") only when showBrowser && id exist — Jellyfin has no browser, so its lines stay plain text.
+- E2e gotcha: a button's accessible name is its TEXT, not its title attr — locate deep-link buttons via `button[title^="Browse "]`; breadcrumb + root pill duplicate "Artists"/"Albums" names (strict mode).

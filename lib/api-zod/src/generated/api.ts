@@ -1518,6 +1518,8 @@ export const GetAudioPlayerNowPlayingResponse = zod.object({
   "title": zod.string().describe('The track title.'),
   "artist": zod.string().nullish().describe('Track artist (Plex grandparentTitle). Null when unknown.'),
   "album": zod.string().nullish().describe('Album the track belongs to (Plex parentTitle). Null when unknown.'),
+  "artistId": zod.string().nullish().describe('Source-side identifier of the track\'s artist (Plex grandparentRatingKey, Subsonic artistId, Jellyfin ArtistItems[0].Id), usable as a browse-endpoint container id. Null\/absent when the source can\'t resolve it.'),
+  "albumId": zod.string().nullish().describe('Source-side identifier of the track\'s album (Plex parentRatingKey, Subsonic albumId, Jellyfin AlbumId), usable as a browse-endpoint container id. Null\/absent when the source can\'t resolve it.'),
   "artwork": zod.string().nullish().describe('Fully-qualified, authenticated album-art URL the browser can load directly (Plex token appended). Null when the source has no artwork.'),
   "durationMs": zod.number().nullish().describe('Track length in milliseconds. Null when the source omits it.'),
   "progressMs": zod.number().nullish().describe('Playback offset in milliseconds for the source\'s current session (Plex viewOffset). Only set on the now-playing track of an active remote session; null otherwise.'),
@@ -1530,6 +1532,8 @@ export const GetAudioPlayerNowPlayingResponse = zod.object({
   "title": zod.string().describe('The track title.'),
   "artist": zod.string().nullish().describe('Track artist (Plex grandparentTitle). Null when unknown.'),
   "album": zod.string().nullish().describe('Album the track belongs to (Plex parentTitle). Null when unknown.'),
+  "artistId": zod.string().nullish().describe('Source-side identifier of the track\'s artist (Plex grandparentRatingKey, Subsonic artistId, Jellyfin ArtistItems[0].Id), usable as a browse-endpoint container id. Null\/absent when the source can\'t resolve it.'),
+  "albumId": zod.string().nullish().describe('Source-side identifier of the track\'s album (Plex parentRatingKey, Subsonic albumId, Jellyfin AlbumId), usable as a browse-endpoint container id. Null\/absent when the source can\'t resolve it.'),
   "artwork": zod.string().nullish().describe('Fully-qualified, authenticated album-art URL the browser can load directly (Plex token appended). Null when the source has no artwork.'),
   "durationMs": zod.number().nullish().describe('Track length in milliseconds. Null when the source omits it.'),
   "progressMs": zod.number().nullish().describe('Playback offset in milliseconds for the source\'s current session (Plex viewOffset). Only set on the now-playing track of an active remote session; null otherwise.'),
@@ -1553,7 +1557,7 @@ export const GetAudioPlayerNowPlayingResponse = zod.object({
  * @summary Search a music source's library for artists, albums, and tracks
  */
 export const SearchAudioLibraryQueryParams = zod.object({
-  "source": zod.enum(['plex', 'subsonic']).optional().describe('Which music source to search. \"plex\" resolves the saved Plex connection; \"subsonic\" the saved Navidrome \/ Subsonic connection. Defaults to \"plex\" when omitted.'),
+  "source": zod.enum(['plex', 'subsonic', 'jellyfin']).optional().describe('Which music source to search. \"plex\" resolves the saved Plex connection; \"subsonic\" the saved Navidrome \/ Subsonic connection; \"jellyfin\" the saved Jellyfin connection. Defaults to \"plex\" when omitted.'),
   "query": zod.coerce.string().describe('The text to match against artist, album, and track names.')
 })
 
@@ -1586,6 +1590,8 @@ export const SearchAudioLibraryResponse = zod.object({
   "title": zod.string().describe('The track title.'),
   "artist": zod.string().nullish().describe('Track artist (Plex grandparentTitle). Null when unknown.'),
   "album": zod.string().nullish().describe('Album the track belongs to (Plex parentTitle). Null when unknown.'),
+  "artistId": zod.string().nullish().describe('Source-side identifier of the track\'s artist (Plex grandparentRatingKey, Subsonic artistId, Jellyfin ArtistItems[0].Id), usable as a browse-endpoint container id. Null\/absent when the source can\'t resolve it.'),
+  "albumId": zod.string().nullish().describe('Source-side identifier of the track\'s album (Plex parentRatingKey, Subsonic albumId, Jellyfin AlbumId), usable as a browse-endpoint container id. Null\/absent when the source can\'t resolve it.'),
   "artwork": zod.string().nullish().describe('Fully-qualified, authenticated album-art URL the browser can load directly (Plex token appended). Null when the source has no artwork.'),
   "durationMs": zod.number().nullish().describe('Track length in milliseconds. Null when the source omits it.'),
   "progressMs": zod.number().nullish().describe('Playback offset in milliseconds for the source\'s current session (Plex viewOffset). Only set on the now-playing track of an active remote session; null otherwise.'),
@@ -1600,7 +1606,7 @@ export const SearchAudioLibraryResponse = zod.object({
  * @summary Browse a music source's library and playlists (with drill-down)
  */
 export const BrowseAudioLibraryQueryParams = zod.object({
-  "source": zod.enum(['plex', 'subsonic']).optional().describe('Which music source to browse. \"plex\" or \"subsonic\". Defaults to \"plex\" when omitted.'),
+  "source": zod.enum(['plex', 'subsonic', 'jellyfin']).optional().describe('Which music source to browse. \"plex\", \"subsonic\", or \"jellyfin\". Defaults to \"plex\" when omitted.'),
   "kind": zod.enum(['recent', 'albums', 'artists', 'artist', 'album', 'playlists', 'playlist', 'random']).describe('What to list. \"recent\" = recently added albums, \"albums\" = all albums, \"artists\" = all artists, \"playlists\" = all playlists, \"random\" = a flat list of ~20 random playable tracks. The drill-down kinds require an id: \"artist\" returns that artist\'s albums, \"album\" returns that album\'s tracks, \"playlist\" returns that playlist\'s tracks.'),
   "id": zod.coerce.string().optional().describe('The container id to drill into. Required for kind=artist, kind=album, and kind=playlist; ignored for the top-level listings.')
 })
@@ -1634,6 +1640,8 @@ export const BrowseAudioLibraryResponse = zod.object({
   "title": zod.string().describe('The track title.'),
   "artist": zod.string().nullish().describe('Track artist (Plex grandparentTitle). Null when unknown.'),
   "album": zod.string().nullish().describe('Album the track belongs to (Plex parentTitle). Null when unknown.'),
+  "artistId": zod.string().nullish().describe('Source-side identifier of the track\'s artist (Plex grandparentRatingKey, Subsonic artistId, Jellyfin ArtistItems[0].Id), usable as a browse-endpoint container id. Null\/absent when the source can\'t resolve it.'),
+  "albumId": zod.string().nullish().describe('Source-side identifier of the track\'s album (Plex parentRatingKey, Subsonic albumId, Jellyfin AlbumId), usable as a browse-endpoint container id. Null\/absent when the source can\'t resolve it.'),
   "artwork": zod.string().nullish().describe('Fully-qualified, authenticated album-art URL the browser can load directly (Plex token appended). Null when the source has no artwork.'),
   "durationMs": zod.number().nullish().describe('Track length in milliseconds. Null when the source omits it.'),
   "progressMs": zod.number().nullish().describe('Playback offset in milliseconds for the source\'s current session (Plex viewOffset). Only set on the now-playing track of an active remote session; null otherwise.'),

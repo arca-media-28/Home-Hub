@@ -12,4 +12,5 @@ export type SearchAudioLibrarySource = typeof SearchAudioLibrarySource[keyof typ
 export const SearchAudioLibrarySource = {
   plex: 'plex',
   subsonic: 'subsonic',
+  jellyfin: 'jellyfin',
 } as const;

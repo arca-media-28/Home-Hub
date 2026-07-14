@@ -14,7 +14,7 @@ import { useAudioPlayer } from "@/lib/audioPlayer";
 import { tileBudget, SECTION_PX, MEDIA_ROW_PX } from "./metrics";
 import { Artwork, fmtTime } from "./audioShared";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
-import MusicBrowser from "./MusicBrowser";
+import MusicBrowser, { type MusicBrowserTarget } from "./MusicBrowser";
 import SpotifyAudioPlayer from "./SpotifyAudioPlayer";
 
 // Turn a failed favorite-write into a short, human-readable reason for the heart
@@ -96,7 +96,7 @@ function StreamAudioPlayer({ enabled, density, tileSettings }: WidgetProps) {
   // The pop-out music browser (search / browse / playlists) is only available
   // for the library sources that back it; its tabs are per-tile toggles that
   // default on when absent.
-  const isLibrarySource = source === "plex" || source === "subsonic";
+  const isLibrarySource = source === "plex" || source === "subsonic" || source === "jellyfin";
   const browserTabs = {
     search: (tileSettings?.audioSearch as boolean | undefined) ?? true,
     browse: (tileSettings?.audioBrowse as boolean | undefined) ?? true,
@@ -108,6 +108,13 @@ function StreamAudioPlayer({ enabled, density, tileSettings }: WidgetProps) {
     findMusicEnabled &&
     (browserTabs.search || browserTabs.browse || browserTabs.playlists);
   const [browserOpen, setBrowserOpen] = useState(false);
+  // Deep-link target for the browser: set when the user clicks the now-playing
+  // artist/album line, cleared when opening via the plain "Find music" button.
+  const [browserTarget, setBrowserTarget] = useState<MusicBrowserTarget | null>(null);
+  const openBrowser = (target: MusicBrowserTarget | null = null) => {
+    setBrowserTarget(target);
+    setBrowserOpen(true);
+  };
 
   // The "dice" button pulls ~20 random tracks from the configured library and
   // appends them to the queue (starting playback when idle). It rides alongside
@@ -151,11 +158,12 @@ function StreamAudioPlayer({ enabled, density, tileSettings }: WidgetProps) {
 
   const browserNode = showBrowser ? (
     <MusicBrowser
-      source={source as "plex" | "subsonic"}
+      source={source as "plex" | "subsonic" | "jellyfin"}
       ownerId={ownerId}
       tabs={browserTabs}
       open={browserOpen}
       onOpenChange={setBrowserOpen}
+      target={browserTarget}
     />
   ) : null;
 
@@ -192,7 +200,7 @@ function StreamAudioPlayer({ enabled, density, tileSettings }: WidgetProps) {
           {showBrowser && (
             <button
               type="button"
-              onClick={() => setBrowserOpen(true)}
+              onClick={() => openBrowser()}
               className="flex items-center gap-1.5 rounded-full border border-border px-3 py-1 text-xs text-foreground transition-colors hover:bg-muted"
             >
               <Library size={13} aria-hidden="true" /> Find music
@@ -333,16 +341,49 @@ function StreamAudioPlayer({ enabled, density, tileSettings }: WidgetProps) {
               <div className="truncate text-sm font-medium" title={displayTrack.title}>
                 {displayTrack.title}
               </div>
-              {displayTrack.artist && (
-                <div className="truncate text-xs text-muted-foreground" title={displayTrack.artist}>
-                  {displayTrack.artist}
-                </div>
-              )}
-              {displayTrack.album && density.level !== "sm" && (
-                <div className="truncate text-[11px] text-muted-foreground/80" title={displayTrack.album}>
-                  {displayTrack.album}
-                </div>
-              )}
+              {displayTrack.artist &&
+                (showBrowser && displayTrack.artistId ? (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      openBrowser({
+                        kind: "artist",
+                        id: displayTrack.artistId!,
+                        title: displayTrack.artist!,
+                      })
+                    }
+                    className="block max-w-full truncate text-left text-xs text-muted-foreground transition-colors hover:text-foreground hover:underline"
+                    title={`Browse ${displayTrack.artist}`}
+                  >
+                    {displayTrack.artist}
+                  </button>
+                ) : (
+                  <div className="truncate text-xs text-muted-foreground" title={displayTrack.artist}>
+                    {displayTrack.artist}
+                  </div>
+                ))}
+              {displayTrack.album &&
+                density.level !== "sm" &&
+                (showBrowser && displayTrack.albumId ? (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      openBrowser({
+                        kind: "album",
+                        id: displayTrack.albumId!,
+                        title: displayTrack.album!,
+                      })
+                    }
+                    className="block max-w-full truncate text-left text-[11px] text-muted-foreground/80 transition-colors hover:text-foreground hover:underline"
+                    title={`Browse ${displayTrack.album}`}
+                  >
+                    {displayTrack.album}
+                  </button>
+                ) : (
+                  <div className="truncate text-[11px] text-muted-foreground/80" title={displayTrack.album}>
+                    {displayTrack.album}
+                  </div>
+                ))}
             </>
           ) : (
             <div className="truncate text-sm font-medium" title={displayTrack.title}>
@@ -380,7 +421,7 @@ function StreamAudioPlayer({ enabled, density, tileSettings }: WidgetProps) {
           {!pillAtControls && showBrowser && (
             <button
               type="button"
-              onClick={() => setBrowserOpen(true)}
+              onClick={() => openBrowser()}
               className="flex items-center justify-center rounded-full border border-border p-1.5 text-foreground transition-colors hover:bg-muted"
               aria-label="Find music"
               title="Find music"
@@ -484,7 +525,7 @@ function StreamAudioPlayer({ enabled, density, tileSettings }: WidgetProps) {
             <div className="absolute left-0 flex items-center gap-1.5">
               <button
                 type="button"
-                onClick={() => setBrowserOpen(true)}
+                onClick={() => openBrowser()}
                 className="flex items-center justify-center rounded-full border border-border p-1.5 text-foreground transition-colors hover:bg-muted"
                 aria-label="Find music"
                 title="Find music"

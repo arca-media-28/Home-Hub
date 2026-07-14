@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   searchAudioLibrary,
   browseAudioLibrary,
@@ -44,6 +44,15 @@ const ROOT_LABELS: Record<BrowseRoot, string> = {
   artists: "Artists",
 };
 
+// A deep-link target the browser can open at directly (e.g. clicking the
+// now-playing artist/album in the Audio Player tile). The browser seeds its
+// navigation stack with the matching root so breadcrumbs still step back.
+export interface MusicBrowserTarget {
+  kind: "artist" | "album";
+  id: string;
+  title: string;
+}
+
 // Cover art for a container (album / artist / playlist). Falls back to a glyph.
 function ContainerArt({ container, size }: { container: AudioContainer; size: number }) {
   const style = { width: size, height: size };
@@ -67,18 +76,28 @@ function ContainerArt({ container, size }: { container: AudioContainer; size: nu
   );
 }
 
+const SOURCE_LABELS = {
+  plex: "Plex",
+  subsonic: "Navidrome / Subsonic",
+  jellyfin: "Jellyfin",
+} as const;
+
 export default function MusicBrowser({
   source,
   ownerId,
   tabs,
   open,
   onOpenChange,
+  target,
 }: {
-  source: "plex" | "subsonic";
+  source: "plex" | "subsonic" | "jellyfin";
   ownerId: string;
   tabs: MusicBrowserTabs;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  // Optional deep-link: when set at open time, the browser starts drilled into
+  // this artist/album instead of a root tab. Consumed once per open.
+  target?: MusicBrowserTarget | null;
 }) {
   const player = useAudioPlayer();
   const available = useMemo(
@@ -144,9 +163,41 @@ export default function MusicBrowser({
     [fetchLoader],
   );
 
+  // Deep-link handling: consume `target` once per open. When we switch tabs to
+  // land on Browse, the reset effect below re-fires for the tab change — the
+  // skip ref stops it from clobbering the deep-linked stack.
+  const targetConsumed = useRef(false);
+  const skipNextReset = useRef(false);
+  useEffect(() => {
+    if (!open) {
+      targetConsumed.current = false;
+      skipNextReset.current = false;
+    }
+  }, [open]);
+
   // Reset to a sensible root whenever the dialog opens or the tab changes.
   useEffect(() => {
     if (!open) return;
+    if (skipNextReset.current) {
+      skipNextReset.current = false;
+      return;
+    }
+    if (target && !targetConsumed.current) {
+      targetConsumed.current = true;
+      if (tabs.browse && tab !== "browse") {
+        skipNextReset.current = true;
+        setTab("browse");
+      }
+      const root: Loader =
+        target.kind === "artist"
+          ? { type: "browse", kind: "artists", title: ROOT_LABELS.artists }
+          : { type: "browse", kind: "albums", title: ROOT_LABELS.albums };
+      void loadStack([
+        root,
+        { type: "browse", kind: target.kind, id: target.id, title: target.title },
+      ]);
+      return;
+    }
     if (tab === "search") {
       void loadStack([]);
     } else if (tab === "playlists") {
@@ -273,7 +324,7 @@ export default function MusicBrowser({
         <DialogHeader>
           <DialogTitle>Find music</DialogTitle>
           <DialogDescription>
-            Search and browse your {source === "plex" ? "Plex" : "Navidrome / Subsonic"}{" "}
+            Search and browse your {SOURCE_LABELS[source]}{" "}
             library, then load anything as the queue.
           </DialogDescription>
         </DialogHeader>
@@ -372,7 +423,7 @@ export default function MusicBrowser({
           )}
           {!loading && !error && sample && (
             <div className="mb-2 rounded bg-muted/60 px-2 py-1 text-[11px] uppercase tracking-wide text-muted-foreground">
-              Demo — connect {source === "plex" ? "Plex" : "Navidrome / Subsonic"} in Settings to browse your library
+              Demo — connect {SOURCE_LABELS[source]} in Settings to browse your library
             </div>
           )}
           {isEmpty && (
