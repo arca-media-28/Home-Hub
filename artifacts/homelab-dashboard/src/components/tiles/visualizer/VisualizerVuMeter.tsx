@@ -11,12 +11,19 @@ interface Props {
 }
 
 // Each dial is drawn as a self-contained unit whose intrinsic footprint is a box
-// of DIAL_W × DIAL_H "radius units" (the arc sits in the top r, the LED row and
-// label in the ~1r below the pivot). The whole meter picks the biggest radius
+// of DIAL_W × DIAL_H "radius units". The whole meter picks the biggest radius
 // that fits both dials — side by side or, on tall/narrow tiles, stacked — so
 // nothing ever overflows or bunches up regardless of the tile's aspect ratio.
+// The arc reaches exactly 1r above the pivot; below the pivot the LED row and
+// label extend to roughly 0.72r (rowY 0.14r + segH 0.2r + label offset 0.2r +
+// half the label font height ~0.15r + a hair of descender room). Using the true
+// content extent — not a full radius — keeps the vertical centering honest.
 const DIAL_W = 1.5; // cell width  = DIAL_W * radius
-const DIAL_H = 2.0; // cell height = DIAL_H * radius
+const DIAL_H = 1.72; // cell height = DIAL_H * radius (1r arc + ~0.72r below pivot)
+
+// Uniform inset (CSS px) between the tile edge and the dials so the arc never
+// touches the canvas edge and padding looks equal on all four sides.
+const PADDING = 8;
 
 // A retro pair of analog VU meters — a left and a right dial, each with a swept
 // arc scale, a spring-loaded needle (fast attack, slow release, the classic
@@ -151,24 +158,28 @@ export default function VisualizerVuMeter({ sample, primary, background, width, 
 
       // Choose the arrangement (side-by-side vs stacked) that yields the largest
       // radius, so the dials are as big as possible while always fitting.
-      const rSide = Math.min(width / 2 / DIAL_W, height / DIAL_H);
-      const rStack = Math.min(width / DIAL_W, height / 2 / DIAL_H);
+      // All geometry is computed inside the padded inner area so the arc never
+      // touches the tile edge and spacing is equal on all four sides.
+      const innerW = Math.max(1, width - 2 * PADDING);
+      const innerH = Math.max(1, height - 2 * PADDING);
+      const rSide = Math.min(innerW / 2 / DIAL_W, innerH / DIAL_H);
+      const rStack = Math.min(innerW / DIAL_W, innerH / 2 / DIAL_H);
       const stacked = rStack > rSide;
       const r = Math.max(1, stacked ? rStack : rSide);
 
       if (stacked) {
         // One dial per horizontal half-height band, centered in each band.
-        const bandH = height / 2;
-        const cx = width / 2;
-        const pivot0 = (bandH - DIAL_H * r) / 2 + r;
+        const bandH = innerH / 2;
+        const cx = PADDING + innerW / 2;
+        const pivot0 = PADDING + (bandH - DIAL_H * r) / 2 + r;
         drawDial(cx, pivot0, r, needlesRef.current[0], "L", trip, rgb);
         drawDial(cx, bandH + pivot0, r, needlesRef.current[1], "R", trip, rgb);
       } else {
         // One dial per vertical half-width column, centered in each column.
-        const colW = width / 2;
-        const pivotY = (height - DIAL_H * r) / 2 + r;
-        drawDial(colW * 0.5, pivotY, r, needlesRef.current[0], "L", trip, rgb);
-        drawDial(colW * 1.5, pivotY, r, needlesRef.current[1], "R", trip, rgb);
+        const colW = innerW / 2;
+        const pivotY = PADDING + (innerH - DIAL_H * r) / 2 + r;
+        drawDial(PADDING + colW * 0.5, pivotY, r, needlesRef.current[0], "L", trip, rgb);
+        drawDial(PADDING + colW * 1.5, pivotY, r, needlesRef.current[1], "R", trip, rgb);
       }
 
       raf = requestAnimationFrame(draw);
