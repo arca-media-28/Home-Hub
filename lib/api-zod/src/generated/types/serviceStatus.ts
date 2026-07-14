@@ -11,4 +11,6 @@ export interface ServiceStatus {
   configured: boolean;
   ok: boolean;
   message: string;
+  /** When this reachability check ran (ISO 8601). */
+  checkedAt: string;
 }

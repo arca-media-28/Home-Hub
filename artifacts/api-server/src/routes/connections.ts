@@ -77,11 +77,12 @@ router.get("/status", requireAuth, async (req: AuthRequest, res) => {
     SUPPORTED_SERVICES.map(async (service) => {
       const row = bySaved.get(service);
       const values = row ? connectionToValues(row) : null;
+      const checkedAt = new Date().toISOString();
       if (!values || !isConfigured(values)) {
-        return { service, configured: false, ok: false, message: "Not configured" };
+        return { service, configured: false, ok: false, message: "Not configured", checkedAt };
       }
       const result = await runPing(service, values);
-      return { service, configured: true, ok: result.ok, message: result.message };
+      return { service, configured: true, ok: result.ok, message: result.message, checkedAt };
     }),
   );
 

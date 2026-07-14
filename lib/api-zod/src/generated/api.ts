@@ -1897,7 +1897,8 @@ export const GetConnectionsStatusResponseItem = zod.object({
   "service": zod.string(),
   "configured": zod.boolean(),
   "ok": zod.boolean(),
-  "message": zod.string()
+  "message": zod.string(),
+  "checkedAt": zod.string().describe('When this reachability check ran (ISO 8601).')
 })
 export const GetConnectionsStatusResponse = zod.array(GetConnectionsStatusResponseItem)
 

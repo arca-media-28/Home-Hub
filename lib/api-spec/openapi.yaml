@@ -3489,7 +3489,7 @@ components:
 
     ServiceStatus:
       type: object
-      required: [service, configured, ok, message]
+      required: [service, configured, ok, message, checkedAt]
       properties:
         service:
           type: string
@@ -3498,6 +3498,9 @@ components:
         ok:
           type: boolean
         message:
+          type: string
+        checkedAt:
+          description: When this reachability check ran (ISO 8601).
           type: string
 
     ConnectionHealth:

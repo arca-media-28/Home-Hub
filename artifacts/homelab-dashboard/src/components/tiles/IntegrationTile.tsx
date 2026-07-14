@@ -26,6 +26,12 @@ import EightBallTile from "./EightBallTile";
 import DiceTile from "./DiceTile";
 import CoinFlipTile from "./CoinFlipTile";
 import FortuneTile from "./FortuneTile";
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+  TooltipProvider,
+} from "@/components/ui/tooltip";
 import { resolveEnabledMetrics, tileDensity, type TileDensity } from "./metrics";
 import { resolveImageStyle } from "./imageStyle";
 import { openTileUrl } from "@/lib/utils";
@@ -128,6 +134,22 @@ function renderStatusView(integration: string, props: WidgetProps) {
   }
 }
 
+// Compact "how long ago" for the status tooltip (e.g. "just now", "45s ago",
+// "5m ago"). Returns null when the timestamp is missing/unparseable.
+function checkedAgo(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const t = new Date(iso).getTime();
+  if (Number.isNaN(t)) return null;
+  const s = Math.max(0, Math.floor((Date.now() - t) / 1000));
+  if (s < 10) return "just now";
+  if (s < 60) return `${s}s ago`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
+}
+
 interface IntegrationTileProps {
   tile: Tile;
   status?: ServiceStatus;
@@ -169,14 +191,33 @@ export default function IntegrationTile({ tile, status }: IntegrationTileProps) 
   }, []);
 
   // The reachability dot, shared between the header and the collapsed-header
-  // overlay so the indicator survives hiding the title.
+  // overlay so the indicator survives hiding the title. Hovering it explains
+  // the last check result (why the service is down + when it was checked).
+  const ago = checkedAgo(status?.checkedAt);
+  const statusSummary = status?.ok
+    ? "Reachable"
+    : `Unreachable${status?.message ? `: ${status.message}` : ""}`;
   const statusDot = showDot ? (
-    <span className="flex h-2 w-2 flex-shrink-0">
-      {status?.ok && (
-        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-500/60" />
-      )}
-      <span className={`relative inline-flex h-2 w-2 rounded-full ${dotColor}`} />
-    </span>
+    <TooltipProvider delayDuration={200}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span
+            className="flex h-2 w-2 flex-shrink-0 cursor-default"
+            aria-label={statusSummary}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {status?.ok && (
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-500/60" />
+            )}
+            <span className={`relative inline-flex h-2 w-2 rounded-full ${dotColor}`} />
+          </span>
+        </TooltipTrigger>
+        <TooltipContent side="bottom" align="start" className="max-w-64">
+          <p>{statusSummary}</p>
+          {ago && <p className="opacity-70">Checked {ago}</p>}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   ) : null;
 
   // With the title hidden the header only earns its fixed height when the tile
