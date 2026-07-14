@@ -2,6 +2,11 @@ import { useEffect, useRef, useState } from "react";
 import type { Tile } from "@workspace/api-client-react";
 import { useAudioPlayer } from "@/lib/audioPlayer";
 import { useVisualizer } from "@/lib/useVisualizer";
+import {
+  useVisualizerThemeDefaults,
+  FALLBACK_VISUALIZER_PRIMARY,
+  FALLBACK_VISUALIZER_BACKGROUND,
+} from "@/lib/themeColors";
 import VisualizerBarGraph from "./visualizer/VisualizerBarGraph";
 import VisualizerLavaLamp from "./visualizer/VisualizerLavaLamp";
 import VisualizerVuMeter from "./visualizer/VisualizerVuMeter";
@@ -9,8 +14,10 @@ import VisualizerVuMeter from "./visualizer/VisualizerVuMeter";
 // ── Shared style/color contract (imported by the tile editor too) ─────────────
 export type VisualizerStyle = "bars" | "lava" | "vu";
 export const DEFAULT_VISUALIZER_STYLE: VisualizerStyle = "bars";
-export const DEFAULT_VISUALIZER_PRIMARY = "#7c3aed";
-export const DEFAULT_VISUALIZER_BACKGROUND = "#0f0f1a";
+// Last-resort hex fallbacks; the real defaults are theme-derived at runtime
+// (see lib/themeColors.ts) so an unconfigured visualizer follows the theme.
+export const DEFAULT_VISUALIZER_PRIMARY = FALLBACK_VISUALIZER_PRIMARY;
+export const DEFAULT_VISUALIZER_BACKGROUND = FALLBACK_VISUALIZER_BACKGROUND;
 
 export const VISUALIZER_STYLE_OPTIONS: {
   value: VisualizerStyle;
@@ -47,10 +54,13 @@ export default function VisualizerTile({ tile }: Props) {
 
   const sample = useVisualizer(analyser, isPlaying);
 
+  // Theme-derived defaults: an unconfigured visualizer follows the active
+  // theme (and re-colors live on theme switch); explicit settings always win.
+  const themeDefaults = useVisualizerThemeDefaults();
   const settings = tile.tileSettings ?? undefined;
   const style = normalizeVisualizerStyle(settings?.visualizerStyle);
-  const primary = settings?.visualizerPrimary || DEFAULT_VISUALIZER_PRIMARY;
-  const background = settings?.visualizerBackground || DEFAULT_VISUALIZER_BACKGROUND;
+  const primary = settings?.visualizerPrimary || themeDefaults.primary;
+  const background = settings?.visualizerBackground || themeDefaults.background;
 
   // Measure the tile so the canvas can be sized in device pixels.
   const wrapRef = useRef<HTMLDivElement | null>(null);

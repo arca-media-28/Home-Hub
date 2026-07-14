@@ -107,11 +107,10 @@ import {
 import {
   VISUALIZER_STYLE_OPTIONS,
   DEFAULT_VISUALIZER_STYLE,
-  DEFAULT_VISUALIZER_PRIMARY,
-  DEFAULT_VISUALIZER_BACKGROUND,
   normalizeVisualizerStyle,
   type VisualizerStyle,
 } from "@/components/tiles/VisualizerTile";
+import { useVisualizerThemeDefaults } from "@/lib/themeColors";
 import { SPORTS_LEAGUES, getLeagueTeams } from "@/lib/sports";
 import {
   fetchSleeperUser,
@@ -528,12 +527,20 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
   const [visualizerStyle, setVisualizerStyle] = useState<VisualizerStyle>(
     normalizeVisualizerStyle(tile?.tileSettings?.visualizerStyle),
   );
+  // Empty string = "follow the theme" (nothing persisted). Explicit hex = a
+  // custom color the user picked. The pickers display the theme-derived
+  // default when unset, but only ever save what the user actually chose.
   const [visualizerPrimary, setVisualizerPrimary] = useState<string>(
-    tile?.tileSettings?.visualizerPrimary ?? DEFAULT_VISUALIZER_PRIMARY,
+    tile?.tileSettings?.visualizerPrimary ?? "",
   );
   const [visualizerBackground, setVisualizerBackground] = useState<string>(
-    tile?.tileSettings?.visualizerBackground ?? DEFAULT_VISUALIZER_BACKGROUND,
+    tile?.tileSettings?.visualizerBackground ?? "",
   );
+  // Theme-derived colors shown in the pickers/preview when nothing custom is
+  // set; recomputed live if the user switches themes while the modal is open.
+  const visualizerThemeDefaults = useVisualizerThemeDefaults();
+  const effVisualizerPrimary = visualizerPrimary || visualizerThemeDefaults.primary;
+  const effVisualizerBackground = visualizerBackground || visualizerThemeDefaults.background;
 
   useEffect(() => {
     if (open) {
@@ -646,8 +653,8 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
       setShowBonsaiPotPicker(false);
       setShowBonsaiLeafPicker(false);
       setVisualizerStyle(normalizeVisualizerStyle(tile?.tileSettings?.visualizerStyle));
-      setVisualizerPrimary(tile?.tileSettings?.visualizerPrimary ?? DEFAULT_VISUALIZER_PRIMARY);
-      setVisualizerBackground(tile?.tileSettings?.visualizerBackground ?? DEFAULT_VISUALIZER_BACKGROUND);
+      setVisualizerPrimary(tile?.tileSettings?.visualizerPrimary ?? "");
+      setVisualizerBackground(tile?.tileSettings?.visualizerBackground ?? "");
       setShowPetColorPicker(false);
       setShowNoteColorPicker(false);
       setShowNoteTextColorPicker(false);
@@ -1444,8 +1451,10 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
                                 : isVisualizer
                                   ? {
                                       visualizerStyle,
-                                      visualizerPrimary,
-                                      visualizerBackground,
+                                      // Empty = follow the theme; persist null so no
+                                      // snapshot of the current theme is stored.
+                                      visualizerPrimary: visualizerPrimary || null,
+                                      visualizerBackground: visualizerBackground || null,
                                     }
                                   : null;
         // Only emit a settings object when there is something to store; an
@@ -1989,7 +1998,7 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
                     >
                       <span
                         className="h-10 w-full overflow-hidden rounded-md"
-                        style={{ background: visualizerBackground }}
+                        style={{ background: effVisualizerBackground }}
                         aria-hidden
                       >
                         <span className="flex h-full w-full items-end justify-center gap-[3px] px-2 pb-1.5">
@@ -1998,22 +2007,22 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
                               <span
                                 key={i}
                                 className="w-full rounded-sm"
-                                style={{ height: `${h * 100}%`, background: visualizerPrimary }}
+                                style={{ height: `${h * 100}%`, background: effVisualizerPrimary }}
                               />
                             ))}
                           {o.value === "lava" && (
                             <span className="flex h-full w-full items-center justify-center gap-1">
                               <span
                                 className="h-5 w-5 rounded-full blur-[2px]"
-                                style={{ background: visualizerPrimary }}
+                                style={{ background: effVisualizerPrimary }}
                               />
                               <span
                                 className="h-7 w-7 rounded-full blur-[2px]"
-                                style={{ background: visualizerPrimary }}
+                                style={{ background: effVisualizerPrimary }}
                               />
                               <span
                                 className="h-4 w-4 rounded-full blur-[2px]"
-                                style={{ background: visualizerPrimary }}
+                                style={{ background: effVisualizerPrimary }}
                               />
                             </span>
                           )}
@@ -2024,7 +2033,7 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
                                   key={i}
                                   className="block h-4 w-[2px] origin-bottom rounded"
                                   style={{
-                                    background: visualizerPrimary,
+                                    background: effVisualizerPrimary,
                                     transform: `rotate(${r}rad)`,
                                   }}
                                 />
@@ -2046,12 +2055,12 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
                     <input
                       id="visualizer-primary"
                       type="color"
-                      value={visualizerPrimary}
+                      value={effVisualizerPrimary}
                       onChange={(e) => setVisualizerPrimary(e.target.value)}
                       className="h-9 w-12 cursor-pointer rounded border border-border bg-transparent p-0.5"
                     />
                     <Input
-                      value={visualizerPrimary}
+                      value={effVisualizerPrimary}
                       onChange={(e) => setVisualizerPrimary(e.target.value)}
                       className="font-mono"
                     />
@@ -2059,8 +2068,8 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
                       type="button"
                       variant="outline"
                       size="sm"
-                      onClick={() => setVisualizerPrimary(DEFAULT_VISUALIZER_PRIMARY)}
-                      disabled={visualizerPrimary === DEFAULT_VISUALIZER_PRIMARY}
+                      onClick={() => setVisualizerPrimary("")}
+                      disabled={!visualizerPrimary}
                     >
                       Reset
                     </Button>
@@ -2073,12 +2082,12 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
                     <input
                       id="visualizer-background"
                       type="color"
-                      value={visualizerBackground}
+                      value={effVisualizerBackground}
                       onChange={(e) => setVisualizerBackground(e.target.value)}
                       className="h-9 w-12 cursor-pointer rounded border border-border bg-transparent p-0.5"
                     />
                     <Input
-                      value={visualizerBackground}
+                      value={effVisualizerBackground}
                       onChange={(e) => setVisualizerBackground(e.target.value)}
                       className="font-mono"
                     />
@@ -2086,8 +2095,8 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
                       type="button"
                       variant="outline"
                       size="sm"
-                      onClick={() => setVisualizerBackground(DEFAULT_VISUALIZER_BACKGROUND)}
-                      disabled={visualizerBackground === DEFAULT_VISUALIZER_BACKGROUND}
+                      onClick={() => setVisualizerBackground("")}
+                      disabled={!visualizerBackground}
                     >
                       Reset
                     </Button>
