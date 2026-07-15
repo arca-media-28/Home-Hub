@@ -259,6 +259,39 @@ function buildFish(species: string[], count: number): FishInstance[] {
   });
 }
 
+// One bubble stream: a fixed x position on the sand emitting a few staggered
+// bubbles that rise, wiggle sideways, and fade ("pop") near the surface.
+// Everything is deterministic per stream/bubble index — CSS keyframes only.
+interface BubbleInstance {
+  r: number;
+  duration: number;
+  delay: number;
+  wiggleDuration: number;
+}
+
+interface BubbleStream {
+  xFrac: number; // fraction of tank width, resolved at render
+  bubbles: BubbleInstance[];
+}
+
+function buildBubbleStreams(count: number): BubbleStream[] {
+  return Array.from({ length: count }, (_, i) => {
+    const perStream = 2 + (jitter(i, 11) > 0.5 ? 1 : 0);
+    return {
+      xFrac: 0.12 + jitter(i, 10) * 0.76,
+      bubbles: Array.from({ length: perStream }, (_, b) => {
+        const k = i * 7 + b;
+        return {
+          r: 1.2 + jitter(k, 12) * 1.6,
+          duration: 6 + jitter(k, 13) * 5,
+          delay: -jitter(k, 14) * 16,
+          wiggleDuration: 1.6 + jitter(k, 15) * 1.4,
+        };
+      }),
+    };
+  });
+}
+
 interface AquariumTileProps {
   tile: Tile;
   editMode: boolean;
@@ -303,6 +336,9 @@ export default function AquariumTile({ tile }: AquariumTileProps) {
 
   const fish = buildFish(fishTypes, fishCount);
   const props = propSlots.filter((p) => p !== NONE_SLOT).slice(0, propBudget);
+  // A couple of bubble streams on small tiles, a few more on big tanks.
+  const streamCount = Math.max(2, Math.min(5, Math.round(1 + area / 120_000)));
+  const streams = buildBubbleStreams(streamCount);
 
   // Match the drawing width to the tile's aspect ratio so the whole tank is
   // visible (no slice-cropping) and the fish's turnaround points sit just
@@ -336,6 +372,31 @@ export default function AquariumTile({ tile }: AquariumTileProps) {
         .aq-fish-flip { animation: aq-flip var(--aq-dur) step-end infinite; animation-delay: var(--aq-delay); }
         .aq-fish-bob { animation: aq-bob var(--aq-bob) ease-in-out infinite; }
         .aq-sway { animation: aq-prop-sway 5s ease-in-out infinite; transform-origin: 0 0; transform-box: fill-box; }
+        /* Bubbles rise from the sand line to just under the surface, fading
+           out ("pop") at the top. Distance is fixed because VB_H is fixed. */
+        @keyframes aq-bubble-rise {
+          0%   { transform: translateY(0); opacity: 0; }
+          8%   { opacity: 0.85; }
+          80%  { opacity: 0.85; }
+          96%  { transform: translateY(-${VB_H - SAND_H - 10}px); opacity: 0; }
+          100% { transform: translateY(-${VB_H - SAND_H - 10}px); opacity: 0; }
+        }
+        @keyframes aq-bubble-wiggle {
+          0%, 100% { transform: translateX(-1.6px); }
+          50%      { transform: translateX(1.6px); }
+        }
+        .aq-bubble { animation: aq-bubble-rise var(--aq-bdur) linear infinite; animation-delay: var(--aq-bdelay); opacity: 0; }
+        .aq-bubble-wiggle { animation: aq-bubble-wiggle var(--aq-bwig) ease-in-out infinite; }
+        /* Gentle water shimmer: the surface glow slowly drifts and breathes. */
+        @keyframes aq-shimmer {
+          0%, 100% { transform: translateX(0); opacity: 0.55; }
+          50%      { transform: translateX(${Math.round(vbW * 0.06)}px); opacity: 0.95; }
+        }
+        .aq-shimmer { animation: aq-shimmer 9s ease-in-out infinite; }
+        @media (prefers-reduced-motion: reduce) {
+          .aq-fish, .aq-fish-flip, .aq-fish-bob, .aq-sway, .aq-bubble, .aq-bubble-wiggle, .aq-shimmer { animation: none; }
+          .aq-bubble { opacity: 0; }
+        }
       `}</style>
       <svg
         viewBox={`0 0 ${vbW} ${VB_H}`}
@@ -359,7 +420,7 @@ export default function AquariumTile({ tile }: AquariumTileProps) {
         {/* Water */}
         <rect x={0} y={0} width={vbW} height={VB_H} fill={`url(#aq-water-${tile.id})`} />
         {/* Soft light shafts near the surface */}
-        <rect x={0} y={0} width={vbW} height={34} fill={`url(#aq-glow-${tile.id})`} />
+        <rect x={0} y={0} width={vbW} height={34} className="aq-shimmer" fill={`url(#aq-glow-${tile.id})`} />
 
         {/* Props sit on the sand line, spaced across the tank width. Rendered
             behind the fish so swimmers pass in front. */}
@@ -394,6 +455,37 @@ export default function AquariumTile({ tile }: AquariumTileProps) {
                 </g>
               </g>
             </g>
+          </g>
+        ))}
+
+        {/* Bubble streams rising from the sand line, in front of the fish so
+            the tiny highlights read against everything. */}
+        {streams.map((st, i) => (
+          <g key={`stream-${i}`} transform={`translate(${(st.xFrac * vbW).toFixed(1)} ${VB_H - SAND_H + 2})`}>
+            {st.bubbles.map((b, j) => (
+              <g
+                key={j}
+                className="aq-bubble"
+                style={
+                  {
+                    "--aq-bdur": `${b.duration.toFixed(2)}s`,
+                    "--aq-bdelay": `${b.delay.toFixed(2)}s`,
+                  } as React.CSSProperties
+                }
+              >
+                <g
+                  className="aq-bubble-wiggle"
+                  style={{ "--aq-bwig": `${b.wiggleDuration.toFixed(2)}s` } as React.CSSProperties}
+                >
+                  <circle
+                    r={b.r.toFixed(2)}
+                    fill="rgba(255,255,255,0.28)"
+                    stroke="rgba(255,255,255,0.55)"
+                    strokeWidth={0.5}
+                  />
+                </g>
+              </g>
+            ))}
           </g>
         ))}
 

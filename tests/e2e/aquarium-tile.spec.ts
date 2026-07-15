@@ -78,6 +78,10 @@ test("aquarium tile persists settings and renders a populated tank", async ({
   const fishCount = await tank.locator("g.aq-fish").count();
   expect(fishCount).toBeGreaterThan(2);
 
+  // Ambient bubble streams rise from the sand (pure CSS animation, always on).
+  const bubbleCount = await tank.locator("g.aq-bubble").count();
+  expect(bubbleCount).toBeGreaterThanOrEqual(2);
+
   // At least one decoration prop is on the sand (castle base rects render as
   // fill #a9a29a, anchor strokes #6b7683, chest fill #8a5a2b).
   const propMarkup = await tank.innerHTML();
