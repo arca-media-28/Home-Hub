@@ -90,4 +90,22 @@ test("aquarium tile persists settings and renders a populated tank", async ({
       propMarkup.includes("#6b7683") ||
       propMarkup.includes("#8a5a2b"),
   ).toBe(true);
+
+  // ---- Click reactions (locked mode) ----
+
+  // Clicking the water drops a transient food pellet at the click point and
+  // briefly excites the fish.
+  const box = await tank.boundingBox();
+  expect(box).not.toBeNull();
+  await page.mouse.click(box!.x + box!.width * 0.5, box!.y + box!.height * 0.3);
+  await expect(tank.locator("g.aq-pellet")).toHaveCount(1);
+  await expect(tank.locator("g.aq-excite").first()).toBeVisible();
+
+  // The pellet is transient: it sinks, fades, and is removed.
+  await expect(tank.locator("g.aq-pellet")).toHaveCount(0, { timeout: 10_000 });
+
+  // Clicking a fish makes it dart (one-off burst animation, then cleared).
+  await tank.locator("g.aq-fish-hit").first().click({ force: true });
+  await expect(tank.locator("g.aq-dart")).toHaveCount(1);
+  await expect(tank.locator("g.aq-dart")).toHaveCount(0, { timeout: 10_000 });
 });

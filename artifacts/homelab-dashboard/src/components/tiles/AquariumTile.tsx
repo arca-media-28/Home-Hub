@@ -6,7 +6,10 @@ import type { Tile } from "@workspace/api-client-react";
 // tank on looping CSS keyframe paths, and the number of fish/props scales with
 // the tile's rendered pixel area (via ResizeObserver). All choices (three fish
 // species slots, sand color, three prop slots) persist in tileSettings and are
-// edited in the tile modal — the tile itself has no interactions.
+// edited in the tile modal. In locked mode the tank is lightly interactive:
+// clicking a fish makes it dart in a quick burst, and clicking the water drops
+// a food pellet that sinks while nearby fish get briefly excited. Both are
+// transient one-off animations — nothing persists.
 // ---------------------------------------------------------------------------
 
 export const NONE_SLOT = "none";
@@ -297,7 +300,19 @@ interface AquariumTileProps {
   editMode: boolean;
 }
 
-export default function AquariumTile({ tile }: AquariumTileProps) {
+// A dropped food pellet: sinks from the click point down to the sand, then is
+// removed. Purely transient client state — nothing persists.
+interface Pellet {
+  id: number;
+  x: number; // viewBox x
+  y: number; // viewBox y where it was dropped
+}
+
+const PELLET_SINK_MS = 2600;
+const DART_MS = 1100;
+const EXCITED_MS = 1600;
+
+export default function AquariumTile({ tile, editMode }: AquariumTileProps) {
   const rootRef = useRef<HTMLDivElement | null>(null);
   // Rendered pixel size, observed so fish/prop counts track the tile's real
   // on-screen area (grid resizes, fixed-scale pages, window changes).
@@ -321,6 +336,26 @@ export default function AquariumTile({ tile }: AquariumTileProps) {
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
+
+  // Transient interaction state (locked mode only): fish currently darting
+  // after a click, dropped food pellets, and a window where every fish gets a
+  // brief excited wiggle after food lands.
+  const [dartingFish, setDartingFish] = useState<Record<number, number>>({});
+  const [pellets, setPellets] = useState<Pellet[]>([]);
+  const [excited, setExcited] = useState(false);
+  const pelletIdRef = useRef(0);
+  const timeoutsRef = useRef<number[]>([]);
+
+  useEffect(() => {
+    const timeouts = timeoutsRef.current;
+    return () => {
+      timeouts.forEach((t) => window.clearTimeout(t));
+    };
+  }, []);
+
+  const later = (fn: () => void, ms: number) => {
+    timeoutsRef.current.push(window.setTimeout(fn, ms));
+  };
 
   const s = tile.tileSettings;
   const fishTypes = normalizeSlots(s?.aquariumFishTypes, FISH_KEYS, DEFAULT_FISH_TYPES);
@@ -347,6 +382,39 @@ export default function AquariumTile({ tile }: AquariumTileProps) {
   const vbW = Math.max(90, Math.round(VB_H * aspect));
   const swimMin = WALL_MARGIN;
   const swimMax = Math.max(swimMin + 10, vbW - WALL_MARGIN);
+
+  // Clicking a fish makes it dart: bump a per-index nonce (so a re-click
+  // restarts the animation via a fresh key) and clear it after the burst.
+  const handleFishClick = (i: number, e: React.MouseEvent) => {
+    if (editMode) return;
+    e.stopPropagation();
+    setDartingFish((prev) => ({ ...prev, [i]: (prev[i] ?? 0) + 1 }));
+    later(() => {
+      setDartingFish((prev) => {
+        if (!(i in prev)) return prev;
+        const next = { ...prev };
+        delete next[i];
+        return next;
+      });
+    }, DART_MS);
+  };
+
+  // Clicking the water drops a food pellet at the click point and briefly
+  // excites the whole tank.
+  const handleTankClick = (e: React.MouseEvent<SVGSVGElement>) => {
+    if (editMode) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    if (rect.width < 1 || rect.height < 1) return;
+    const x = ((e.clientX - rect.left) / rect.width) * vbW;
+    const y = ((e.clientY - rect.top) / rect.height) * VB_H;
+    // Ignore clicks in the sand — pellets sink onto it, not into it.
+    if (y > VB_H - SAND_H) return;
+    const id = ++pelletIdRef.current;
+    setPellets((prev) => [...prev.slice(-5), { id, x, y: Math.max(6, y) }]);
+    setExcited(true);
+    later(() => setPellets((prev) => prev.filter((p) => p.id !== id)), PELLET_SINK_MS);
+    later(() => setExcited(false), EXCITED_MS);
+  };
 
   return (
     <div ref={rootRef} className="absolute inset-0 overflow-hidden rounded-[inherit]">
@@ -393,17 +461,45 @@ export default function AquariumTile({ tile }: AquariumTileProps) {
           50%      { transform: translateX(${Math.round(vbW * 0.06)}px); opacity: 0.95; }
         }
         .aq-shimmer { animation: aq-shimmer 9s ease-in-out infinite; }
+        /* Click reactions: a clicked fish darts (a fast wobble + lunge burst),
+           and after food drops the whole tank gets a brief excited wiggle. A
+           pellet sinks from the click point to the sand and fades away. */
+        @keyframes aq-dart {
+          0%   { transform: translate(0, 0) rotate(0deg); }
+          18%  { transform: translate(9px, -5px) rotate(-7deg); }
+          38%  { transform: translate(-7px, 4px) rotate(6deg); }
+          58%  { transform: translate(6px, -3px) rotate(-4deg); }
+          78%  { transform: translate(-3px, 2px) rotate(2deg); }
+          100% { transform: translate(0, 0) rotate(0deg); }
+        }
+        .aq-dart { animation: aq-dart ${DART_MS}ms ease-out 1; }
+        @keyframes aq-excite {
+          0%, 100% { transform: translateY(0); }
+          20% { transform: translateY(-4px); }
+          40% { transform: translateY(3px); }
+          60% { transform: translateY(-3px); }
+          80% { transform: translateY(2px); }
+        }
+        .aq-excite { animation: aq-excite 0.8s ease-in-out 2; }
+        @keyframes aq-pellet-sink {
+          0%   { transform: translateY(0); opacity: 1; }
+          85%  { opacity: 1; }
+          100% { transform: translateY(var(--aq-sink)); opacity: 0; }
+        }
+        .aq-pellet { animation: aq-pellet-sink ${PELLET_SINK_MS}ms ease-in 1 forwards; }
+        .aq-fish-hit { cursor: pointer; pointer-events: bounding-box; }
         @media (prefers-reduced-motion: reduce) {
-          .aq-fish, .aq-fish-flip, .aq-fish-bob, .aq-sway, .aq-bubble, .aq-bubble-wiggle, .aq-shimmer { animation: none; }
-          .aq-bubble { opacity: 0; }
+          .aq-fish, .aq-fish-flip, .aq-fish-bob, .aq-sway, .aq-bubble, .aq-bubble-wiggle, .aq-shimmer, .aq-dart, .aq-excite, .aq-pellet { animation: none; }
+          .aq-bubble, .aq-pellet { opacity: 0; }
         }
       `}</style>
       <svg
         viewBox={`0 0 ${vbW} ${VB_H}`}
         preserveAspectRatio="xMidYMid slice"
-        className="h-full w-full select-none"
+        className={`h-full w-full select-none${editMode ? "" : " cursor-pointer"}`}
         aria-label="Aquarium"
         role="img"
+        onClick={handleTankClick}
       >
         <defs>
           <linearGradient id={`aq-water-${tile.id}`} x1="0" y1="0" x2="0" y2="1">
@@ -448,13 +544,36 @@ export default function AquariumTile({ tile }: AquariumTileProps) {
             <g transform={`translate(0 ${f.y.toFixed(1)}) scale(${f.scale.toFixed(2)})`}>
               <g className="aq-fish-flip">
                 <g
-                  className="aq-fish-bob"
+                  className={`aq-fish-bob${editMode ? "" : " aq-fish-hit"}${excited ? " aq-excite" : ""}`}
                   style={{ "--aq-bob": `${f.bobDuration.toFixed(2)}s` } as React.CSSProperties}
+                  onClick={(e) => handleFishClick(i, e)}
                 >
-                  <FishShape species={f.species} />
+                  {dartingFish[i] !== undefined ? (
+                    <g key={`dart-${dartingFish[i]}`} className="aq-dart">
+                      <FishShape species={f.species} />
+                    </g>
+                  ) : (
+                    <FishShape species={f.species} />
+                  )}
                 </g>
               </g>
             </g>
+          </g>
+        ))}
+
+        {/* Food pellets: transient, sink from the click point to the sand and
+            fade out. Rendered in front of the fish like the bubbles. */}
+        {pellets.map((p) => (
+          <g
+            key={p.id}
+            className="aq-pellet"
+            transform={`translate(${p.x.toFixed(1)} ${p.y.toFixed(1)})`}
+            style={
+              { "--aq-sink": `${Math.max(4, VB_H - SAND_H - 2 - p.y).toFixed(1)}px` } as React.CSSProperties
+            }
+          >
+            <circle r={2} fill="#b5803a" stroke="#8a5f26" strokeWidth={0.6} />
+            <circle cx={-0.6} cy={-0.6} r={0.6} fill="rgba(255,255,255,0.5)" />
           </g>
         ))}
 

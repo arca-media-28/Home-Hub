@@ -9,4 +9,5 @@ description: Animated fish-tank toy tile — settings model, size-scaled populat
 - Tank must be BOUNDED by the tile (user requirement): viewBox width is derived from measured tile aspect (height fixed) so it maps 1:1 with no slice-cropping, and fish turn at wall margins (per-tile keyframes named with tile.id) instead of swimming off-screen.
 - **Why deterministic jitter:** Math.random in render would reshuffle the whole tank on every settings change or resize.
 - Ambient motion (bubble streams + surface shimmer) is always-on pure CSS, no settings; a prefers-reduced-motion block disables all tank animations.
+- Click reactions (locked mode only): fish click = one-off dart (per-index nonce keyed <g> so re-click restarts CSS animation), water click = transient pellet + brief tank-wide excite; all React state, nothing persisted; `pointer-events: bounding-box` makes fish clickable; edit mode gates handlers off.
 - Playwright e2e specs live at REPO ROOT `tests/e2e/` (root playwright.config.ts), NOT under artifacts/homelab-dashboard — specs placed inside the artifact dir are silently not found.
