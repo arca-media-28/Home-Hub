@@ -36,6 +36,7 @@ import NoteTile from "@/components/tiles/NoteTile";
 import TimerTile from "@/components/tiles/TimerTile";
 import TamagotchiTile from "@/components/tiles/TamagotchiTile";
 import BonsaiTile from "@/components/tiles/BonsaiTile";
+import AquariumTile from "@/components/tiles/AquariumTile";
 import VisualizerTile from "@/components/tiles/VisualizerTile";
 import TileEditModal, { type EditMode } from "@/components/TileEditModal";
 import { INTEGRATION_SERVICE, CONNECTION_BACKED_INTEGRATIONS } from "@/lib/integrationMeta";
@@ -237,6 +238,13 @@ function renderTileContent(tile: Tile, status: ServiceStatus | undefined, editMo
   // tamagotchi/note/timer, bypassing the standard integration header.
   if (tile.integration === "bonsai") {
     return <BonsaiTile tile={tile} editMode={editMode} />;
+  }
+  // The Aquarium is a self-contained animated toy: fish idle-swim across a
+  // full-tile tank whose population scales with the tile's rendered size. It
+  // paints its own surface like the bonsai/tamagotchi, bypassing the standard
+  // integration header.
+  if (tile.integration === "aquarium") {
+    return <AquariumTile tile={tile} editMode={editMode} />;
   }
   // The Audio Visualizer is a self-contained toy that taps the app's own audio
   // player and paints a live, sound-reactive canvas (bars / lava lamp / VU

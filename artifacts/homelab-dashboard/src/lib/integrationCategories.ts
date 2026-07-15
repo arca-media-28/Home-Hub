@@ -65,6 +65,7 @@ const CATEGORY_BY_KEY: Record<string, Category> = {
   fortune: "Fun",
   tamagotchi: "Fun",
   bonsai: "Fun",
+  aquarium: "Fun",
   visualizer: "Fun",
 };
 

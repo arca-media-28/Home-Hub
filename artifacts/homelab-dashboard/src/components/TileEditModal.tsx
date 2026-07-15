@@ -105,6 +105,15 @@ import {
   type BonsaiStyle,
 } from "@/components/tiles/BonsaiTile";
 import {
+  AQUARIUM_FISH_OPTIONS,
+  AQUARIUM_PROP_OPTIONS,
+  AQUARIUM_SAND_COLORS,
+  DEFAULT_FISH_TYPES,
+  DEFAULT_SAND_COLOR,
+  DEFAULT_PROPS,
+  NONE_SLOT as AQUARIUM_NONE,
+} from "@/components/tiles/AquariumTile";
+import {
   VISUALIZER_STYLE_OPTIONS,
   DEFAULT_VISUALIZER_STYLE,
   normalizeVisualizerStyle,
@@ -211,6 +220,7 @@ const INTEGRATIONS = [
   { value: TileIntegration.fortune, label: "Fortune" },
   { value: TileIntegration.tamagotchi, label: "Tamagotchi" },
   { value: TileIntegration.bonsai, label: "Bonsai" },
+  { value: TileIntegration.aquarium, label: "Aquarium" },
   { value: TileIntegration.visualizer, label: "Audio Visualizer" },
   { value: TileIntegration.note, label: "Note" },
   { value: TileIntegration.spacer, label: "Spacer" },
@@ -528,6 +538,19 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
   const [showBonsaiPotPicker, setShowBonsaiPotPicker] = useState(false);
   const [showBonsaiLeafPicker, setShowBonsaiLeafPicker] = useState(false);
 
+  // Aquarium look: three fish-species slots, sand color, and three prop
+  // slots. All cosmetic; the tile itself animates the tank.
+  const [aquariumFishTypes, setAquariumFishTypes] = useState<string[]>(
+    tile?.tileSettings?.aquariumFishTypes ?? DEFAULT_FISH_TYPES,
+  );
+  const [aquariumSandColor, setAquariumSandColor] = useState<string>(
+    tile?.tileSettings?.aquariumSandColor ?? DEFAULT_SAND_COLOR,
+  );
+  const [aquariumProps, setAquariumProps] = useState<string[]>(
+    tile?.tileSettings?.aquariumProps ?? DEFAULT_PROPS,
+  );
+  const [showAquariumSandPicker, setShowAquariumSandPicker] = useState(false);
+
   // Audio Visualizer look. Style + the two colors are the only editable state;
   // the tile itself reads the live audio player, so nothing else is persisted.
   const [visualizerStyle, setVisualizerStyle] = useState<VisualizerStyle>(
@@ -659,6 +682,10 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
       setBonsaiStyle((tile?.tileSettings?.bonsaiStyle as BonsaiStyle) ?? DEFAULT_STYLE);
       setShowBonsaiPotPicker(false);
       setShowBonsaiLeafPicker(false);
+      setAquariumFishTypes(tile?.tileSettings?.aquariumFishTypes ?? DEFAULT_FISH_TYPES);
+      setAquariumSandColor(tile?.tileSettings?.aquariumSandColor ?? DEFAULT_SAND_COLOR);
+      setAquariumProps(tile?.tileSettings?.aquariumProps ?? DEFAULT_PROPS);
+      setShowAquariumSandPicker(false);
       setVisualizerStyle(normalizeVisualizerStyle(tile?.tileSettings?.visualizerStyle));
       setVisualizerPrimary(tile?.tileSettings?.visualizerPrimary ?? "");
       setVisualizerBackground(tile?.tileSettings?.visualizerBackground ?? "");
@@ -736,6 +763,11 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
   // name/URL/image/background/metrics and instead exposes its cosmetic look
   // (pot color, foliage color, blossoms, tree style).
   const isBonsai = integration === TileIntegration.bonsai;
+  // The Aquarium is a self-contained animated fish-tank toy. Like the bonsai
+  // it paints its own full-tile surface with no header or backing service, so
+  // the editor strips name/URL/image/background/metrics and exposes only its
+  // look (fish species, sand color, decoration props).
+  const isAquarium = integration === TileIntegration.aquarium;
   // The Audio Visualizer is a self-contained toy that paints a live,
   // sound-reactive canvas from the app's own audio player. Like the bonsai it
   // has no header and no backing service, so the editor strips
@@ -764,7 +796,7 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
   // Tiles that carry no link/image/background content: layout helpers plus the
   // note and timer, which paint their own surface.
   const isContentless =
-    isLayoutTile || isNote || isTimer || isEightball || isDice || isCoinFlip || isFortune || isTamagotchi || isBonsai || isVisualizer;
+    isLayoutTile || isNote || isTimer || isEightball || isDice || isCoinFlip || isFortune || isTamagotchi || isBonsai || isAquarium || isVisualizer;
 
   // Teams for the chosen leagues, for the dependent team multi-select. Sourced
   // from the baked-in catalog (ESPN's /teams endpoint isn't CORS-enabled), so
@@ -1295,7 +1327,7 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
       // A spacer carries no content at all; a divider keeps only its label
       // (name). Both clear url/background/image so converting an existing tile
       // into a layout tile leaves nothing behind.
-      name: isSpacer || isNote || isTimer || isTamagotchi || isBonsai || isVisualizer ? "" : name || undefined,
+      name: isSpacer || isNote || isTimer || isTamagotchi || isBonsai || isAquarium || isVisualizer ? "" : name || undefined,
       url: isContentless ? "" : url || undefined,
       // Send the raw value so clearing (null) reaches the body and the server
       // writes NULL; otherwise an undefined field is dropped and the old color
@@ -1455,6 +1487,12 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
                                     bonsaiGrowth: tile?.tileSettings?.bonsaiGrowth ?? null,
                                     bonsaiUpdatedAt: tile?.tileSettings?.bonsaiUpdatedAt ?? null,
                                   }
+                                : isAquarium
+                                  ? {
+                                      aquariumFishTypes,
+                                      aquariumSandColor,
+                                      aquariumProps,
+                                    }
                                 : isVisualizer
                                   ? {
                                       visualizerStyle,
@@ -1978,6 +2016,149 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {isAquarium && (
+            <div className="space-y-4 border-t border-border pt-4">
+              <p className="text-sm text-muted-foreground">
+                A live fish tank. Fish idle-swim across the tile all day, and
+                more fish appear as the tile gets bigger. Pick up to three fish
+                species, the sand color, and up to three decorations below.
+              </p>
+
+              <div className="space-y-1.5">
+                <Label>Fish</Label>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                  {[0, 1, 2].map((slot) => (
+                    <Select
+                      key={slot}
+                      value={aquariumFishTypes[slot] ?? AQUARIUM_NONE}
+                      onValueChange={(v) =>
+                        setAquariumFishTypes((prev) => {
+                          const next = [...prev];
+                          while (next.length < 3) next.push(AQUARIUM_NONE);
+                          next[slot] = v;
+                          return next;
+                        })
+                      }
+                    >
+                      <SelectTrigger aria-label={`Fish ${slot + 1}`}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={AQUARIUM_NONE}>(none)</SelectItem>
+                        {AQUARIUM_FISH_OPTIONS.map((o) => (
+                          <SelectItem key={o.value} value={o.value}>
+                            {o.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>Sand color</Label>
+                <div className="flex flex-wrap items-center gap-2">
+                  {AQUARIUM_SAND_COLORS.map((preset) => (
+                    <button
+                      key={preset.value}
+                      type="button"
+                      onClick={() => setAquariumSandColor(preset.value)}
+                      title={preset.label}
+                      aria-label={preset.label}
+                      aria-pressed={aquariumSandColor === preset.value}
+                      className={`h-8 w-8 rounded-full border shadow-sm transition-transform hover:scale-105 ${
+                        aquariumSandColor === preset.value
+                          ? "ring-2 ring-ring ring-offset-2 ring-offset-background"
+                          : "border-border"
+                      }`}
+                      style={{ background: preset.color }}
+                    />
+                  ))}
+                </div>
+                <div className="flex items-center gap-2 pt-1">
+                  <button
+                    type="button"
+                    className="w-8 h-8 rounded-md border border-border flex-shrink-0 shadow-sm"
+                    style={{
+                      background:
+                        AQUARIUM_SAND_COLORS.find((p) => p.value === aquariumSandColor)
+                          ?.color ?? aquariumSandColor,
+                    }}
+                    onClick={() => setShowAquariumSandPicker((v) => !v)}
+                    aria-label="Pick custom sand color"
+                  />
+                  <Input
+                    value={aquariumSandColor}
+                    onChange={(e) => setAquariumSandColor(e.target.value)}
+                    placeholder="#d9b98c or preset name"
+                    className="font-mono text-sm"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="flex-shrink-0"
+                    onClick={() => setAquariumSandColor(DEFAULT_SAND_COLOR)}
+                    disabled={aquariumSandColor === DEFAULT_SAND_COLOR}
+                    title="Reset to default sand color"
+                    aria-label="Reset to default sand color"
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                  </Button>
+                </div>
+                {showAquariumSandPicker && (
+                  <div className="mt-2">
+                    <HexColorPicker
+                      color={
+                        aquariumSandColor.startsWith("#")
+                          ? aquariumSandColor
+                          : AQUARIUM_SAND_COLORS.find((p) => p.value === aquariumSandColor)
+                              ?.color ?? "#d9b98c"
+                      }
+                      onChange={setAquariumSandColor}
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>Decorations</Label>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                  {[0, 1, 2].map((slot) => (
+                    <Select
+                      key={slot}
+                      value={aquariumProps[slot] ?? AQUARIUM_NONE}
+                      onValueChange={(v) =>
+                        setAquariumProps((prev) => {
+                          const next = [...prev];
+                          while (next.length < 3) next.push(AQUARIUM_NONE);
+                          next[slot] = v;
+                          return next;
+                        })
+                      }
+                    >
+                      <SelectTrigger aria-label={`Decoration ${slot + 1}`}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={AQUARIUM_NONE}>(none)</SelectItem>
+                        {AQUARIUM_PROP_OPTIONS.map((o) => (
+                          <SelectItem key={o.value} value={o.value}>
+                            {o.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Small tiles show one decoration; bigger tiles reveal more.
+                </p>
               </div>
             </div>
           )}

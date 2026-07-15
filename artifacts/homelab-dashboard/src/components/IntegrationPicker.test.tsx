@@ -35,6 +35,7 @@ vi.mock("@workspace/api-client-react", () => ({
     fortune: "fortune",
     tamagotchi: "tamagotchi",
     bonsai: "bonsai",
+    aquarium: "aquarium",
     note: "note",
     spacer: "spacer",
     divider: "divider",

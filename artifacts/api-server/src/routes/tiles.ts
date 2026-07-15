@@ -101,6 +101,9 @@ interface TileSettings {
   bonsaiLeafColor?: string | null;
   bonsaiBlossom?: string | null;
   bonsaiStyle?: string | null;
+  aquariumFishTypes?: string[] | null;
+  aquariumSandColor?: string | null;
+  aquariumProps?: string[] | null;
   visualizerStyle?: string | null;
   visualizerPrimary?: string | null;
   visualizerBackground?: string | null;
@@ -579,6 +582,25 @@ function pickTileSettings(obj: Record<string, unknown>): TileSettings {
     result.bonsaiStyle = obj["bonsaiStyle"];
   } else if (obj["bonsaiStyle"] === null) {
     result.bonsaiStyle = null;
+  }
+  if (Array.isArray(obj["aquariumFishTypes"])) {
+    result.aquariumFishTypes = obj["aquariumFishTypes"].filter(
+      (x): x is string => typeof x === "string",
+    );
+  } else if (obj["aquariumFishTypes"] === null) {
+    result.aquariumFishTypes = null;
+  }
+  if (typeof obj["aquariumSandColor"] === "string") {
+    result.aquariumSandColor = obj["aquariumSandColor"];
+  } else if (obj["aquariumSandColor"] === null) {
+    result.aquariumSandColor = null;
+  }
+  if (Array.isArray(obj["aquariumProps"])) {
+    result.aquariumProps = obj["aquariumProps"].filter(
+      (x): x is string => typeof x === "string",
+    );
+  } else if (obj["aquariumProps"] === null) {
+    result.aquariumProps = null;
   }
   if (typeof obj["visualizerStyle"] === "string") {
     result.visualizerStyle = obj["visualizerStyle"];

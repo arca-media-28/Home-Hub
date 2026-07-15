@@ -1936,7 +1936,7 @@ components:
           enum: [app, truenas, media, sonarr, radarr, lidarr, qbittorrent]
         integration:
           type: ["string", "null"]
-          enum: [truenas, media, jellyfin, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, audioplayer, clock, timer, weather, sports, news, stocks, sleeper, email, calendar, note, spacer, divider, eightball, dice, coinflip, fortune, tamagotchi, bonsai, visualizer, null]
+          enum: [truenas, media, jellyfin, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, audioplayer, clock, timer, weather, sports, news, stocks, sleeper, email, calendar, note, spacer, divider, eightball, dice, coinflip, fortune, tamagotchi, bonsai, aquarium, visualizer, null]
         gridX:
           type: integer
         gridY:
@@ -2020,7 +2020,7 @@ components:
           enum: [app, truenas, media, sonarr, radarr, lidarr, qbittorrent]
         integration:
           type: ["string", "null"]
-          enum: [truenas, media, jellyfin, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, audioplayer, clock, timer, weather, sports, news, stocks, sleeper, email, calendar, note, spacer, divider, eightball, dice, coinflip, fortune, tamagotchi, bonsai, visualizer, null]
+          enum: [truenas, media, jellyfin, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, audioplayer, clock, timer, weather, sports, news, stocks, sleeper, email, calendar, note, spacer, divider, eightball, dice, coinflip, fortune, tamagotchi, bonsai, aquarium, visualizer, null]
         gridX:
           type: integer
         gridY:
@@ -2063,7 +2063,7 @@ components:
       properties:
         integration:
           type: ["string", "null"]
-          enum: [truenas, media, jellyfin, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, audioplayer, clock, timer, weather, sports, news, stocks, sleeper, email, calendar, note, spacer, divider, eightball, dice, coinflip, fortune, tamagotchi, bonsai, visualizer, null]
+          enum: [truenas, media, jellyfin, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, audioplayer, clock, timer, weather, sports, news, stocks, sleeper, email, calendar, note, spacer, divider, eightball, dice, coinflip, fortune, tamagotchi, bonsai, aquarium, visualizer, null]
         gridX:
           type: integer
         gridY:
@@ -2575,6 +2575,29 @@ components:
             "windswept", "cascade"). Cosmetic only. Null or absent uses the
             default upright style.
           type: ["string", "null"]
+        aquariumFishTypes:
+          description: >-
+            An Aquarium tile's three fish species slots (e.g. "clownfish",
+            "bluetang", "angelfish", "pufferfish", "goldfish", "betta"). Each
+            slot may be "none" to leave it empty. Null or absent uses the
+            defaults.
+          type: ["array", "null"]
+          items:
+            type: string
+        aquariumSandColor:
+          description: >-
+            An Aquarium tile's sand floor color: a preset key (e.g. "tan",
+            "white", "dark") or a custom #hex value. Null or absent uses the
+            default tan sand.
+          type: ["string", "null"]
+        aquariumProps:
+          description: >-
+            An Aquarium tile's three decoration prop slots (e.g. "seaweed",
+            "coral", "chest", "anchor", "castle", "rock"). Each slot may be
+            "none" to leave it empty. Null or absent uses the defaults.
+          type: ["array", "null"]
+          items:
+            type: string
         visualizerStyle:
           description: >-
             An Audio Visualizer tile's render style: "bars" (frequency bar

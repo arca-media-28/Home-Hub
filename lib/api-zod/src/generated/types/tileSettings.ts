@@ -394,6 +394,21 @@ export type TileSettings = {
      */
   bonsaiStyle?: string | null;
   /**
+     * An Aquarium tile's three fish species slots (e.g. "clownfish", "bluetang", "angelfish", "pufferfish", "goldfish", "betta"). Each slot may be "none" to leave it empty. Null or absent uses the defaults.
+     * @nullable
+     */
+  aquariumFishTypes?: string[] | null;
+  /**
+     * An Aquarium tile's sand floor color: a preset key (e.g. "tan", "white", "dark") or a custom #hex value. Null or absent uses the default tan sand.
+     * @nullable
+     */
+  aquariumSandColor?: string | null;
+  /**
+     * An Aquarium tile's three decoration prop slots (e.g. "seaweed", "coral", "chest", "anchor", "castle", "rock"). Each slot may be "none" to leave it empty. Null or absent uses the defaults.
+     * @nullable
+     */
+  aquariumProps?: string[] | null;
+  /**
      * An Audio Visualizer tile's render style: "bars" (frequency bar graph), "lava" (morphing lava-lamp blobs), or "vu" (retro VU meter). Null or absent defaults to "bars".
      * @nullable
      */

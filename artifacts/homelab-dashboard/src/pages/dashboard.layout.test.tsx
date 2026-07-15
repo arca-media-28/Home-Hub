@@ -92,6 +92,7 @@ vi.mock("@workspace/api-client-react", () => ({
     fortune: "fortune",
     tamagotchi: "tamagotchi",
     bonsai: "bonsai",
+    aquarium: "aquarium",
   },
   TileType: { app: "app", integration: "integration" },
   useGetMe: () => ({ data: { id: 1, username: "tester" }, isError: false }),
