@@ -101,6 +101,15 @@ test("aquarium tile persists settings and renders a populated tank", async ({
   await expect(tank.locator("g.aq-pellet")).toHaveCount(1);
   await expect(tank.locator("g.aq-excite").first()).toBeVisible();
 
+  // Regression: the pellet must render at the click point, not at the tile's
+  // left edge (the sink animation once overrode the placement transform).
+  const pelletBox = await tank.locator("g.aq-pellet").boundingBox();
+  expect(pelletBox).not.toBeNull();
+  const pelletCenterX = pelletBox!.x + pelletBox!.width / 2;
+  expect(Math.abs(pelletCenterX - (box!.x + box!.width * 0.5))).toBeLessThan(
+    box!.width * 0.1,
+  );
+
   // The pellet is transient: it sinks, fades, and is removed.
   await expect(tank.locator("g.aq-pellet")).toHaveCount(0, { timeout: 10_000 });
 

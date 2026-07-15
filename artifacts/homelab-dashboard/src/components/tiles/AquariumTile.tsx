@@ -563,17 +563,21 @@ export default function AquariumTile({ tile, editMode }: AquariumTileProps) {
 
         {/* Food pellets: transient, sink from the click point to the sand and
             fade out. Rendered in front of the fish like the bubbles. */}
+        {/* The placement translate lives on an OUTER group: the sink keyframes
+            animate the CSS transform property, which overrides the SVG
+            transform attribute on the same element — so animating the placed
+            group itself would snap every pellet back to the origin. */}
         {pellets.map((p) => (
-          <g
-            key={p.id}
-            className="aq-pellet"
-            transform={`translate(${p.x.toFixed(1)} ${p.y.toFixed(1)})`}
-            style={
-              { "--aq-sink": `${Math.max(4, VB_H - SAND_H - 2 - p.y).toFixed(1)}px` } as React.CSSProperties
-            }
-          >
-            <circle r={2} fill="#b5803a" stroke="#8a5f26" strokeWidth={0.6} />
-            <circle cx={-0.6} cy={-0.6} r={0.6} fill="rgba(255,255,255,0.5)" />
+          <g key={p.id} transform={`translate(${p.x.toFixed(1)} ${p.y.toFixed(1)})`}>
+            <g
+              className="aq-pellet"
+              style={
+                { "--aq-sink": `${Math.max(4, VB_H - SAND_H - 2 - p.y).toFixed(1)}px` } as React.CSSProperties
+              }
+            >
+              <circle r={2} fill="#b5803a" stroke="#8a5f26" strokeWidth={0.6} />
+              <circle cx={-0.6} cy={-0.6} r={0.6} fill="rgba(255,255,255,0.5)" />
+            </g>
           </g>
         ))}
 
