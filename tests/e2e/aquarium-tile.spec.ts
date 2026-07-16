@@ -94,12 +94,16 @@ test("aquarium tile persists settings and renders a populated tank", async ({
   // ---- Click reactions (locked mode) ----
 
   // Clicking the water drops a transient food pellet at the click point and
-  // briefly excites the fish.
+  // sends the nearest fish swimming over to eat it (no tank-wide wiggle).
   const box = await tank.boundingBox();
   expect(box).not.toBeNull();
   await page.mouse.click(box!.x + box!.width * 0.5, box!.y + box!.height * 0.3);
   await expect(tank.locator("g.aq-pellet")).toHaveCount(1);
-  await expect(tank.locator("g.aq-excite").first()).toBeVisible();
+  await expect(tank.locator("g.aq-feeding")).toHaveCount(1);
+  // Exactly one fish reacts; the rest keep their normal swim loop.
+  const swimmingCount = await tank.locator("g.aq-fish").count();
+  expect(swimmingCount).toBe(fishCount - 1);
+  expect(await tank.locator("g.aq-excite").count()).toBe(0);
 
   // Regression: the pellet must render at the click point, not at the tile's
   // left edge (the sink animation once overrode the placement transform).
@@ -110,8 +114,11 @@ test("aquarium tile persists settings and renders a populated tank", async ({
     box!.width * 0.1,
   );
 
-  // The pellet is transient: it sinks, fades, and is removed.
+  // The pellet is transient: eaten or sunk, it is removed; the feeding fish
+  // finishes its meal and rejoins the normal swim loop.
   await expect(tank.locator("g.aq-pellet")).toHaveCount(0, { timeout: 10_000 });
+  await expect(tank.locator("g.aq-feeding")).toHaveCount(0, { timeout: 10_000 });
+  await expect(tank.locator("g.aq-fish")).toHaveCount(fishCount);
 
   // Clicking a fish makes it dart (one-off burst animation, then cleared).
   await tank.locator("g.aq-fish-hit").first().click({ force: true });

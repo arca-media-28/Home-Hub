@@ -8,8 +8,8 @@ import type { Tile } from "@workspace/api-client-react";
 // species slots, sand color, three prop slots) persist in tileSettings and are
 // edited in the tile modal. In locked mode the tank is lightly interactive:
 // clicking a fish makes it dart in a quick burst, and clicking the water drops
-// a food pellet that sinks while nearby fish get briefly excited. Both are
-// transient one-off animations — nothing persists.
+// a food pellet that sinks while the nearest fish swims over and eats it. Both
+// are transient one-off animations — nothing persists.
 // ---------------------------------------------------------------------------
 
 export const NONE_SLOT = "none";
@@ -310,7 +310,49 @@ interface Pellet {
 
 const PELLET_SINK_MS = 2600;
 const DART_MS = 1100;
-const EXCITED_MS = 1600;
+// After eating, the fish swims back up to its own lane before the ambient
+// loop takes over again.
+const FEED_BACK_MS = 700;
+
+// The fish center aims slightly above the sand line so its mouth meets the
+// pellet where it lands.
+const FEED_LAND_Y = VB_H - SAND_H - 8;
+
+// A fish currently swimming to dropped food. `x`/`y` are the inline transform
+// target in viewBox units; the element CSS-transitions toward them.
+interface Feeding {
+  fishIndex: number;
+  pelletId: number;
+  x: number;
+  y: number;
+  dir: 1 | -1;
+  durMs: number;
+  // "start" places the fish at its measured position with no transition;
+  // "to" glides it to the pellet; "back" returns it to its swim lane.
+  phase: "start" | "to" | "back";
+}
+
+// The ambient swim loop uses CSS `ease-in-out` = cubic-bezier(0.42,0,0.58,1),
+// whose output curve is exactly smoothstep: y = 3t² - 2t³. To resume the loop
+// at a given x without a snap we invert the easing: find the keyframe time
+// fraction whose eased output equals `frac`.
+function inverseEaseInOut(frac: number): number {
+  const f = Math.min(1, Math.max(0, frac));
+  // Bisection on y(t) = 3t² - 2t³ (monotonic on [0,1]).
+  let lo = 0;
+  let hi = 1;
+  for (let k = 0; k < 40; k++) {
+    const mid = (lo + hi) / 2;
+    const y = mid * mid * (3 - 2 * mid);
+    if (y < f) lo = mid;
+    else hi = mid;
+  }
+  const t = (lo + hi) / 2;
+  // Convert curve parameter t back to input time via B_x(t) for
+  // cubic-bezier(0.42, 0, 0.58, 1).
+  const inv = 1 - t;
+  return 3 * 0.42 * t * inv * inv + 3 * 0.58 * t * t * inv + t * t * t;
+}
 
 export default function AquariumTile({ tile, editMode }: AquariumTileProps) {
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -338,13 +380,18 @@ export default function AquariumTile({ tile, editMode }: AquariumTileProps) {
   }, []);
 
   // Transient interaction state (locked mode only): fish currently darting
-  // after a click, dropped food pellets, and a window where every fish gets a
-  // brief excited wiggle after food lands.
+  // after a click, dropped food pellets, the one fish swimming to dropped
+  // food, and per-fish swim-loop delay overrides used to resume the ambient
+  // loop at the fish's post-meal position without a snap.
   const [dartingFish, setDartingFish] = useState<Record<number, number>>({});
   const [pellets, setPellets] = useState<Pellet[]>([]);
-  const [excited, setExcited] = useState(false);
+  const [feeding, setFeeding] = useState<Feeding | null>(null);
+  const [fishDelays, setFishDelays] = useState<Record<number, number>>({});
   const pelletIdRef = useRef(0);
   const timeoutsRef = useRef<number[]>([]);
+  // Refs to each fish's innermost shape group so its live on-screen position
+  // (driven by CSS animations) can be measured at click time.
+  const fishShapeRefs = useRef<(SVGGElement | null)[]>([]);
 
   useEffect(() => {
     const timeouts = timeoutsRef.current;
@@ -399,8 +446,8 @@ export default function AquariumTile({ tile, editMode }: AquariumTileProps) {
     }, DART_MS);
   };
 
-  // Clicking the water drops a food pellet at the click point and briefly
-  // excites the whole tank.
+  // Clicking the water drops a food pellet at the click point; the nearest
+  // fish turns toward it, swims over, eats it, and rejoins its swim loop.
   const handleTankClick = (e: React.MouseEvent<SVGSVGElement>) => {
     if (editMode) return;
     const rect = e.currentTarget.getBoundingClientRect();
@@ -410,10 +457,75 @@ export default function AquariumTile({ tile, editMode }: AquariumTileProps) {
     // Ignore clicks in the sand — pellets sink onto it, not into it.
     if (y > VB_H - SAND_H) return;
     const id = ++pelletIdRef.current;
-    setPellets((prev) => [...prev.slice(-5), { id, x, y: Math.max(6, y) }]);
-    setExcited(true);
+    const pelletX = x;
+    const pelletY = Math.max(6, y);
+    setPellets((prev) => [...prev.slice(-5), { id, x: pelletX, y: pelletY }]);
     later(() => setPellets((prev) => prev.filter((p) => p.id !== id)), PELLET_SINK_MS);
-    later(() => setExcited(false), EXCITED_MS);
+
+    // Send the nearest fish to the food. Skipped under reduced motion (the
+    // ambient loop is frozen anyway) and while another meal is in progress —
+    // rapid re-clicks just drop extra pellets.
+    if (feeding !== null || fish.length === 0) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+    // Fish move via CSS animations, so live positions must be measured from
+    // the rendered elements, not derived from state.
+    let bestIdx = -1;
+    let bestDist = Infinity;
+    let bestX = 0;
+    let bestY = 0;
+    fishShapeRefs.current.forEach((el, i) => {
+      if (!el || !fish[i]) return;
+      const b = el.getBoundingClientRect();
+      if (b.width < 1 && b.height < 1) return;
+      const cx = ((b.left + b.width / 2 - rect.left) / rect.width) * vbW;
+      const cy = ((b.top + b.height / 2 - rect.top) / rect.height) * VB_H;
+      const d = Math.hypot(cx - pelletX, cy - pelletY);
+      if (d < bestDist) {
+        bestDist = d;
+        bestIdx = i;
+        bestX = cx;
+        bestY = cy;
+      }
+    });
+    if (bestIdx < 0) return;
+
+    const target = fish[bestIdx]!;
+    // Meet the pellet where it lands on the sand; keep the resume x inside
+    // the swim range so the hand-back math stays valid.
+    const eatX = Math.min(swimMax, Math.max(swimMin, pelletX));
+    const dir: 1 | -1 = eatX >= bestX ? 1 : -1;
+    const dist = Math.hypot(eatX - bestX, FEED_LAND_Y - bestY);
+    const toDur = Math.min(PELLET_SINK_MS - 200, Math.max(650, Math.round(dist * 16)));
+
+    // Phase 1: pin the fish at its measured position (no transition)...
+    setFeeding({ fishIndex: bestIdx, pelletId: id, x: bestX, y: bestY, dir, durMs: toDur, phase: "start" });
+    // ...then glide it to the pellet's landing spot.
+    later(() => {
+      setFeeding((cur) =>
+        cur && cur.pelletId === id ? { ...cur, x: eatX, y: FEED_LAND_Y, phase: "to" } : cur,
+      );
+    }, 30);
+    // Phase 2: eat (remove the pellet) and swim back up to its own lane.
+    later(() => {
+      setPellets((prev) => prev.filter((p) => p.id !== id));
+      setFeeding((cur) =>
+        cur && cur.pelletId === id
+          ? { ...cur, x: eatX, y: target.y, durMs: FEED_BACK_MS, phase: "back" }
+          : cur,
+      );
+    }, 30 + toDur);
+    // Phase 3: hand back to the ambient loop. The loop's position is fully
+    // determined by its (negative) delay, so pick a delay that puts the fish
+    // exactly at (eatX, its lane y) moving in its current direction.
+    later(() => {
+      const range = swimMax - swimMin;
+      const frac = range > 0 ? (dir === 1 ? eatX - swimMin : swimMax - eatX) / range : 0;
+      const half = inverseEaseInOut(frac) * 0.5;
+      const phasePos = dir === 1 ? half : 0.5 + half;
+      setFishDelays((prev) => ({ ...prev, [bestIdx]: -phasePos * target.duration }));
+      setFeeding((cur) => (cur && cur.pelletId === id ? null : cur));
+    }, 30 + toDur + FEED_BACK_MS);
   };
 
   return (
@@ -462,8 +574,9 @@ export default function AquariumTile({ tile, editMode }: AquariumTileProps) {
         }
         .aq-shimmer { animation: aq-shimmer 9s ease-in-out infinite; }
         /* Click reactions: a clicked fish darts (a fast wobble + lunge burst),
-           and after food drops the whole tank gets a brief excited wiggle. A
-           pellet sinks from the click point to the sand and fades away. */
+           and after food drops the nearest fish glides over to eat it (inline
+           transition, no keyframes needed). A pellet sinks from the click
+           point to the sand and fades away. */
         @keyframes aq-dart {
           0%   { transform: translate(0, 0) rotate(0deg); }
           18%  { transform: translate(9px, -5px) rotate(-7deg); }
@@ -473,14 +586,6 @@ export default function AquariumTile({ tile, editMode }: AquariumTileProps) {
           100% { transform: translate(0, 0) rotate(0deg); }
         }
         .aq-dart { animation: aq-dart ${DART_MS}ms ease-out 1; }
-        @keyframes aq-excite {
-          0%, 100% { transform: translateY(0); }
-          20% { transform: translateY(-4px); }
-          40% { transform: translateY(3px); }
-          60% { transform: translateY(-3px); }
-          80% { transform: translateY(2px); }
-        }
-        .aq-excite { animation: aq-excite 0.8s ease-in-out 2; }
         @keyframes aq-pellet-sink {
           0%   { transform: translateY(0); opacity: 1; }
           85%  { opacity: 1; }
@@ -489,7 +594,8 @@ export default function AquariumTile({ tile, editMode }: AquariumTileProps) {
         .aq-pellet { animation: aq-pellet-sink ${PELLET_SINK_MS}ms ease-in 1 forwards; }
         .aq-fish-hit { cursor: pointer; pointer-events: bounding-box; }
         @media (prefers-reduced-motion: reduce) {
-          .aq-fish, .aq-fish-flip, .aq-fish-bob, .aq-sway, .aq-bubble, .aq-bubble-wiggle, .aq-shimmer, .aq-dart, .aq-excite, .aq-pellet { animation: none; }
+          .aq-fish, .aq-fish-flip, .aq-fish-bob, .aq-sway, .aq-bubble, .aq-bubble-wiggle, .aq-shimmer, .aq-dart, .aq-pellet { animation: none; }
+          .aq-feeding { transition: none !important; }
           .aq-bubble, .aq-pellet { opacity: 0; }
         }
       `}</style>
@@ -529,37 +635,61 @@ export default function AquariumTile({ tile, editMode }: AquariumTileProps) {
           );
         })}
 
-        {/* Fish */}
-        {fish.map((f, i) => (
-          <g
-            key={i}
-            className="aq-fish"
-            style={
-              {
-                "--aq-dur": `${f.duration.toFixed(2)}s`,
-                "--aq-delay": `${f.delay.toFixed(2)}s`,
-              } as React.CSSProperties
-            }
-          >
-            <g transform={`translate(0 ${f.y.toFixed(1)}) scale(${f.scale.toFixed(2)})`}>
-              <g className="aq-fish-flip">
-                <g
-                  className={`aq-fish-bob${editMode ? "" : " aq-fish-hit"}${excited ? " aq-excite" : ""}`}
-                  style={{ "--aq-bob": `${f.bobDuration.toFixed(2)}s` } as React.CSSProperties}
-                  onClick={(e) => handleFishClick(i, e)}
-                >
-                  {dartingFish[i] !== undefined ? (
-                    <g key={`dart-${dartingFish[i]}`} className="aq-dart">
+        {/* Fish. A fish that's swimming to food renders on a separate branch:
+            its looping CSS animation classes are dropped (so removing/re-adding
+            them later restarts the loop fresh, honoring the recomputed delay)
+            and an inline CSS transition glides it between measured positions. */}
+        {fish.map((f, i) =>
+          feeding && feeding.fishIndex === i ? (
+            <g
+              key={i}
+              className="aq-feeding"
+              style={{
+                transform: `translate(${feeding.x.toFixed(1)}px, ${feeding.y.toFixed(1)}px)`,
+                transition:
+                  feeding.phase === "start"
+                    ? "none"
+                    : `transform ${feeding.durMs}ms ease-in-out`,
+              }}
+            >
+              <g transform={`scale(${(feeding.dir * f.scale).toFixed(2)} ${f.scale.toFixed(2)})`}>
+                <FishShape species={f.species} />
+              </g>
+            </g>
+          ) : (
+            <g
+              key={i}
+              className="aq-fish"
+              style={
+                {
+                  "--aq-dur": `${f.duration.toFixed(2)}s`,
+                  "--aq-delay": `${(fishDelays[i] ?? f.delay).toFixed(2)}s`,
+                } as React.CSSProperties
+              }
+            >
+              <g transform={`translate(0 ${f.y.toFixed(1)}) scale(${f.scale.toFixed(2)})`}>
+                <g className="aq-fish-flip">
+                  <g
+                    ref={(el) => {
+                      fishShapeRefs.current[i] = el;
+                    }}
+                    className={`aq-fish-bob${editMode ? "" : " aq-fish-hit"}`}
+                    style={{ "--aq-bob": `${f.bobDuration.toFixed(2)}s` } as React.CSSProperties}
+                    onClick={(e) => handleFishClick(i, e)}
+                  >
+                    {dartingFish[i] !== undefined ? (
+                      <g key={`dart-${dartingFish[i]}`} className="aq-dart">
+                        <FishShape species={f.species} />
+                      </g>
+                    ) : (
                       <FishShape species={f.species} />
-                    </g>
-                  ) : (
-                    <FishShape species={f.species} />
-                  )}
+                    )}
+                  </g>
                 </g>
               </g>
             </g>
-          </g>
-        ))}
+          ),
+        )}
 
         {/* Food pellets: transient, sink from the click point to the sand and
             fade out. Rendered in front of the fish like the bubbles. */}
