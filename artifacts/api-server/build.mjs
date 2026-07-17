@@ -72,6 +72,9 @@ async function buildAll() {
       // which breaks once bundled. Externalize isomorphic-dompurify so it (and
       // its nested jsdom) load from node_modules at runtime instead.
       "isomorphic-dompurify",
+      // gamedig ships a large game/protocol registry it resolves at runtime;
+      // load it from node_modules instead of bundling it.
+      "gamedig",
       "better-sqlite3",
       "sqlite3",
       "canvas",

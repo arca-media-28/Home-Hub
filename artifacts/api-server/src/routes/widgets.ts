@@ -48,6 +48,7 @@ import {
   demoCalendarEvents,
   type CalendarEvent,
 } from "../lib/calendar.js";
+import { guessGameType, queryGamePlayers, type PlayerCount } from "../lib/gameQuery.js";
 
 const router = Router();
 
@@ -3932,10 +3933,10 @@ router.get("/pterodactyl", requireAuth, async (req: AuthRequest, res) => {
     // Sample data only when the service is genuinely unconfigured.
     res.json({
       servers: [
-        { id: "a1b2c3d4", name: "Minecraft SMP", state: "running", cpuPercent: 42.5, memUsedMb: 3072, memLimitMb: 8192 },
-        { id: "e5f6a7b8", name: "Valheim", state: "running", cpuPercent: 18.2, memUsedMb: 2048, memLimitMb: 4096 },
-        { id: "c9d0e1f2", name: "Terraria", state: "starting", cpuPercent: 5.1, memUsedMb: 256, memLimitMb: 2048 },
-        { id: "b3c4d5e6", name: "Ark Survival", state: "offline", cpuPercent: 0, memUsedMb: 0, memLimitMb: 16384 },
+        { id: "a1b2c3d4", name: "Minecraft SMP", state: "running", cpuPercent: 42.5, memUsedMb: 3072, memLimitMb: 8192, players: { current: 3, max: 20 } },
+        { id: "e5f6a7b8", name: "Valheim", state: "running", cpuPercent: 18.2, memUsedMb: 2048, memLimitMb: 4096, players: { current: 0, max: 10 } },
+        { id: "c9d0e1f2", name: "Terraria", state: "starting", cpuPercent: 5.1, memUsedMb: 256, memLimitMb: 2048, players: null },
+        { id: "b3c4d5e6", name: "Ark Survival", state: "offline", cpuPercent: 0, memUsedMb: 0, memLimitMb: 16384, players: null },
       ],
     });
     return;
@@ -3955,10 +3956,44 @@ router.get("/pterodactyl", requireAuth, async (req: AuthRequest, res) => {
         identifier?: string;
         name?: string;
         limits?: { memory?: number | null };
+        invocation?: string | null;
+        docker_image?: string | null;
+        sftp_details?: { ip?: string | null };
+        relationships?: {
+          allocations?: {
+            data?: Array<{
+              attributes?: {
+                ip?: string | null;
+                ip_alias?: string | null;
+                port?: number | null;
+                is_default?: boolean;
+              };
+            }>;
+          };
+        };
       };
     }>)
       .map((s) => s.attributes)
       .filter((a): a is NonNullable<typeof a> => Boolean(a?.identifier));
+
+    // Best-effort player occupancy: pick the server's public address from its
+    // default allocation (alias hostname first; the raw IP only when routable,
+    // else the node's SFTP host) and query the game itself — the panel API has
+    // no player information. Unknown game or unreachable query → null.
+    const queryTargetFor = (s: (typeof rawServers)[number]) => {
+      const allocations = s.relationships?.allocations?.data ?? [];
+      const def =
+        allocations.find((a) => a.attributes?.is_default)?.attributes ??
+        allocations[0]?.attributes;
+      if (!def || typeof def.port !== "number") return null;
+      const rawIp = def.ip ?? "";
+      const routableIp = rawIp && !/^(0\.0\.0\.0|127\.|::)/.test(rawIp) ? rawIp : null;
+      const host = def.ip_alias || routableIp || s.sftp_details?.ip || null;
+      if (!host) return null;
+      const game = guessGameType(`${s.name ?? ""} ${s.invocation ?? ""} ${s.docker_image ?? ""}`);
+      if (!game) return null;
+      return { type: game.type, host, port: def.port + game.portOffset };
+    };
 
     const servers = await Promise.all(
       rawServers.map(async (s) => {
@@ -3981,6 +4016,15 @@ router.get("/pterodactyl", requireAuth, async (req: AuthRequest, res) => {
             : "unknown";
           const cpu = attrs.resources?.cpu_absolute;
           const memBytes = attrs.resources?.memory_bytes;
+
+          // Player occupancy only makes sense for a running server; the game
+          // query itself is additive and resolves to null on any failure.
+          let players: PlayerCount | null = null;
+          if (state === "running") {
+            const target = queryTargetFor(s);
+            if (target) players = await queryGamePlayers(target.type, target.host, target.port);
+          }
+
           return {
             id,
             name: s.name ?? id,
@@ -3989,6 +4033,7 @@ router.get("/pterodactyl", requireAuth, async (req: AuthRequest, res) => {
             memUsedMb:
               typeof memBytes === "number" ? Math.round(memBytes / (1024 * 1024)) : null,
             memLimitMb,
+            players,
           };
         } catch (err) {
           // Additive: keep the row so the tile still lists the server.
@@ -3996,7 +4041,7 @@ router.get("/pterodactyl", requireAuth, async (req: AuthRequest, res) => {
             { id, reason: normalizeHttpError(err) },
             "Pterodactyl per-server resources fetch failed",
           );
-          return { id, name: s.name ?? id, state: "unknown", cpuPercent: null, memUsedMb: null, memLimitMb };
+          return { id, name: s.name ?? id, state: "unknown", cpuPercent: null, memUsedMb: null, memLimitMb, players: null };
         }
       }),
     );

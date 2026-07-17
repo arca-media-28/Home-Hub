@@ -1510,7 +1510,11 @@ export const GetPterodactylWidgetResponse = zod.object({
   "state": zod.enum(['running', 'starting', 'stopping', 'offline', 'unknown']).describe('Live power state from the panel\'s resources endpoint. \"unknown\" when the per-server resources call failed (the row still renders).'),
   "cpuPercent": zod.number().nullable().describe('Current absolute CPU usage percent, or null when unknown.'),
   "memUsedMb": zod.number().nullable().describe('Current memory usage in MiB, or null when unknown.'),
-  "memLimitMb": zod.number().nullable().describe('Configured memory limit in MiB, or null when unlimited\/unknown.')
+  "memLimitMb": zod.number().nullable().describe('Configured memory limit in MiB, or null when unlimited\/unknown.'),
+  "players": zod.union([zod.object({
+  "current": zod.number().describe('Number of players currently connected.'),
+  "max": zod.number().nullable().describe('Configured player slot limit, or null when unknown.')
+}),zod.null()]).describe('Live player occupancy queried directly from the game server (the panel API has no player data). Null when the server is not running, the game could not be identified, or the query failed.')
 }))
 })
 

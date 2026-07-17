@@ -1732,6 +1732,16 @@ export const PterodactylServerState = {
   unknown: 'unknown',
 } as const;
 
+export interface PterodactylPlayers {
+  /** Number of players currently connected. */
+  current: number;
+  /**
+     * Configured player slot limit, or null when unknown.
+     * @nullable
+     */
+  max: number | null;
+}
+
 export interface PterodactylServer {
   /** The server's short identifier from the panel. */
   id: string;
@@ -1753,6 +1763,8 @@ export interface PterodactylServer {
      * @nullable
      */
   memLimitMb: number | null;
+  /** Live player occupancy queried directly from the game server (the panel API has no player data). Null when the server is not running, the game could not be identified, or the query failed. */
+  players: PterodactylPlayers | null;
 }
 
 export interface PterodactylData {

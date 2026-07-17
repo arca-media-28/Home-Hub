@@ -2,7 +2,7 @@ import {
   useGetPterodactylWidget,
   getGetPterodactylWidgetQueryKey,
 } from "@workspace/api-client-react";
-import { Gamepad2, AlertTriangle } from "lucide-react";
+import { Gamepad2, AlertTriangle, Users } from "lucide-react";
 import type { WidgetProps } from "./IntegrationTile";
 import {
   tileBudget,
@@ -203,10 +203,22 @@ export default function PterodactylTile({ enabled, density, tileSettings }: Widg
             <span className={`${rowDot} rounded-full flex-shrink-0 ${style.dot}`} />
             <span className="truncate font-medium text-foreground">{s.name}</span>
           </span>
-          <span
-            className={`${rowSubText} uppercase tracking-wider flex-shrink-0 ${style.text}`}
-          >
-            {style.label}
+          <span className="flex items-center gap-2 flex-shrink-0">
+            {s.players != null && (
+              <span
+                className={`flex items-center gap-1 ${rowSubText} tabular-nums ${
+                  s.players.current > 0 ? "text-foreground" : "text-muted-foreground"
+                }`}
+                title="Players online"
+              >
+                <Users className={rowScale === 2 ? "w-3.5 h-3.5" : "w-3 h-3"} />
+                {s.players.current}
+                {s.players.max != null && ` / ${s.players.max}`}
+              </span>
+            )}
+            <span className={`${rowSubText} uppercase tracking-wider ${style.text}`}>
+              {style.label}
+            </span>
           </span>
         </div>
         {showResources &&

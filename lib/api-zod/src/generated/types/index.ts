@@ -95,6 +95,7 @@ export * from './prowlarrHealthIssue';
 export * from './prowlarrIndexer';
 export * from './prowlarrIndexerStatus';
 export * from './pterodactylData';
+export * from './pterodactylPlayers';
 export * from './pterodactylServer';
 export * from './pterodactylServerState';
 export * from './qbittorrentData';

@@ -3982,7 +3982,7 @@ components:
 
     PterodactylServer:
       type: object
-      required: [id, name, state, cpuPercent, memUsedMb, memLimitMb]
+      required: [id, name, state, cpuPercent, memUsedMb, memLimitMb, players]
       properties:
         id:
           description: The server's short identifier from the panel.
@@ -4003,6 +4003,25 @@ components:
           type: ["number", "null"]
         memLimitMb:
           description: Configured memory limit in MiB, or null when unlimited/unknown.
+          type: ["number", "null"]
+        players:
+          description: >-
+            Live player occupancy queried directly from the game server (the
+            panel API has no player data). Null when the server is not running,
+            the game could not be identified, or the query failed.
+          oneOf:
+            - $ref: "#/components/schemas/PterodactylPlayers"
+            - type: "null"
+
+    PterodactylPlayers:
+      type: object
+      required: [current, max]
+      properties:
+        current:
+          description: Number of players currently connected.
+          type: number
+        max:
+          description: Configured player slot limit, or null when unknown.
           type: ["number", "null"]
 
     TailscaleData:

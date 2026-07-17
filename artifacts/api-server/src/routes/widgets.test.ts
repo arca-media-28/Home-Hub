@@ -70,6 +70,17 @@ vi.mock("../lib/logger.js", () => ({
   logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
 }));
 
+// Stub the game-server player query so no real UDP/TCP game protocol traffic
+// happens (gamedig would otherwise time out slowly). guessGameType stays real.
+const queryGamePlayers = vi.fn();
+vi.mock("../lib/gameQuery.js", async (importOriginal) => {
+  const real = await importOriginal<typeof import("../lib/gameQuery.js")>();
+  return {
+    ...real,
+    queryGamePlayers: (...args: unknown[]) => queryGamePlayers(...args),
+  };
+});
+
 // Imported after the mocks are registered (vi.mock is hoisted above imports).
 const { default: widgetsRouter } = await import("./widgets.js");
 // The fetch cache is real (not mocked) — weather tests invalidate their keys
@@ -1987,6 +1998,7 @@ describe("GET /widgets/pterodactyl", () => {
         cpuPercent: 37.3,
         memUsedMb: 2048,
         memLimitMb: 4096,
+        players: null,
       },
       {
         id: "def456",
@@ -1995,12 +2007,77 @@ describe("GET /widgets/pterodactyl", () => {
         cpuPercent: 0,
         memUsedMb: 0,
         memLimitMb: null,
+        players: null,
       },
     ]);
 
     // The list call must authenticate with the client API key as a Bearer token.
     const [, listOpts] = httpGet.mock.calls[0]!;
     expect(listOpts.headers.Authorization).toBe("Bearer ptlc_key");
+    // Without allocations there is no query target, so no game query happens.
+    expect(queryGamePlayers).not.toHaveBeenCalled();
+  });
+
+  it("queries live player occupancy for running servers via their allocation", async () => {
+    findByService.mockReturnValue(
+      connRow({ service: "pterodactyl", url: "https://panel.local", api_key: "ptlc_key" }),
+    );
+    queryGamePlayers.mockResolvedValue({ current: 2, max: 10 });
+
+    httpGet.mockImplementation((url: string) => {
+      if (url.endsWith("/api/client")) {
+        return Promise.resolve({
+          data: {
+            data: [
+              {
+                attributes: {
+                  identifier: "abc123",
+                  name: "Minecraft SMP",
+                  limits: { memory: 4096 },
+                  invocation: "java -jar server.jar",
+                  sftp_details: { ip: "node.lan" },
+                  relationships: {
+                    allocations: {
+                      data: [
+                        // Non-default allocation first: the default one wins.
+                        { attributes: { ip: "0.0.0.0", ip_alias: null, port: 25570, is_default: false } },
+                        { attributes: { ip: "0.0.0.0", ip_alias: "mc.example.com", port: 25565, is_default: true } },
+                      ],
+                    },
+                  },
+                },
+              },
+            ],
+          },
+        });
+      }
+      if (url.includes("/servers/abc123/resources")) {
+        return Promise.resolve({
+          data: {
+            attributes: {
+              current_state: "running",
+              resources: { memory_bytes: 1073741824, cpu_absolute: 10 },
+            },
+          },
+        });
+      }
+      return Promise.reject(httpError(404));
+    });
+
+    const res = await request(app).get("/widgets/pterodactyl");
+    expect(res.status).toBe(200);
+    expect(res.body.servers[0].players).toEqual({ current: 2, max: 10 });
+    // The game was identified from the java invocation and queried at the
+    // default allocation's alias hostname and port.
+    expect(queryGamePlayers).toHaveBeenCalledWith("minecraft", "mc.example.com", 25565);
+
+    // Regression: an unreachable game query stays additive — players comes
+    // back null and the row (and the whole widget) still succeeds.
+    queryGamePlayers.mockResolvedValue(null);
+    const res2 = await request(app).get("/widgets/pterodactyl");
+    expect(res2.status).toBe(200);
+    expect(res2.body.servers[0].players).toBeNull();
+    expect(res2.body.servers[0].state).toBe("running");
   });
 
   it("keeps a server row with state unknown when its resources call fails", async () => {
@@ -2031,6 +2108,7 @@ describe("GET /widgets/pterodactyl", () => {
         cpuPercent: null,
         memUsedMb: null,
         memLimitMb: 4096,
+        players: null,
       },
     ]);
   });

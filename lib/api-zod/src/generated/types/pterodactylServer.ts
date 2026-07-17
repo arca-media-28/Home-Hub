@@ -5,6 +5,7 @@
  * Tachboard API
  * OpenAPI spec version: 0.1.0
  */
+import type { PterodactylPlayers } from './pterodactylPlayers';
 import type { PterodactylServerState } from './pterodactylServerState';
 
 export interface PterodactylServer {
@@ -28,4 +29,6 @@ export interface PterodactylServer {
      * @nullable
      */
   memLimitMb: number | null;
+  /** Live player occupancy queried directly from the game server (the panel API has no player data). Null when the server is not running, the game could not be identified, or the query failed. */
+  players: PterodactylPlayers | null;
 }
