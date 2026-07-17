@@ -54,6 +54,7 @@ import {
   Shield,
   Network,
   Radar,
+  Gamepad2,
   Globe,
   Tv2,
   TrendingUp,
@@ -118,6 +119,7 @@ type ServiceKey =
   | "pihole"
   | "nginx-proxy-manager"
   | "prowlarr"
+  | "pterodactyl"
   | "tailscale"
   | "ersatztv"
   | "stocks";
@@ -234,6 +236,22 @@ const SERVICES: ServiceDef[] = [
     name: "Prowlarr",
     icon: Radar,
     fields: [URL_FIELD, API_KEY_FIELD],
+  },
+  {
+    key: "pterodactyl",
+    name: "Pterodactyl",
+    icon: Gamepad2,
+    // The game panel's client API authenticates with a per-user client API key
+    // (Account Settings → API Credentials in the panel).
+    fields: [
+      { key: "url", label: "Panel URL", placeholder: "https://panel.example.com" },
+      {
+        key: "apiKey",
+        label: "Client API Key",
+        type: "password",
+        placeholder: "ptlc_••••••••",
+      },
+    ],
   },
   {
     key: "tailscale",

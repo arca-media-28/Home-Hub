@@ -23,6 +23,7 @@ export const TileIntegration = {
   pihole: 'pihole',
   'nginx-proxy-manager': 'nginx-proxy-manager',
   prowlarr: 'prowlarr',
+  pterodactyl: 'pterodactyl',
   tailscale: 'tailscale',
   ersatztv: 'ersatztv',
   audioplayer: 'audioplayer',

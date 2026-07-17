@@ -75,7 +75,7 @@ export const GetTilesResponseItem = zod.object({
   "userId": zod.number(),
   "pageId": zod.number().nullish().describe('The page this tile belongs to. Null only for tiles that predate the multi-page migration and could not be assigned a page.'),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'lidarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('email'),zod.literal('calendar'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal('bonsai'),zod.literal('aquarium'),zod.literal('visualizer'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('pterodactyl'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('email'),zod.literal('calendar'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal('bonsai'),zod.literal('aquarium'),zod.literal('visualizer'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -137,6 +137,7 @@ export const GetTilesResponseItem = zod.object({
   "truenasShowCpuCores": zod.boolean().nullish().describe('When true (or absent, the default), the dedicated CPU-temperature TrueNAS tile shows the per-core temperature readout beneath the gauge. Set false for a simpler tile with just the headline gauge.'),
   "truenasPools": zod.array(zod.string()).nullish().describe('Allow-list of TrueNAS ZFS pool (volume) names to show on the tile. Applies to both the dedicated ZFS Pools view and the pools section of the combined view. Null, absent, or empty means show all pools (the default, backward-compatible behavior).'),
   "truenasPoolOrder": zod.array(zod.string()).nullish().describe('Explicit display order of TrueNAS ZFS pool (volume) names. Pools whose name appears here are shown first, in this order; any remaining pools follow in their server-reported order. Applies to both the dedicated ZFS Pools view and the pools section of the combined view. Null, absent, or empty keeps the server-reported order (the default, backward-compatible behavior).'),
+  "pterodactylServers": zod.array(zod.string()).nullish().describe('Allow-list of Pterodactyl server identifiers to show on the tile. Null, absent, or empty means show all servers (the default, backward-compatible behavior).'),
   "noteBody": zod.string().nullish().describe('Free-form note text for a Note (post-it) tile. Null or absent means an empty note.'),
   "noteItems": zod.array(zod.object({
   "text": zod.string().describe('The checklist item\'s label text.'),
@@ -194,7 +195,7 @@ export const GetTilesResponse = zod.array(GetTilesResponseItem)
 export const CreateTileBody = zod.object({
   "pageId": zod.number().nullish().describe('The page to create this tile on. Omit to fall back to the user\'s first page.'),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'lidarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('email'),zod.literal('calendar'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal('bonsai'),zod.literal('aquarium'),zod.literal('visualizer'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('pterodactyl'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('email'),zod.literal('calendar'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal('bonsai'),zod.literal('aquarium'),zod.literal('visualizer'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -256,6 +257,7 @@ export const CreateTileBody = zod.object({
   "truenasShowCpuCores": zod.boolean().nullish().describe('When true (or absent, the default), the dedicated CPU-temperature TrueNAS tile shows the per-core temperature readout beneath the gauge. Set false for a simpler tile with just the headline gauge.'),
   "truenasPools": zod.array(zod.string()).nullish().describe('Allow-list of TrueNAS ZFS pool (volume) names to show on the tile. Applies to both the dedicated ZFS Pools view and the pools section of the combined view. Null, absent, or empty means show all pools (the default, backward-compatible behavior).'),
   "truenasPoolOrder": zod.array(zod.string()).nullish().describe('Explicit display order of TrueNAS ZFS pool (volume) names. Pools whose name appears here are shown first, in this order; any remaining pools follow in their server-reported order. Applies to both the dedicated ZFS Pools view and the pools section of the combined view. Null, absent, or empty keeps the server-reported order (the default, backward-compatible behavior).'),
+  "pterodactylServers": zod.array(zod.string()).nullish().describe('Allow-list of Pterodactyl server identifiers to show on the tile. Null, absent, or empty means show all servers (the default, backward-compatible behavior).'),
   "noteBody": zod.string().nullish().describe('Free-form note text for a Note (post-it) tile. Null or absent means an empty note.'),
   "noteItems": zod.array(zod.object({
   "text": zod.string().describe('The checklist item\'s label text.'),
@@ -317,7 +319,7 @@ export const GetTileResponse = zod.object({
   "userId": zod.number(),
   "pageId": zod.number().nullish().describe('The page this tile belongs to. Null only for tiles that predate the multi-page migration and could not be assigned a page.'),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'lidarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('email'),zod.literal('calendar'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal('bonsai'),zod.literal('aquarium'),zod.literal('visualizer'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('pterodactyl'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('email'),zod.literal('calendar'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal('bonsai'),zod.literal('aquarium'),zod.literal('visualizer'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -379,6 +381,7 @@ export const GetTileResponse = zod.object({
   "truenasShowCpuCores": zod.boolean().nullish().describe('When true (or absent, the default), the dedicated CPU-temperature TrueNAS tile shows the per-core temperature readout beneath the gauge. Set false for a simpler tile with just the headline gauge.'),
   "truenasPools": zod.array(zod.string()).nullish().describe('Allow-list of TrueNAS ZFS pool (volume) names to show on the tile. Applies to both the dedicated ZFS Pools view and the pools section of the combined view. Null, absent, or empty means show all pools (the default, backward-compatible behavior).'),
   "truenasPoolOrder": zod.array(zod.string()).nullish().describe('Explicit display order of TrueNAS ZFS pool (volume) names. Pools whose name appears here are shown first, in this order; any remaining pools follow in their server-reported order. Applies to both the dedicated ZFS Pools view and the pools section of the combined view. Null, absent, or empty keeps the server-reported order (the default, backward-compatible behavior).'),
+  "pterodactylServers": zod.array(zod.string()).nullish().describe('Allow-list of Pterodactyl server identifiers to show on the tile. Null, absent, or empty means show all servers (the default, backward-compatible behavior).'),
   "noteBody": zod.string().nullish().describe('Free-form note text for a Note (post-it) tile. Null or absent means an empty note.'),
   "noteItems": zod.array(zod.object({
   "text": zod.string().describe('The checklist item\'s label text.'),
@@ -437,7 +440,7 @@ export const UpdateTileParams = zod.object({
 })
 
 export const UpdateTileBody = zod.object({
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('email'),zod.literal('calendar'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal('bonsai'),zod.literal('aquarium'),zod.literal('visualizer'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('pterodactyl'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('email'),zod.literal('calendar'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal('bonsai'),zod.literal('aquarium'),zod.literal('visualizer'),zod.literal(null)]).nullish(),
   "gridX": zod.number().optional(),
   "gridY": zod.number().optional(),
   "gridW": zod.number().optional(),
@@ -499,6 +502,7 @@ export const UpdateTileBody = zod.object({
   "truenasShowCpuCores": zod.boolean().nullish().describe('When true (or absent, the default), the dedicated CPU-temperature TrueNAS tile shows the per-core temperature readout beneath the gauge. Set false for a simpler tile with just the headline gauge.'),
   "truenasPools": zod.array(zod.string()).nullish().describe('Allow-list of TrueNAS ZFS pool (volume) names to show on the tile. Applies to both the dedicated ZFS Pools view and the pools section of the combined view. Null, absent, or empty means show all pools (the default, backward-compatible behavior).'),
   "truenasPoolOrder": zod.array(zod.string()).nullish().describe('Explicit display order of TrueNAS ZFS pool (volume) names. Pools whose name appears here are shown first, in this order; any remaining pools follow in their server-reported order. Applies to both the dedicated ZFS Pools view and the pools section of the combined view. Null, absent, or empty keeps the server-reported order (the default, backward-compatible behavior).'),
+  "pterodactylServers": zod.array(zod.string()).nullish().describe('Allow-list of Pterodactyl server identifiers to show on the tile. Null, absent, or empty means show all servers (the default, backward-compatible behavior).'),
   "noteBody": zod.string().nullish().describe('Free-form note text for a Note (post-it) tile. Null or absent means an empty note.'),
   "noteItems": zod.array(zod.object({
   "text": zod.string().describe('The checklist item\'s label text.'),
@@ -552,7 +556,7 @@ export const UpdateTileResponse = zod.object({
   "userId": zod.number(),
   "pageId": zod.number().nullish().describe('The page this tile belongs to. Null only for tiles that predate the multi-page migration and could not be assigned a page.'),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'lidarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('email'),zod.literal('calendar'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal('bonsai'),zod.literal('aquarium'),zod.literal('visualizer'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('pterodactyl'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('email'),zod.literal('calendar'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal('bonsai'),zod.literal('aquarium'),zod.literal('visualizer'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -614,6 +618,7 @@ export const UpdateTileResponse = zod.object({
   "truenasShowCpuCores": zod.boolean().nullish().describe('When true (or absent, the default), the dedicated CPU-temperature TrueNAS tile shows the per-core temperature readout beneath the gauge. Set false for a simpler tile with just the headline gauge.'),
   "truenasPools": zod.array(zod.string()).nullish().describe('Allow-list of TrueNAS ZFS pool (volume) names to show on the tile. Applies to both the dedicated ZFS Pools view and the pools section of the combined view. Null, absent, or empty means show all pools (the default, backward-compatible behavior).'),
   "truenasPoolOrder": zod.array(zod.string()).nullish().describe('Explicit display order of TrueNAS ZFS pool (volume) names. Pools whose name appears here are shown first, in this order; any remaining pools follow in their server-reported order. Applies to both the dedicated ZFS Pools view and the pools section of the combined view. Null, absent, or empty keeps the server-reported order (the default, backward-compatible behavior).'),
+  "pterodactylServers": zod.array(zod.string()).nullish().describe('Allow-list of Pterodactyl server identifiers to show on the tile. Null, absent, or empty means show all servers (the default, backward-compatible behavior).'),
   "noteBody": zod.string().nullish().describe('Free-form note text for a Note (post-it) tile. Null or absent means an empty note.'),
   "noteItems": zod.array(zod.object({
   "text": zod.string().describe('The checklist item\'s label text.'),
@@ -691,7 +696,7 @@ export const SaveLayoutResponseItem = zod.object({
   "userId": zod.number(),
   "pageId": zod.number().nullish().describe('The page this tile belongs to. Null only for tiles that predate the multi-page migration and could not be assigned a page.'),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'lidarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('email'),zod.literal('calendar'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal('bonsai'),zod.literal('aquarium'),zod.literal('visualizer'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('pterodactyl'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('email'),zod.literal('calendar'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal('bonsai'),zod.literal('aquarium'),zod.literal('visualizer'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -753,6 +758,7 @@ export const SaveLayoutResponseItem = zod.object({
   "truenasShowCpuCores": zod.boolean().nullish().describe('When true (or absent, the default), the dedicated CPU-temperature TrueNAS tile shows the per-core temperature readout beneath the gauge. Set false for a simpler tile with just the headline gauge.'),
   "truenasPools": zod.array(zod.string()).nullish().describe('Allow-list of TrueNAS ZFS pool (volume) names to show on the tile. Applies to both the dedicated ZFS Pools view and the pools section of the combined view. Null, absent, or empty means show all pools (the default, backward-compatible behavior).'),
   "truenasPoolOrder": zod.array(zod.string()).nullish().describe('Explicit display order of TrueNAS ZFS pool (volume) names. Pools whose name appears here are shown first, in this order; any remaining pools follow in their server-reported order. Applies to both the dedicated ZFS Pools view and the pools section of the combined view. Null, absent, or empty keeps the server-reported order (the default, backward-compatible behavior).'),
+  "pterodactylServers": zod.array(zod.string()).nullish().describe('Allow-list of Pterodactyl server identifiers to show on the tile. Null, absent, or empty means show all servers (the default, backward-compatible behavior).'),
   "noteBody": zod.string().nullish().describe('Free-form note text for a Note (post-it) tile. Null or absent means an empty note.'),
   "noteItems": zod.array(zod.object({
   "text": zod.string().describe('The checklist item\'s label text.'),
@@ -955,6 +961,7 @@ export const ExportAllPagesResponse = zod.object({
   "truenasShowCpuCores": zod.boolean().nullish().describe('When true (or absent, the default), the dedicated CPU-temperature TrueNAS tile shows the per-core temperature readout beneath the gauge. Set false for a simpler tile with just the headline gauge.'),
   "truenasPools": zod.array(zod.string()).nullish().describe('Allow-list of TrueNAS ZFS pool (volume) names to show on the tile. Applies to both the dedicated ZFS Pools view and the pools section of the combined view. Null, absent, or empty means show all pools (the default, backward-compatible behavior).'),
   "truenasPoolOrder": zod.array(zod.string()).nullish().describe('Explicit display order of TrueNAS ZFS pool (volume) names. Pools whose name appears here are shown first, in this order; any remaining pools follow in their server-reported order. Applies to both the dedicated ZFS Pools view and the pools section of the combined view. Null, absent, or empty keeps the server-reported order (the default, backward-compatible behavior).'),
+  "pterodactylServers": zod.array(zod.string()).nullish().describe('Allow-list of Pterodactyl server identifiers to show on the tile. Null, absent, or empty means show all servers (the default, backward-compatible behavior).'),
   "noteBody": zod.string().nullish().describe('Free-form note text for a Note (post-it) tile. Null or absent means an empty note.'),
   "noteItems": zod.array(zod.object({
   "text": zod.string().describe('The checklist item\'s label text.'),
@@ -1085,6 +1092,7 @@ export const ExportPageResponse = zod.object({
   "truenasShowCpuCores": zod.boolean().nullish().describe('When true (or absent, the default), the dedicated CPU-temperature TrueNAS tile shows the per-core temperature readout beneath the gauge. Set false for a simpler tile with just the headline gauge.'),
   "truenasPools": zod.array(zod.string()).nullish().describe('Allow-list of TrueNAS ZFS pool (volume) names to show on the tile. Applies to both the dedicated ZFS Pools view and the pools section of the combined view. Null, absent, or empty means show all pools (the default, backward-compatible behavior).'),
   "truenasPoolOrder": zod.array(zod.string()).nullish().describe('Explicit display order of TrueNAS ZFS pool (volume) names. Pools whose name appears here are shown first, in this order; any remaining pools follow in their server-reported order. Applies to both the dedicated ZFS Pools view and the pools section of the combined view. Null, absent, or empty keeps the server-reported order (the default, backward-compatible behavior).'),
+  "pterodactylServers": zod.array(zod.string()).nullish().describe('Allow-list of Pterodactyl server identifiers to show on the tile. Null, absent, or empty means show all servers (the default, backward-compatible behavior).'),
   "noteBody": zod.string().nullish().describe('Free-form note text for a Note (post-it) tile. Null or absent means an empty note.'),
   "noteItems": zod.array(zod.object({
   "text": zod.string().describe('The checklist item\'s label text.'),
@@ -1211,6 +1219,7 @@ export const ImportPagesBody = zod.object({
   "truenasShowCpuCores": zod.boolean().nullish().describe('When true (or absent, the default), the dedicated CPU-temperature TrueNAS tile shows the per-core temperature readout beneath the gauge. Set false for a simpler tile with just the headline gauge.'),
   "truenasPools": zod.array(zod.string()).nullish().describe('Allow-list of TrueNAS ZFS pool (volume) names to show on the tile. Applies to both the dedicated ZFS Pools view and the pools section of the combined view. Null, absent, or empty means show all pools (the default, backward-compatible behavior).'),
   "truenasPoolOrder": zod.array(zod.string()).nullish().describe('Explicit display order of TrueNAS ZFS pool (volume) names. Pools whose name appears here are shown first, in this order; any remaining pools follow in their server-reported order. Applies to both the dedicated ZFS Pools view and the pools section of the combined view. Null, absent, or empty keeps the server-reported order (the default, backward-compatible behavior).'),
+  "pterodactylServers": zod.array(zod.string()).nullish().describe('Allow-list of Pterodactyl server identifiers to show on the tile. Null, absent, or empty means show all servers (the default, backward-compatible behavior).'),
   "noteBody": zod.string().nullish().describe('Free-form note text for a Note (post-it) tile. Null or absent means an empty note.'),
   "noteItems": zod.array(zod.object({
   "text": zod.string().describe('The checklist item\'s label text.'),
@@ -1487,6 +1496,21 @@ export const GetProwlarrWidgetResponse = zod.object({
   "source": zod.string(),
   "type": zod.string(),
   "message": zod.string()
+}))
+})
+
+
+/**
+ * @summary Get game server list with per-server state and live resource usage from the Pterodactyl panel
+ */
+export const GetPterodactylWidgetResponse = zod.object({
+  "servers": zod.array(zod.object({
+  "id": zod.string().describe('The server\'s short identifier from the panel.'),
+  "name": zod.string(),
+  "state": zod.enum(['running', 'starting', 'stopping', 'offline', 'unknown']).describe('Live power state from the panel\'s resources endpoint. \"unknown\" when the per-server resources call failed (the row still renders).'),
+  "cpuPercent": zod.number().nullable().describe('Current absolute CPU usage percent, or null when unknown.'),
+  "memUsedMb": zod.number().nullable().describe('Current memory usage in MiB, or null when unknown.'),
+  "memLimitMb": zod.number().nullable().describe('Configured memory limit in MiB, or null when unlimited\/unknown.')
 }))
 })
 
@@ -1954,7 +1978,7 @@ export const GetConnectionHealthResponse = zod.array(GetConnectionHealthResponse
  * @summary Test a service connection using the supplied values without saving
  */
 export const TestConnectionParams = zod.object({
-  "service": zod.enum(['truenas', 'plex', 'jellyfin', 'subsonic', 'sonarr', 'radarr', 'lidarr', 'qbittorrent', 'pihole', 'nginx-proxy-manager', 'prowlarr', 'tailscale', 'ersatztv', 'stocks'])
+  "service": zod.enum(['truenas', 'plex', 'jellyfin', 'subsonic', 'sonarr', 'radarr', 'lidarr', 'qbittorrent', 'pihole', 'nginx-proxy-manager', 'prowlarr', 'pterodactyl', 'tailscale', 'ersatztv', 'stocks'])
 })
 
 export const TestConnectionBody = zod.object({
@@ -1975,7 +1999,7 @@ export const TestConnectionResponse = zod.object({
  * @summary Save connection settings for a single service
  */
 export const UpdateConnectionParams = zod.object({
-  "service": zod.enum(['truenas', 'plex', 'jellyfin', 'subsonic', 'sonarr', 'radarr', 'lidarr', 'qbittorrent', 'pihole', 'nginx-proxy-manager', 'prowlarr', 'tailscale', 'ersatztv', 'stocks'])
+  "service": zod.enum(['truenas', 'plex', 'jellyfin', 'subsonic', 'sonarr', 'radarr', 'lidarr', 'qbittorrent', 'pihole', 'nginx-proxy-manager', 'prowlarr', 'pterodactyl', 'tailscale', 'ersatztv', 'stocks'])
 })
 
 export const UpdateConnectionBody = zod.object({

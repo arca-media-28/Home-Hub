@@ -139,6 +139,16 @@ export async function pingService(service: string, v: TestValues): Promise<TestR
       });
       return { ok: true, message: "Connected" };
     }
+    case "pterodactyl": {
+      // Pterodactyl's client API authenticates with a per-user client API key
+      // (Bearer). Listing the account's servers confirms reachability and a
+      // valid key in one call.
+      if (!v.apiKey) return { ok: false, message: "Enter a Client API Key first." };
+      await httpClient.get(`${base}/api/client`, {
+        headers: { Authorization: `Bearer ${v.apiKey}`, Accept: "application/json" },
+      });
+      return { ok: true, message: "Connected" };
+    }
     case "ersatztv": {
       // ErsatzTV runs without auth here: a successful GET against the channels
       // playlist confirms reachability using only the base URL.

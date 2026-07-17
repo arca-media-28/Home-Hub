@@ -214,6 +214,11 @@ export type TileSettings = {
      */
   truenasPoolOrder?: string[] | null;
   /**
+     * Allow-list of Pterodactyl server identifiers to show on the tile. Null, absent, or empty means show all servers (the default, backward-compatible behavior).
+     * @nullable
+     */
+  pterodactylServers?: string[] | null;
+  /**
      * Free-form note text for a Note (post-it) tile. Null or absent means an empty note.
      * @nullable
      */

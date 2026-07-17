@@ -3916,6 +3916,99 @@ router.get("/prowlarr", requireAuth, async (req: AuthRequest, res) => {
 });
 
 // ────────────────────────────────────────────────
+// Pterodactyl Widget
+// ────────────────────────────────────────────────
+// Pterodactyl's client API (Bearer client API key) lists the account's game
+// servers; each server's live power state and resource usage comes from the
+// per-server /resources endpoint. Resource calls are additive: a failing one
+// leaves that server row with state "unknown" and null stats instead of
+// failing the whole tile, since the list call already proved the panel is up.
+router.get("/pterodactyl", requireAuth, async (req: AuthRequest, res) => {
+  const saved = getSavedConnection(req.user!.userId, "pterodactyl");
+  const baseUrl = saved.url || process.env["PTERODACTYL_URL"];
+  const apiKey = saved.apiKey || process.env["PTERODACTYL_API_KEY"];
+
+  if (!baseUrl || !apiKey) {
+    // Sample data only when the service is genuinely unconfigured.
+    res.json({
+      servers: [
+        { id: "a1b2c3d4", name: "Minecraft SMP", state: "running", cpuPercent: 42.5, memUsedMb: 3072, memLimitMb: 8192 },
+        { id: "e5f6a7b8", name: "Valheim", state: "running", cpuPercent: 18.2, memUsedMb: 2048, memLimitMb: 4096 },
+        { id: "c9d0e1f2", name: "Terraria", state: "starting", cpuPercent: 5.1, memUsedMb: 256, memLimitMb: 2048 },
+        { id: "b3c4d5e6", name: "Ark Survival", state: "offline", cpuPercent: 0, memUsedMb: 0, memLimitMb: 16384 },
+      ],
+    });
+    return;
+  }
+
+  try {
+    const headers = { Authorization: `Bearer ${apiKey}`, Accept: "application/json" };
+
+    const listRes = await httpClient.get(`${baseUrl}/api/client`, {
+      headers,
+      // One page of 100 covers realistic homelab panels without paginating.
+      params: { per_page: 100 },
+    });
+
+    const rawServers = ((listRes.data?.data ?? []) as Array<{
+      attributes?: {
+        identifier?: string;
+        name?: string;
+        limits?: { memory?: number | null };
+      };
+    }>)
+      .map((s) => s.attributes)
+      .filter((a): a is NonNullable<typeof a> => Boolean(a?.identifier));
+
+    const servers = await Promise.all(
+      rawServers.map(async (s) => {
+        const id = s.identifier!;
+        // memory limit is configured in MiB; 0 means "unlimited" in the panel.
+        const limit = s.limits?.memory;
+        const memLimitMb = typeof limit === "number" && limit > 0 ? limit : null;
+        try {
+          const r = await httpClient.get(
+            `${baseUrl}/api/client/servers/${encodeURIComponent(id)}/resources`,
+            { headers },
+          );
+          const attrs = (r.data?.attributes ?? {}) as {
+            current_state?: string;
+            resources?: { memory_bytes?: number; cpu_absolute?: number };
+          };
+          const known = ["running", "starting", "stopping", "offline"];
+          const state = known.includes(attrs.current_state ?? "")
+            ? (attrs.current_state as string)
+            : "unknown";
+          const cpu = attrs.resources?.cpu_absolute;
+          const memBytes = attrs.resources?.memory_bytes;
+          return {
+            id,
+            name: s.name ?? id,
+            state,
+            cpuPercent: typeof cpu === "number" ? Math.round(cpu * 10) / 10 : null,
+            memUsedMb:
+              typeof memBytes === "number" ? Math.round(memBytes / (1024 * 1024)) : null,
+            memLimitMb,
+          };
+        } catch (err) {
+          // Additive: keep the row so the tile still lists the server.
+          logger.warn(
+            { id, reason: normalizeHttpError(err) },
+            "Pterodactyl per-server resources fetch failed",
+          );
+          return { id, name: s.name ?? id, state: "unknown", cpuPercent: null, memUsedMb: null, memLimitMb };
+        }
+      }),
+    );
+
+    res.json({ servers });
+  } catch (err) {
+    logger.error({ reason: normalizeHttpError(err) }, "Pterodactyl widget error");
+    res.status(502).json({ error: "Failed to fetch Pterodactyl data" });
+  }
+});
+
+// ────────────────────────────────────────────────
 // Tailscale Widget
 // ────────────────────────────────────────────────
 // Unlike the LAN services, Tailscale data comes from its cloud API

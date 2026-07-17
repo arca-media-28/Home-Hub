@@ -60,6 +60,7 @@ export const TileIntegration = {
   pihole: 'pihole',
   'nginx-proxy-manager': 'nginx-proxy-manager',
   prowlarr: 'prowlarr',
+  pterodactyl: 'pterodactyl',
   tailscale: 'tailscale',
   ersatztv: 'ersatztv',
   audioplayer: 'audioplayer',
@@ -326,6 +327,11 @@ export type TileSettings = {
      * @nullable
      */
   truenasPoolOrder?: string[] | null;
+  /**
+     * Allow-list of Pterodactyl server identifiers to show on the tile. Null, absent, or empty means show all servers (the default, backward-compatible behavior).
+     * @nullable
+     */
+  pterodactylServers?: string[] | null;
   /**
      * Free-form note text for a Note (post-it) tile. Null or absent means an empty note.
      * @nullable
@@ -629,6 +635,7 @@ export const TileInputIntegration = {
   pihole: 'pihole',
   'nginx-proxy-manager': 'nginx-proxy-manager',
   prowlarr: 'prowlarr',
+  pterodactyl: 'pterodactyl',
   tailscale: 'tailscale',
   ersatztv: 'ersatztv',
   audioplayer: 'audioplayer',
@@ -704,6 +711,7 @@ export const TileUpdateIntegration = {
   pihole: 'pihole',
   'nginx-proxy-manager': 'nginx-proxy-manager',
   prowlarr: 'prowlarr',
+  pterodactyl: 'pterodactyl',
   tailscale: 'tailscale',
   ersatztv: 'ersatztv',
   audioplayer: 'audioplayer',
@@ -1708,6 +1716,47 @@ export interface ProwlarrData {
   /** Number of releases grabbed across all indexers in the last 24 hours. */
   grabCount24h: number;
   healthIssues: ProwlarrHealthIssue[];
+}
+
+/**
+ * Live power state from the panel's resources endpoint. "unknown" when the per-server resources call failed (the row still renders).
+ */
+export type PterodactylServerState = typeof PterodactylServerState[keyof typeof PterodactylServerState];
+
+
+export const PterodactylServerState = {
+  running: 'running',
+  starting: 'starting',
+  stopping: 'stopping',
+  offline: 'offline',
+  unknown: 'unknown',
+} as const;
+
+export interface PterodactylServer {
+  /** The server's short identifier from the panel. */
+  id: string;
+  name: string;
+  /** Live power state from the panel's resources endpoint. "unknown" when the per-server resources call failed (the row still renders). */
+  state: PterodactylServerState;
+  /**
+     * Current absolute CPU usage percent, or null when unknown.
+     * @nullable
+     */
+  cpuPercent: number | null;
+  /**
+     * Current memory usage in MiB, or null when unknown.
+     * @nullable
+     */
+  memUsedMb: number | null;
+  /**
+     * Configured memory limit in MiB, or null when unlimited/unknown.
+     * @nullable
+     */
+  memLimitMb: number | null;
+}
+
+export interface PterodactylData {
+  servers: PterodactylServer[];
 }
 
 export interface TailscaleDevice {

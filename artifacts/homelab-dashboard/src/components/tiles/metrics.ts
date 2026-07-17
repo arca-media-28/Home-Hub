@@ -61,6 +61,11 @@ export const METRIC_CATALOG: Record<string, MetricDef[]> = {
     { key: "grabCount", label: "Grabs (24h)" },
     { key: "healthWarnings", label: "Health warnings" },
   ],
+  [TileIntegration.pterodactyl]: [
+    { key: "health", label: "Overall health" },
+    { key: "serverList", label: "Server list" },
+    { key: "resources", label: "CPU / RAM usage" },
+  ],
   [TileIntegration.tailscale]: [
     { key: "summary", label: "Device summary" },
     { key: "exitNodes", label: "Exit nodes" },

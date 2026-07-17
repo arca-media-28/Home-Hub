@@ -50,6 +50,7 @@ const CATEGORY_BY_KEY: Record<string, Category> = {
   prowlarr: "Downloads",
   // Server
   truenas: "Server",
+  pterodactyl: "Server",
   "nginx-proxy-manager": "Server",
   tailscale: "Server",
   pihole: "Server",

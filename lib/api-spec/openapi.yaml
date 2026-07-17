@@ -673,6 +673,21 @@ paths:
               schema:
                 $ref: "#/components/schemas/ProwlarrData"
 
+  /widgets/pterodactyl:
+    get:
+      operationId: getPterodactylWidget
+      tags: [widgets]
+      summary: Get game server list with per-server state and live resource usage from the Pterodactyl panel
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Pterodactyl game server status summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PterodactylData"
+
   /widgets/tailscale:
     get:
       operationId: getTailscaleStatus
@@ -1435,7 +1450,7 @@ paths:
           required: true
           schema:
             type: string
-            enum: [truenas, plex, jellyfin, subsonic, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, stocks]
+            enum: [truenas, plex, jellyfin, subsonic, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, pterodactyl, tailscale, ersatztv, stocks]
       requestBody:
         required: true
         content:
@@ -1469,7 +1484,7 @@ paths:
           required: true
           schema:
             type: string
-            enum: [truenas, plex, jellyfin, subsonic, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, stocks]
+            enum: [truenas, plex, jellyfin, subsonic, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, pterodactyl, tailscale, ersatztv, stocks]
       requestBody:
         required: true
         content:
@@ -1936,7 +1951,7 @@ components:
           enum: [app, truenas, media, sonarr, radarr, lidarr, qbittorrent]
         integration:
           type: ["string", "null"]
-          enum: [truenas, media, jellyfin, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, audioplayer, clock, timer, weather, sports, news, stocks, sleeper, email, calendar, note, spacer, divider, eightball, dice, coinflip, fortune, tamagotchi, bonsai, aquarium, visualizer, null]
+          enum: [truenas, media, jellyfin, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, pterodactyl, tailscale, ersatztv, audioplayer, clock, timer, weather, sports, news, stocks, sleeper, email, calendar, note, spacer, divider, eightball, dice, coinflip, fortune, tamagotchi, bonsai, aquarium, visualizer, null]
         gridX:
           type: integer
         gridY:
@@ -2020,7 +2035,7 @@ components:
           enum: [app, truenas, media, sonarr, radarr, lidarr, qbittorrent]
         integration:
           type: ["string", "null"]
-          enum: [truenas, media, jellyfin, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, audioplayer, clock, timer, weather, sports, news, stocks, sleeper, email, calendar, note, spacer, divider, eightball, dice, coinflip, fortune, tamagotchi, bonsai, aquarium, visualizer, null]
+          enum: [truenas, media, jellyfin, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, pterodactyl, tailscale, ersatztv, audioplayer, clock, timer, weather, sports, news, stocks, sleeper, email, calendar, note, spacer, divider, eightball, dice, coinflip, fortune, tamagotchi, bonsai, aquarium, visualizer, null]
         gridX:
           type: integer
         gridY:
@@ -2063,7 +2078,7 @@ components:
       properties:
         integration:
           type: ["string", "null"]
-          enum: [truenas, media, jellyfin, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, tailscale, ersatztv, audioplayer, clock, timer, weather, sports, news, stocks, sleeper, email, calendar, note, spacer, divider, eightball, dice, coinflip, fortune, tamagotchi, bonsai, aquarium, visualizer, null]
+          enum: [truenas, media, jellyfin, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, pterodactyl, tailscale, ersatztv, audioplayer, clock, timer, weather, sports, news, stocks, sleeper, email, calendar, note, spacer, divider, eightball, dice, coinflip, fortune, tamagotchi, bonsai, aquarium, visualizer, null]
         gridX:
           type: integer
         gridY:
@@ -2352,6 +2367,14 @@ components:
             pools follow in their server-reported order. Applies to both the
             dedicated ZFS Pools view and the pools section of the combined view.
             Null, absent, or empty keeps the server-reported order (the default,
+            backward-compatible behavior).
+          type: ["array", "null"]
+          items:
+            type: string
+        pterodactylServers:
+          description: >-
+            Allow-list of Pterodactyl server identifiers to show on the tile.
+            Null, absent, or empty means show all servers (the default,
             backward-compatible behavior).
           type: ["array", "null"]
           items:
@@ -3947,6 +3970,40 @@ components:
           type: string
         message:
           type: string
+
+    PterodactylData:
+      type: object
+      required: [servers]
+      properties:
+        servers:
+          type: array
+          items:
+            $ref: "#/components/schemas/PterodactylServer"
+
+    PterodactylServer:
+      type: object
+      required: [id, name, state, cpuPercent, memUsedMb, memLimitMb]
+      properties:
+        id:
+          description: The server's short identifier from the panel.
+          type: string
+        name:
+          type: string
+        state:
+          description: >-
+            Live power state from the panel's resources endpoint. "unknown"
+            when the per-server resources call failed (the row still renders).
+          type: string
+          enum: [running, starting, stopping, offline, unknown]
+        cpuPercent:
+          description: Current absolute CPU usage percent, or null when unknown.
+          type: ["number", "null"]
+        memUsedMb:
+          description: Current memory usage in MiB, or null when unknown.
+          type: ["number", "null"]
+        memLimitMb:
+          description: Configured memory limit in MiB, or null when unlimited/unknown.
+          type: ["number", "null"]
 
     TailscaleData:
       type: object

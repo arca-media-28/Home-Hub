@@ -110,6 +110,7 @@ interface TileSettings {
   truenasMetric?: "cpuram" | "network" | "arc" | "pools" | "disks" | "cputemp" | null;
   truenasShowCpuCores?: boolean | null;
   truenasPools?: string[] | null;
+  pterodactylServers?: string[] | null;
   truenasPoolOrder?: string[] | null;
 }
 
@@ -379,6 +380,13 @@ function pickTileSettings(obj: Record<string, unknown>): TileSettings {
     );
   } else if (obj["truenasPools"] === null) {
     result.truenasPools = null;
+  }
+  if (Array.isArray(obj["pterodactylServers"])) {
+    result.pterodactylServers = obj["pterodactylServers"].filter(
+      (x): x is string => typeof x === "string",
+    );
+  } else if (obj["pterodactylServers"] === null) {
+    result.pterodactylServers = null;
   }
   if (Array.isArray(obj["truenasPoolOrder"])) {
     result.truenasPoolOrder = obj["truenasPoolOrder"].filter(

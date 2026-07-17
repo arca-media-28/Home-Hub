@@ -15,6 +15,7 @@ import {
   ShieldBan,
   Network,
   Search,
+  Gamepad2,
   Waypoints,
   Radio,
   Music,
@@ -95,6 +96,10 @@ export const INTEGRATION_META: Record<string, IntegrationMeta> = {
   [TileIntegration.prowlarr]: {
     icon: Search,
     description: "Indexer health and recent grabs.",
+  },
+  [TileIntegration.pterodactyl]: {
+    icon: Gamepad2,
+    description: "Game server status and resource usage.",
   },
   [TileIntegration.tailscale]: {
     icon: Waypoints,
@@ -209,6 +214,7 @@ export const INTEGRATION_SERVICE: Record<string, string> = {
   [TileIntegration["nginx-proxy-manager"]]: "nginx-proxy-manager",
   [TileIntegration.lidarr]: "lidarr",
   [TileIntegration.prowlarr]: "prowlarr",
+  [TileIntegration.pterodactyl]: "pterodactyl",
   [TileIntegration.tailscale]: "tailscale",
   [TileIntegration.ersatztv]: "ersatztv",
 };
@@ -237,6 +243,7 @@ export const CONNECTION_BACKED_INTEGRATIONS: Record<
     label: "Nginx Proxy Manager",
   },
   [TileIntegration.prowlarr]: { service: "prowlarr", label: "Prowlarr" },
+  [TileIntegration.pterodactyl]: { service: "pterodactyl", label: "Pterodactyl" },
   [TileIntegration.tailscale]: { service: "tailscale", label: "Tailscale" },
   [TileIntegration.ersatztv]: { service: "ersatztv", label: "ErsatzTV" },
   [TileIntegration.stocks]: { service: "stocks", label: "Stocks" },

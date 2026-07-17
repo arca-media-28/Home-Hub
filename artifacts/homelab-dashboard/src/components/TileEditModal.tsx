@@ -144,6 +144,8 @@ import {
   getGetConnectionsStatusQueryKey,
   useGetTruenasMetrics,
   getGetTruenasMetricsQueryKey,
+  useGetPterodactylWidget,
+  getGetPterodactylWidgetQueryKey,
   useGetGoogleStatus,
   getGetGoogleStatusQueryKey,
   useListImapAccounts,
@@ -202,6 +204,7 @@ const INTEGRATIONS = [
   { value: TileIntegration.pihole, label: "Pi-hole" },
   { value: TileIntegration["nginx-proxy-manager"], label: "Nginx Proxy Manager" },
   { value: TileIntegration.prowlarr, label: "Prowlarr" },
+  { value: TileIntegration.pterodactyl, label: "Pterodactyl" },
   { value: TileIntegration.tailscale, label: "Tailscale" },
   { value: TileIntegration.ersatztv, label: "ErsatzTV" },
   { value: TileIntegration.audioplayer, label: "Audio Player" },
@@ -287,6 +290,11 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
   // section of the combined view to those volumes.
   const [truenasPools, setTruenasPools] = useState<string[] | null>(
     tile?.tileSettings?.truenasPools ?? null,
+  );
+  // Pterodactyl server allow-list. null/empty = "show all servers"; an explicit
+  // array narrows the tile's server list to those identifiers.
+  const [pterodactylServers, setPterodactylServers] = useState<string[] | null>(
+    tile?.tileSettings?.pterodactylServers ?? null,
   );
   // Explicit display order of TrueNAS volumes (ZFS pools). null/empty = keep the
   // server-reported order (backward-compatible default). Volumes listed here are
@@ -591,6 +599,7 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
       setTruenasMetric(tile?.tileSettings?.truenasMetric ?? null);
       setTruenasShowCpuCores(tile?.tileSettings?.truenasShowCpuCores !== false);
       setTruenasPools(tile?.tileSettings?.truenasPools ?? null);
+      setPterodactylServers(tile?.tileSettings?.pterodactylServers ?? null);
       setTruenasPoolOrder(tile?.tileSettings?.truenasPoolOrder ?? null);
       setCategoryFilter(tile?.tileSettings?.categoryFilter ?? null);
       setGroupByCategory(tile?.tileSettings?.groupByCategory ?? false);
@@ -728,6 +737,9 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
   // variant is chosen (truenasMetric set), the generic metric-checkbox section
   // is hidden — the variant already fixes which metrics the tile renders.
   const isTruenas = integration === TileIntegration.truenas;
+  // Pterodactyl carries a per-tile allow-list of server identifiers
+  // (null/empty = show all servers), edited via a checkbox picker below.
+  const isPterodactyl = integration === TileIntegration.pterodactyl;
   // The no-connection built-in widgets (clock/weather) have their own config UI
   // and no metric catalog or backing service.
   const isClock = integration === TileIntegration.clock;
@@ -1023,6 +1035,45 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
     const coversAll =
       availablePools.length > 0 && availablePools.every((p) => set.has(p));
     setTruenasPools(coversAll ? null : next);
+  }
+
+  // Pterodactyl server discovery — only fetch while the editor is open and
+  // Pterodactyl is the selected integration. The available servers come from
+  // the widget endpoint (sample servers when unconfigured, live otherwise).
+  const pterodactylQuery = useGetPterodactylWidget({
+    query: {
+      queryKey: getGetPterodactylWidgetQueryKey(),
+      enabled: open && isPterodactyl,
+    },
+  });
+  const availablePteroServers = (pterodactylQuery.data?.servers ?? []).filter(
+    (s) => typeof s.id === "string" && s.id.length > 0,
+  );
+  const availablePteroIds = availablePteroServers.map((s) => s.id);
+  // The set of servers the saved filter currently covers. Only null means
+  // "all servers" here — an empty array is a deliberate "none selected"
+  // in-progress state (e.g. right after unchecking "All servers"), so it must
+  // render every box unchecked, not checked.
+  const checkedPteroServers = new Set(
+    pterodactylServers == null ? availablePteroIds : pterodactylServers,
+  );
+
+  function togglePterodactylServer(id: string, checked: boolean) {
+    // Start from the saved selection when present; otherwise (null = "all")
+    // start from the full reported list so unchecking one leaves the rest
+    // selected. An empty array stays empty so checking one selects just it.
+    const base =
+      pterodactylServers == null ? availablePteroIds : pterodactylServers;
+    const set = new Set(base);
+    if (checked) set.add(id);
+    else set.delete(id);
+    // Collapse back to null ("show all") when every reported server is
+    // selected, so a newly-added server shows automatically. Computed against
+    // the full reported list — never an empty one — so a transiently empty
+    // fetch can't silently wipe an explicit selection.
+    const coversAll =
+      availablePteroIds.length > 0 && availablePteroIds.every((p) => set.has(p));
+    setPterodactylServers(coversAll ? null : Array.from(set));
   }
 
   // The volumes the tile actually shows, in their current display order. We mirror
@@ -1356,6 +1407,14 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
       tileSettings: (() => {
         const widget = isTruenas
           ? { truenasMetric, truenasShowCpuCores, truenasPools, truenasPoolOrder }
+          : isPterodactyl
+          ? {
+              // Empty selection collapses to null ("show all servers").
+              pterodactylServers:
+                pterodactylServers != null && pterodactylServers.length > 0
+                  ? pterodactylServers
+                  : null,
+            }
           : isQbittorrent
           ? { categoryFilter, groupByCategory }
           : isClock
@@ -2674,6 +2733,58 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
                 )}
               </div>
             )}
+
+          {isPterodactyl && (
+            <div className="space-y-2 border-t border-border pt-4">
+              <Label>Filter servers</Label>
+              <p className="text-xs text-muted-foreground">
+                Show only the selected game servers. Leave all checked to show
+                every server.
+              </p>
+              {pterodactylQuery.isLoading ? (
+                <p className="text-xs text-muted-foreground pt-1">
+                  Loading servers…
+                </p>
+              ) : availablePteroServers.length === 0 ? (
+                <p className="text-xs text-muted-foreground pt-1">
+                  No servers were reported by this Pterodactyl panel.
+                </p>
+              ) : (
+                <div className="space-y-2 pt-1">
+                  <label
+                    htmlFor="pterodactyl-server-all"
+                    className="flex items-center gap-2 cursor-pointer select-none"
+                  >
+                    <Checkbox
+                      id="pterodactyl-server-all"
+                      checked={pterodactylServers == null}
+                      onCheckedChange={(c) => {
+                        if (c === true) setPterodactylServers(null);
+                        else setPterodactylServers([]);
+                      }}
+                    />
+                    <span className="text-sm font-medium">All servers</span>
+                  </label>
+                  {availablePteroServers.map((s) => (
+                    <label
+                      key={s.id}
+                      htmlFor={`pterodactyl-server-${s.id}`}
+                      className="flex items-center gap-2 cursor-pointer select-none pl-5"
+                    >
+                      <Checkbox
+                        id={`pterodactyl-server-${s.id}`}
+                        checked={checkedPteroServers.has(s.id)}
+                        onCheckedChange={(c) =>
+                          togglePterodactylServer(s.id, c === true)
+                        }
+                      />
+                      <span className="text-sm">{s.name}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {isQbittorrent && torrentsMetricOn && (
             <div className="space-y-2 border-t border-border pt-4">

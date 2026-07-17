@@ -1910,6 +1910,143 @@ describe("GET /widgets/news", () => {
   });
 });
 
+// ── Pterodactyl ─────────────────────────────────────────────────────────────
+describe("GET /widgets/pterodactyl", () => {
+  it("returns sample data when unconfigured", async () => {
+    const res = await request(app).get("/widgets/pterodactyl");
+    expect(res.status).toBe(200);
+    expect(res.body.servers).toHaveLength(4);
+    // Sample data includes running, starting, and offline servers so the tile
+    // preview shows every state without a live panel.
+    const states = res.body.servers.map((s: { state: string }) => s.state);
+    expect(states).toContain("running");
+    expect(states).toContain("starting");
+    expect(states).toContain("offline");
+    expect(httpGet).not.toHaveBeenCalled();
+  });
+
+  it("maps live servers: state, CPU, memory usage and limit", async () => {
+    findByService.mockReturnValue(
+      connRow({ service: "pterodactyl", url: "https://panel.local", api_key: "ptlc_key" }),
+    );
+
+    httpGet.mockImplementation((url: string) => {
+      if (url.endsWith("/api/client")) {
+        return Promise.resolve({
+          data: {
+            data: [
+              {
+                attributes: {
+                  identifier: "abc123",
+                  name: "Minecraft",
+                  limits: { memory: 4096 },
+                },
+              },
+              {
+                attributes: {
+                  identifier: "def456",
+                  name: "Valheim",
+                  // 0 = unlimited in the panel → null limit.
+                  limits: { memory: 0 },
+                },
+              },
+            ],
+          },
+        });
+      }
+      if (url.includes("/servers/abc123/resources")) {
+        return Promise.resolve({
+          data: {
+            attributes: {
+              current_state: "running",
+              resources: { memory_bytes: 2147483648, cpu_absolute: 37.25 },
+            },
+          },
+        });
+      }
+      if (url.includes("/servers/def456/resources")) {
+        return Promise.resolve({
+          data: {
+            attributes: {
+              current_state: "offline",
+              resources: { memory_bytes: 0, cpu_absolute: 0 },
+            },
+          },
+        });
+      }
+      return Promise.reject(httpError(404));
+    });
+
+    const res = await request(app).get("/widgets/pterodactyl");
+    expect(res.status).toBe(200);
+    expect(res.body.servers).toEqual([
+      {
+        id: "abc123",
+        name: "Minecraft",
+        state: "running",
+        cpuPercent: 37.3,
+        memUsedMb: 2048,
+        memLimitMb: 4096,
+      },
+      {
+        id: "def456",
+        name: "Valheim",
+        state: "offline",
+        cpuPercent: 0,
+        memUsedMb: 0,
+        memLimitMb: null,
+      },
+    ]);
+
+    // The list call must authenticate with the client API key as a Bearer token.
+    const [, listOpts] = httpGet.mock.calls[0]!;
+    expect(listOpts.headers.Authorization).toBe("Bearer ptlc_key");
+  });
+
+  it("keeps a server row with state unknown when its resources call fails", async () => {
+    findByService.mockReturnValue(
+      connRow({ service: "pterodactyl", url: "https://panel.local", api_key: "ptlc_key" }),
+    );
+
+    httpGet.mockImplementation((url: string) => {
+      if (url.endsWith("/api/client")) {
+        return Promise.resolve({
+          data: {
+            data: [
+              { attributes: { identifier: "abc123", name: "Minecraft", limits: { memory: 4096 } } },
+            ],
+          },
+        });
+      }
+      return Promise.reject(httpError(500));
+    });
+
+    const res = await request(app).get("/widgets/pterodactyl");
+    expect(res.status).toBe(200);
+    expect(res.body.servers).toEqual([
+      {
+        id: "abc123",
+        name: "Minecraft",
+        state: "unknown",
+        cpuPercent: null,
+        memUsedMb: null,
+        memLimitMb: 4096,
+      },
+    ]);
+  });
+
+  it("returns 502 when configured but the panel is unreachable", async () => {
+    findByService.mockReturnValue(
+      connRow({ service: "pterodactyl", url: "https://panel.local", api_key: "ptlc_key" }),
+    );
+    httpGet.mockRejectedValue(httpError(500));
+
+    const res = await request(app).get("/widgets/pterodactyl");
+    expect(res.status).toBe(502);
+    expect(res.body.error).toMatch(/pterodactyl/i);
+  });
+});
+
 // ── Tailscale ───────────────────────────────────────────────────────────────
 describe("GET /widgets/tailscale", () => {
   it("returns sample data when unconfigured", async () => {
