@@ -338,10 +338,38 @@ const DART_MS = 1100;
 // After eating, the fish swims back up to its own lane before the ambient
 // loop takes over again.
 const FEED_BACK_MS = 700;
+// One-off "chomp" flourish at the pellet's landing point when the fish
+// arrives: crumb particles scatter, a couple of tiny bubbles puff up, and the
+// fish itself does a quick mouth-wiggle pulse. Purely cosmetic and transient;
+// it overlaps the swim-back without touching the feeding state machine.
+const CHOMP_MS = 650;
 
-// The fish center aims slightly above the sand line so its mouth meets the
-// pellet where it lands.
+// Lowest y a fish center aims for: slightly above the sand line, so if the
+// pellet has fully landed the fish's mouth still meets it rather than
+// burrowing into the sand.
 const FEED_LAND_Y = VB_H - SAND_H - 8;
+// Where a sinking pellet ends up (matches the --aq-sink target below).
+const PELLET_REST_Y = VB_H - SAND_H - 2;
+
+// The pellet sinks with CSS `ease-in` = cubic-bezier(0.42, 0, 1, 1). To meet
+// the pellet mid-sink, predict its progress at a given time fraction: solve
+// the bezier's x-curve for the parameter, then evaluate the y-curve (which
+// for these control points is smoothstep 3t² - 2t³).
+function easeInProgress(timeFrac: number): number {
+  const f = Math.min(1, Math.max(0, timeFrac));
+  // Bisection on B_x(t) = 3·0.42·t(1-t)² + 3·1·t²(1-t) + t³ (monotonic).
+  let lo = 0;
+  let hi = 1;
+  for (let k = 0; k < 40; k++) {
+    const mid = (lo + hi) / 2;
+    const inv = 1 - mid;
+    const x = 3 * 0.42 * mid * inv * inv + 3 * mid * mid * inv + mid * mid * mid;
+    if (x < f) lo = mid;
+    else hi = mid;
+  }
+  const t = (lo + hi) / 2;
+  return t * t * (3 - 2 * t);
+}
 
 // A fish currently swimming to dropped food. `x`/`y` are the inline transform
 // target in viewBox units; the element CSS-transitions toward them.
@@ -355,6 +383,15 @@ interface Feeding {
   // "start" places the fish at its measured position with no transition;
   // "to" glides it to the pellet; "back" returns it to its swim lane.
   phase: "start" | "to" | "back";
+}
+
+// A one-off eat flourish at the pellet's landing point. `dir` mirrors the
+// eating fish so crumbs scatter away from its mouth.
+interface Chomp {
+  id: number;
+  x: number;
+  y: number;
+  dir: 1 | -1;
 }
 
 // The ambient swim loop uses CSS `ease-in-out` = cubic-bezier(0.42,0,0.58,1),
@@ -411,6 +448,7 @@ export default function AquariumTile({ tile, editMode }: AquariumTileProps) {
   const [dartingFish, setDartingFish] = useState<Record<number, number>>({});
   const [pellets, setPellets] = useState<Pellet[]>([]);
   const [feeding, setFeeding] = useState<Feeding | null>(null);
+  const [chomps, setChomps] = useState<Chomp[]>([]);
   const [fishDelays, setFishDelays] = useState<Record<number, number>>({});
   const pelletIdRef = useRef(0);
   const timeoutsRef = useRef<number[]>([]);
@@ -522,36 +560,56 @@ export default function AquariumTile({ tile, editMode }: AquariumTileProps) {
     if (bestIdx < 0) return;
 
     const target = fish[bestIdx]!;
-    // Meet the pellet where it lands on the sand; keep the resume x inside
-    // the swim range so the hand-back math stays valid.
     const eatX = Math.min(swimMax, Math.max(swimMin, pelletX));
     const dir: 1 | -1 = eatX >= bestX ? 1 : -1;
-    const dist = Math.hypot(eatX - bestX, FEED_LAND_Y - bestY);
-    const toDur = Math.min(PELLET_SINK_MS - 200, Math.max(650, Math.round(dist * 16)));
+    // The fish is positioned by its body CENTER, but it should collect the
+    // food with its mouth: offset the center back from the pellet by roughly
+    // the snout distance (fish shapes face right with mouths ~9 local units
+    // ahead of center, scaled per fish). Clamped to the swim range so the
+    // hand-back math stays valid.
+    const fishX = Math.min(swimMax, Math.max(swimMin, eatX - dir * 9 * target.scale));
+    // Meet the pellet where it actually IS when the fish arrives, not where
+    // it will eventually land — the pellet is usually still mid-sink. Predict
+    // its y from the sink easing at the arrival time; since the travel time
+    // itself depends on the distance, refine the estimate once.
+    const sinkDist = Math.max(4, PELLET_REST_Y - pelletY);
+    const pelletYAt = (ms: number) =>
+      Math.min(FEED_LAND_Y, pelletY + sinkDist * easeInProgress(ms / PELLET_SINK_MS));
+    const durFor = (y: number) =>
+      Math.min(
+        PELLET_SINK_MS - 200,
+        Math.max(650, Math.round(Math.hypot(fishX - bestX, y - bestY) * 16)),
+      );
+    let toDur = durFor(pelletYAt(1000));
+    toDur = durFor(pelletYAt(toDur));
+    const eatY = pelletYAt(toDur);
 
     // Phase 1: pin the fish at its measured position (no transition)...
     setFeeding({ fishIndex: bestIdx, pelletId: id, x: bestX, y: bestY, dir, durMs: toDur, phase: "start" });
-    // ...then glide it to the pellet's landing spot.
+    // ...then glide it to where the pellet will be on arrival.
     later(() => {
       setFeeding((cur) =>
-        cur && cur.pelletId === id ? { ...cur, x: eatX, y: FEED_LAND_Y, phase: "to" } : cur,
+        cur && cur.pelletId === id ? { ...cur, x: fishX, y: eatY, phase: "to" } : cur,
       );
     }, 30);
-    // Phase 2: eat (remove the pellet) and swim back up to its own lane.
+    // Phase 2: eat (remove the pellet), play a one-off chomp flourish at the
+    // meeting point, and swim back up to its own lane.
     later(() => {
       setPellets((prev) => prev.filter((p) => p.id !== id));
+      setChomps((prev) => [...prev.slice(-3), { id, x: eatX, y: eatY, dir }]);
+      later(() => setChomps((prev) => prev.filter((c) => c.id !== id)), CHOMP_MS);
       setFeeding((cur) =>
         cur && cur.pelletId === id
-          ? { ...cur, x: eatX, y: target.y, durMs: FEED_BACK_MS, phase: "back" }
+          ? { ...cur, x: fishX, y: target.y, durMs: FEED_BACK_MS, phase: "back" }
           : cur,
       );
     }, 30 + toDur);
     // Phase 3: hand back to the ambient loop. The loop's position is fully
     // determined by its (negative) delay, so pick a delay that puts the fish
-    // exactly at (eatX, its lane y) moving in its current direction.
+    // exactly at (fishX, its lane y) moving in its current direction.
     later(() => {
       const range = swimMax - swimMin;
-      const frac = range > 0 ? (dir === 1 ? eatX - swimMin : swimMax - eatX) / range : 0;
+      const frac = range > 0 ? (dir === 1 ? fishX - swimMin : swimMax - fishX) / range : 0;
       const half = inverseEaseInOut(frac) * 0.5;
       const phasePos = dir === 1 ? half : 0.5 + half;
       setFishDelays((prev) => ({ ...prev, [bestIdx]: -phasePos * target.duration }));
@@ -650,11 +708,33 @@ export default function AquariumTile({ tile, editMode }: AquariumTileProps) {
           100% { transform: translateY(var(--aq-sink)); opacity: 0; }
         }
         .aq-pellet { animation: aq-pellet-sink ${PELLET_SINK_MS}ms ease-in 1 forwards; }
+        /* One-off chomp flourish when the fish reaches its food: crumb
+           particles scatter away from the mouth and fade, a couple of tiny
+           bubbles puff upward, and the fish does a quick bite pulse. Each
+           crumb's scatter vector lives in CSS vars set inline. */
+        @keyframes aq-crumb {
+          0%   { transform: translate(0, 0) scale(1); opacity: 0.95; }
+          100% { transform: translate(var(--aq-cx), var(--aq-cy)) scale(0.4); opacity: 0; }
+        }
+        .aq-crumb { animation: aq-crumb ${CHOMP_MS}ms ease-out 1 forwards; }
+        @keyframes aq-puff {
+          0%   { transform: translateY(0) scale(0.6); opacity: 0; }
+          25%  { opacity: 0.8; }
+          100% { transform: translateY(-14px) scale(1.15); opacity: 0; }
+        }
+        .aq-puff { animation: aq-puff ${CHOMP_MS}ms ease-out 1 forwards; animation-delay: var(--aq-puffdelay); opacity: 0; }
+        @keyframes aq-bite {
+          0%, 100% { transform: rotate(0deg); }
+          25%      { transform: rotate(-6deg); }
+          55%      { transform: rotate(4deg); }
+          80%      { transform: rotate(-2deg); }
+        }
+        .aq-bite { animation: aq-bite ${CHOMP_MS}ms ease-in-out 1; }
         .aq-fish-hit { cursor: pointer; pointer-events: bounding-box; }
         @media (prefers-reduced-motion: reduce) {
-          .aq-fish, .aq-fish-flip, .aq-fish-bob, .aq-sway, .aq-bubble, .aq-bubble-wiggle, .aq-shimmer, .aq-ray, .aq-ray-breathe, .aq-particle, .aq-particle-bob, .aq-dart, .aq-pellet { animation: none; }
+          .aq-fish, .aq-fish-flip, .aq-fish-bob, .aq-sway, .aq-bubble, .aq-bubble-wiggle, .aq-shimmer, .aq-ray, .aq-ray-breathe, .aq-particle, .aq-particle-bob, .aq-dart, .aq-pellet, .aq-crumb, .aq-puff, .aq-bite { animation: none; }
           .aq-feeding { transition: none !important; }
-          .aq-bubble, .aq-pellet { opacity: 0; }
+          .aq-bubble, .aq-pellet, .aq-crumb, .aq-puff { opacity: 0; }
         }
       `}</style>
       <svg
@@ -755,7 +835,16 @@ export default function AquariumTile({ tile, editMode }: AquariumTileProps) {
               }}
             >
               <g transform={`scale(${(feeding.dir * f.scale).toFixed(2)} ${f.scale.toFixed(2)})`}>
-                <FishShape species={f.species} />
+                {/* Quick bite wiggle plays as the fish turns back from the
+                    pellet. It lives on an extra inner group so the CSS
+                    rotation doesn't wipe the scale attribute above. */}
+                {feeding.phase === "back" ? (
+                  <g className="aq-bite">
+                    <FishShape species={f.species} />
+                  </g>
+                ) : (
+                  <FishShape species={f.species} />
+                )}
               </g>
             </g>
           ) : (
@@ -810,6 +899,53 @@ export default function AquariumTile({ tile, editMode }: AquariumTileProps) {
               <circle r={2} fill="#b5803a" stroke="#8a5f26" strokeWidth={0.6} />
               <circle cx={-0.6} cy={-0.6} r={0.6} fill="rgba(255,255,255,0.5)" />
             </g>
+          </g>
+        ))}
+
+        {/* One-off chomp flourishes at the pellet's landing point: a few
+            crumb particles scatter away from the fish's mouth while a couple
+            of tiny bubbles puff upward, then everything fades. Placement
+            translate sits on the outer group so the CSS scatter/puff
+            transforms on inner groups don't wipe it. */}
+        {chomps.map((c) => (
+          <g key={`chomp-${c.id}`} transform={`translate(${c.x.toFixed(1)} ${c.y.toFixed(1)})`}>
+            {Array.from({ length: 5 }, (_, k) => {
+              // Scatter fan biased away from the mouth (opposite the fish's
+              // approach direction), deterministic per crumb index.
+              const ang = (-0.9 + (k / 4) * 1.8) * 0.9;
+              const dist = 7 + jitter(k, 40) * 7;
+              const dx = -c.dir * Math.cos(ang) * dist;
+              const dy = Math.sin(ang) * dist - 3;
+              return (
+                <g
+                  key={k}
+                  className="aq-crumb"
+                  style={
+                    {
+                      "--aq-cx": `${dx.toFixed(1)}px`,
+                      "--aq-cy": `${dy.toFixed(1)}px`,
+                    } as React.CSSProperties
+                  }
+                >
+                  <circle r={(0.7 + jitter(k, 41) * 0.6).toFixed(2)} fill="#b5803a" />
+                </g>
+              );
+            })}
+            {Array.from({ length: 2 }, (_, k) => (
+              <g key={`puff-${k}`} transform={`translate(${(k === 0 ? -2.5 : 2.5).toFixed(1)} -2)`}>
+                <g
+                  className="aq-puff"
+                  style={{ "--aq-puffdelay": `${k * 90}ms` } as React.CSSProperties}
+                >
+                  <circle
+                    r={(1.1 + k * 0.5).toFixed(2)}
+                    fill="rgba(255,255,255,0.28)"
+                    stroke="rgba(255,255,255,0.55)"
+                    strokeWidth={0.5}
+                  />
+                </g>
+              </g>
+            ))}
           </g>
         ))}
 

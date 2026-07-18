@@ -122,6 +122,11 @@ test("aquarium tile persists settings and renders a populated tank", async ({
     box!.width * 0.1,
   );
 
+  // When the fish reaches the pellet, a one-off chomp flourish plays at the
+  // landing point (crumb particles + a small bubble puff), then fades.
+  await expect(tank.locator("g.aq-crumb").first()).toBeAttached({ timeout: 10_000 });
+  await expect(tank.locator("g.aq-crumb")).toHaveCount(0, { timeout: 10_000 });
+
   // The pellet is transient: eaten or sunk, it is removed; the feeding fish
   // finishes its meal and rejoins the normal swim loop.
   await expect(tank.locator("g.aq-pellet")).toHaveCount(0, { timeout: 10_000 });
