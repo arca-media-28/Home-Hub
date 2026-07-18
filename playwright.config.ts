@@ -34,7 +34,10 @@ export default defineConfig({
   webServer: useEmbeddedServer
     ? {
         command: "pnpm run dev:local",
-        url: "http://localhost:3000/",
+        // Wait on the API health endpoint *through* the Vite proxy: the web
+        // dev server comes up before the API's first build finishes, and
+        // waiting only on the web root lets specs start while /api still 500s.
+        url: "http://localhost:3000/api/healthz",
         reuseExistingServer: true,
         timeout: 120_000,
       }

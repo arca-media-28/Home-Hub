@@ -19,3 +19,6 @@ Root config `playwright.config.ts` + specs under `tests/e2e/`; run with `pnpm ru
 ## Auth in tests (NOT cookies)
 - Auth is a **Bearer JWT**: `POST /api/auth/register` (or `/login`) returns `{ token, user }`; the web app stores it in `localStorage["token"]` and sends `Authorization: Bearer <token>`.
 - In a spec: register via `page.request`, then (a) pass `{ Authorization: 'Bearer '+token }` on API calls like `POST /api/tiles`, and (b) `page.addInitScript(t => localStorage.setItem('token', t), token)` BEFORE the first `goto('/')` so the browser app is authed on load.
+
+## API readiness
+- Playwright webServer now waits on `http://localhost:3000/api/healthz` (API health through the Vite proxy), not the web root — the web dev server boots before the API's first build, and waiting only on `/` let the first spec hit warm-up 500s on `/api/auth/register`.
