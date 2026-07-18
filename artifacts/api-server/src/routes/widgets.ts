@@ -4053,6 +4053,45 @@ router.get("/pterodactyl", requireAuth, async (req: AuthRequest, res) => {
   }
 });
 
+// Send a power signal (start/stop/restart) to one server on the panel. The
+// panel replies 204 on success. When no connection is configured the tile is
+// showing sample data, so the action is acknowledged as a demo no-op instead
+// of failing — the buttons stay usable in demo mode without side effects.
+router.post("/pterodactyl/power", requireAuth, async (req: AuthRequest, res) => {
+  const { serverId, signal } = (req.body ?? {}) as { serverId?: unknown; signal?: unknown };
+  if (typeof serverId !== "string" || serverId.trim() === "") {
+    res.status(400).json({ error: "serverId is required" });
+    return;
+  }
+  if (signal !== "start" && signal !== "stop" && signal !== "restart") {
+    res.status(400).json({ error: "signal must be start, stop, or restart" });
+    return;
+  }
+
+  const saved = getSavedConnection(req.user!.userId, "pterodactyl");
+  const baseUrl = saved.url || process.env["PTERODACTYL_URL"];
+  const apiKey = saved.apiKey || process.env["PTERODACTYL_API_KEY"];
+  if (!baseUrl || !apiKey) {
+    res.json({ ok: true, demo: true });
+    return;
+  }
+
+  try {
+    await httpClient.post(
+      `${baseUrl}/api/client/servers/${encodeURIComponent(serverId)}/power`,
+      { signal },
+      { headers: { Authorization: `Bearer ${apiKey}`, Accept: "application/json" } },
+    );
+    res.json({ ok: true, demo: false });
+  } catch (err) {
+    logger.error(
+      { serverId, signal, reason: describeHttpError(err) },
+      "Pterodactyl power signal failed",
+    );
+    res.status(502).json({ error: `Failed to ${signal} the server` });
+  }
+});
+
 // ────────────────────────────────────────────────
 // Tailscale Widget
 // ────────────────────────────────────────────────

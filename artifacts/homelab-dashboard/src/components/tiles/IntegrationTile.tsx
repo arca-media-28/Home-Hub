@@ -78,6 +78,10 @@ export interface WidgetProps {
   // The tile's integration value. MediaTile uses it to pick the backing media
   // server (Plex vs Jellyfin); other widgets ignore it.
   integration: string;
+  // True while the dashboard layout is being arranged. Widgets with in-place
+  // actions (e.g. Pterodactyl power buttons) hide them in edit mode so clicks
+  // don't fight drag/resize.
+  editMode: boolean;
 }
 
 function renderStatusView(integration: string, props: WidgetProps) {
@@ -157,9 +161,10 @@ function checkedAgo(iso: string | null | undefined): string | null {
 interface IntegrationTileProps {
   tile: Tile;
   status?: ServiceStatus;
+  editMode?: boolean;
 }
 
-export default function IntegrationTile({ tile, status }: IntegrationTileProps) {
+export default function IntegrationTile({ tile, status, editMode = false }: IntegrationTileProps) {
   const integration = tile.integration!;
   const hasImage = Boolean(tile.imageUrl);
   // No explicit per-tile color → follow the active theme's card surface.
@@ -313,10 +318,10 @@ export default function IntegrationTile({ tile, status }: IntegrationTileProps) 
           // scrolls) instead of pinning to it and clipping. `min-h-full` keeps a
           // short widget filling the body as before.
           <div className="min-h-full">
-            {renderStatusView(integration, { enabled, density, tileSettings: tile.tileSettings, integration })}
+            {renderStatusView(integration, { enabled, density, tileSettings: tile.tileSettings, integration, editMode })}
           </div>
         ) : (
-          renderStatusView(integration, { enabled, density, tileSettings: tile.tileSettings, integration })
+          renderStatusView(integration, { enabled, density, tileSettings: tile.tileSettings, integration, editMode })
         )}
       </div>
     </div>

@@ -688,6 +688,39 @@ paths:
               schema:
                 $ref: "#/components/schemas/PterodactylData"
 
+  /widgets/pterodactyl/power:
+    post:
+      operationId: sendPterodactylPower
+      tags: [widgets]
+      summary: Send a power signal (start/stop/restart) to one game server on the Pterodactyl panel
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PterodactylPowerRequest"
+      responses:
+        "200":
+          description: The power signal was accepted (or acknowledged as a demo no-op)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PterodactylPowerResult"
+        "400":
+          description: Invalid server id or power signal
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "502":
+          description: The Pterodactyl panel rejected the request or could not be reached
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /widgets/tailscale:
     get:
       operationId: getTailscaleStatus
@@ -4023,6 +4056,31 @@ components:
         max:
           description: Configured player slot limit, or null when unknown.
           type: ["number", "null"]
+
+    PterodactylPowerRequest:
+      type: object
+      required: [serverId, signal]
+      properties:
+        serverId:
+          description: The target server's short identifier from the panel.
+          type: string
+        signal:
+          description: The power action to send.
+          type: string
+          enum: [start, stop, restart]
+
+    PterodactylPowerResult:
+      type: object
+      required: [ok, demo]
+      properties:
+        ok:
+          description: True when the signal was accepted.
+          type: boolean
+        demo:
+          description: >-
+            True when no Pterodactyl connection is configured — the request was
+            acknowledged but nothing was sent (the tile is showing sample data).
+          type: boolean
 
     TailscaleData:
       type: object

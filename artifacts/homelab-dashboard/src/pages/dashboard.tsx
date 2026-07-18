@@ -256,7 +256,7 @@ function renderTileContent(tile: Tile, status: ServiceStatus | undefined, editMo
   // Every tile renders as a styled app/link card. When an integration is
   // attached it also shows a compact live-status section from that service.
   if (tile.integration) {
-    return <IntegrationTile tile={tile} status={status} />;
+    return <IntegrationTile tile={tile} status={status} editMode={editMode} />;
   }
   return <AppTile tile={tile} />;
 }

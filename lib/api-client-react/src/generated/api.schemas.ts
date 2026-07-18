@@ -1771,6 +1771,32 @@ export interface PterodactylData {
   servers: PterodactylServer[];
 }
 
+/**
+ * The power action to send.
+ */
+export type PterodactylPowerRequestSignal = typeof PterodactylPowerRequestSignal[keyof typeof PterodactylPowerRequestSignal];
+
+
+export const PterodactylPowerRequestSignal = {
+  start: 'start',
+  stop: 'stop',
+  restart: 'restart',
+} as const;
+
+export interface PterodactylPowerRequest {
+  /** The target server's short identifier from the panel. */
+  serverId: string;
+  /** The power action to send. */
+  signal: PterodactylPowerRequestSignal;
+}
+
+export interface PterodactylPowerResult {
+  /** True when the signal was accepted. */
+  ok: boolean;
+  /** True when no Pterodactyl connection is configured — the request was acknowledged but nothing was sent (the tile is showing sample data). */
+  demo: boolean;
+}
+
 export interface TailscaleDevice {
   id: string;
   /** The device's machine/host name. */

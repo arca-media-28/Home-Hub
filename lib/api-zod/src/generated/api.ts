@@ -1520,6 +1520,20 @@ export const GetPterodactylWidgetResponse = zod.object({
 
 
 /**
+ * @summary Send a power signal (start/stop/restart) to one game server on the Pterodactyl panel
+ */
+export const SendPterodactylPowerBody = zod.object({
+  "serverId": zod.string().describe('The target server\'s short identifier from the panel.'),
+  "signal": zod.enum(['start', 'stop', 'restart']).describe('The power action to send.')
+})
+
+export const SendPterodactylPowerResponse = zod.object({
+  "ok": zod.boolean().describe('True when the signal was accepted.'),
+  "demo": zod.boolean().describe('True when no Pterodactyl connection is configured — the request was acknowledged but nothing was sent (the tile is showing sample data).')
+})
+
+
+/**
  * @summary Get tailnet device status (online/offline counts and per-device list) from Tailscale
  */
 export const GetTailscaleStatusResponse = zod.object({

@@ -1,0 +1,113 @@
+// @vitest-environment jsdom
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { render, cleanup, screen, fireEvent } from "@testing-library/react";
+
+// ---------------------------------------------------------------------------
+// Coverage for the Pterodactyl tile's per-row power controls: buttons are
+// contextual to the server's power state (start when offline, stop/restart
+// when running, spinner while transitioning), clicking one fires the power
+// mutation with the right signal, and edit mode hides the controls entirely
+// so they can't fight drag/resize.
+// ---------------------------------------------------------------------------
+
+const { powerMutate } = vi.hoisted(() => ({ powerMutate: vi.fn() }));
+
+// Servers the mocked widget hook returns. Set per test.
+let mockServers: Array<{
+  id: string;
+  name: string;
+  state: string;
+  cpuPercent: number | null;
+  memUsedMb: number | null;
+  memLimitMb: number | null;
+  players: { current: number; max: number | null } | null;
+}> = [];
+
+vi.mock("@workspace/api-client-react", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@workspace/api-client-react")>()),
+  useGetPterodactylWidget: () => ({
+    data: { servers: mockServers },
+    isLoading: false,
+    isError: false,
+  }),
+  getGetPterodactylWidgetQueryKey: () => ["/api/widgets/pterodactyl"],
+  useSendPterodactylPower: () => ({ mutate: powerMutate }),
+  PterodactylPowerRequestSignal: { start: "start", stop: "stop", restart: "restart" },
+}));
+
+vi.mock("@tanstack/react-query", () => ({
+  useQueryClient: () => ({ invalidateQueries: vi.fn() }),
+}));
+
+vi.mock("@/hooks/use-toast", () => ({
+  useToast: () => ({ toast: vi.fn() }),
+}));
+
+import PterodactylTile from "./PterodactylTile";
+import { tileDensity, resolveEnabledMetrics } from "./metrics";
+
+function renderTile({ editMode = false }: { editMode?: boolean } = {}) {
+  return render(
+    <PterodactylTile
+      enabled={resolveEnabledMetrics("pterodactyl", null)}
+      density={tileDensity(6, 6, { width: 320, height: 360 }, false, false)}
+      tileSettings={null}
+      integration="pterodactyl"
+      editMode={editMode}
+    />,
+  );
+}
+
+beforeEach(() => {
+  powerMutate.mockClear();
+  mockServers = [
+    { id: "run1", name: "Minecraft", state: "running", cpuPercent: 12, memUsedMb: 1024, memLimitMb: 4096, players: { current: 2, max: 20 } },
+    { id: "off1", name: "Valheim", state: "offline", cpuPercent: 0, memUsedMb: 0, memLimitMb: 4096, players: null },
+    { id: "boot1", name: "Terraria", state: "starting", cpuPercent: 1, memUsedMb: 128, memLimitMb: 2048, players: null },
+  ];
+});
+
+afterEach(() => cleanup());
+
+describe("PterodactylTile power controls", () => {
+  it("shows contextual buttons per state in locked mode", () => {
+    renderTile();
+    // Running server → stop + restart, no start.
+    expect(screen.getByLabelText("Stop Minecraft")).toBeTruthy();
+    expect(screen.getByLabelText("Restart Minecraft")).toBeTruthy();
+    expect(screen.queryByLabelText("Start Minecraft")).toBeNull();
+    // Offline server → start only.
+    expect(screen.getByLabelText("Start Valheim")).toBeTruthy();
+    expect(screen.queryByLabelText("Stop Valheim")).toBeNull();
+    // Transitioning server → spinner instead of buttons.
+    expect(screen.queryByLabelText(/Terraria/)).toBeNull();
+  });
+
+  it("sends the matching power signal when a button is clicked", () => {
+    renderTile();
+    fireEvent.click(screen.getByLabelText("Start Valheim"));
+    expect(powerMutate).toHaveBeenCalledWith({
+      data: { serverId: "off1", signal: "start" },
+    });
+
+    fireEvent.click(screen.getByLabelText("Restart Minecraft"));
+    expect(powerMutate).toHaveBeenCalledWith({
+      data: { serverId: "run1", signal: "restart" },
+    });
+  });
+
+  it("shows a pending spinner on the acted-upon row until state changes", () => {
+    renderTile();
+    fireEvent.click(screen.getByLabelText("Stop Minecraft"));
+    // The row's buttons are replaced by a spinner while the action is pending.
+    expect(screen.queryByLabelText("Stop Minecraft")).toBeNull();
+    expect(screen.queryByLabelText("Restart Minecraft")).toBeNull();
+  });
+
+  it("hides all power controls in edit mode", () => {
+    renderTile({ editMode: true });
+    expect(screen.queryByLabelText("Stop Minecraft")).toBeNull();
+    expect(screen.queryByLabelText("Restart Minecraft")).toBeNull();
+    expect(screen.queryByLabelText("Start Valheim")).toBeNull();
+  });
+});

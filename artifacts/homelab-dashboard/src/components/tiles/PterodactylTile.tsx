@@ -1,8 +1,13 @@
+import { useEffect, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   useGetPterodactylWidget,
   getGetPterodactylWidgetQueryKey,
+  useSendPterodactylPower,
+  type PterodactylPowerRequestSignal,
 } from "@workspace/api-client-react";
-import { Gamepad2, AlertTriangle, Users } from "lucide-react";
+import { Gamepad2, AlertTriangle, Users, Play, Square, RotateCw, Loader2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 import type { WidgetProps } from "./IntegrationTile";
 import {
   tileBudget,
@@ -33,10 +38,101 @@ function formatMem(usedMb: number | null, limitMb: number | null): string | null
   return `${used} / ${limit}`;
 }
 
-export default function PterodactylTile({ enabled, density, tileSettings }: WidgetProps) {
+// How long a row keeps its spinner after a power action if no poll ever
+// reflects the transition (panel accepted but state read lags/fails).
+const PENDING_TIMEOUT_MS = 20_000;
+// After an action, poll faster for a while so starting/stopping resolves
+// visibly instead of waiting out the normal 30s interval.
+const BOOST_MS = 60_000;
+
+export default function PterodactylTile({ enabled, density, tileSettings, editMode }: WidgetProps) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  // Servers with an in-flight power action: id → the signal sent + when. The
+  // row shows a spinner until a poll reports the server transitioning (or the
+  // action clearly completed), or the timeout lapses.
+  const [pending, setPending] = useState<Record<string, { signal: PterodactylPowerRequestSignal; at: number }>>({});
+  const [boostUntil, setBoostUntil] = useState(0);
+
   const { data, isLoading, isError } = useGetPterodactylWidget({
-    query: { queryKey: getGetPterodactylWidgetQueryKey(), refetchInterval: 30_000 },
+    query: {
+      queryKey: getGetPterodactylWidgetQueryKey(),
+      refetchInterval: Date.now() < boostUntil ? 5_000 : 30_000,
+    },
   });
+
+  const power = useSendPterodactylPower({
+    mutation: {
+      onSuccess: (result, { data: req }) => {
+        if (result.demo) {
+          // Sample data — nothing was sent; don't fake a transition.
+          setPending((p) => {
+            const next = { ...p };
+            delete next[req.serverId];
+            return next;
+          });
+          toast({
+            title: "Demo mode",
+            description: "Connect Pterodactyl in Settings to control real servers.",
+          });
+          return;
+        }
+        setBoostUntil(Date.now() + BOOST_MS);
+        void queryClient.invalidateQueries({ queryKey: getGetPterodactylWidgetQueryKey() });
+      },
+      onError: (err, { data: req }) => {
+        setPending((p) => {
+          const next = { ...p };
+          delete next[req.serverId];
+          return next;
+        });
+        const message =
+          err instanceof Error && err.message ? err.message : "The panel rejected the request";
+        toast({
+          title: `Could not ${req.signal} server`,
+          description: message,
+          variant: "destructive",
+        });
+      },
+    },
+  });
+
+  const sendPower = (serverId: string, signal: PterodactylPowerRequestSignal) => {
+    setPending((p) => ({ ...p, [serverId]: { signal, at: Date.now() } }));
+    power.mutate({ data: { serverId, signal } });
+  };
+
+  // Clear a row's pending spinner once a poll shows the action took effect
+  // (server transitioning, or already in the expected end state), or when the
+  // timeout lapses without the panel ever reflecting it.
+  const serversRef = useRef(data?.servers);
+  serversRef.current = data?.servers;
+  useEffect(() => {
+    setPending((p) => {
+      let changed = false;
+      const next = { ...p };
+      for (const [id, entry] of Object.entries(p)) {
+        const server = serversRef.current?.find((s) => s.id === id);
+        const state = server?.state;
+        const settled =
+          state === "starting" ||
+          state === "stopping" ||
+          (entry.signal === "start" && state === "running") ||
+          (entry.signal === "stop" && state === "offline") ||
+          // A quick restart can land back on "running" between polls without
+          // us ever observing the stopping/starting transition.
+          (entry.signal === "restart" && state === "running" && Date.now() - entry.at > 5_000) ||
+          Date.now() - entry.at > PENDING_TIMEOUT_MS ||
+          !server;
+        if (settled) {
+          delete next[id];
+          changed = true;
+        }
+      }
+      return changed ? next : p;
+    });
+  }, [data]);
 
   if (isLoading) {
     return (
@@ -72,7 +168,12 @@ export default function PterodactylTile({ enabled, density, tileSettings }: Widg
   const down = data.servers.filter((s) => s.state === "offline").length;
 
   const showResources = enabled.has("resources");
-  const rowPx = showResources ? TWO_LINE_ROW_PX : ROW_PX;
+  // Rows are always at least two lines (name, then players/status/controls);
+  // the resources metric adds a third line. Each row renders as its own card
+  // (background + padding) so servers read as separate items — the card
+  // chrome costs extra height per row.
+  const CARD_PX = 14;
+  const rowPx = (showResources ? TWO_LINE_ROW_PX + 16 : TWO_LINE_ROW_PX) + CARD_PX;
 
   // Wide, short tiles waste the whole right side when content stacks
   // vertically — the health block alone eats the budget and the list hides.
@@ -188,6 +289,60 @@ export default function PterodactylTile({ enabled, density, tileSettings }: Widg
     </div>
   );
 
+  // Per-row power controls (locked mode only — in edit mode clicks belong to
+  // drag/resize). Contextual: start when offline, stop/restart when running;
+  // a spinner replaces the buttons while an action awaits its state change or
+  // the panel reports the server transitioning.
+  const btnIcon = rowScale === 2 ? "w-3.5 h-3.5" : "w-3 h-3";
+  const powerControls = (s: (typeof visibleServers)[number]) => {
+    if (editMode) return null;
+    const isPending = Boolean(pending[s.id]);
+    const transitioning = s.state === "starting" || s.state === "stopping";
+    if (isPending || transitioning) {
+      return (
+        <span className="flex items-center flex-shrink-0 text-muted-foreground" aria-label="Working…">
+          <Loader2 className={`${btnIcon} animate-spin`} />
+        </span>
+      );
+    }
+    const btn = (
+      label: string,
+      signal: PterodactylPowerRequestSignal,
+      Icon: typeof Play,
+      cls: string,
+    ) => (
+      <button
+        type="button"
+        title={label}
+        aria-label={`${label} ${s.name}`}
+        onClick={(e) => {
+          e.stopPropagation();
+          sendPower(s.id, signal);
+        }}
+        className={`p-0.5 rounded text-muted-foreground transition-colors ${cls}`}
+      >
+        <Icon className={btnIcon} />
+      </button>
+    );
+    if (s.state === "running") {
+      return (
+        <span className="flex items-center gap-0.5 flex-shrink-0">
+          {btn("Restart", "restart", RotateCw, "hover:text-amber-500")}
+          {btn("Stop", "stop", Square, "hover:text-red-500")}
+        </span>
+      );
+    }
+    if (s.state === "offline") {
+      return (
+        <span className="flex items-center flex-shrink-0">
+          {btn("Start", "start", Play, "hover:text-green-500")}
+        </span>
+      );
+    }
+    // Unknown state — we couldn't read it, so offer nothing rather than guess.
+    return null;
+  };
+
   const serverRow = (s: (typeof visibleServers)[number]) => {
     const style = STATE_STYLE[s.state] ?? STATE_STYLE["unknown"]!;
     const mem = formatMem(s.memUsedMb, s.memLimitMb);
@@ -197,13 +352,16 @@ export default function PterodactylTile({ enabled, density, tileSettings }: Widg
         : null;
     const cpuPct = s.cpuPercent != null ? Math.min(100, s.cpuPercent) : null;
     return (
-      <div key={s.id} className="min-w-0">
-        <div className={`flex items-center justify-between gap-1.5 ${rowText}`}>
-          <span className="flex items-center gap-1.5 min-w-0">
-            <span className={`${rowDot} rounded-full flex-shrink-0 ${style.dot}`} />
-            <span className="truncate font-medium text-foreground">{s.name}</span>
-          </span>
-          <span className="flex items-center gap-2 flex-shrink-0">
+      <div key={s.id} className="min-w-0 rounded-md bg-muted/40 border border-border/60 px-2 py-1.5">
+        <div className={`flex items-center gap-1.5 ${rowText}`}>
+          <span className={`${rowDot} rounded-full flex-shrink-0 ${style.dot}`} />
+          <span className="truncate font-medium text-foreground">{s.name}</span>
+        </div>
+        <div className="flex items-center justify-between gap-2 pl-3 mt-0.5">
+          <span className="flex items-center gap-2 min-w-0">
+            <span className={`${rowSubText} uppercase tracking-wider ${style.text}`}>
+              {style.label}
+            </span>
             {s.players != null && (
               <span
                 className={`flex items-center gap-1 ${rowSubText} tabular-nums ${
@@ -216,10 +374,8 @@ export default function PterodactylTile({ enabled, density, tileSettings }: Widg
                 {s.players.max != null && ` / ${s.players.max}`}
               </span>
             )}
-            <span className={`${rowSubText} uppercase tracking-wider ${style.text}`}>
-              {style.label}
-            </span>
           </span>
+          {powerControls(s)}
         </div>
         {showResources &&
           s.state === "running" &&

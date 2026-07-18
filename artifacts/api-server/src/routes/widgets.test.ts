@@ -2125,6 +2125,68 @@ describe("GET /widgets/pterodactyl", () => {
   });
 });
 
+describe("POST /widgets/pterodactyl/power", () => {
+  it("rejects a missing server id", async () => {
+    const res = await request(app)
+      .post("/widgets/pterodactyl/power")
+      .send({ signal: "start" });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/serverId/i);
+    expect(httpPost).not.toHaveBeenCalled();
+  });
+
+  it("rejects an invalid power signal", async () => {
+    const res = await request(app)
+      .post("/widgets/pterodactyl/power")
+      .send({ serverId: "abc123", signal: "kill" });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/signal/i);
+    expect(httpPost).not.toHaveBeenCalled();
+  });
+
+  it("acknowledges as a demo no-op when unconfigured", async () => {
+    const res = await request(app)
+      .post("/widgets/pterodactyl/power")
+      .send({ serverId: "a1b2c3d4", signal: "restart" });
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ ok: true, demo: true });
+    expect(httpPost).not.toHaveBeenCalled();
+  });
+
+  it("sends the power signal to the panel when configured", async () => {
+    findByService.mockReturnValue(
+      connRow({ service: "pterodactyl", url: "https://panel.local", api_key: "ptlc_key" }),
+    );
+    httpPost.mockResolvedValue({ status: 204, data: "" });
+
+    const res = await request(app)
+      .post("/widgets/pterodactyl/power")
+      .send({ serverId: "abc123", signal: "stop" });
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ ok: true, demo: false });
+    expect(httpPost).toHaveBeenCalledWith(
+      "https://panel.local/api/client/servers/abc123/power",
+      { signal: "stop" },
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: "Bearer ptlc_key" }),
+      }),
+    );
+  });
+
+  it("returns 502 when the panel rejects the signal", async () => {
+    findByService.mockReturnValue(
+      connRow({ service: "pterodactyl", url: "https://panel.local", api_key: "ptlc_key" }),
+    );
+    httpPost.mockRejectedValue(httpError(409));
+
+    const res = await request(app)
+      .post("/widgets/pterodactyl/power")
+      .send({ serverId: "abc123", signal: "start" });
+    expect(res.status).toBe(502);
+    expect(res.body.error).toMatch(/start/i);
+  });
+});
+
 // ── Tailscale ───────────────────────────────────────────────────────────────
 describe("GET /widgets/tailscale", () => {
   it("returns sample data when unconfigured", async () => {

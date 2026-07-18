@@ -73,6 +73,8 @@ import type {
   PiholeData,
   ProwlarrData,
   PterodactylData,
+  PterodactylPowerRequest,
+  PterodactylPowerResult,
   QbittorrentData,
   RadarrData,
   SearchAudioLibraryParams,
@@ -2526,6 +2528,77 @@ export function useGetPterodactylWidget<TData = Awaited<ReturnType<typeof getPte
 
 
 
+
+export const getSendPterodactylPowerUrl = () => {
+
+
+
+
+  return `/api/widgets/pterodactyl/power`
+}
+
+/**
+ * @summary Send a power signal (start/stop/restart) to one game server on the Pterodactyl panel
+ */
+export const sendPterodactylPower = async (pterodactylPowerRequest: PterodactylPowerRequest, options?: RequestInit): Promise<PterodactylPowerResult> => {
+
+  return customFetch<PterodactylPowerResult>(getSendPterodactylPowerUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      pterodactylPowerRequest,)
+  }
+);}
+
+
+
+
+export const getSendPterodactylPowerMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendPterodactylPower>>, TError,{data: BodyType<PterodactylPowerRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof sendPterodactylPower>>, TError,{data: BodyType<PterodactylPowerRequest>}, TContext> => {
+
+const mutationKey = ['sendPterodactylPower'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof sendPterodactylPower>>, {data: BodyType<PterodactylPowerRequest>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  sendPterodactylPower(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SendPterodactylPowerMutationResult = NonNullable<Awaited<ReturnType<typeof sendPterodactylPower>>>
+    export type SendPterodactylPowerMutationBody = BodyType<PterodactylPowerRequest>
+    export type SendPterodactylPowerMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Send a power signal (start/stop/restart) to one game server on the Pterodactyl panel
+ */
+export const useSendPterodactylPower = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendPterodactylPower>>, TError,{data: BodyType<PterodactylPowerRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof sendPterodactylPower>>,
+        TError,
+        {data: BodyType<PterodactylPowerRequest>},
+        TContext
+      > => {
+      return useMutation(getSendPterodactylPowerMutationOptions(options));
+    }
 
 export const getGetTailscaleStatusUrl = () => {
 
