@@ -82,6 +82,14 @@ test("aquarium tile persists settings and renders a populated tank", async ({
   const bubbleCount = await tank.locator("g.aq-bubble").count();
   expect(bubbleCount).toBeGreaterThanOrEqual(2);
 
+  // Mood layer: 1-2 diagonal light rays sweep the tank, and on a large tile
+  // a few faint particles drift with the water (both pure CSS keyframes).
+  const rayCount = await tank.locator("g.aq-ray").count();
+  expect(rayCount).toBeGreaterThanOrEqual(1);
+  expect(rayCount).toBeLessThanOrEqual(2);
+  const particleCount = await tank.locator("g.aq-particle").count();
+  expect(particleCount).toBeGreaterThanOrEqual(4);
+
   // At least one decoration prop is on the sand (castle base rects render as
   // fill #a9a29a, anchor strokes #6b7683, chest fill #8a5a2b).
   const propMarkup = await tank.innerHTML();

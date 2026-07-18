@@ -295,6 +295,31 @@ function buildBubbleStreams(count: number): BubbleStream[] {
   });
 }
 
+// Faint drifting particles (plankton/dust) that ride the water on larger
+// tiles. Each one slowly drifts sideways while bobbing a little; everything is
+// deterministic per index — CSS keyframes only.
+interface ParticleInstance {
+  xFrac: number; // fraction of tank width
+  y: number; // viewBox y
+  r: number;
+  driftDuration: number;
+  driftDelay: number;
+  bobDuration: number;
+  opacity: number;
+}
+
+function buildParticles(count: number): ParticleInstance[] {
+  return Array.from({ length: count }, (_, i) => ({
+    xFrac: 0.06 + jitter(i, 20) * 0.88,
+    y: 14 + jitter(i, 21) * (VB_H - SAND_H - 24),
+    r: 0.5 + jitter(i, 22) * 0.7,
+    driftDuration: 18 + jitter(i, 23) * 20,
+    driftDelay: -jitter(i, 24) * 38,
+    bobDuration: 5 + jitter(i, 25) * 5,
+    opacity: 0.18 + jitter(i, 26) * 0.22,
+  }));
+}
+
 interface AquariumTileProps {
   tile: Tile;
   editMode: boolean;
@@ -421,6 +446,12 @@ export default function AquariumTile({ tile, editMode }: AquariumTileProps) {
   // A couple of bubble streams on small tiles, a few more on big tanks.
   const streamCount = Math.max(2, Math.min(5, Math.round(1 + area / 120_000)));
   const streams = buildBubbleStreams(streamCount);
+  // Faint drifting particles only appear on larger tiles where the extra
+  // motion reads as atmosphere rather than clutter (0 on small tiles).
+  const particleCount = area >= 240_000 ? 8 : area >= 80_000 ? 4 : 0;
+  const particles = buildParticles(particleCount);
+  // 2 light rays on wide tanks, 1 on narrow ones.
+  const rayCount = area >= 80_000 ? 2 : 1;
 
   // Match the drawing width to the tile's aspect ratio so the whole tank is
   // visible (no slice-cropping) and the fish's turnaround points sit just
@@ -573,6 +604,33 @@ export default function AquariumTile({ tile, editMode }: AquariumTileProps) {
           50%      { transform: translateX(${Math.round(vbW * 0.06)}px); opacity: 0.95; }
         }
         .aq-shimmer { animation: aq-shimmer 9s ease-in-out infinite; }
+        /* Diagonal light rays sweep very slowly across the tank while gently
+           breathing in intensity. The sweep animates the CSS transform on an
+           OUTER group (the skew lives on an inner SVG attribute so it isn't
+           overridden — CSS transforms beat the transform attribute). */
+        @keyframes aq-ray-sweep-${tile.id} {
+          0%, 100% { transform: translateX(0); }
+          50%      { transform: translateX(${Math.round(vbW * 0.16)}px); }
+        }
+        @keyframes aq-ray-breathe {
+          0%, 100% { opacity: 0.5; }
+          50%      { opacity: 1; }
+        }
+        .aq-ray { animation: aq-ray-sweep-${tile.id} var(--aq-raydur) ease-in-out infinite; animation-delay: var(--aq-raydelay); }
+        .aq-ray-breathe { animation: aq-ray-breathe var(--aq-raybreathe) ease-in-out infinite; animation-delay: var(--aq-raydelay); }
+        /* Tiny plankton/dust motes drift sideways with the water and bob a
+           little. Placement translate sits on an outer group (SVG attribute)
+           so the CSS drift transform doesn't override it. */
+        @keyframes aq-particle-drift-${tile.id} {
+          0%, 100% { transform: translateX(0); }
+          50%      { transform: translateX(${Math.round(vbW * 0.1)}px); }
+        }
+        @keyframes aq-particle-bob {
+          0%, 100% { transform: translateY(0); }
+          50%      { transform: translateY(-4px); }
+        }
+        .aq-particle { animation: aq-particle-drift-${tile.id} var(--aq-pdur) ease-in-out infinite; animation-delay: var(--aq-pdelay); }
+        .aq-particle-bob { animation: aq-particle-bob var(--aq-pbob) ease-in-out infinite; }
         /* Click reactions: a clicked fish darts (a fast wobble + lunge burst),
            and after food drops the nearest fish glides over to eat it (inline
            transition, no keyframes needed). A pellet sinks from the click
@@ -594,7 +652,7 @@ export default function AquariumTile({ tile, editMode }: AquariumTileProps) {
         .aq-pellet { animation: aq-pellet-sink ${PELLET_SINK_MS}ms ease-in 1 forwards; }
         .aq-fish-hit { cursor: pointer; pointer-events: bounding-box; }
         @media (prefers-reduced-motion: reduce) {
-          .aq-fish, .aq-fish-flip, .aq-fish-bob, .aq-sway, .aq-bubble, .aq-bubble-wiggle, .aq-shimmer, .aq-dart, .aq-pellet { animation: none; }
+          .aq-fish, .aq-fish-flip, .aq-fish-bob, .aq-sway, .aq-bubble, .aq-bubble-wiggle, .aq-shimmer, .aq-ray, .aq-ray-breathe, .aq-particle, .aq-particle-bob, .aq-dart, .aq-pellet { animation: none; }
           .aq-feeding { transition: none !important; }
           .aq-bubble, .aq-pellet { opacity: 0; }
         }
@@ -617,12 +675,56 @@ export default function AquariumTile({ tile, editMode }: AquariumTileProps) {
             <stop offset="0%" stopColor="rgba(255,255,255,0.35)" />
             <stop offset="100%" stopColor="rgba(255,255,255,0)" />
           </linearGradient>
+          <linearGradient id={`aq-ray-${tile.id}`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="rgba(255,255,240,0.22)" />
+            <stop offset="70%" stopColor="rgba(255,255,240,0.06)" />
+            <stop offset="100%" stopColor="rgba(255,255,240,0)" />
+          </linearGradient>
         </defs>
 
         {/* Water */}
         <rect x={0} y={0} width={vbW} height={VB_H} fill={`url(#aq-water-${tile.id})`} />
         {/* Soft light shafts near the surface */}
         <rect x={0} y={0} width={vbW} height={34} className="aq-shimmer" fill={`url(#aq-glow-${tile.id})`} />
+
+        {/* Diagonal light rays: soft skewed shafts falling from the surface,
+            sweeping very slowly. The CSS sweep animates the outer group; the
+            placement + skew live on inner SVG transform attributes so they
+            aren't overridden by the CSS transform. Behind fish and props. */}
+        {Array.from({ length: rayCount }, (_, i) => {
+          const rayX = vbW * (0.18 + jitter(i, 30) * 0.45);
+          const rayW = 14 + jitter(i, 31) * 14;
+          const raySkew = -14 - jitter(i, 32) * 8;
+          return (
+            <g
+              key={`ray-${i}`}
+              className="aq-ray"
+              style={
+                {
+                  "--aq-raydur": `${(26 + jitter(i, 33) * 14).toFixed(1)}s`,
+                  "--aq-raydelay": `${(-jitter(i, 34) * 30).toFixed(1)}s`,
+                } as React.CSSProperties
+              }
+            >
+              <g
+                className="aq-ray-breathe"
+                style={
+                  { "--aq-raybreathe": `${(11 + jitter(i, 35) * 8).toFixed(1)}s` } as React.CSSProperties
+                }
+              >
+                <g transform={`translate(${rayX.toFixed(1)} 0) skewX(${raySkew.toFixed(1)})`}>
+                  <rect
+                    x={0}
+                    y={0}
+                    width={rayW.toFixed(1)}
+                    height={VB_H - SAND_H + 6}
+                    fill={`url(#aq-ray-${tile.id})`}
+                  />
+                </g>
+              </g>
+            </g>
+          );
+        })}
 
         {/* Props sit on the sand line, spaced across the tank width. Rendered
             behind the fish so swimmers pass in front. */}
@@ -707,6 +809,30 @@ export default function AquariumTile({ tile, editMode }: AquariumTileProps) {
             >
               <circle r={2} fill="#b5803a" stroke="#8a5f26" strokeWidth={0.6} />
               <circle cx={-0.6} cy={-0.6} r={0.6} fill="rgba(255,255,255,0.5)" />
+            </g>
+          </g>
+        ))}
+
+        {/* Faint plankton/dust motes drifting with the water (large tiles
+            only). Placement translate on the outer group; the CSS drift/bob
+            transforms animate the inner groups so placement isn't wiped. */}
+        {particles.map((p, i) => (
+          <g key={`particle-${i}`} transform={`translate(${(p.xFrac * vbW).toFixed(1)} ${p.y.toFixed(1)})`}>
+            <g
+              className="aq-particle"
+              style={
+                {
+                  "--aq-pdur": `${p.driftDuration.toFixed(2)}s`,
+                  "--aq-pdelay": `${p.driftDelay.toFixed(2)}s`,
+                } as React.CSSProperties
+              }
+            >
+              <g
+                className="aq-particle-bob"
+                style={{ "--aq-pbob": `${p.bobDuration.toFixed(2)}s` } as React.CSSProperties}
+              >
+                <circle r={p.r.toFixed(2)} fill={`rgba(235,245,250,${p.opacity.toFixed(2)})`} />
+              </g>
             </g>
           </g>
         ))}
