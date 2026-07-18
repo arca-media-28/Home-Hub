@@ -6,7 +6,7 @@ import {
   useSendPterodactylPower,
   type PterodactylPowerRequestSignal,
 } from "@workspace/api-client-react";
-import { Gamepad2, AlertTriangle, Users, Play, Square, RotateCw, Loader2 } from "lucide-react";
+import { Gamepad2, AlertTriangle, Users, Play, Square, RotateCw, Loader2, Check, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { WidgetProps } from "./IntegrationTile";
 import {
@@ -53,6 +53,9 @@ export default function PterodactylTile({ enabled, density, tileSettings, editMo
   // row shows a spinner until a poll reports the server transitioning (or the
   // action clearly completed), or the timeout lapses.
   const [pending, setPending] = useState<Record<string, { signal: PterodactylPowerRequestSignal; at: number }>>({});
+  // A stop/restart awaiting confirmation because players are online. Only one
+  // row confirms at a time; any other action or a cancel clears it.
+  const [confirm, setConfirm] = useState<{ id: string; signal: PterodactylPowerRequestSignal } | null>(null);
   const [boostUntil, setBoostUntil] = useState(0);
 
   const { data, isLoading, isError } = useGetPterodactylWidget({
@@ -99,6 +102,7 @@ export default function PterodactylTile({ enabled, density, tileSettings, editMo
   });
 
   const sendPower = (serverId: string, signal: PterodactylPowerRequestSignal) => {
+    setConfirm(null);
     setPending((p) => ({ ...p, [serverId]: { signal, at: Date.now() } }));
     power.mutate({ data: { serverId, signal } });
   };
@@ -305,6 +309,43 @@ export default function PterodactylTile({ enabled, density, tileSettings, editMo
         </span>
       );
     }
+    // Stop/restart on a server with players connected asks first — the inline
+    // confirm replaces the buttons so nothing shifts at small tile sizes.
+    if (confirm?.id === s.id) {
+      const verb = confirm.signal === "stop" ? "Stop" : "Restart";
+      const players = s.players?.current ?? 0;
+      return (
+        <span className="flex items-center gap-1 flex-shrink-0">
+          <span className={`${rowSubText} text-amber-500 whitespace-nowrap`}>
+            {verb}? {players} online
+          </span>
+          <button
+            type="button"
+            title={`Confirm ${verb.toLowerCase()}`}
+            aria-label={`Confirm ${verb.toLowerCase()} ${s.name}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              sendPower(s.id, confirm.signal);
+            }}
+            className="p-0.5 rounded text-muted-foreground transition-colors hover:text-red-500"
+          >
+            <Check className={btnIcon} />
+          </button>
+          <button
+            type="button"
+            title="Cancel"
+            aria-label={`Cancel ${verb.toLowerCase()} ${s.name}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              setConfirm(null);
+            }}
+            className="p-0.5 rounded text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <X className={btnIcon} />
+          </button>
+        </span>
+      );
+    }
     const btn = (
       label: string,
       signal: PterodactylPowerRequestSignal,
@@ -317,6 +358,11 @@ export default function PterodactylTile({ enabled, density, tileSettings, editMo
         aria-label={`${label} ${s.name}`}
         onClick={(e) => {
           e.stopPropagation();
+          const disruptive = signal === "stop" || signal === "restart";
+          if (disruptive && (s.players?.current ?? 0) > 0) {
+            setConfirm({ id: s.id, signal });
+            return;
+          }
           sendPower(s.id, signal);
         }}
         className={`p-0.5 rounded text-muted-foreground transition-colors ${cls}`}

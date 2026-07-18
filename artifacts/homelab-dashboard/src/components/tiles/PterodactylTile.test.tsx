@@ -89,16 +89,33 @@ describe("PterodactylTile power controls", () => {
     expect(powerMutate).toHaveBeenCalledWith({
       data: { serverId: "off1", signal: "start" },
     });
+  });
 
+  it("asks before stop/restart when players are online, and confirms/cancels", () => {
+    renderTile();
+    // Minecraft has 2 players connected — restart must NOT fire immediately.
     fireEvent.click(screen.getByLabelText("Restart Minecraft"));
+    expect(powerMutate).not.toHaveBeenCalled();
+    expect(screen.getByText("Restart? 2 online")).toBeTruthy();
+
+    // Cancel restores the buttons without sending anything.
+    fireEvent.click(screen.getByLabelText("Cancel restart Minecraft"));
+    expect(powerMutate).not.toHaveBeenCalled();
+    expect(screen.getByLabelText("Restart Minecraft")).toBeTruthy();
+
+    // Stop asks too; confirming sends the signal.
+    fireEvent.click(screen.getByLabelText("Stop Minecraft"));
+    expect(powerMutate).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByLabelText("Confirm stop Minecraft"));
     expect(powerMutate).toHaveBeenCalledWith({
-      data: { serverId: "run1", signal: "restart" },
+      data: { serverId: "run1", signal: "stop" },
     });
   });
 
   it("shows a pending spinner on the acted-upon row until state changes", () => {
     renderTile();
     fireEvent.click(screen.getByLabelText("Stop Minecraft"));
+    fireEvent.click(screen.getByLabelText("Confirm stop Minecraft"));
     // The row's buttons are replaced by a spinner while the action is pending.
     expect(screen.queryByLabelText("Stop Minecraft")).toBeNull();
     expect(screen.queryByLabelText("Restart Minecraft")).toBeNull();
