@@ -2082,8 +2082,10 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
           {isAquarium && (
             <div className="space-y-4 border-t border-border pt-4">
               <p className="text-sm text-muted-foreground">
-                A live fish tank. Fish idle-swim across the tile all day, and
-                more fish appear as the tile gets bigger. Pick up to three fish
+                A live fish tank that follows the time of day: calm in the
+                morning, lively from early afternoon, and dark and sleepy
+                after 8 PM. Fish idle-swim across the tile, and more fish
+                appear as the tile gets bigger. Pick up to three fish
                 species, the sand color, and up to three decorations below.
               </p>
 

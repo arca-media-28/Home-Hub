@@ -43,6 +43,59 @@ export const DEFAULT_FISH_TYPES = ["clownfish", "bluetang", NONE_SLOT];
 export const DEFAULT_SAND_COLOR = "tan";
 export const DEFAULT_PROPS = ["seaweed", "coral", NONE_SLOT];
 
+// The tank's mood follows the time of day: "calm" is the original look
+// (mornings and early afternoon), "lively" speeds everything up and adds
+// extra bubbles/particles (from around 1 PM), and "night" darkens the water,
+// dims the light, and slows the motion down (after 8 PM until morning).
+export type AquariumMood = "calm" | "lively" | "night";
+
+export function moodForHour(hour: number): AquariumMood {
+  if (hour >= 20 || hour < 7) return "night";
+  if (hour >= 13) return "lively";
+  return "calm";
+}
+
+// Deterministic per-mood tuning applied on top of the per-index jitter:
+// `speedMult` scales every looping animation duration (bigger = slower),
+// `extraStreams`/`particleMult` adjust ambient density, and night mode swaps
+// the water gradient and dims the rays/shimmer via `lightOpacity`.
+const MOOD_CONFIG: Record<
+  AquariumMood,
+  {
+    speedMult: number;
+    extraStreams: number;
+    particleMult: number;
+    minParticles: number;
+    lightOpacity: number;
+    waterStops: [string, string, string];
+  }
+> = {
+  calm: {
+    speedMult: 1,
+    extraStreams: 0,
+    particleMult: 1,
+    minParticles: 0,
+    lightOpacity: 1,
+    waterStops: ["#7ec3e8", "#3f8fc4", "#1e5f92"],
+  },
+  lively: {
+    speedMult: 0.6,
+    extraStreams: 2,
+    particleMult: 1.75,
+    minParticles: 4,
+    lightOpacity: 1,
+    waterStops: ["#7ec3e8", "#3f8fc4", "#1e5f92"],
+  },
+  night: {
+    speedMult: 1.6,
+    extraStreams: -1,
+    particleMult: 0.6,
+    minParticles: 0,
+    lightOpacity: 0.35,
+    waterStops: ["#2c4a6b", "#17304f", "#0a1c33"],
+  },
+};
+
 export function resolveSandColor(value: string | null | undefined): string {
   if (typeof value === "string" && value.startsWith("#")) return value;
   const preset = AQUARIUM_SAND_COLORS.find((p) => p.value === value);
@@ -467,10 +520,22 @@ export default function AquariumTile({ tile, editMode }: AquariumTileProps) {
     timeoutsRef.current.push(window.setTimeout(fn, ms));
   };
 
+  // The mood tracks the wall clock (night after 8 PM, lively from 1 PM,
+  // calm in between); re-check once a minute so the tank transitions on
+  // its own while the dashboard stays open.
+  const [mood, setMood] = useState<AquariumMood>(() => moodForHour(new Date().getHours()));
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      setMood(moodForHour(new Date().getHours()));
+    }, 60_000);
+    return () => window.clearInterval(id);
+  }, []);
+
   const s = tile.tileSettings;
   const fishTypes = normalizeSlots(s?.aquariumFishTypes, FISH_KEYS, DEFAULT_FISH_TYPES);
   const propSlots = normalizeSlots(s?.aquariumProps, PROP_KEYS, DEFAULT_PROPS);
   const sand = resolveSandColor(s?.aquariumSandColor);
+  const moodCfg = MOOD_CONFIG[mood];
 
   // Fish count scales with rendered area: a small tile (~200x150) shows 2-4
   // fish, a large one (~800x600+) shows 8-14. Props unlock with area too:
@@ -481,12 +546,19 @@ export default function AquariumTile({ tile, editMode }: AquariumTileProps) {
 
   const fish = buildFish(fishTypes, fishCount);
   const props = propSlots.filter((p) => p !== NONE_SLOT).slice(0, propBudget);
-  // A couple of bubble streams on small tiles, a few more on big tanks.
-  const streamCount = Math.max(2, Math.min(5, Math.round(1 + area / 120_000)));
+  // A couple of bubble streams on small tiles, a few more on big tanks; the
+  // mood adds or removes a couple on top of the area-based count.
+  const baseStreams = Math.max(2, Math.min(5, Math.round(1 + area / 120_000)));
+  const streamCount = Math.max(1, Math.min(7, baseStreams + moodCfg.extraStreams));
   const streams = buildBubbleStreams(streamCount);
   // Faint drifting particles only appear on larger tiles where the extra
-  // motion reads as atmosphere rather than clutter (0 on small tiles).
-  const particleCount = area >= 240_000 ? 8 : area >= 80_000 ? 4 : 0;
+  // motion reads as atmosphere rather than clutter (0 on small tiles) —
+  // except in lively mood, which always keeps a few motes drifting.
+  const baseParticles = area >= 240_000 ? 8 : area >= 80_000 ? 4 : 0;
+  const particleCount = Math.max(
+    moodCfg.minParticles,
+    Math.round(baseParticles * moodCfg.particleMult),
+  );
   const particles = buildParticles(particleCount);
   // 2 light rays on wide tanks, 1 on narrow ones.
   const rayCount = area >= 80_000 ? 2 : 1;
@@ -612,7 +684,10 @@ export default function AquariumTile({ tile, editMode }: AquariumTileProps) {
       const frac = range > 0 ? (dir === 1 ? fishX - swimMin : swimMax - fishX) / range : 0;
       const half = inverseEaseInOut(frac) * 0.5;
       const phasePos = dir === 1 ? half : 0.5 + half;
-      setFishDelays((prev) => ({ ...prev, [bestIdx]: -phasePos * target.duration }));
+      setFishDelays((prev) => ({
+        ...prev,
+        [bestIdx]: -phasePos * target.duration * moodCfg.speedMult,
+      }));
       setFeeding((cur) => (cur && cur.pelletId === id ? null : cur));
     }, 30 + toDur + FEED_BACK_MS);
   };
@@ -640,7 +715,7 @@ export default function AquariumTile({ tile, editMode }: AquariumTileProps) {
         .aq-fish { animation: aq-swim-${tile.id} var(--aq-dur) ease-in-out infinite; animation-delay: var(--aq-delay); }
         .aq-fish-flip { animation: aq-flip var(--aq-dur) step-end infinite; animation-delay: var(--aq-delay); }
         .aq-fish-bob { animation: aq-bob var(--aq-bob) ease-in-out infinite; }
-        .aq-sway { animation: aq-prop-sway 5s ease-in-out infinite; transform-origin: 0 0; transform-box: fill-box; }
+        .aq-sway { animation: aq-prop-sway ${(5 * moodCfg.speedMult).toFixed(1)}s ease-in-out infinite; transform-origin: 0 0; transform-box: fill-box; }
         /* Bubbles rise from the sand line to just under the surface, fading
            out ("pop") at the top. Distance is fixed because VB_H is fixed. */
         @keyframes aq-bubble-rise {
@@ -661,7 +736,7 @@ export default function AquariumTile({ tile, editMode }: AquariumTileProps) {
           0%, 100% { transform: translateX(0); opacity: 0.55; }
           50%      { transform: translateX(${Math.round(vbW * 0.06)}px); opacity: 0.95; }
         }
-        .aq-shimmer { animation: aq-shimmer 9s ease-in-out infinite; }
+        .aq-shimmer { animation: aq-shimmer ${(9 * moodCfg.speedMult).toFixed(1)}s ease-in-out infinite; }
         /* Diagonal light rays sweep very slowly across the tank while gently
            breathing in intensity. The sweep animates the CSS transform on an
            OUTER group (the skew lives on an inner SVG attribute so it isn't
@@ -747,9 +822,9 @@ export default function AquariumTile({ tile, editMode }: AquariumTileProps) {
       >
         <defs>
           <linearGradient id={`aq-water-${tile.id}`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#7ec3e8" />
-            <stop offset="45%" stopColor="#3f8fc4" />
-            <stop offset="100%" stopColor="#1e5f92" />
+            <stop offset="0%" stopColor={moodCfg.waterStops[0]} />
+            <stop offset="45%" stopColor={moodCfg.waterStops[1]} />
+            <stop offset="100%" stopColor={moodCfg.waterStops[2]} />
           </linearGradient>
           <linearGradient id={`aq-glow-${tile.id}`} x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="rgba(255,255,255,0.35)" />
@@ -760,12 +835,33 @@ export default function AquariumTile({ tile, editMode }: AquariumTileProps) {
             <stop offset="70%" stopColor="rgba(255,255,240,0.06)" />
             <stop offset="100%" stopColor="rgba(255,255,240,0)" />
           </linearGradient>
+          {/* Soften the ray shaft's hard left/right edges — without this the
+              sweeping ray reads as a moving straight line on flat water. */}
+          <filter
+            id={`aq-ray-blur-${tile.id}`}
+            x="-60%"
+            y="-10%"
+            width="220%"
+            height="120%"
+          >
+            <feGaussianBlur stdDeviation="4" />
+          </filter>
         </defs>
 
         {/* Water */}
         <rect x={0} y={0} width={vbW} height={VB_H} fill={`url(#aq-water-${tile.id})`} />
-        {/* Soft light shafts near the surface */}
-        <rect x={0} y={0} width={vbW} height={34} className="aq-shimmer" fill={`url(#aq-glow-${tile.id})`} />
+        {/* Soft light shafts near the surface. The rect is oversized on both
+            sides so the shimmer's horizontal drift never pulls a hard vertical
+            edge into view. */}
+        <rect
+          x={-Math.round(vbW * 0.12)}
+          y={0}
+          width={vbW + Math.round(vbW * 0.24)}
+          height={34}
+          className="aq-shimmer"
+          fill={`url(#aq-glow-${tile.id})`}
+          opacity={moodCfg.lightOpacity}
+        />
 
         {/* Diagonal light rays: soft skewed shafts falling from the surface,
             sweeping very slowly. The CSS sweep animates the outer group; the
@@ -779,9 +875,10 @@ export default function AquariumTile({ tile, editMode }: AquariumTileProps) {
             <g
               key={`ray-${i}`}
               className="aq-ray"
+              opacity={moodCfg.lightOpacity}
               style={
                 {
-                  "--aq-raydur": `${(26 + jitter(i, 33) * 14).toFixed(1)}s`,
+                  "--aq-raydur": `${((26 + jitter(i, 33) * 14) * moodCfg.speedMult).toFixed(1)}s`,
                   "--aq-raydelay": `${(-jitter(i, 34) * 30).toFixed(1)}s`,
                 } as React.CSSProperties
               }
@@ -789,7 +886,7 @@ export default function AquariumTile({ tile, editMode }: AquariumTileProps) {
               <g
                 className="aq-ray-breathe"
                 style={
-                  { "--aq-raybreathe": `${(11 + jitter(i, 35) * 8).toFixed(1)}s` } as React.CSSProperties
+                  { "--aq-raybreathe": `${((11 + jitter(i, 35) * 8) * moodCfg.speedMult).toFixed(1)}s` } as React.CSSProperties
                 }
               >
                 <g transform={`translate(${rayX.toFixed(1)} 0) skewX(${raySkew.toFixed(1)})`}>
@@ -799,6 +896,7 @@ export default function AquariumTile({ tile, editMode }: AquariumTileProps) {
                     width={rayW.toFixed(1)}
                     height={VB_H - SAND_H + 6}
                     fill={`url(#aq-ray-${tile.id})`}
+                    filter={`url(#aq-ray-blur-${tile.id})`}
                   />
                 </g>
               </g>
@@ -853,8 +951,8 @@ export default function AquariumTile({ tile, editMode }: AquariumTileProps) {
               className="aq-fish"
               style={
                 {
-                  "--aq-dur": `${f.duration.toFixed(2)}s`,
-                  "--aq-delay": `${(fishDelays[i] ?? f.delay).toFixed(2)}s`,
+                  "--aq-dur": `${(f.duration * moodCfg.speedMult).toFixed(2)}s`,
+                  "--aq-delay": `${(fishDelays[i] ?? f.delay * moodCfg.speedMult).toFixed(2)}s`,
                 } as React.CSSProperties
               }
             >
@@ -865,7 +963,7 @@ export default function AquariumTile({ tile, editMode }: AquariumTileProps) {
                       fishShapeRefs.current[i] = el;
                     }}
                     className={`aq-fish-bob${editMode ? "" : " aq-fish-hit"}`}
-                    style={{ "--aq-bob": `${f.bobDuration.toFixed(2)}s` } as React.CSSProperties}
+                    style={{ "--aq-bob": `${(f.bobDuration * moodCfg.speedMult).toFixed(2)}s` } as React.CSSProperties}
                     onClick={(e) => handleFishClick(i, e)}
                   >
                     {dartingFish[i] !== undefined ? (
@@ -958,14 +1056,14 @@ export default function AquariumTile({ tile, editMode }: AquariumTileProps) {
               className="aq-particle"
               style={
                 {
-                  "--aq-pdur": `${p.driftDuration.toFixed(2)}s`,
+                  "--aq-pdur": `${(p.driftDuration * moodCfg.speedMult).toFixed(2)}s`,
                   "--aq-pdelay": `${p.driftDelay.toFixed(2)}s`,
                 } as React.CSSProperties
               }
             >
               <g
                 className="aq-particle-bob"
-                style={{ "--aq-pbob": `${p.bobDuration.toFixed(2)}s` } as React.CSSProperties}
+                style={{ "--aq-pbob": `${(p.bobDuration * moodCfg.speedMult).toFixed(2)}s` } as React.CSSProperties}
               >
                 <circle r={p.r.toFixed(2)} fill={`rgba(235,245,250,${p.opacity.toFixed(2)})`} />
               </g>
@@ -983,14 +1081,14 @@ export default function AquariumTile({ tile, editMode }: AquariumTileProps) {
                 className="aq-bubble"
                 style={
                   {
-                    "--aq-bdur": `${b.duration.toFixed(2)}s`,
+                    "--aq-bdur": `${(b.duration * moodCfg.speedMult).toFixed(2)}s`,
                     "--aq-bdelay": `${b.delay.toFixed(2)}s`,
                   } as React.CSSProperties
                 }
               >
                 <g
                   className="aq-bubble-wiggle"
-                  style={{ "--aq-bwig": `${b.wiggleDuration.toFixed(2)}s` } as React.CSSProperties}
+                  style={{ "--aq-bwig": `${(b.wiggleDuration * moodCfg.speedMult).toFixed(2)}s` } as React.CSSProperties}
                 >
                   <circle
                     r={b.r.toFixed(2)}

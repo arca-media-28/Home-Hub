@@ -64,8 +64,11 @@ test("aquarium tile persists settings and renders a populated tank", async ({
   expect(tile.tileSettings.aquariumSandColor).toBe("#c08552");
   expect(tile.tileSettings.aquariumProps).toEqual(["castle", "anchor", "chest"]);
 
-  // Load the dashboard authenticated and find the rendered tank.
+  // Load the dashboard authenticated and find the rendered tank. Pin the
+  // clock to mid-morning so the time-driven mood is the calm baseline
+  // (particle/bubble density assertions below assume it).
   await page.addInitScript((t) => localStorage.setItem("token", t), token);
+  await page.clock.setFixedTime(new Date("2026-07-18T10:00:00"));
   await page.goto("/");
   const tank = page.getByRole("img", { name: "Aquarium" });
   await expect(tank).toBeVisible();
@@ -137,4 +140,69 @@ test("aquarium tile persists settings and renders a populated tank", async ({
   await tank.locator("g.aq-fish-hit").first().click({ force: true });
   await expect(tank.locator("g.aq-dart")).toHaveCount(1);
   await expect(tank.locator("g.aq-dart")).toHaveCount(0, { timeout: 10_000 });
+});
+
+test("aquarium mood follows the time of day", async ({ page }) => {
+  const username = `aquamood_${rand()}`;
+  const password = `Pw_${rand()}!`;
+
+  const reg = await page.request.post("/api/auth/register", {
+    data: { username, password },
+  });
+  expect(reg.ok(), `register failed: ${reg.status()}`).toBeTruthy();
+  const { token } = (await reg.json()) as { token: string };
+  const authHeaders = { Authorization: `Bearer ${token}` };
+
+  const res = await page.request.post("/api/tiles", {
+    data: {
+      type: "integration",
+      integration: "aquarium",
+      name: "",
+      gridX: 0,
+      gridY: 0,
+      gridW: 6,
+      gridH: 6,
+      tileSettings: {},
+    },
+    headers: authHeaders,
+  });
+  expect(res.ok(), `tile create failed: ${res.status()}`).toBeTruthy();
+
+  await page.addInitScript((t) => localStorage.setItem("token", t), token);
+
+  // 10 PM: night mode — dark water gradient and dimmed light rays.
+  await page.clock.setFixedTime(new Date("2026-07-18T22:00:00"));
+  await page.goto("/");
+  const tank = page.getByRole("img", { name: "Aquarium" });
+  await expect(tank).toBeVisible();
+  await expect(tank.locator('stop[stop-color="#0a1c33"]')).toHaveCount(1);
+  expect(
+    await tank.locator("g.aq-ray").first().getAttribute("opacity"),
+  ).toBe("0.35");
+  const nightStreams = await tank.locator("g.aq-bubble").count();
+
+  // 2 PM: lively mode — bright water, extra bubble streams versus night
+  // (night = base-1 streams, lively = base+2) and a guaranteed minimum of
+  // drifting particles, with rays back to full strength.
+  await page.clock.setFixedTime(new Date("2026-07-18T14:00:00"));
+  await page.reload();
+  await expect(tank).toBeVisible();
+  await expect(tank.locator('stop[stop-color="#1e5f92"]')).toHaveCount(1);
+  const livelyBubbles = await tank.locator("g.aq-bubble").count();
+  expect(livelyBubbles).toBeGreaterThan(nightStreams);
+  expect(await tank.locator("g.aq-particle").count()).toBeGreaterThanOrEqual(4);
+  expect(
+    await tank.locator("g.aq-ray").first().getAttribute("opacity"),
+  ).toBe("1");
+
+  // 10 AM: calm mode — bright water, no ray dimming, and fewer bubble
+  // streams than lively (calm adds none on top of the base count).
+  await page.clock.setFixedTime(new Date("2026-07-18T10:00:00"));
+  await page.reload();
+  await expect(tank).toBeVisible();
+  await expect(tank.locator('stop[stop-color="#1e5f92"]')).toHaveCount(1);
+  expect(await tank.locator("g.aq-bubble").count()).toBeLessThan(livelyBubbles);
+  expect(
+    await tank.locator("g.aq-ray").first().getAttribute("opacity"),
+  ).toBe("1");
 });
