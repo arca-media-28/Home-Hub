@@ -107,6 +107,15 @@ interface TileSettings {
   visualizerStyle?: string | null;
   visualizerPrimary?: string | null;
   visualizerBackground?: string | null;
+  photoSource?: "uploads" | "urls" | "google" | "immich" | null;
+  photoUploadUrls?: string[] | null;
+  photoUrls?: string[] | null;
+  photoAlbumId?: string | null;
+  photoInterval?: number | null;
+  photoFit?: "cover" | "contain" | null;
+  frameStyle?: "none" | "wood" | "thin" | "gold" | "polaroid" | "custom" | null;
+  frameColor?: string | null;
+  frameWidth?: number | null;
   truenasMetric?: "cpuram" | "network" | "arc" | "pools" | "disks" | "cputemp" | null;
   truenasShowCpuCores?: boolean | null;
   truenasPools?: string[] | null;
@@ -624,6 +633,68 @@ function pickTileSettings(obj: Record<string, unknown>): TileSettings {
     result.visualizerBackground = obj["visualizerBackground"];
   } else if (obj["visualizerBackground"] === null) {
     result.visualizerBackground = null;
+  }
+  // Picture Frame tile settings.
+  if (
+    obj["photoSource"] === "uploads" ||
+    obj["photoSource"] === "urls" ||
+    obj["photoSource"] === "google" ||
+    obj["photoSource"] === "immich"
+  ) {
+    result.photoSource = obj["photoSource"];
+  } else if (obj["photoSource"] === null) {
+    result.photoSource = null;
+  }
+  if (Array.isArray(obj["photoUploadUrls"])) {
+    result.photoUploadUrls = obj["photoUploadUrls"].filter(
+      (x): x is string => typeof x === "string",
+    );
+  } else if (obj["photoUploadUrls"] === null) {
+    result.photoUploadUrls = null;
+  }
+  if (Array.isArray(obj["photoUrls"])) {
+    result.photoUrls = obj["photoUrls"].filter(
+      (x): x is string => typeof x === "string",
+    );
+  } else if (obj["photoUrls"] === null) {
+    result.photoUrls = null;
+  }
+  if (typeof obj["photoAlbumId"] === "string") {
+    result.photoAlbumId = obj["photoAlbumId"];
+  } else if (obj["photoAlbumId"] === null) {
+    result.photoAlbumId = null;
+  }
+  if (typeof obj["photoInterval"] === "number" && Number.isFinite(obj["photoInterval"])) {
+    result.photoInterval = obj["photoInterval"];
+  } else if (obj["photoInterval"] === null) {
+    result.photoInterval = null;
+  }
+  if (obj["photoFit"] === "cover" || obj["photoFit"] === "contain") {
+    result.photoFit = obj["photoFit"];
+  } else if (obj["photoFit"] === null) {
+    result.photoFit = null;
+  }
+  if (
+    obj["frameStyle"] === "none" ||
+    obj["frameStyle"] === "wood" ||
+    obj["frameStyle"] === "thin" ||
+    obj["frameStyle"] === "gold" ||
+    obj["frameStyle"] === "polaroid" ||
+    obj["frameStyle"] === "custom"
+  ) {
+    result.frameStyle = obj["frameStyle"];
+  } else if (obj["frameStyle"] === null) {
+    result.frameStyle = null;
+  }
+  if (typeof obj["frameColor"] === "string") {
+    result.frameColor = obj["frameColor"];
+  } else if (obj["frameColor"] === null) {
+    result.frameColor = null;
+  }
+  if (typeof obj["frameWidth"] === "number" && Number.isFinite(obj["frameWidth"])) {
+    result.frameWidth = obj["frameWidth"];
+  } else if (obj["frameWidth"] === null) {
+    result.frameWidth = null;
   }
   return result;
 }

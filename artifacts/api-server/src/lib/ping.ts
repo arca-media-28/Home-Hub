@@ -149,6 +149,15 @@ export async function pingService(service: string, v: TestValues): Promise<TestR
       });
       return { ok: true, message: "Connected" };
     }
+    case "immich": {
+      // Immich authenticates with a per-user API key in the x-api-key header.
+      // Listing albums confirms reachability and a valid key in one call.
+      if (!v.apiKey) return { ok: false, message: "Enter an API Key first." };
+      await httpClient.get(`${base}/api/albums`, {
+        headers: { "x-api-key": v.apiKey },
+      });
+      return { ok: true, message: "Connected" };
+    }
     case "ersatztv": {
       // ErsatzTV runs without auth here: a successful GET against the channels
       // playlist confirms reachability using only the base URL.

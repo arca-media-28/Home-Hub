@@ -69,6 +69,7 @@ import {
   Mail,
   CalendarDays,
   Trash2,
+  Image as ImageIcon,
 } from "lucide-react";
 import {
   Collapsible,
@@ -122,7 +123,8 @@ type ServiceKey =
   | "pterodactyl"
   | "tailscale"
   | "ersatztv"
-  | "stocks";
+  | "stocks"
+  | "immich";
 
 type FieldKey = "url" | "apiKey" | "username" | "password" | "token";
 
@@ -276,6 +278,14 @@ const SERVICES: ServiceDef[] = [
     icon: Tv2,
     // ErsatzTV runs without auth here, so only a base URL is needed.
     fields: [URL_FIELD],
+  },
+  {
+    key: "immich",
+    name: "Immich",
+    icon: ImageIcon,
+    // Immich authenticates with a per-user API key (Account Settings → API
+    // Keys in Immich). Used by the Picture Frame tile's album source.
+    fields: [URL_FIELD, API_KEY_FIELD],
   },
   {
     key: "stocks",

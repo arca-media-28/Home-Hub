@@ -119,6 +119,14 @@ import {
   normalizeVisualizerStyle,
   type VisualizerStyle,
 } from "@/components/tiles/VisualizerTile";
+import {
+  PHOTO_INTERVAL_OPTIONS,
+  FRAME_STYLE_OPTIONS,
+  DEFAULT_PHOTO_INTERVAL,
+  DEFAULT_FRAME_COLOR,
+  DEFAULT_FRAME_WIDTH,
+  type FrameStyle,
+} from "@/components/tiles/PictureFrameTile";
 import { useVisualizerThemeDefaults } from "@/lib/themeColors";
 import { SPORTS_LEAGUES, getLeagueTeams } from "@/lib/sports";
 import {
@@ -152,6 +160,8 @@ import {
   getListImapAccountsQueryKey,
   useListCalDavAccounts,
   getListCalDavAccountsQueryKey,
+  useGetPhotoAlbums,
+  getGetPhotoAlbumsQueryKey,
   TileType,
   TileIntegration,
   type Tile,
@@ -225,6 +235,7 @@ const INTEGRATIONS = [
   { value: TileIntegration.bonsai, label: "Bonsai" },
   { value: TileIntegration.aquarium, label: "Aquarium" },
   { value: TileIntegration.visualizer, label: "Audio Visualizer" },
+  { value: TileIntegration.pictureframe, label: "Picture Frame" },
   { value: TileIntegration.note, label: "Note" },
   { value: TileIntegration.spacer, label: "Spacer" },
   { value: TileIntegration.divider, label: "Section Label" },
@@ -573,6 +584,38 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
   const [visualizerBackground, setVisualizerBackground] = useState<string>(
     tile?.tileSettings?.visualizerBackground ?? "",
   );
+  // Picture Frame slideshow config. Source picks where photos come from;
+  // uploads/urls carry their own lists, google/immich carry an album id.
+  const [photoSource, setPhotoSource] = useState<string>(
+    tile?.tileSettings?.photoSource ?? "uploads",
+  );
+  const [photoUploadUrls, setPhotoUploadUrls] = useState<string[]>(
+    tile?.tileSettings?.photoUploadUrls ?? [],
+  );
+  // The URL list is edited as a textarea, one URL per line.
+  const [photoUrlsText, setPhotoUrlsText] = useState<string>(
+    (tile?.tileSettings?.photoUrls ?? []).join("\n"),
+  );
+  const [photoAlbumId, setPhotoAlbumId] = useState<string>(
+    tile?.tileSettings?.photoAlbumId ?? "",
+  );
+  const [photoInterval, setPhotoInterval] = useState<number>(
+    tile?.tileSettings?.photoInterval ?? DEFAULT_PHOTO_INTERVAL,
+  );
+  const [photoFit, setPhotoFit] = useState<"cover" | "contain">(
+    tile?.tileSettings?.photoFit === "contain" ? "contain" : "cover",
+  );
+  const [frameStyle, setFrameStyle] = useState<FrameStyle>(
+    (tile?.tileSettings?.frameStyle as FrameStyle) ?? "none",
+  );
+  const [frameColor, setFrameColor] = useState<string>(
+    tile?.tileSettings?.frameColor ?? DEFAULT_FRAME_COLOR,
+  );
+  const [frameWidth, setFrameWidth] = useState<number>(
+    tile?.tileSettings?.frameWidth ?? DEFAULT_FRAME_WIDTH,
+  );
+  const [showFrameColorPicker, setShowFrameColorPicker] = useState(false);
+
   // Theme-derived colors shown in the pickers/preview when nothing custom is
   // set; recomputed live if the user switches themes while the modal is open.
   const visualizerThemeDefaults = useVisualizerThemeDefaults();
@@ -698,6 +741,16 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
       setVisualizerStyle(normalizeVisualizerStyle(tile?.tileSettings?.visualizerStyle));
       setVisualizerPrimary(tile?.tileSettings?.visualizerPrimary ?? "");
       setVisualizerBackground(tile?.tileSettings?.visualizerBackground ?? "");
+      setPhotoSource(tile?.tileSettings?.photoSource ?? "uploads");
+      setPhotoUploadUrls(tile?.tileSettings?.photoUploadUrls ?? []);
+      setPhotoUrlsText((tile?.tileSettings?.photoUrls ?? []).join("\n"));
+      setPhotoAlbumId(tile?.tileSettings?.photoAlbumId ?? "");
+      setPhotoInterval(tile?.tileSettings?.photoInterval ?? DEFAULT_PHOTO_INTERVAL);
+      setPhotoFit(tile?.tileSettings?.photoFit === "contain" ? "contain" : "cover");
+      setFrameStyle((tile?.tileSettings?.frameStyle as FrameStyle) ?? "none");
+      setFrameColor(tile?.tileSettings?.frameColor ?? DEFAULT_FRAME_COLOR);
+      setFrameWidth(tile?.tileSettings?.frameWidth ?? DEFAULT_FRAME_WIDTH);
+      setShowFrameColorPicker(false);
       setShowPetColorPicker(false);
       setShowNoteColorPicker(false);
       setShowNoteTextColorPicker(false);
@@ -705,6 +758,21 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
       setShowTitleColorPicker(false);
     }
   }, [open, tile]);
+
+  // Album list for the Picture Frame's Google Photos / Immich sources. Only
+  // fetched while the modal is open on a Picture Frame with an album source.
+  const isAlbumSource = photoSource === "google" || photoSource === "immich";
+  const albumsQuery = useGetPhotoAlbums(
+    { source: photoSource === "immich" ? "immich" : "google" },
+    {
+      query: {
+        queryKey: getGetPhotoAlbumsQueryKey({
+          source: photoSource === "immich" ? "immich" : "google",
+        }),
+        enabled: open && integration === TileIntegration.pictureframe && isAlbumSource,
+      },
+    },
+  );
 
   // The image library — the user's previously uploaded images.
   const uploadsQuery = useListUploads({
@@ -785,6 +853,11 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
   // has no header and no backing service, so the editor strips
   // name/URL/image/background/metrics and exposes only its style + two colors.
   const isVisualizer = integration === TileIntegration.visualizer;
+  // The Picture Frame is a self-contained photo slideshow that paints photos
+  // edge-to-edge across the whole tile, so the editor strips
+  // name/URL/image/background/metrics and exposes its photo source, timing,
+  // fit, and frame styling instead.
+  const isPictureFrame = integration === TileIntegration.pictureframe;
   // The spacer is a layout-only tile: an invisible gap with no name, URL,
   // image, background, or live data. Only its size/position matter, so the
   // editor strips every content field and shows a short description instead.
@@ -808,7 +881,7 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
   // Tiles that carry no link/image/background content: layout helpers plus the
   // note and timer, which paint their own surface.
   const isContentless =
-    isLayoutTile || isNote || isTimer || isEightball || isDice || isCoinFlip || isFortune || isTamagotchi || isBonsai || isAquarium || isVisualizer;
+    isLayoutTile || isNote || isTimer || isEightball || isDice || isCoinFlip || isFortune || isTamagotchi || isBonsai || isAquarium || isVisualizer || isPictureFrame;
 
   // Teams for the chosen leagues, for the dependent team multi-select. Sourced
   // from the baked-in catalog (ESPN's /teams endpoint isn't CORS-enabled), so
@@ -1378,7 +1451,7 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
       // A spacer carries no content at all; a divider keeps only its label
       // (name). Both clear url/background/image so converting an existing tile
       // into a layout tile leaves nothing behind.
-      name: isSpacer || isNote || isTimer || isTamagotchi || isBonsai || isAquarium || isVisualizer ? "" : name || undefined,
+      name: isSpacer || isNote || isTimer || isTamagotchi || isBonsai || isAquarium || isVisualizer || isPictureFrame ? "" : name || undefined,
       url: isContentless ? "" : url || undefined,
       // Send the raw value so clearing (null) reaches the body and the server
       // writes NULL; otherwise an undefined field is dropped and the old color
@@ -1559,6 +1632,36 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
                                       // snapshot of the current theme is stored.
                                       visualizerPrimary: visualizerPrimary || null,
                                       visualizerBackground: visualizerBackground || null,
+                                    }
+                                : isPictureFrame
+                                  ? {
+                                      photoSource: photoSource as
+                                        | "uploads"
+                                        | "urls"
+                                        | "google"
+                                        | "immich",
+                                      photoUploadUrls:
+                                        photoSource === "uploads" && photoUploadUrls.length > 0
+                                          ? photoUploadUrls
+                                          : null,
+                                      photoUrls: (() => {
+                                        if (photoSource !== "urls") return null;
+                                        const list = photoUrlsText
+                                          .split("\n")
+                                          .map((l) => l.trim())
+                                          .filter(Boolean);
+                                        return list.length > 0 ? list : null;
+                                      })(),
+                                      photoAlbumId:
+                                        (photoSource === "google" || photoSource === "immich") &&
+                                        photoAlbumId
+                                          ? photoAlbumId
+                                          : null,
+                                      photoInterval,
+                                      photoFit,
+                                      frameStyle,
+                                      frameColor: frameStyle === "custom" ? frameColor : null,
+                                      frameWidth: frameStyle === "custom" ? frameWidth : null,
                                     }
                                   : null;
         // The status-dot toggle only applies to connection-backed integrations.
@@ -2354,6 +2457,232 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
                   </div>
                 </div>
               </div>
+            </div>
+          )}
+
+          {isPictureFrame && (
+            <div className="space-y-4 border-t border-border pt-4">
+              <p className="text-sm text-muted-foreground">
+                A digital picture frame that fills the tile with a photo
+                slideshow. Pick where the photos come from, how fast they
+                rotate, and an optional frame.
+              </p>
+
+              <div className="space-y-1.5">
+                <Label>Photo source</Label>
+                <Select value={photoSource} onValueChange={setPhotoSource}>
+                  <SelectTrigger aria-label="Photo source" data-testid="pictureframe-source">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="uploads">Uploaded images</SelectItem>
+                    <SelectItem value="urls">Image URLs</SelectItem>
+                    <SelectItem value="google">Google Photos album</SelectItem>
+                    <SelectItem value="immich">Immich album</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {photoSource === "uploads" && (
+                <div className="space-y-1.5">
+                  <Label>Photos from your library</Label>
+                  {uploadsQuery.isLoading ? (
+                    <p className="text-xs text-muted-foreground">Loading…</p>
+                  ) : (uploadsQuery.data?.length ?? 0) === 0 ? (
+                    <p className="text-xs text-muted-foreground">
+                      No uploads yet. Add images via any tile's image library
+                      first, then pick them here.
+                    </p>
+                  ) : (
+                    <div className="grid grid-cols-4 gap-2 max-h-40 overflow-y-auto pr-1">
+                      {uploadsQuery.data!.map((file) => {
+                        const selected = photoUploadUrls.includes(file.url);
+                        return (
+                          <button
+                            key={file.id}
+                            type="button"
+                            aria-pressed={selected}
+                            onClick={() =>
+                              setPhotoUploadUrls((prev) =>
+                                selected
+                                  ? prev.filter((u) => u !== file.url)
+                                  : [...prev, file.url],
+                              )
+                            }
+                            className={`aspect-square rounded-md overflow-hidden border ${
+                              selected
+                                ? "border-primary ring-2 ring-primary"
+                                : "border-border hover:border-primary/60"
+                            }`}
+                            title={file.originalName ?? undefined}
+                          >
+                            <img
+                              src={file.url}
+                              alt={file.originalName ?? "uploaded image"}
+                              className="w-full h-full object-cover"
+                              draggable={false}
+                            />
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    Click photos to add or remove them from the slideshow.
+                    {photoUploadUrls.length > 0 && ` ${photoUploadUrls.length} selected.`}
+                  </p>
+                </div>
+              )}
+
+              {photoSource === "urls" && (
+                <div className="space-y-1.5">
+                  <Label htmlFor="pictureframe-urls">Image URLs (one per line)</Label>
+                  <textarea
+                    id="pictureframe-urls"
+                    value={photoUrlsText}
+                    onChange={(e) => setPhotoUrlsText(e.target.value)}
+                    placeholder={"https://example.com/photo1.jpg\nhttps://example.com/photo2.jpg"}
+                    rows={4}
+                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-mono placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  />
+                </div>
+              )}
+
+              {isAlbumSource && (
+                <div className="space-y-1.5">
+                  <Label>Album</Label>
+                  {albumsQuery.isLoading ? (
+                    <p className="text-xs text-muted-foreground">Loading albums…</p>
+                  ) : albumsQuery.isError ? (
+                    <p className="text-xs text-destructive">
+                      {photoSource === "google"
+                        ? "Couldn't load Google Photos albums. Link Google (with photo access) in Settings, then try again."
+                        : "Couldn't load Immich albums. Add your Immich server in Settings first."}
+                    </p>
+                  ) : (
+                    <Select value={photoAlbumId || NONE} onValueChange={(v) => setPhotoAlbumId(v === NONE ? "" : v)}>
+                      <SelectTrigger aria-label="Album" data-testid="pictureframe-album">
+                        <SelectValue placeholder="Choose an album" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={NONE}>(choose an album)</SelectItem>
+                        {(albumsQuery.data?.albums ?? []).map((a) => (
+                          <SelectItem key={a.id} value={a.id}>
+                            {a.title}
+                            {a.count != null ? ` (${a.count})` : ""}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                  {albumsQuery.data?.sample && (
+                    <p className="text-xs text-muted-foreground">
+                      Showing sample albums — the tile will play demo photos
+                      until {photoSource === "google" ? "Google Photos is linked" : "Immich is connected"}.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label>Change photo every</Label>
+                  <Select
+                    value={String(photoInterval)}
+                    onValueChange={(v) => setPhotoInterval(Number(v))}
+                  >
+                    <SelectTrigger aria-label="Slideshow interval">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PHOTO_INTERVAL_OPTIONS.map((o) => (
+                        <SelectItem key={o.value} value={String(o.value)}>
+                          {o.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Photo fit</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {(["cover", "contain"] as const).map((v) => (
+                      <button
+                        key={v}
+                        type="button"
+                        aria-pressed={photoFit === v}
+                        onClick={() => setPhotoFit(v)}
+                        className={`rounded-md border px-3 py-2 text-sm transition-colors ${
+                          photoFit === v
+                            ? "border-primary bg-primary/10 font-medium"
+                            : "border-border hover:bg-accent"
+                        }`}
+                      >
+                        {v === "cover" ? "Fill tile" : "Fit whole photo"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>Frame</Label>
+                <div className="grid grid-cols-3 gap-2">
+                  {FRAME_STYLE_OPTIONS.map((o) => (
+                    <button
+                      key={o.value}
+                      type="button"
+                      aria-pressed={frameStyle === o.value}
+                      onClick={() => setFrameStyle(o.value)}
+                      className={`rounded-md border px-3 py-2 text-sm transition-colors ${
+                        frameStyle === o.value
+                          ? "border-primary bg-primary/10 font-medium"
+                          : "border-border hover:bg-accent"
+                      }`}
+                    >
+                      {o.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {frameStyle === "custom" && (
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label>Frame color</Label>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        className="w-8 h-8 rounded-md border border-border flex-shrink-0 shadow-sm"
+                        style={{ background: frameColor }}
+                        onClick={() => setShowFrameColorPicker((v) => !v)}
+                        aria-label="Pick frame color"
+                      />
+                      <Input
+                        value={frameColor}
+                        onChange={(e) => setFrameColor(e.target.value)}
+                        placeholder={DEFAULT_FRAME_COLOR}
+                        className="font-mono text-sm"
+                      />
+                    </div>
+                    {showFrameColorPicker && (
+                      <div className="mt-2">
+                        <HexColorPicker color={frameColor} onChange={setFrameColor} />
+                      </div>
+                    )}
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Frame width ({frameWidth}px)</Label>
+                    <Slider
+                      value={[frameWidth]}
+                      min={2}
+                      max={40}
+                      step={1}
+                      onValueChange={([v]) => setFrameWidth(v)}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

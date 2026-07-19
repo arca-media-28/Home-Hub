@@ -47,4 +47,5 @@ export const TileUpdateIntegration = {
   bonsai: 'bonsai',
   aquarium: 'aquarium',
   visualizer: 'visualizer',
+  pictureframe: 'pictureframe',
 } as const;

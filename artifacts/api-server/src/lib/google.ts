@@ -33,6 +33,10 @@ export const CALLBACK_PATH = "/api/widgets/gmail/callback";
 export const GOOGLE_SCOPES = [
   "https://www.googleapis.com/auth/gmail.modify",
   "https://www.googleapis.com/auth/calendar.readonly",
+  // Read-only Google Photos library access for the Picture Frame tile.
+  // Accounts linked before this scope was added simply lack it; the Photos
+  // routes surface a clear "re-link" error until the user reconnects.
+  "https://www.googleapis.com/auth/photoslibrary.readonly",
   "https://www.googleapis.com/auth/userinfo.email",
 ].join(" ");
 

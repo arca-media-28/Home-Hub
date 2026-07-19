@@ -37,6 +37,7 @@ import {
   Fish,
   AudioLines,
   StickyNote,
+  Images,
   SquareDashed,
   Heading,
   type LucideIcon,
@@ -180,6 +181,10 @@ export const INTEGRATION_META: Record<string, IntegrationMeta> = {
   [TileIntegration.visualizer]: {
     icon: AudioLines,
     description: "Live audio visualizer for the music player.",
+  },
+  [TileIntegration.pictureframe]: {
+    icon: Images,
+    description: "A photo slideshow from uploads, URLs, or albums.",
   },
   [TileIntegration.note]: {
     icon: StickyNote,

@@ -428,4 +428,49 @@ export type TileSettings = {
      * @nullable
      */
   visualizerBackground?: string | null;
+  /**
+     * Where a Picture Frame tile's photos come from: "uploads" (images from the upload library), "urls" (a pasted list of image URLs), "google" (a Google Photos album), or "immich" (an Immich album). Null or absent means unconfigured — the tile shows demo photos.
+     * @nullable
+     */
+  photoSource?: 'uploads' | 'urls' | 'google' | 'immich' | null;
+  /**
+     * The uploaded images (their /api/uploads/files/... URLs) a Picture Frame tile cycles through when photoSource is "uploads".
+     * @nullable
+     */
+  photoUploadUrls?: string[] | null;
+  /**
+     * The image URLs a Picture Frame tile cycles through when photoSource is "urls".
+     * @nullable
+     */
+  photoUrls?: string[] | null;
+  /**
+     * The selected album id for a server-backed photoSource ("google" or "immich"). Null or absent means no album chosen yet.
+     * @nullable
+     */
+  photoAlbumId?: string | null;
+  /**
+     * Seconds between automatic slide advances on a Picture Frame tile. 0 disables auto-advance (manual only). Null or absent uses the default (30s).
+     * @nullable
+     */
+  photoInterval?: number | null;
+  /**
+     * How a Picture Frame tile scales its photos: "cover" (fill, crop) or "contain" (letterbox, whole image). Null or absent uses cover.
+     * @nullable
+     */
+  photoFit?: 'cover' | 'contain' | null;
+  /**
+     * A Picture Frame tile's decorative frame: "none", "wood", "thin", "gold", "polaroid", or "custom" (uses frameColor/frameWidth). Null or absent means no frame.
+     * @nullable
+     */
+  frameStyle?: 'none' | 'wood' | 'thin' | 'gold' | 'polaroid' | 'custom' | null;
+  /**
+     * The frame color (#hex) when frameStyle is "custom". Null or absent uses a neutral default.
+     * @nullable
+     */
+  frameColor?: string | null;
+  /**
+     * The frame thickness in pixels when frameStyle is "custom". Null or absent uses the default.
+     * @nullable
+     */
+  frameWidth?: number | null;
 } | null | null;

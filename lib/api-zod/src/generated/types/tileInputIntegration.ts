@@ -47,4 +47,5 @@ export const TileInputIntegration = {
   bonsai: 'bonsai',
   aquarium: 'aquarium',
   visualizer: 'visualizer',
+  pictureframe: 'pictureframe',
 } as const;

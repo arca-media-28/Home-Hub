@@ -48,6 +48,8 @@ import type {
   GetMediaContinueParams,
   GetMediaRecentParams,
   GetNewsWidgetParams,
+  GetPhotoAlbumsParams,
+  GetPhotosWidgetParams,
   GetStockCandlesParams,
   GetStocksWidgetParams,
   GetTilesParams,
@@ -70,6 +72,8 @@ import type {
   PageExport,
   PageInput,
   PageReorder,
+  PhotoAlbumsData,
+  PhotosData,
   PiholeData,
   ProwlarrData,
   PterodactylData,
@@ -2754,6 +2758,174 @@ export function useGetErsatzTvWidget<TData = Awaited<ReturnType<typeof getErsatz
 
 
 
+export const getGetPhotoAlbumsUrl = (params: GetPhotoAlbumsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/widgets/photos/albums?${stringifiedParams}` : `/api/widgets/photos/albums`
+}
+
+/**
+ * @summary List albums from a connected photo source (Google Photos or Immich)
+ */
+export const getPhotoAlbums = async (params: GetPhotoAlbumsParams, options?: RequestInit): Promise<PhotoAlbumsData> => {
+
+  return customFetch<PhotoAlbumsData>(getGetPhotoAlbumsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPhotoAlbumsQueryKey = (params?: GetPhotoAlbumsParams,) => {
+    return [
+    `/api/widgets/photos/albums`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetPhotoAlbumsQueryOptions = <TData = Awaited<ReturnType<typeof getPhotoAlbums>>, TError = ErrorType<ErrorResponse>>(params: GetPhotoAlbumsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPhotoAlbums>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPhotoAlbumsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPhotoAlbums>>> = ({ signal }) => getPhotoAlbums(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPhotoAlbums>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPhotoAlbumsQueryResult = NonNullable<Awaited<ReturnType<typeof getPhotoAlbums>>>
+export type GetPhotoAlbumsQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary List albums from a connected photo source (Google Photos or Immich)
+ */
+
+export function useGetPhotoAlbums<TData = Awaited<ReturnType<typeof getPhotoAlbums>>, TError = ErrorType<ErrorResponse>>(
+ params: GetPhotoAlbumsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPhotoAlbums>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPhotoAlbumsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetPhotosWidgetUrl = (params: GetPhotosWidgetParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/widgets/photos?${stringifiedParams}` : `/api/widgets/photos`
+}
+
+/**
+ * @summary Get a normalized photo list for the Picture Frame tile from a server-backed source
+ */
+export const getPhotosWidget = async (params: GetPhotosWidgetParams, options?: RequestInit): Promise<PhotosData> => {
+
+  return customFetch<PhotosData>(getGetPhotosWidgetUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPhotosWidgetQueryKey = (params?: GetPhotosWidgetParams,) => {
+    return [
+    `/api/widgets/photos`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetPhotosWidgetQueryOptions = <TData = Awaited<ReturnType<typeof getPhotosWidget>>, TError = ErrorType<ErrorResponse>>(params: GetPhotosWidgetParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPhotosWidget>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPhotosWidgetQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPhotosWidget>>> = ({ signal }) => getPhotosWidget(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPhotosWidget>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPhotosWidgetQueryResult = NonNullable<Awaited<ReturnType<typeof getPhotosWidget>>>
+export type GetPhotosWidgetQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Get a normalized photo list for the Picture Frame tile from a server-backed source
+ */
+
+export function useGetPhotosWidget<TData = Awaited<ReturnType<typeof getPhotosWidget>>, TError = ErrorType<ErrorResponse>>(
+ params: GetPhotosWidgetParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPhotosWidget>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPhotosWidgetQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
 export const getGetAudioPlayerNowPlayingUrl = (params?: GetAudioPlayerNowPlayingParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -4197,7 +4369,7 @@ export function useGetConnectionHealth<TData = Awaited<ReturnType<typeof getConn
 
 
 
-export const getTestConnectionUrl = (service: 'truenas' | 'plex' | 'jellyfin' | 'subsonic' | 'sonarr' | 'radarr' | 'lidarr' | 'qbittorrent' | 'pihole' | 'nginx-proxy-manager' | 'prowlarr' | 'pterodactyl' | 'tailscale' | 'ersatztv' | 'stocks',) => {
+export const getTestConnectionUrl = (service: 'truenas' | 'plex' | 'jellyfin' | 'subsonic' | 'sonarr' | 'radarr' | 'lidarr' | 'qbittorrent' | 'pihole' | 'nginx-proxy-manager' | 'prowlarr' | 'pterodactyl' | 'tailscale' | 'ersatztv' | 'stocks' | 'immich',) => {
 
 
 
@@ -4208,7 +4380,7 @@ export const getTestConnectionUrl = (service: 'truenas' | 'plex' | 'jellyfin' | 
 /**
  * @summary Test a service connection using the supplied values without saving
  */
-export const testConnection = async (service: 'truenas' | 'plex' | 'jellyfin' | 'subsonic' | 'sonarr' | 'radarr' | 'lidarr' | 'qbittorrent' | 'pihole' | 'nginx-proxy-manager' | 'prowlarr' | 'pterodactyl' | 'tailscale' | 'ersatztv' | 'stocks',
+export const testConnection = async (service: 'truenas' | 'plex' | 'jellyfin' | 'subsonic' | 'sonarr' | 'radarr' | 'lidarr' | 'qbittorrent' | 'pihole' | 'nginx-proxy-manager' | 'prowlarr' | 'pterodactyl' | 'tailscale' | 'ersatztv' | 'stocks' | 'immich',
     serviceConnectionUpdate: ServiceConnectionUpdate, options?: RequestInit): Promise<ConnectionTestResult> => {
 
   return customFetch<ConnectionTestResult>(getTestConnectionUrl(service),
@@ -4225,8 +4397,8 @@ export const testConnection = async (service: 'truenas' | 'plex' | 'jellyfin' | 
 
 
 export const getTestConnectionMutationOptions = <TError = ErrorType<ErrorResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof testConnection>>, TError,{service: 'truenas' | 'plex' | 'jellyfin' | 'subsonic' | 'sonarr' | 'radarr' | 'lidarr' | 'qbittorrent' | 'pihole' | 'nginx-proxy-manager' | 'prowlarr' | 'pterodactyl' | 'tailscale' | 'ersatztv' | 'stocks';data: BodyType<ServiceConnectionUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof testConnection>>, TError,{service: 'truenas' | 'plex' | 'jellyfin' | 'subsonic' | 'sonarr' | 'radarr' | 'lidarr' | 'qbittorrent' | 'pihole' | 'nginx-proxy-manager' | 'prowlarr' | 'pterodactyl' | 'tailscale' | 'ersatztv' | 'stocks';data: BodyType<ServiceConnectionUpdate>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof testConnection>>, TError,{service: 'truenas' | 'plex' | 'jellyfin' | 'subsonic' | 'sonarr' | 'radarr' | 'lidarr' | 'qbittorrent' | 'pihole' | 'nginx-proxy-manager' | 'prowlarr' | 'pterodactyl' | 'tailscale' | 'ersatztv' | 'stocks' | 'immich';data: BodyType<ServiceConnectionUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof testConnection>>, TError,{service: 'truenas' | 'plex' | 'jellyfin' | 'subsonic' | 'sonarr' | 'radarr' | 'lidarr' | 'qbittorrent' | 'pihole' | 'nginx-proxy-manager' | 'prowlarr' | 'pterodactyl' | 'tailscale' | 'ersatztv' | 'stocks' | 'immich';data: BodyType<ServiceConnectionUpdate>}, TContext> => {
 
 const mutationKey = ['testConnection'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -4238,7 +4410,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof testConnection>>, {service: 'truenas' | 'plex' | 'jellyfin' | 'subsonic' | 'sonarr' | 'radarr' | 'lidarr' | 'qbittorrent' | 'pihole' | 'nginx-proxy-manager' | 'prowlarr' | 'pterodactyl' | 'tailscale' | 'ersatztv' | 'stocks';data: BodyType<ServiceConnectionUpdate>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof testConnection>>, {service: 'truenas' | 'plex' | 'jellyfin' | 'subsonic' | 'sonarr' | 'radarr' | 'lidarr' | 'qbittorrent' | 'pihole' | 'nginx-proxy-manager' | 'prowlarr' | 'pterodactyl' | 'tailscale' | 'ersatztv' | 'stocks' | 'immich';data: BodyType<ServiceConnectionUpdate>}> = (props) => {
           const {service,data} = props ?? {};
 
           return  testConnection(service,data,requestOptions)
@@ -4259,17 +4431,17 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
  * @summary Test a service connection using the supplied values without saving
  */
 export const useTestConnection = <TError = ErrorType<ErrorResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof testConnection>>, TError,{service: 'truenas' | 'plex' | 'jellyfin' | 'subsonic' | 'sonarr' | 'radarr' | 'lidarr' | 'qbittorrent' | 'pihole' | 'nginx-proxy-manager' | 'prowlarr' | 'pterodactyl' | 'tailscale' | 'ersatztv' | 'stocks';data: BodyType<ServiceConnectionUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof testConnection>>, TError,{service: 'truenas' | 'plex' | 'jellyfin' | 'subsonic' | 'sonarr' | 'radarr' | 'lidarr' | 'qbittorrent' | 'pihole' | 'nginx-proxy-manager' | 'prowlarr' | 'pterodactyl' | 'tailscale' | 'ersatztv' | 'stocks' | 'immich';data: BodyType<ServiceConnectionUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof testConnection>>,
         TError,
-        {service: 'truenas' | 'plex' | 'jellyfin' | 'subsonic' | 'sonarr' | 'radarr' | 'lidarr' | 'qbittorrent' | 'pihole' | 'nginx-proxy-manager' | 'prowlarr' | 'pterodactyl' | 'tailscale' | 'ersatztv' | 'stocks';data: BodyType<ServiceConnectionUpdate>},
+        {service: 'truenas' | 'plex' | 'jellyfin' | 'subsonic' | 'sonarr' | 'radarr' | 'lidarr' | 'qbittorrent' | 'pihole' | 'nginx-proxy-manager' | 'prowlarr' | 'pterodactyl' | 'tailscale' | 'ersatztv' | 'stocks' | 'immich';data: BodyType<ServiceConnectionUpdate>},
         TContext
       > => {
       return useMutation(getTestConnectionMutationOptions(options));
     }
 
-export const getUpdateConnectionUrl = (service: 'truenas' | 'plex' | 'jellyfin' | 'subsonic' | 'sonarr' | 'radarr' | 'lidarr' | 'qbittorrent' | 'pihole' | 'nginx-proxy-manager' | 'prowlarr' | 'pterodactyl' | 'tailscale' | 'ersatztv' | 'stocks',) => {
+export const getUpdateConnectionUrl = (service: 'truenas' | 'plex' | 'jellyfin' | 'subsonic' | 'sonarr' | 'radarr' | 'lidarr' | 'qbittorrent' | 'pihole' | 'nginx-proxy-manager' | 'prowlarr' | 'pterodactyl' | 'tailscale' | 'ersatztv' | 'stocks' | 'immich',) => {
 
 
 
@@ -4280,7 +4452,7 @@ export const getUpdateConnectionUrl = (service: 'truenas' | 'plex' | 'jellyfin' 
 /**
  * @summary Save connection settings for a single service
  */
-export const updateConnection = async (service: 'truenas' | 'plex' | 'jellyfin' | 'subsonic' | 'sonarr' | 'radarr' | 'lidarr' | 'qbittorrent' | 'pihole' | 'nginx-proxy-manager' | 'prowlarr' | 'pterodactyl' | 'tailscale' | 'ersatztv' | 'stocks',
+export const updateConnection = async (service: 'truenas' | 'plex' | 'jellyfin' | 'subsonic' | 'sonarr' | 'radarr' | 'lidarr' | 'qbittorrent' | 'pihole' | 'nginx-proxy-manager' | 'prowlarr' | 'pterodactyl' | 'tailscale' | 'ersatztv' | 'stocks' | 'immich',
     serviceConnectionUpdate: ServiceConnectionUpdate, options?: RequestInit): Promise<ServiceConnection> => {
 
   return customFetch<ServiceConnection>(getUpdateConnectionUrl(service),
@@ -4297,8 +4469,8 @@ export const updateConnection = async (service: 'truenas' | 'plex' | 'jellyfin' 
 
 
 export const getUpdateConnectionMutationOptions = <TError = ErrorType<ErrorResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateConnection>>, TError,{service: 'truenas' | 'plex' | 'jellyfin' | 'subsonic' | 'sonarr' | 'radarr' | 'lidarr' | 'qbittorrent' | 'pihole' | 'nginx-proxy-manager' | 'prowlarr' | 'pterodactyl' | 'tailscale' | 'ersatztv' | 'stocks';data: BodyType<ServiceConnectionUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof updateConnection>>, TError,{service: 'truenas' | 'plex' | 'jellyfin' | 'subsonic' | 'sonarr' | 'radarr' | 'lidarr' | 'qbittorrent' | 'pihole' | 'nginx-proxy-manager' | 'prowlarr' | 'pterodactyl' | 'tailscale' | 'ersatztv' | 'stocks';data: BodyType<ServiceConnectionUpdate>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateConnection>>, TError,{service: 'truenas' | 'plex' | 'jellyfin' | 'subsonic' | 'sonarr' | 'radarr' | 'lidarr' | 'qbittorrent' | 'pihole' | 'nginx-proxy-manager' | 'prowlarr' | 'pterodactyl' | 'tailscale' | 'ersatztv' | 'stocks' | 'immich';data: BodyType<ServiceConnectionUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateConnection>>, TError,{service: 'truenas' | 'plex' | 'jellyfin' | 'subsonic' | 'sonarr' | 'radarr' | 'lidarr' | 'qbittorrent' | 'pihole' | 'nginx-proxy-manager' | 'prowlarr' | 'pterodactyl' | 'tailscale' | 'ersatztv' | 'stocks' | 'immich';data: BodyType<ServiceConnectionUpdate>}, TContext> => {
 
 const mutationKey = ['updateConnection'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -4310,7 +4482,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateConnection>>, {service: 'truenas' | 'plex' | 'jellyfin' | 'subsonic' | 'sonarr' | 'radarr' | 'lidarr' | 'qbittorrent' | 'pihole' | 'nginx-proxy-manager' | 'prowlarr' | 'pterodactyl' | 'tailscale' | 'ersatztv' | 'stocks';data: BodyType<ServiceConnectionUpdate>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateConnection>>, {service: 'truenas' | 'plex' | 'jellyfin' | 'subsonic' | 'sonarr' | 'radarr' | 'lidarr' | 'qbittorrent' | 'pihole' | 'nginx-proxy-manager' | 'prowlarr' | 'pterodactyl' | 'tailscale' | 'ersatztv' | 'stocks' | 'immich';data: BodyType<ServiceConnectionUpdate>}> = (props) => {
           const {service,data} = props ?? {};
 
           return  updateConnection(service,data,requestOptions)
@@ -4331,11 +4503,11 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
  * @summary Save connection settings for a single service
  */
 export const useUpdateConnection = <TError = ErrorType<ErrorResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateConnection>>, TError,{service: 'truenas' | 'plex' | 'jellyfin' | 'subsonic' | 'sonarr' | 'radarr' | 'lidarr' | 'qbittorrent' | 'pihole' | 'nginx-proxy-manager' | 'prowlarr' | 'pterodactyl' | 'tailscale' | 'ersatztv' | 'stocks';data: BodyType<ServiceConnectionUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateConnection>>, TError,{service: 'truenas' | 'plex' | 'jellyfin' | 'subsonic' | 'sonarr' | 'radarr' | 'lidarr' | 'qbittorrent' | 'pihole' | 'nginx-proxy-manager' | 'prowlarr' | 'pterodactyl' | 'tailscale' | 'ersatztv' | 'stocks' | 'immich';data: BodyType<ServiceConnectionUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof updateConnection>>,
         TError,
-        {service: 'truenas' | 'plex' | 'jellyfin' | 'subsonic' | 'sonarr' | 'radarr' | 'lidarr' | 'qbittorrent' | 'pihole' | 'nginx-proxy-manager' | 'prowlarr' | 'pterodactyl' | 'tailscale' | 'ersatztv' | 'stocks';data: BodyType<ServiceConnectionUpdate>},
+        {service: 'truenas' | 'plex' | 'jellyfin' | 'subsonic' | 'sonarr' | 'radarr' | 'lidarr' | 'qbittorrent' | 'pihole' | 'nginx-proxy-manager' | 'prowlarr' | 'pterodactyl' | 'tailscale' | 'ersatztv' | 'stocks' | 'immich';data: BodyType<ServiceConnectionUpdate>},
         TContext
       > => {
       return useMutation(getUpdateConnectionMutationOptions(options));

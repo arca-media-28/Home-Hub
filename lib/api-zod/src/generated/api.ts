@@ -75,7 +75,7 @@ export const GetTilesResponseItem = zod.object({
   "userId": zod.number(),
   "pageId": zod.number().nullish().describe('The page this tile belongs to. Null only for tiles that predate the multi-page migration and could not be assigned a page.'),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'lidarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('pterodactyl'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('email'),zod.literal('calendar'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal('bonsai'),zod.literal('aquarium'),zod.literal('visualizer'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('pterodactyl'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('email'),zod.literal('calendar'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal('bonsai'),zod.literal('aquarium'),zod.literal('visualizer'),zod.literal('pictureframe'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -182,7 +182,16 @@ export const GetTilesResponseItem = zod.object({
   "aquariumProps": zod.array(zod.string()).nullish().describe('An Aquarium tile\'s three decoration prop slots (e.g. \"seaweed\", \"coral\", \"chest\", \"anchor\", \"castle\", \"rock\"). Each slot may be \"none\" to leave it empty. Null or absent uses the defaults.'),
   "visualizerStyle": zod.union([zod.literal('bars'),zod.literal('lava'),zod.literal('vu'),zod.literal(null)]).nullish().describe('An Audio Visualizer tile\'s render style: \"bars\" (frequency bar graph), \"lava\" (morphing lava-lamp blobs), or \"vu\" (retro VU meter). Null or absent defaults to \"bars\".'),
   "visualizerPrimary": zod.string().nullish().describe('An Audio Visualizer tile\'s primary accent color as a #hex value — the bars\/blobs\/needles\/lit LEDs. Null or absent uses the default.'),
-  "visualizerBackground": zod.string().nullish().describe('An Audio Visualizer tile\'s background \/ glow color as a #hex value — the canvas backdrop and halo glow. Null or absent uses the default.')
+  "visualizerBackground": zod.string().nullish().describe('An Audio Visualizer tile\'s background \/ glow color as a #hex value — the canvas backdrop and halo glow. Null or absent uses the default.'),
+  "photoSource": zod.union([zod.literal('uploads'),zod.literal('urls'),zod.literal('google'),zod.literal('immich'),zod.literal(null)]).nullish().describe('Where a Picture Frame tile\'s photos come from: \"uploads\" (images from the upload library), \"urls\" (a pasted list of image URLs), \"google\" (a Google Photos album), or \"immich\" (an Immich album). Null or absent means unconfigured — the tile shows demo photos.'),
+  "photoUploadUrls": zod.array(zod.string()).nullish().describe('The uploaded images (their \/api\/uploads\/files\/... URLs) a Picture Frame tile cycles through when photoSource is \"uploads\".'),
+  "photoUrls": zod.array(zod.string()).nullish().describe('The image URLs a Picture Frame tile cycles through when photoSource is \"urls\".'),
+  "photoAlbumId": zod.string().nullish().describe('The selected album id for a server-backed photoSource (\"google\" or \"immich\"). Null or absent means no album chosen yet.'),
+  "photoInterval": zod.number().nullish().describe('Seconds between automatic slide advances on a Picture Frame tile. 0 disables auto-advance (manual only). Null or absent uses the default (30s).'),
+  "photoFit": zod.union([zod.literal('cover'),zod.literal('contain'),zod.literal(null)]).nullish().describe('How a Picture Frame tile scales its photos: \"cover\" (fill, crop) or \"contain\" (letterbox, whole image). Null or absent uses cover.'),
+  "frameStyle": zod.union([zod.literal('none'),zod.literal('wood'),zod.literal('thin'),zod.literal('gold'),zod.literal('polaroid'),zod.literal('custom'),zod.literal(null)]).nullish().describe('A Picture Frame tile\'s decorative frame: \"none\", \"wood\", \"thin\", \"gold\", \"polaroid\", or \"custom\" (uses frameColor\/frameWidth). Null or absent means no frame.'),
+  "frameColor": zod.string().nullish().describe('The frame color (#hex) when frameStyle is \"custom\". Null or absent uses a neutral default.'),
+  "frameWidth": zod.number().nullish().describe('The frame thickness in pixels when frameStyle is \"custom\". Null or absent uses the default.')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.'),
   "createdAt": zod.string().optional()
 })
@@ -195,7 +204,7 @@ export const GetTilesResponse = zod.array(GetTilesResponseItem)
 export const CreateTileBody = zod.object({
   "pageId": zod.number().nullish().describe('The page to create this tile on. Omit to fall back to the user\'s first page.'),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'lidarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('pterodactyl'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('email'),zod.literal('calendar'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal('bonsai'),zod.literal('aquarium'),zod.literal('visualizer'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('pterodactyl'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('email'),zod.literal('calendar'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal('bonsai'),zod.literal('aquarium'),zod.literal('visualizer'),zod.literal('pictureframe'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -302,7 +311,16 @@ export const CreateTileBody = zod.object({
   "aquariumProps": zod.array(zod.string()).nullish().describe('An Aquarium tile\'s three decoration prop slots (e.g. \"seaweed\", \"coral\", \"chest\", \"anchor\", \"castle\", \"rock\"). Each slot may be \"none\" to leave it empty. Null or absent uses the defaults.'),
   "visualizerStyle": zod.union([zod.literal('bars'),zod.literal('lava'),zod.literal('vu'),zod.literal(null)]).nullish().describe('An Audio Visualizer tile\'s render style: \"bars\" (frequency bar graph), \"lava\" (morphing lava-lamp blobs), or \"vu\" (retro VU meter). Null or absent defaults to \"bars\".'),
   "visualizerPrimary": zod.string().nullish().describe('An Audio Visualizer tile\'s primary accent color as a #hex value — the bars\/blobs\/needles\/lit LEDs. Null or absent uses the default.'),
-  "visualizerBackground": zod.string().nullish().describe('An Audio Visualizer tile\'s background \/ glow color as a #hex value — the canvas backdrop and halo glow. Null or absent uses the default.')
+  "visualizerBackground": zod.string().nullish().describe('An Audio Visualizer tile\'s background \/ glow color as a #hex value — the canvas backdrop and halo glow. Null or absent uses the default.'),
+  "photoSource": zod.union([zod.literal('uploads'),zod.literal('urls'),zod.literal('google'),zod.literal('immich'),zod.literal(null)]).nullish().describe('Where a Picture Frame tile\'s photos come from: \"uploads\" (images from the upload library), \"urls\" (a pasted list of image URLs), \"google\" (a Google Photos album), or \"immich\" (an Immich album). Null or absent means unconfigured — the tile shows demo photos.'),
+  "photoUploadUrls": zod.array(zod.string()).nullish().describe('The uploaded images (their \/api\/uploads\/files\/... URLs) a Picture Frame tile cycles through when photoSource is \"uploads\".'),
+  "photoUrls": zod.array(zod.string()).nullish().describe('The image URLs a Picture Frame tile cycles through when photoSource is \"urls\".'),
+  "photoAlbumId": zod.string().nullish().describe('The selected album id for a server-backed photoSource (\"google\" or \"immich\"). Null or absent means no album chosen yet.'),
+  "photoInterval": zod.number().nullish().describe('Seconds between automatic slide advances on a Picture Frame tile. 0 disables auto-advance (manual only). Null or absent uses the default (30s).'),
+  "photoFit": zod.union([zod.literal('cover'),zod.literal('contain'),zod.literal(null)]).nullish().describe('How a Picture Frame tile scales its photos: \"cover\" (fill, crop) or \"contain\" (letterbox, whole image). Null or absent uses cover.'),
+  "frameStyle": zod.union([zod.literal('none'),zod.literal('wood'),zod.literal('thin'),zod.literal('gold'),zod.literal('polaroid'),zod.literal('custom'),zod.literal(null)]).nullish().describe('A Picture Frame tile\'s decorative frame: \"none\", \"wood\", \"thin\", \"gold\", \"polaroid\", or \"custom\" (uses frameColor\/frameWidth). Null or absent means no frame.'),
+  "frameColor": zod.string().nullish().describe('The frame color (#hex) when frameStyle is \"custom\". Null or absent uses a neutral default.'),
+  "frameWidth": zod.number().nullish().describe('The frame thickness in pixels when frameStyle is \"custom\". Null or absent uses the default.')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.')
 })
 
@@ -319,7 +337,7 @@ export const GetTileResponse = zod.object({
   "userId": zod.number(),
   "pageId": zod.number().nullish().describe('The page this tile belongs to. Null only for tiles that predate the multi-page migration and could not be assigned a page.'),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'lidarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('pterodactyl'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('email'),zod.literal('calendar'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal('bonsai'),zod.literal('aquarium'),zod.literal('visualizer'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('pterodactyl'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('email'),zod.literal('calendar'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal('bonsai'),zod.literal('aquarium'),zod.literal('visualizer'),zod.literal('pictureframe'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -426,7 +444,16 @@ export const GetTileResponse = zod.object({
   "aquariumProps": zod.array(zod.string()).nullish().describe('An Aquarium tile\'s three decoration prop slots (e.g. \"seaweed\", \"coral\", \"chest\", \"anchor\", \"castle\", \"rock\"). Each slot may be \"none\" to leave it empty. Null or absent uses the defaults.'),
   "visualizerStyle": zod.union([zod.literal('bars'),zod.literal('lava'),zod.literal('vu'),zod.literal(null)]).nullish().describe('An Audio Visualizer tile\'s render style: \"bars\" (frequency bar graph), \"lava\" (morphing lava-lamp blobs), or \"vu\" (retro VU meter). Null or absent defaults to \"bars\".'),
   "visualizerPrimary": zod.string().nullish().describe('An Audio Visualizer tile\'s primary accent color as a #hex value — the bars\/blobs\/needles\/lit LEDs. Null or absent uses the default.'),
-  "visualizerBackground": zod.string().nullish().describe('An Audio Visualizer tile\'s background \/ glow color as a #hex value — the canvas backdrop and halo glow. Null or absent uses the default.')
+  "visualizerBackground": zod.string().nullish().describe('An Audio Visualizer tile\'s background \/ glow color as a #hex value — the canvas backdrop and halo glow. Null or absent uses the default.'),
+  "photoSource": zod.union([zod.literal('uploads'),zod.literal('urls'),zod.literal('google'),zod.literal('immich'),zod.literal(null)]).nullish().describe('Where a Picture Frame tile\'s photos come from: \"uploads\" (images from the upload library), \"urls\" (a pasted list of image URLs), \"google\" (a Google Photos album), or \"immich\" (an Immich album). Null or absent means unconfigured — the tile shows demo photos.'),
+  "photoUploadUrls": zod.array(zod.string()).nullish().describe('The uploaded images (their \/api\/uploads\/files\/... URLs) a Picture Frame tile cycles through when photoSource is \"uploads\".'),
+  "photoUrls": zod.array(zod.string()).nullish().describe('The image URLs a Picture Frame tile cycles through when photoSource is \"urls\".'),
+  "photoAlbumId": zod.string().nullish().describe('The selected album id for a server-backed photoSource (\"google\" or \"immich\"). Null or absent means no album chosen yet.'),
+  "photoInterval": zod.number().nullish().describe('Seconds between automatic slide advances on a Picture Frame tile. 0 disables auto-advance (manual only). Null or absent uses the default (30s).'),
+  "photoFit": zod.union([zod.literal('cover'),zod.literal('contain'),zod.literal(null)]).nullish().describe('How a Picture Frame tile scales its photos: \"cover\" (fill, crop) or \"contain\" (letterbox, whole image). Null or absent uses cover.'),
+  "frameStyle": zod.union([zod.literal('none'),zod.literal('wood'),zod.literal('thin'),zod.literal('gold'),zod.literal('polaroid'),zod.literal('custom'),zod.literal(null)]).nullish().describe('A Picture Frame tile\'s decorative frame: \"none\", \"wood\", \"thin\", \"gold\", \"polaroid\", or \"custom\" (uses frameColor\/frameWidth). Null or absent means no frame.'),
+  "frameColor": zod.string().nullish().describe('The frame color (#hex) when frameStyle is \"custom\". Null or absent uses a neutral default.'),
+  "frameWidth": zod.number().nullish().describe('The frame thickness in pixels when frameStyle is \"custom\". Null or absent uses the default.')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.'),
   "createdAt": zod.string().optional()
 })
@@ -440,7 +467,7 @@ export const UpdateTileParams = zod.object({
 })
 
 export const UpdateTileBody = zod.object({
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('pterodactyl'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('email'),zod.literal('calendar'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal('bonsai'),zod.literal('aquarium'),zod.literal('visualizer'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('pterodactyl'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('email'),zod.literal('calendar'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal('bonsai'),zod.literal('aquarium'),zod.literal('visualizer'),zod.literal('pictureframe'),zod.literal(null)]).nullish(),
   "gridX": zod.number().optional(),
   "gridY": zod.number().optional(),
   "gridW": zod.number().optional(),
@@ -547,7 +574,16 @@ export const UpdateTileBody = zod.object({
   "aquariumProps": zod.array(zod.string()).nullish().describe('An Aquarium tile\'s three decoration prop slots (e.g. \"seaweed\", \"coral\", \"chest\", \"anchor\", \"castle\", \"rock\"). Each slot may be \"none\" to leave it empty. Null or absent uses the defaults.'),
   "visualizerStyle": zod.union([zod.literal('bars'),zod.literal('lava'),zod.literal('vu'),zod.literal(null)]).nullish().describe('An Audio Visualizer tile\'s render style: \"bars\" (frequency bar graph), \"lava\" (morphing lava-lamp blobs), or \"vu\" (retro VU meter). Null or absent defaults to \"bars\".'),
   "visualizerPrimary": zod.string().nullish().describe('An Audio Visualizer tile\'s primary accent color as a #hex value — the bars\/blobs\/needles\/lit LEDs. Null or absent uses the default.'),
-  "visualizerBackground": zod.string().nullish().describe('An Audio Visualizer tile\'s background \/ glow color as a #hex value — the canvas backdrop and halo glow. Null or absent uses the default.')
+  "visualizerBackground": zod.string().nullish().describe('An Audio Visualizer tile\'s background \/ glow color as a #hex value — the canvas backdrop and halo glow. Null or absent uses the default.'),
+  "photoSource": zod.union([zod.literal('uploads'),zod.literal('urls'),zod.literal('google'),zod.literal('immich'),zod.literal(null)]).nullish().describe('Where a Picture Frame tile\'s photos come from: \"uploads\" (images from the upload library), \"urls\" (a pasted list of image URLs), \"google\" (a Google Photos album), or \"immich\" (an Immich album). Null or absent means unconfigured — the tile shows demo photos.'),
+  "photoUploadUrls": zod.array(zod.string()).nullish().describe('The uploaded images (their \/api\/uploads\/files\/... URLs) a Picture Frame tile cycles through when photoSource is \"uploads\".'),
+  "photoUrls": zod.array(zod.string()).nullish().describe('The image URLs a Picture Frame tile cycles through when photoSource is \"urls\".'),
+  "photoAlbumId": zod.string().nullish().describe('The selected album id for a server-backed photoSource (\"google\" or \"immich\"). Null or absent means no album chosen yet.'),
+  "photoInterval": zod.number().nullish().describe('Seconds between automatic slide advances on a Picture Frame tile. 0 disables auto-advance (manual only). Null or absent uses the default (30s).'),
+  "photoFit": zod.union([zod.literal('cover'),zod.literal('contain'),zod.literal(null)]).nullish().describe('How a Picture Frame tile scales its photos: \"cover\" (fill, crop) or \"contain\" (letterbox, whole image). Null or absent uses cover.'),
+  "frameStyle": zod.union([zod.literal('none'),zod.literal('wood'),zod.literal('thin'),zod.literal('gold'),zod.literal('polaroid'),zod.literal('custom'),zod.literal(null)]).nullish().describe('A Picture Frame tile\'s decorative frame: \"none\", \"wood\", \"thin\", \"gold\", \"polaroid\", or \"custom\" (uses frameColor\/frameWidth). Null or absent means no frame.'),
+  "frameColor": zod.string().nullish().describe('The frame color (#hex) when frameStyle is \"custom\". Null or absent uses a neutral default.'),
+  "frameWidth": zod.number().nullish().describe('The frame thickness in pixels when frameStyle is \"custom\". Null or absent uses the default.')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.')
 })
 
@@ -556,7 +592,7 @@ export const UpdateTileResponse = zod.object({
   "userId": zod.number(),
   "pageId": zod.number().nullish().describe('The page this tile belongs to. Null only for tiles that predate the multi-page migration and could not be assigned a page.'),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'lidarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('pterodactyl'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('email'),zod.literal('calendar'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal('bonsai'),zod.literal('aquarium'),zod.literal('visualizer'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('pterodactyl'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('email'),zod.literal('calendar'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal('bonsai'),zod.literal('aquarium'),zod.literal('visualizer'),zod.literal('pictureframe'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -663,7 +699,16 @@ export const UpdateTileResponse = zod.object({
   "aquariumProps": zod.array(zod.string()).nullish().describe('An Aquarium tile\'s three decoration prop slots (e.g. \"seaweed\", \"coral\", \"chest\", \"anchor\", \"castle\", \"rock\"). Each slot may be \"none\" to leave it empty. Null or absent uses the defaults.'),
   "visualizerStyle": zod.union([zod.literal('bars'),zod.literal('lava'),zod.literal('vu'),zod.literal(null)]).nullish().describe('An Audio Visualizer tile\'s render style: \"bars\" (frequency bar graph), \"lava\" (morphing lava-lamp blobs), or \"vu\" (retro VU meter). Null or absent defaults to \"bars\".'),
   "visualizerPrimary": zod.string().nullish().describe('An Audio Visualizer tile\'s primary accent color as a #hex value — the bars\/blobs\/needles\/lit LEDs. Null or absent uses the default.'),
-  "visualizerBackground": zod.string().nullish().describe('An Audio Visualizer tile\'s background \/ glow color as a #hex value — the canvas backdrop and halo glow. Null or absent uses the default.')
+  "visualizerBackground": zod.string().nullish().describe('An Audio Visualizer tile\'s background \/ glow color as a #hex value — the canvas backdrop and halo glow. Null or absent uses the default.'),
+  "photoSource": zod.union([zod.literal('uploads'),zod.literal('urls'),zod.literal('google'),zod.literal('immich'),zod.literal(null)]).nullish().describe('Where a Picture Frame tile\'s photos come from: \"uploads\" (images from the upload library), \"urls\" (a pasted list of image URLs), \"google\" (a Google Photos album), or \"immich\" (an Immich album). Null or absent means unconfigured — the tile shows demo photos.'),
+  "photoUploadUrls": zod.array(zod.string()).nullish().describe('The uploaded images (their \/api\/uploads\/files\/... URLs) a Picture Frame tile cycles through when photoSource is \"uploads\".'),
+  "photoUrls": zod.array(zod.string()).nullish().describe('The image URLs a Picture Frame tile cycles through when photoSource is \"urls\".'),
+  "photoAlbumId": zod.string().nullish().describe('The selected album id for a server-backed photoSource (\"google\" or \"immich\"). Null or absent means no album chosen yet.'),
+  "photoInterval": zod.number().nullish().describe('Seconds between automatic slide advances on a Picture Frame tile. 0 disables auto-advance (manual only). Null or absent uses the default (30s).'),
+  "photoFit": zod.union([zod.literal('cover'),zod.literal('contain'),zod.literal(null)]).nullish().describe('How a Picture Frame tile scales its photos: \"cover\" (fill, crop) or \"contain\" (letterbox, whole image). Null or absent uses cover.'),
+  "frameStyle": zod.union([zod.literal('none'),zod.literal('wood'),zod.literal('thin'),zod.literal('gold'),zod.literal('polaroid'),zod.literal('custom'),zod.literal(null)]).nullish().describe('A Picture Frame tile\'s decorative frame: \"none\", \"wood\", \"thin\", \"gold\", \"polaroid\", or \"custom\" (uses frameColor\/frameWidth). Null or absent means no frame.'),
+  "frameColor": zod.string().nullish().describe('The frame color (#hex) when frameStyle is \"custom\". Null or absent uses a neutral default.'),
+  "frameWidth": zod.number().nullish().describe('The frame thickness in pixels when frameStyle is \"custom\". Null or absent uses the default.')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.'),
   "createdAt": zod.string().optional()
 })
@@ -696,7 +741,7 @@ export const SaveLayoutResponseItem = zod.object({
   "userId": zod.number(),
   "pageId": zod.number().nullish().describe('The page this tile belongs to. Null only for tiles that predate the multi-page migration and could not be assigned a page.'),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'lidarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('pterodactyl'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('email'),zod.literal('calendar'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal('bonsai'),zod.literal('aquarium'),zod.literal('visualizer'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('pterodactyl'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('email'),zod.literal('calendar'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal('bonsai'),zod.literal('aquarium'),zod.literal('visualizer'),zod.literal('pictureframe'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -803,7 +848,16 @@ export const SaveLayoutResponseItem = zod.object({
   "aquariumProps": zod.array(zod.string()).nullish().describe('An Aquarium tile\'s three decoration prop slots (e.g. \"seaweed\", \"coral\", \"chest\", \"anchor\", \"castle\", \"rock\"). Each slot may be \"none\" to leave it empty. Null or absent uses the defaults.'),
   "visualizerStyle": zod.union([zod.literal('bars'),zod.literal('lava'),zod.literal('vu'),zod.literal(null)]).nullish().describe('An Audio Visualizer tile\'s render style: \"bars\" (frequency bar graph), \"lava\" (morphing lava-lamp blobs), or \"vu\" (retro VU meter). Null or absent defaults to \"bars\".'),
   "visualizerPrimary": zod.string().nullish().describe('An Audio Visualizer tile\'s primary accent color as a #hex value — the bars\/blobs\/needles\/lit LEDs. Null or absent uses the default.'),
-  "visualizerBackground": zod.string().nullish().describe('An Audio Visualizer tile\'s background \/ glow color as a #hex value — the canvas backdrop and halo glow. Null or absent uses the default.')
+  "visualizerBackground": zod.string().nullish().describe('An Audio Visualizer tile\'s background \/ glow color as a #hex value — the canvas backdrop and halo glow. Null or absent uses the default.'),
+  "photoSource": zod.union([zod.literal('uploads'),zod.literal('urls'),zod.literal('google'),zod.literal('immich'),zod.literal(null)]).nullish().describe('Where a Picture Frame tile\'s photos come from: \"uploads\" (images from the upload library), \"urls\" (a pasted list of image URLs), \"google\" (a Google Photos album), or \"immich\" (an Immich album). Null or absent means unconfigured — the tile shows demo photos.'),
+  "photoUploadUrls": zod.array(zod.string()).nullish().describe('The uploaded images (their \/api\/uploads\/files\/... URLs) a Picture Frame tile cycles through when photoSource is \"uploads\".'),
+  "photoUrls": zod.array(zod.string()).nullish().describe('The image URLs a Picture Frame tile cycles through when photoSource is \"urls\".'),
+  "photoAlbumId": zod.string().nullish().describe('The selected album id for a server-backed photoSource (\"google\" or \"immich\"). Null or absent means no album chosen yet.'),
+  "photoInterval": zod.number().nullish().describe('Seconds between automatic slide advances on a Picture Frame tile. 0 disables auto-advance (manual only). Null or absent uses the default (30s).'),
+  "photoFit": zod.union([zod.literal('cover'),zod.literal('contain'),zod.literal(null)]).nullish().describe('How a Picture Frame tile scales its photos: \"cover\" (fill, crop) or \"contain\" (letterbox, whole image). Null or absent uses cover.'),
+  "frameStyle": zod.union([zod.literal('none'),zod.literal('wood'),zod.literal('thin'),zod.literal('gold'),zod.literal('polaroid'),zod.literal('custom'),zod.literal(null)]).nullish().describe('A Picture Frame tile\'s decorative frame: \"none\", \"wood\", \"thin\", \"gold\", \"polaroid\", or \"custom\" (uses frameColor\/frameWidth). Null or absent means no frame.'),
+  "frameColor": zod.string().nullish().describe('The frame color (#hex) when frameStyle is \"custom\". Null or absent uses a neutral default.'),
+  "frameWidth": zod.number().nullish().describe('The frame thickness in pixels when frameStyle is \"custom\". Null or absent uses the default.')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.'),
   "createdAt": zod.string().optional()
 })
@@ -1006,7 +1060,16 @@ export const ExportAllPagesResponse = zod.object({
   "aquariumProps": zod.array(zod.string()).nullish().describe('An Aquarium tile\'s three decoration prop slots (e.g. \"seaweed\", \"coral\", \"chest\", \"anchor\", \"castle\", \"rock\"). Each slot may be \"none\" to leave it empty. Null or absent uses the defaults.'),
   "visualizerStyle": zod.union([zod.literal('bars'),zod.literal('lava'),zod.literal('vu'),zod.literal(null)]).nullish().describe('An Audio Visualizer tile\'s render style: \"bars\" (frequency bar graph), \"lava\" (morphing lava-lamp blobs), or \"vu\" (retro VU meter). Null or absent defaults to \"bars\".'),
   "visualizerPrimary": zod.string().nullish().describe('An Audio Visualizer tile\'s primary accent color as a #hex value — the bars\/blobs\/needles\/lit LEDs. Null or absent uses the default.'),
-  "visualizerBackground": zod.string().nullish().describe('An Audio Visualizer tile\'s background \/ glow color as a #hex value — the canvas backdrop and halo glow. Null or absent uses the default.')
+  "visualizerBackground": zod.string().nullish().describe('An Audio Visualizer tile\'s background \/ glow color as a #hex value — the canvas backdrop and halo glow. Null or absent uses the default.'),
+  "photoSource": zod.union([zod.literal('uploads'),zod.literal('urls'),zod.literal('google'),zod.literal('immich'),zod.literal(null)]).nullish().describe('Where a Picture Frame tile\'s photos come from: \"uploads\" (images from the upload library), \"urls\" (a pasted list of image URLs), \"google\" (a Google Photos album), or \"immich\" (an Immich album). Null or absent means unconfigured — the tile shows demo photos.'),
+  "photoUploadUrls": zod.array(zod.string()).nullish().describe('The uploaded images (their \/api\/uploads\/files\/... URLs) a Picture Frame tile cycles through when photoSource is \"uploads\".'),
+  "photoUrls": zod.array(zod.string()).nullish().describe('The image URLs a Picture Frame tile cycles through when photoSource is \"urls\".'),
+  "photoAlbumId": zod.string().nullish().describe('The selected album id for a server-backed photoSource (\"google\" or \"immich\"). Null or absent means no album chosen yet.'),
+  "photoInterval": zod.number().nullish().describe('Seconds between automatic slide advances on a Picture Frame tile. 0 disables auto-advance (manual only). Null or absent uses the default (30s).'),
+  "photoFit": zod.union([zod.literal('cover'),zod.literal('contain'),zod.literal(null)]).nullish().describe('How a Picture Frame tile scales its photos: \"cover\" (fill, crop) or \"contain\" (letterbox, whole image). Null or absent uses cover.'),
+  "frameStyle": zod.union([zod.literal('none'),zod.literal('wood'),zod.literal('thin'),zod.literal('gold'),zod.literal('polaroid'),zod.literal('custom'),zod.literal(null)]).nullish().describe('A Picture Frame tile\'s decorative frame: \"none\", \"wood\", \"thin\", \"gold\", \"polaroid\", or \"custom\" (uses frameColor\/frameWidth). Null or absent means no frame.'),
+  "frameColor": zod.string().nullish().describe('The frame color (#hex) when frameStyle is \"custom\". Null or absent uses a neutral default.'),
+  "frameWidth": zod.number().nullish().describe('The frame thickness in pixels when frameStyle is \"custom\". Null or absent uses the default.')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.')
 }).describe('A tile inside an export envelope. Mirrors Tile but omits every identity field (id, userId, pageId, createdAt) so it can be re-imported under any user\/page. Carries no credential data — integrations are referenced by type only.'))
 }).describe('A single page within an export envelope.'))
@@ -1137,7 +1200,16 @@ export const ExportPageResponse = zod.object({
   "aquariumProps": zod.array(zod.string()).nullish().describe('An Aquarium tile\'s three decoration prop slots (e.g. \"seaweed\", \"coral\", \"chest\", \"anchor\", \"castle\", \"rock\"). Each slot may be \"none\" to leave it empty. Null or absent uses the defaults.'),
   "visualizerStyle": zod.union([zod.literal('bars'),zod.literal('lava'),zod.literal('vu'),zod.literal(null)]).nullish().describe('An Audio Visualizer tile\'s render style: \"bars\" (frequency bar graph), \"lava\" (morphing lava-lamp blobs), or \"vu\" (retro VU meter). Null or absent defaults to \"bars\".'),
   "visualizerPrimary": zod.string().nullish().describe('An Audio Visualizer tile\'s primary accent color as a #hex value — the bars\/blobs\/needles\/lit LEDs. Null or absent uses the default.'),
-  "visualizerBackground": zod.string().nullish().describe('An Audio Visualizer tile\'s background \/ glow color as a #hex value — the canvas backdrop and halo glow. Null or absent uses the default.')
+  "visualizerBackground": zod.string().nullish().describe('An Audio Visualizer tile\'s background \/ glow color as a #hex value — the canvas backdrop and halo glow. Null or absent uses the default.'),
+  "photoSource": zod.union([zod.literal('uploads'),zod.literal('urls'),zod.literal('google'),zod.literal('immich'),zod.literal(null)]).nullish().describe('Where a Picture Frame tile\'s photos come from: \"uploads\" (images from the upload library), \"urls\" (a pasted list of image URLs), \"google\" (a Google Photos album), or \"immich\" (an Immich album). Null or absent means unconfigured — the tile shows demo photos.'),
+  "photoUploadUrls": zod.array(zod.string()).nullish().describe('The uploaded images (their \/api\/uploads\/files\/... URLs) a Picture Frame tile cycles through when photoSource is \"uploads\".'),
+  "photoUrls": zod.array(zod.string()).nullish().describe('The image URLs a Picture Frame tile cycles through when photoSource is \"urls\".'),
+  "photoAlbumId": zod.string().nullish().describe('The selected album id for a server-backed photoSource (\"google\" or \"immich\"). Null or absent means no album chosen yet.'),
+  "photoInterval": zod.number().nullish().describe('Seconds between automatic slide advances on a Picture Frame tile. 0 disables auto-advance (manual only). Null or absent uses the default (30s).'),
+  "photoFit": zod.union([zod.literal('cover'),zod.literal('contain'),zod.literal(null)]).nullish().describe('How a Picture Frame tile scales its photos: \"cover\" (fill, crop) or \"contain\" (letterbox, whole image). Null or absent uses cover.'),
+  "frameStyle": zod.union([zod.literal('none'),zod.literal('wood'),zod.literal('thin'),zod.literal('gold'),zod.literal('polaroid'),zod.literal('custom'),zod.literal(null)]).nullish().describe('A Picture Frame tile\'s decorative frame: \"none\", \"wood\", \"thin\", \"gold\", \"polaroid\", or \"custom\" (uses frameColor\/frameWidth). Null or absent means no frame.'),
+  "frameColor": zod.string().nullish().describe('The frame color (#hex) when frameStyle is \"custom\". Null or absent uses a neutral default.'),
+  "frameWidth": zod.number().nullish().describe('The frame thickness in pixels when frameStyle is \"custom\". Null or absent uses the default.')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.')
 }).describe('A tile inside an export envelope. Mirrors Tile but omits every identity field (id, userId, pageId, createdAt) so it can be re-imported under any user\/page. Carries no credential data — integrations are referenced by type only.'))
 }).describe('A single page within an export envelope.'))
@@ -1264,7 +1336,16 @@ export const ImportPagesBody = zod.object({
   "aquariumProps": zod.array(zod.string()).nullish().describe('An Aquarium tile\'s three decoration prop slots (e.g. \"seaweed\", \"coral\", \"chest\", \"anchor\", \"castle\", \"rock\"). Each slot may be \"none\" to leave it empty. Null or absent uses the defaults.'),
   "visualizerStyle": zod.union([zod.literal('bars'),zod.literal('lava'),zod.literal('vu'),zod.literal(null)]).nullish().describe('An Audio Visualizer tile\'s render style: \"bars\" (frequency bar graph), \"lava\" (morphing lava-lamp blobs), or \"vu\" (retro VU meter). Null or absent defaults to \"bars\".'),
   "visualizerPrimary": zod.string().nullish().describe('An Audio Visualizer tile\'s primary accent color as a #hex value — the bars\/blobs\/needles\/lit LEDs. Null or absent uses the default.'),
-  "visualizerBackground": zod.string().nullish().describe('An Audio Visualizer tile\'s background \/ glow color as a #hex value — the canvas backdrop and halo glow. Null or absent uses the default.')
+  "visualizerBackground": zod.string().nullish().describe('An Audio Visualizer tile\'s background \/ glow color as a #hex value — the canvas backdrop and halo glow. Null or absent uses the default.'),
+  "photoSource": zod.union([zod.literal('uploads'),zod.literal('urls'),zod.literal('google'),zod.literal('immich'),zod.literal(null)]).nullish().describe('Where a Picture Frame tile\'s photos come from: \"uploads\" (images from the upload library), \"urls\" (a pasted list of image URLs), \"google\" (a Google Photos album), or \"immich\" (an Immich album). Null or absent means unconfigured — the tile shows demo photos.'),
+  "photoUploadUrls": zod.array(zod.string()).nullish().describe('The uploaded images (their \/api\/uploads\/files\/... URLs) a Picture Frame tile cycles through when photoSource is \"uploads\".'),
+  "photoUrls": zod.array(zod.string()).nullish().describe('The image URLs a Picture Frame tile cycles through when photoSource is \"urls\".'),
+  "photoAlbumId": zod.string().nullish().describe('The selected album id for a server-backed photoSource (\"google\" or \"immich\"). Null or absent means no album chosen yet.'),
+  "photoInterval": zod.number().nullish().describe('Seconds between automatic slide advances on a Picture Frame tile. 0 disables auto-advance (manual only). Null or absent uses the default (30s).'),
+  "photoFit": zod.union([zod.literal('cover'),zod.literal('contain'),zod.literal(null)]).nullish().describe('How a Picture Frame tile scales its photos: \"cover\" (fill, crop) or \"contain\" (letterbox, whole image). Null or absent uses cover.'),
+  "frameStyle": zod.union([zod.literal('none'),zod.literal('wood'),zod.literal('thin'),zod.literal('gold'),zod.literal('polaroid'),zod.literal('custom'),zod.literal(null)]).nullish().describe('A Picture Frame tile\'s decorative frame: \"none\", \"wood\", \"thin\", \"gold\", \"polaroid\", or \"custom\" (uses frameColor\/frameWidth). Null or absent means no frame.'),
+  "frameColor": zod.string().nullish().describe('The frame color (#hex) when frameStyle is \"custom\". Null or absent uses a neutral default.'),
+  "frameWidth": zod.number().nullish().describe('The frame thickness in pixels when frameStyle is \"custom\". Null or absent uses the default.')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.')
 }).describe('A tile inside an export envelope. Mirrors Tile but omits every identity field (id, userId, pageId, createdAt) so it can be re-imported under any user\/page. Carries no credential data — integrations are referenced by type only.'))
 }).describe('A single page within an export envelope.'))
@@ -1569,6 +1650,40 @@ export const GetErsatzTvWidgetResponse = zod.object({
   "name": zod.string().describe('The channel\'s display name.'),
   "nowPlaying": zod.string().nullable().describe('Title of the programme currently airing on the channel (start ≤ now < stop in the EPG). Null when nothing is currently scheduled.')
 })).describe('Channels and what each is currently airing (from the EPG).')
+})
+
+
+/**
+ * @summary List albums from a connected photo source (Google Photos or Immich)
+ */
+export const GetPhotoAlbumsQueryParams = zod.object({
+  "source": zod.enum(['google', 'immich']).describe('Which photo source to list albums from. \"google\" uses the linked Google account (Photos scope); \"immich\" the saved Immich server connection.')
+})
+
+export const GetPhotoAlbumsResponse = zod.object({
+  "sample": zod.boolean().nullish().describe('True when the source is unconfigured and the albums are representative samples rather than real data.'),
+  "albums": zod.array(zod.object({
+  "id": zod.string().describe('Source-side album identifier.'),
+  "title": zod.string().describe('The album\'s display name.'),
+  "count": zod.number().nullish().describe('Number of items in the album when the source reports it.')
+}))
+})
+
+
+/**
+ * @summary Get a normalized photo list for the Picture Frame tile from a server-backed source
+ */
+export const GetPhotosWidgetQueryParams = zod.object({
+  "source": zod.enum(['google', 'immich']).describe('Which photo source to read. \"google\" lists a Google Photos album (photo URLs are server-side proxy paths because Google baseUrls expire); \"immich\" lists an Immich album (proxy paths carry the API key server-side).'),
+  "albumId": zod.coerce.string().optional().describe('The album to list. Required once the source is configured.')
+})
+
+export const GetPhotosWidgetResponse = zod.object({
+  "sample": zod.boolean().nullish().describe('True when the source is unconfigured; photos is empty and the tile falls back to its built-in demo slideshow.'),
+  "photos": zod.array(zod.object({
+  "id": zod.string().describe('Source-side photo identifier.'),
+  "url": zod.string().describe('URL the tile loads the image from. For server-backed sources this is an authenticated API proxy path (fetched with the bearer token and rendered via an object URL), never a raw upstream URL.')
+}))
 })
 
 
@@ -1996,7 +2111,7 @@ export const GetConnectionHealthResponse = zod.array(GetConnectionHealthResponse
  * @summary Test a service connection using the supplied values without saving
  */
 export const TestConnectionParams = zod.object({
-  "service": zod.enum(['truenas', 'plex', 'jellyfin', 'subsonic', 'sonarr', 'radarr', 'lidarr', 'qbittorrent', 'pihole', 'nginx-proxy-manager', 'prowlarr', 'pterodactyl', 'tailscale', 'ersatztv', 'stocks'])
+  "service": zod.enum(['truenas', 'plex', 'jellyfin', 'subsonic', 'sonarr', 'radarr', 'lidarr', 'qbittorrent', 'pihole', 'nginx-proxy-manager', 'prowlarr', 'pterodactyl', 'tailscale', 'ersatztv', 'stocks', 'immich'])
 })
 
 export const TestConnectionBody = zod.object({
@@ -2017,7 +2132,7 @@ export const TestConnectionResponse = zod.object({
  * @summary Save connection settings for a single service
  */
 export const UpdateConnectionParams = zod.object({
-  "service": zod.enum(['truenas', 'plex', 'jellyfin', 'subsonic', 'sonarr', 'radarr', 'lidarr', 'qbittorrent', 'pihole', 'nginx-proxy-manager', 'prowlarr', 'pterodactyl', 'tailscale', 'ersatztv', 'stocks'])
+  "service": zod.enum(['truenas', 'plex', 'jellyfin', 'subsonic', 'sonarr', 'radarr', 'lidarr', 'qbittorrent', 'pihole', 'nginx-proxy-manager', 'prowlarr', 'pterodactyl', 'tailscale', 'ersatztv', 'stocks', 'immich'])
 })
 
 export const UpdateConnectionBody = zod.object({

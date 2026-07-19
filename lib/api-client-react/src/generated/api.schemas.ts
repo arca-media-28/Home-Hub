@@ -84,6 +84,7 @@ export const TileIntegration = {
   bonsai: 'bonsai',
   aquarium: 'aquarium',
   visualizer: 'visualizer',
+  pictureframe: 'pictureframe',
 } as const;
 
 /**
@@ -542,6 +543,51 @@ export type TileSettings = {
      * @nullable
      */
   visualizerBackground?: string | null;
+  /**
+     * Where a Picture Frame tile's photos come from: "uploads" (images from the upload library), "urls" (a pasted list of image URLs), "google" (a Google Photos album), or "immich" (an Immich album). Null or absent means unconfigured — the tile shows demo photos.
+     * @nullable
+     */
+  photoSource?: 'uploads' | 'urls' | 'google' | 'immich' | null;
+  /**
+     * The uploaded images (their /api/uploads/files/... URLs) a Picture Frame tile cycles through when photoSource is "uploads".
+     * @nullable
+     */
+  photoUploadUrls?: string[] | null;
+  /**
+     * The image URLs a Picture Frame tile cycles through when photoSource is "urls".
+     * @nullable
+     */
+  photoUrls?: string[] | null;
+  /**
+     * The selected album id for a server-backed photoSource ("google" or "immich"). Null or absent means no album chosen yet.
+     * @nullable
+     */
+  photoAlbumId?: string | null;
+  /**
+     * Seconds between automatic slide advances on a Picture Frame tile. 0 disables auto-advance (manual only). Null or absent uses the default (30s).
+     * @nullable
+     */
+  photoInterval?: number | null;
+  /**
+     * How a Picture Frame tile scales its photos: "cover" (fill, crop) or "contain" (letterbox, whole image). Null or absent uses cover.
+     * @nullable
+     */
+  photoFit?: 'cover' | 'contain' | null;
+  /**
+     * A Picture Frame tile's decorative frame: "none", "wood", "thin", "gold", "polaroid", or "custom" (uses frameColor/frameWidth). Null or absent means no frame.
+     * @nullable
+     */
+  frameStyle?: 'none' | 'wood' | 'thin' | 'gold' | 'polaroid' | 'custom' | null;
+  /**
+     * The frame color (#hex) when frameStyle is "custom". Null or absent uses a neutral default.
+     * @nullable
+     */
+  frameColor?: string | null;
+  /**
+     * The frame thickness in pixels when frameStyle is "custom". Null or absent uses the default.
+     * @nullable
+     */
+  frameWidth?: number | null;
 } | null | null;
 
 export interface Tile {
@@ -659,6 +705,7 @@ export const TileInputIntegration = {
   bonsai: 'bonsai',
   aquarium: 'aquarium',
   visualizer: 'visualizer',
+  pictureframe: 'pictureframe',
 } as const;
 
 export interface TileInput {
@@ -735,6 +782,7 @@ export const TileUpdateIntegration = {
   bonsai: 'bonsai',
   aquarium: 'aquarium',
   visualizer: 'visualizer',
+  pictureframe: 'pictureframe',
 } as const;
 
 export interface TileUpdate {
@@ -1865,6 +1913,43 @@ export interface ErsatzTvData {
   channels: ErsatzTvChannel[];
 }
 
+export interface PhotoAlbum {
+  /** Source-side album identifier. */
+  id: string;
+  /** The album's display name. */
+  title: string;
+  /**
+     * Number of items in the album when the source reports it.
+     * @nullable
+     */
+  count?: number | null;
+}
+
+export interface PhotoAlbumsData {
+  /**
+     * True when the source is unconfigured and the albums are representative samples rather than real data.
+     * @nullable
+     */
+  sample?: boolean | null;
+  albums: PhotoAlbum[];
+}
+
+export interface PhotoItem {
+  /** Source-side photo identifier. */
+  id: string;
+  /** URL the tile loads the image from. For server-backed sources this is an authenticated API proxy path (fetched with the bearer token and rendered via an object URL), never a raw upstream URL. */
+  url: string;
+}
+
+export interface PhotosData {
+  /**
+     * True when the source is unconfigured; photos is empty and the tile falls back to its built-in demo slideshow.
+     * @nullable
+     */
+  sample?: boolean | null;
+  photos: PhotoItem[];
+}
+
 export interface AudioTrack {
   /** Stable identifier for the track within its source. */
   id: string;
@@ -2094,6 +2179,40 @@ export type GetMediaContinueServer = typeof GetMediaContinueServer[keyof typeof 
 export const GetMediaContinueServer = {
   plex: 'plex',
   jellyfin: 'jellyfin',
+} as const;
+
+export type GetPhotoAlbumsParams = {
+/**
+ * Which photo source to list albums from. "google" uses the linked Google account (Photos scope); "immich" the saved Immich server connection.
+ */
+source: GetPhotoAlbumsSource;
+};
+
+export type GetPhotoAlbumsSource = typeof GetPhotoAlbumsSource[keyof typeof GetPhotoAlbumsSource];
+
+
+export const GetPhotoAlbumsSource = {
+  google: 'google',
+  immich: 'immich',
+} as const;
+
+export type GetPhotosWidgetParams = {
+/**
+ * Which photo source to read. "google" lists a Google Photos album (photo URLs are server-side proxy paths because Google baseUrls expire); "immich" lists an Immich album (proxy paths carry the API key server-side).
+ */
+source: GetPhotosWidgetSource;
+/**
+ * The album to list. Required once the source is configured.
+ */
+albumId?: string;
+};
+
+export type GetPhotosWidgetSource = typeof GetPhotosWidgetSource[keyof typeof GetPhotosWidgetSource];
+
+
+export const GetPhotosWidgetSource = {
+  google: 'google',
+  immich: 'immich',
 } as const;
 
 export type GetAudioPlayerNowPlayingParams = {

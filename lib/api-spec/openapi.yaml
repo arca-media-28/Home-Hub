@@ -751,6 +751,79 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErsatzTvData"
 
+  /widgets/photos/albums:
+    get:
+      operationId: getPhotoAlbums
+      tags: [widgets]
+      summary: List albums from a connected photo source (Google Photos or Immich)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: source
+          in: query
+          required: true
+          description: >-
+            Which photo source to list albums from. "google" uses the linked
+            Google account (Photos scope); "immich" the saved Immich server
+            connection.
+          schema:
+            type: string
+            enum: [google, immich]
+      responses:
+        "200":
+          description: The source's albums (or sample albums when unconfigured)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PhotoAlbumsData"
+        "502":
+          description: The configured photo source could not be reached
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /widgets/photos:
+    get:
+      operationId: getPhotosWidget
+      tags: [widgets]
+      summary: Get a normalized photo list for the Picture Frame tile from a server-backed source
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: source
+          in: query
+          required: true
+          description: >-
+            Which photo source to read. "google" lists a Google Photos album
+            (photo URLs are server-side proxy paths because Google baseUrls
+            expire); "immich" lists an Immich album (proxy paths carry the API
+            key server-side).
+          schema:
+            type: string
+            enum: [google, immich]
+        - name: albumId
+          in: query
+          required: false
+          description: The album to list. Required once the source is configured.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: >-
+            The album's photos, or sample:true with an empty list when the
+            source is unconfigured (the tile then shows built-in demo photos).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PhotosData"
+        "502":
+          description: The configured photo source could not be reached
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /widgets/audioplayer:
     get:
       operationId: getAudioPlayerNowPlaying
@@ -1483,7 +1556,7 @@ paths:
           required: true
           schema:
             type: string
-            enum: [truenas, plex, jellyfin, subsonic, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, pterodactyl, tailscale, ersatztv, stocks]
+            enum: [truenas, plex, jellyfin, subsonic, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, pterodactyl, tailscale, ersatztv, stocks, immich]
       requestBody:
         required: true
         content:
@@ -1517,7 +1590,7 @@ paths:
           required: true
           schema:
             type: string
-            enum: [truenas, plex, jellyfin, subsonic, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, pterodactyl, tailscale, ersatztv, stocks]
+            enum: [truenas, plex, jellyfin, subsonic, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, pterodactyl, tailscale, ersatztv, stocks, immich]
       requestBody:
         required: true
         content:
@@ -1984,7 +2057,7 @@ components:
           enum: [app, truenas, media, sonarr, radarr, lidarr, qbittorrent]
         integration:
           type: ["string", "null"]
-          enum: [truenas, media, jellyfin, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, pterodactyl, tailscale, ersatztv, audioplayer, clock, timer, weather, sports, news, stocks, sleeper, email, calendar, note, spacer, divider, eightball, dice, coinflip, fortune, tamagotchi, bonsai, aquarium, visualizer, null]
+          enum: [truenas, media, jellyfin, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, pterodactyl, tailscale, ersatztv, audioplayer, clock, timer, weather, sports, news, stocks, sleeper, email, calendar, note, spacer, divider, eightball, dice, coinflip, fortune, tamagotchi, bonsai, aquarium, visualizer, pictureframe, null]
         gridX:
           type: integer
         gridY:
@@ -2068,7 +2141,7 @@ components:
           enum: [app, truenas, media, sonarr, radarr, lidarr, qbittorrent]
         integration:
           type: ["string", "null"]
-          enum: [truenas, media, jellyfin, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, pterodactyl, tailscale, ersatztv, audioplayer, clock, timer, weather, sports, news, stocks, sleeper, email, calendar, note, spacer, divider, eightball, dice, coinflip, fortune, tamagotchi, bonsai, aquarium, visualizer, null]
+          enum: [truenas, media, jellyfin, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, pterodactyl, tailscale, ersatztv, audioplayer, clock, timer, weather, sports, news, stocks, sleeper, email, calendar, note, spacer, divider, eightball, dice, coinflip, fortune, tamagotchi, bonsai, aquarium, visualizer, pictureframe, null]
         gridX:
           type: integer
         gridY:
@@ -2111,7 +2184,7 @@ components:
       properties:
         integration:
           type: ["string", "null"]
-          enum: [truenas, media, jellyfin, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, pterodactyl, tailscale, ersatztv, audioplayer, clock, timer, weather, sports, news, stocks, sleeper, email, calendar, note, spacer, divider, eightball, dice, coinflip, fortune, tamagotchi, bonsai, aquarium, visualizer, null]
+          enum: [truenas, media, jellyfin, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, pterodactyl, tailscale, ersatztv, audioplayer, clock, timer, weather, sports, news, stocks, sleeper, email, calendar, note, spacer, divider, eightball, dice, coinflip, fortune, tamagotchi, bonsai, aquarium, visualizer, pictureframe, null]
         gridX:
           type: integer
         gridY:
@@ -2671,6 +2744,62 @@ components:
             An Audio Visualizer tile's background / glow color as a #hex value —
             the canvas backdrop and halo glow. Null or absent uses the default.
           type: ["string", "null"]
+        photoSource:
+          description: >-
+            Where a Picture Frame tile's photos come from: "uploads" (images
+            from the upload library), "urls" (a pasted list of image URLs),
+            "google" (a Google Photos album), or "immich" (an Immich album).
+            Null or absent means unconfigured — the tile shows demo photos.
+          type: ["string", "null"]
+          enum: ["uploads", "urls", "google", "immich", null]
+        photoUploadUrls:
+          description: >-
+            The uploaded images (their /api/uploads/files/... URLs) a Picture
+            Frame tile cycles through when photoSource is "uploads".
+          type: ["array", "null"]
+          items:
+            type: string
+        photoUrls:
+          description: >-
+            The image URLs a Picture Frame tile cycles through when
+            photoSource is "urls".
+          type: ["array", "null"]
+          items:
+            type: string
+        photoAlbumId:
+          description: >-
+            The selected album id for a server-backed photoSource ("google" or
+            "immich"). Null or absent means no album chosen yet.
+          type: ["string", "null"]
+        photoInterval:
+          description: >-
+            Seconds between automatic slide advances on a Picture Frame tile.
+            0 disables auto-advance (manual only). Null or absent uses the
+            default (30s).
+          type: ["number", "null"]
+        photoFit:
+          description: >-
+            How a Picture Frame tile scales its photos: "cover" (fill, crop)
+            or "contain" (letterbox, whole image). Null or absent uses cover.
+          type: ["string", "null"]
+          enum: ["cover", "contain", null]
+        frameStyle:
+          description: >-
+            A Picture Frame tile's decorative frame: "none", "wood", "thin",
+            "gold", "polaroid", or "custom" (uses frameColor/frameWidth). Null
+            or absent means no frame.
+          type: ["string", "null"]
+          enum: ["none", "wood", "thin", "gold", "polaroid", "custom", null]
+        frameColor:
+          description: >-
+            The frame color (#hex) when frameStyle is "custom". Null or absent
+            uses a neutral default.
+          type: ["string", "null"]
+        frameWidth:
+          description: >-
+            The frame thickness in pixels when frameStyle is "custom". Null or
+            absent uses the default.
+          type: ["number", "null"]
 
     NoteChecklistItem:
       type: object
@@ -4198,6 +4327,62 @@ components:
             Title of the programme currently airing on the channel (start ≤ now
             < stop in the EPG). Null when nothing is currently scheduled.
           type: ["string", "null"]
+
+    PhotoAlbum:
+      type: object
+      required: [id, title]
+      properties:
+        id:
+          description: Source-side album identifier.
+          type: string
+        title:
+          description: The album's display name.
+          type: string
+        count:
+          description: Number of items in the album when the source reports it.
+          type: ["integer", "null"]
+
+    PhotoAlbumsData:
+      type: object
+      required: [albums]
+      properties:
+        sample:
+          description: >-
+            True when the source is unconfigured and the albums are
+            representative samples rather than real data.
+          type: ["boolean", "null"]
+        albums:
+          type: array
+          items:
+            $ref: "#/components/schemas/PhotoAlbum"
+
+    PhotoItem:
+      type: object
+      required: [id, url]
+      properties:
+        id:
+          description: Source-side photo identifier.
+          type: string
+        url:
+          description: >-
+            URL the tile loads the image from. For server-backed sources this
+            is an authenticated API proxy path (fetched with the bearer token
+            and rendered via an object URL), never a raw upstream URL.
+          type: string
+
+    PhotosData:
+      type: object
+      required: [photos]
+      properties:
+        sample:
+          description: >-
+            True when the source is unconfigured; photos is empty and the tile
+            falls back to its built-in demo slideshow.
+          type: ["boolean", "null"]
+        photos:
+          type: array
+          items:
+            $ref: "#/components/schemas/PhotoItem"
 
     AudioTrack:
       type: object

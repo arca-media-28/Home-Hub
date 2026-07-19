@@ -27,6 +27,7 @@ import {
   createGooglePendingAuth,
   consumeGooglePendingAuth,
   consumeGoogleAuthIntent,
+  getGoogleAccessToken,
   CALLBACK_PATH as GMAIL_CALLBACK_PATH,
 } from "../lib/google.js";
 import { listImapAccounts, listCalDavAccounts } from "../lib/mailAccounts.js";
@@ -4394,6 +4395,251 @@ router.get("/ersatztv", requireAuth, async (req: AuthRequest, res) => {
   } catch (err) {
     logger.error({ reason: normalizeHttpError(err) }, "ErsatzTV widget error");
     res.status(502).json({ error: "Failed to fetch ErsatzTV data" });
+  }
+});
+
+// ────────────────────────────────────────────────
+// Picture Frame (Photos) Widget
+// ────────────────────────────────────────────────
+// Two server-backed photo sources: a Google Photos album (via the linked
+// Google account, Photos read-only scope) and an Immich album (via a saved
+// per-user "immich" connection: base URL + API key). Both list albums and
+// return a normalized photo list whose URLs are authenticated API proxy paths:
+// Google baseUrls expire (~60 min) so bytes are re-resolved server-side per
+// request, and Immich asset downloads need the API key which must never reach
+// the browser. The tile fetches those proxy paths with its bearer token and
+// renders object URLs. Convention: sample data only when the source is
+// genuinely unconfigured; a configured source that fails → 502.
+
+const GOOGLE_PHOTOS_BASE = "https://photoslibrary.googleapis.com/v1";
+
+const SAMPLE_PHOTO_ALBUMS = [
+  { id: "sample-family", title: "Family Moments", count: 42 },
+  { id: "sample-vacation", title: "Summer Vacation", count: 118 },
+  { id: "sample-pets", title: "Pets", count: 27 },
+];
+
+// The first linked Google account, or null when Google isn't configured/linked.
+function firstGoogleAccountId(userId: number): string | null {
+  if (!isGoogleConfigured(userId) || !isGoogleLinked(userId)) return null;
+  return listGoogleAccounts(userId)[0]?.id ?? null;
+}
+
+// GET /api/widgets/photos/albums?source=google|immich — list albums.
+router.get("/photos/albums", requireAuth, async (req: AuthRequest, res) => {
+  const source = req.query["source"];
+  const userId = req.user!.userId;
+
+  if (source === "google") {
+    const accountId = firstGoogleAccountId(userId);
+    if (!accountId) {
+      res.json({ sample: true, albums: SAMPLE_PHOTO_ALBUMS });
+      return;
+    }
+    try {
+      const token = await getGoogleAccessToken(userId, accountId);
+      const albums: { id: string; title: string; count: number | null }[] = [];
+      let pageToken: string | undefined;
+      do {
+        const r = await cloudHttpClient.get(`${GOOGLE_PHOTOS_BASE}/albums`, {
+          headers: { Authorization: `Bearer ${token}` },
+          params: { pageSize: 50, ...(pageToken ? { pageToken } : {}) },
+        });
+        const data = r.data as {
+          albums?: { id: string; title?: string; mediaItemsCount?: string }[];
+          nextPageToken?: string;
+        };
+        for (const a of data.albums ?? []) {
+          if (!a?.id) continue;
+          const count = a.mediaItemsCount ? parseInt(a.mediaItemsCount, 10) : NaN;
+          albums.push({
+            id: a.id,
+            title: a.title || "Untitled album",
+            count: Number.isFinite(count) ? count : null,
+          });
+        }
+        pageToken = data.nextPageToken;
+      } while (pageToken && albums.length < 500);
+      res.json({ albums });
+    } catch (err) {
+      const detail = describeHttpError(err);
+      logger.error({ detail }, "Google Photos album list error");
+      res.status(502).json({
+        error:
+          detail.status === 403
+            ? "Google Photos access denied — re-link your Google account to grant the Photos permission"
+            : "Failed to fetch Google Photos albums",
+      });
+    }
+    return;
+  }
+
+  if (source === "immich") {
+    const saved = getSavedConnection(userId, "immich");
+    if (!saved.url || !saved.apiKey) {
+      res.json({ sample: true, albums: SAMPLE_PHOTO_ALBUMS });
+      return;
+    }
+    try {
+      const r = await httpClient.get(`${saved.url}/api/albums`, {
+        headers: { "x-api-key": saved.apiKey },
+      });
+      const list = Array.isArray(r.data) ? r.data : [];
+      res.json({
+        albums: list
+          .filter((a: { id?: string }) => typeof a?.id === "string")
+          .map((a: { id: string; albumName?: string; assetCount?: number }) => ({
+            id: a.id,
+            title: a.albumName || "Untitled album",
+            count: typeof a.assetCount === "number" ? a.assetCount : null,
+          })),
+      });
+    } catch (err) {
+      logger.error({ detail: describeHttpError(err) }, "Immich album list error");
+      res.status(502).json({ error: "Failed to fetch Immich albums" });
+    }
+    return;
+  }
+
+  res.status(400).json({ error: "Unknown photo source" });
+});
+
+// GET /api/widgets/photos?source=google|immich&albumId=… — normalized photo list.
+router.get("/photos", requireAuth, async (req: AuthRequest, res) => {
+  const source = req.query["source"];
+  const albumId = typeof req.query["albumId"] === "string" ? req.query["albumId"] : "";
+  const userId = req.user!.userId;
+
+  if (source === "google") {
+    const accountId = firstGoogleAccountId(userId);
+    // Unconfigured (no linked account, or no album chosen yet): sample mode —
+    // the tile shows its built-in demo slideshow.
+    if (!accountId || !albumId || albumId.startsWith("sample-")) {
+      res.json({ sample: true, photos: [] });
+      return;
+    }
+    try {
+      const token = await getGoogleAccessToken(userId, accountId);
+      const r = await cloudHttpClient.post(
+        `${GOOGLE_PHOTOS_BASE}/mediaItems:search`,
+        { albumId, pageSize: 100 },
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      const items = (r.data as {
+        mediaItems?: { id: string; mimeType?: string }[];
+      }).mediaItems ?? [];
+      res.json({
+        photos: items
+          .filter((m) => typeof m?.id === "string" && (m.mimeType ?? "").startsWith("image/"))
+          .map((m) => ({
+            id: m.id,
+            url: `/api/widgets/photos/google/media/${encodeURIComponent(m.id)}`,
+          })),
+      });
+    } catch (err) {
+      const detail = describeHttpError(err);
+      logger.error({ detail }, "Google Photos album listing error");
+      res.status(502).json({
+        error:
+          detail.status === 403
+            ? "Google Photos access denied — re-link your Google account to grant the Photos permission"
+            : "Failed to fetch Google Photos",
+      });
+    }
+    return;
+  }
+
+  if (source === "immich") {
+    const saved = getSavedConnection(userId, "immich");
+    if (!saved.url || !saved.apiKey || !albumId || albumId.startsWith("sample-")) {
+      res.json({ sample: true, photos: [] });
+      return;
+    }
+    try {
+      const r = await httpClient.get(
+        `${saved.url}/api/albums/${encodeURIComponent(albumId)}`,
+        { headers: { "x-api-key": saved.apiKey } },
+      );
+      const assets = (r.data as { assets?: { id: string; type?: string }[] }).assets ?? [];
+      res.json({
+        photos: assets
+          .filter((a) => typeof a?.id === "string" && (a.type ?? "IMAGE") === "IMAGE")
+          .map((a) => ({
+            id: a.id,
+            url: `/api/widgets/photos/immich/asset/${encodeURIComponent(a.id)}`,
+          })),
+      });
+    } catch (err) {
+      logger.error({ detail: describeHttpError(err) }, "Immich album listing error");
+      res.status(502).json({ error: "Failed to fetch Immich album" });
+    }
+    return;
+  }
+
+  res.status(400).json({ error: "Unknown photo source" });
+});
+
+// GET /api/widgets/photos/google/media/:id — proxy one Google photo's bytes.
+// baseUrls expire, so the media item is re-fetched for a fresh baseUrl before
+// downloading a display-sized rendition.
+router.get("/photos/google/media/:id", requireAuth, async (req: AuthRequest, res) => {
+  const userId = req.user!.userId;
+  const accountId = firstGoogleAccountId(userId);
+  if (!accountId) {
+    res.status(400).json({ error: "Google Photos is not linked" });
+    return;
+  }
+  try {
+    const token = await getGoogleAccessToken(userId, accountId);
+    const meta = await cloudHttpClient.get(
+      `${GOOGLE_PHOTOS_BASE}/mediaItems/${encodeURIComponent(String(req.params["id"]))}`,
+      { headers: { Authorization: `Bearer ${token}` } },
+    );
+    const { baseUrl, mimeType } = meta.data as { baseUrl?: string; mimeType?: string };
+    if (!baseUrl) {
+      res.status(502).json({ error: "Google Photos item has no download URL" });
+      return;
+    }
+    const img = await cloudHttpClient.get(`${baseUrl}=w2048-h2048`, {
+      responseType: "arraybuffer",
+    });
+    res.setHeader("Content-Type", mimeType || "image/jpeg");
+    // Renditions are immutable for a given item; let the browser cache them.
+    res.setHeader("Cache-Control", "private, max-age=3600");
+    res.send(Buffer.from(img.data as ArrayBuffer));
+  } catch (err) {
+    logger.error({ detail: describeHttpError(err) }, "Google Photos media proxy error");
+    res.status(502).json({ error: "Failed to fetch Google photo" });
+  }
+});
+
+// GET /api/widgets/photos/immich/asset/:id — proxy one Immich asset's preview
+// bytes (the API key stays server-side).
+router.get("/photos/immich/asset/:id", requireAuth, async (req: AuthRequest, res) => {
+  const saved = getSavedConnection(req.user!.userId, "immich");
+  if (!saved.url || !saved.apiKey) {
+    res.status(400).json({ error: "Immich is not configured" });
+    return;
+  }
+  try {
+    const r = await httpClient.get(
+      `${saved.url}/api/assets/${encodeURIComponent(String(req.params["id"]))}/thumbnail`,
+      {
+        headers: { "x-api-key": saved.apiKey },
+        params: { size: "preview" },
+        responseType: "arraybuffer",
+      },
+    );
+    const contentType =
+      typeof r.headers?.["content-type"] === "string"
+        ? r.headers["content-type"]
+        : "image/jpeg";
+    res.setHeader("Content-Type", contentType);
+    res.setHeader("Cache-Control", "private, max-age=3600");
+    res.send(Buffer.from(r.data as ArrayBuffer));
+  } catch (err) {
+    logger.error({ detail: describeHttpError(err) }, "Immich asset proxy error");
+    res.status(502).json({ error: "Failed to fetch Immich photo" });
   }
 });
 
