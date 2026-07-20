@@ -136,6 +136,7 @@ import {
   type SleeperLeague,
 } from "@/lib/sleeper";
 import { useToast } from "@/hooks/use-toast";
+import { clearPlaybackMemory } from "@/components/tiles/VideoPlayerTile";
 import {
   useCreateTile,
   useUpdateTile,
@@ -1848,7 +1849,12 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
   }
 
   function handleDelete() {
-    if (tile) deleteTile.mutate({ id: tile.id });
+    if (tile) {
+      // Forget any saved video playback position immediately so a
+      // re-created tile with the same id can't inherit an old position.
+      clearPlaybackMemory(tile.id);
+      deleteTile.mutate({ id: tile.id });
+    }
   }
 
   const isPending = createTile.isPending || updateTile.isPending;

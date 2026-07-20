@@ -223,7 +223,7 @@ function savePlaybackMemory(tileId: Tile["id"], memory: PlaybackMemory) {
   writePlaybackStore(store);
 }
 
-function clearPlaybackMemory(tileId: Tile["id"]) {
+export function clearPlaybackMemory(tileId: Tile["id"]) {
   const store = readPlaybackStore();
   if (String(tileId) in store) {
     delete store[String(tileId)];
