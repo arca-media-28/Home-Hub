@@ -58,6 +58,44 @@ afterAll(() => {
   fs.rmSync(tmpDir, { recursive: true, force: true });
 });
 
+describe("GET /uploads/usage", () => {
+  it("reports total stored bytes and the configured cap, updating after upload and delete", async () => {
+    const before = await request(app).get("/uploads/usage");
+    expect(before.status).toBe(200);
+    expect(before.body.usedBytes).toBeTypeOf("number");
+    expect(before.body.capBytes).toBe(5 * 1024 * 1024 * 1024);
+    const baseline = before.body.usedBytes;
+
+    const png = await sharp({
+      create: { width: 32, height: 32, channels: 3, background: { r: 1, g: 2, b: 3 } },
+    })
+      .png()
+      .toBuffer();
+    const uploaded = await request(app)
+      .post("/uploads")
+      .attach("file", png, { filename: "usage.png", contentType: "image/png" });
+    expect(uploaded.status).toBe(201);
+
+    const after = await request(app).get("/uploads/usage");
+    expect(after.body.usedBytes).toBeGreaterThan(baseline);
+
+    const del = await request(app).delete(`/uploads/${uploaded.body.id}`);
+    expect(del.status).toBe(204);
+    const final = await request(app).get("/uploads/usage");
+    expect(final.body.usedBytes).toBe(baseline);
+  });
+
+  it("respects UPLOADS_MAX_TOTAL_BYTES for the reported cap", async () => {
+    process.env["UPLOADS_MAX_TOTAL_BYTES"] = "1048576";
+    try {
+      const res = await request(app).get("/uploads/usage");
+      expect(res.body.capBytes).toBe(1048576);
+    } finally {
+      delete process.env["UPLOADS_MAX_TOTAL_BYTES"];
+    }
+  });
+});
+
 describe("POST /uploads (optimization)", () => {
   it("downscales a large raster image to MAX_EDGE (1024) and re-encodes it", async () => {
     // A 2000x1500 PNG — bigger than MAX_EDGE on its long edge.

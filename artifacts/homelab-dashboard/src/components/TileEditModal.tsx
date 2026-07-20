@@ -142,6 +142,8 @@ import {
   useDeleteTile,
   useListUploads,
   useDeleteUpload,
+  useGetUploadUsage,
+  getGetUploadUsageQueryKey,
   useGetQbittorrentStatus,
   getListUploadsQueryKey,
   getGetQbittorrentStatusQueryKey,
@@ -848,10 +850,19 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
   const uploadsQuery = useListUploads({
     query: { queryKey: getListUploadsQueryKey(), enabled: open },
   });
+  // Total upload storage in use vs the server cap — shown as a compact
+  // "X of Y used" line in the upload library sections.
+  const uploadUsageQuery = useGetUploadUsage({
+    query: { queryKey: getGetUploadUsageQueryKey(), enabled: open },
+  });
+  const uploadUsageLine = uploadUsageQuery.data
+    ? `${formatUploadSize(uploadUsageQuery.data.usedBytes)} of ${formatUploadSize(uploadUsageQuery.data.capBytes)} used`
+    : null;
   const deleteUpload = useDeleteUpload({
     mutation: {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getListUploadsQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getGetUploadUsageQueryKey() });
       },
       onError: (err) => {
         toast({ title: "Failed to delete file", description: err.message, variant: "destructive" });
@@ -1377,6 +1388,7 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
       setImageScale(DEFAULT_SCALE);
       // Refresh the library so the new image appears there too.
       queryClient.invalidateQueries({ queryKey: getListUploadsQueryKey() });
+      queryClient.invalidateQueries({ queryKey: getGetUploadUsageQueryKey() });
       toast({ title: "Image uploaded" });
     } catch (err: unknown) {
       toast({
@@ -1411,6 +1423,7 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
         prev.includes(uploadedUrl) ? prev : [...prev, uploadedUrl],
       );
       queryClient.invalidateQueries({ queryKey: getListUploadsQueryKey() });
+      queryClient.invalidateQueries({ queryKey: getGetUploadUsageQueryKey() });
       toast({ title: "Video uploaded" });
     } catch (err: unknown) {
       toast({
@@ -2951,6 +2964,14 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
                     Click videos to add or remove them from the playlist.
                     {videoUploadUrls.length > 0 && ` ${videoUploadUrls.length} selected.`}
                   </p>
+                  {uploadUsageLine && (
+                    <p
+                      className="text-xs text-muted-foreground"
+                      data-testid="upload-usage-videos"
+                    >
+                      Storage: {uploadUsageLine}
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -4765,6 +4786,14 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
                       </div>
                     ))}
                   </div>
+                )}
+                {uploadUsageLine && (
+                  <p
+                    className="text-xs text-muted-foreground mt-1.5"
+                    data-testid="upload-usage-library"
+                  >
+                    Storage: {uploadUsageLine}
+                  </p>
                 )}
               </TabsContent>
 

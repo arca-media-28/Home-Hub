@@ -447,6 +447,21 @@ paths:
                 items:
                   $ref: "#/components/schemas/UploadedFile"
 
+  /uploads/usage:
+    get:
+      operationId: getUploadUsage
+      tags: [uploads]
+      summary: Get total upload storage usage and the configured cap
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Upload storage usage
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadUsage"
+
   /uploads/{id}:
     delete:
       operationId: deleteUpload
@@ -3648,6 +3663,17 @@ components:
           type: ["integer", "null"]
         createdAt:
           type: ["string", "null"]
+
+    UploadUsage:
+      type: object
+      required: [usedBytes, capBytes]
+      properties:
+        usedBytes:
+          type: integer
+          description: Total bytes of stored uploads across all users.
+        capBytes:
+          type: integer
+          description: Configured total upload storage cap in bytes.
 
     ServiceConnection:
       type: object

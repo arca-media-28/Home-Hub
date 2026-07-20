@@ -250,6 +250,14 @@ router.post("/", requireAuth, upload.single("file"), async (req: AuthRequest, re
   }
 });
 
+// GET /api/uploads/usage — total upload storage in use (across all users,
+// matching how the cap is enforced) plus the configured cap, so the UI can
+// show "X of Y used" in the upload library sections.
+router.get("/usage", requireAuth, (_req: AuthRequest, res) => {
+  const usedBytes = uploadStmts.totalSize.get()!.total;
+  res.json({ usedBytes, capBytes: maxTotalUploadBytes() });
+});
+
 // GET /api/uploads — list the current user's uploaded images (the library)
 router.get("/", requireAuth, (req: AuthRequest, res) => {
   const files = uploadStmts.findAllByUser.all(req.user!.userId);

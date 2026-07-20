@@ -1457,6 +1457,15 @@ export const ListUploadsResponse = zod.array(ListUploadsResponseItem)
 
 
 /**
+ * @summary Get total upload storage usage and the configured cap
+ */
+export const GetUploadUsageResponse = zod.object({
+  "usedBytes": zod.number().describe('Total bytes of stored uploads across all users.'),
+  "capBytes": zod.number().describe('Configured total upload storage cap in bytes.')
+})
+
+
+/**
  * @summary Delete an uploaded image from the library
  */
 export const DeleteUploadParams = zod.object({

@@ -1402,6 +1402,13 @@ export interface UploadedFile {
   createdAt?: string | null;
 }
 
+export interface UploadUsage {
+  /** Total bytes of stored uploads across all users. */
+  usedBytes: number;
+  /** Configured total upload storage cap in bytes. */
+  capBytes: number;
+}
+
 export interface ServiceConnection {
   service: string;
   /** @nullable */

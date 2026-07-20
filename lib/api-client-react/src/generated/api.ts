@@ -106,6 +106,7 @@ import type {
   TileInput,
   TileUpdate,
   TruenasMetrics,
+  UploadUsage,
   UploadedFile,
   UserProfile,
   VideoLibrariesData,
@@ -1517,6 +1518,83 @@ export function useListUploads<TData = Awaited<ReturnType<typeof listUploads>>, 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getListUploadsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetUploadUsageUrl = () => {
+
+
+
+
+  return `/api/uploads/usage`
+}
+
+/**
+ * @summary Get total upload storage usage and the configured cap
+ */
+export const getUploadUsage = async ( options?: RequestInit): Promise<UploadUsage> => {
+
+  return customFetch<UploadUsage>(getGetUploadUsageUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetUploadUsageQueryKey = () => {
+    return [
+    `/api/uploads/usage`
+    ] as const;
+    }
+
+
+export const getGetUploadUsageQueryOptions = <TData = Awaited<ReturnType<typeof getUploadUsage>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getUploadUsage>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetUploadUsageQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getUploadUsage>>> = ({ signal }) => getUploadUsage({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getUploadUsage>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetUploadUsageQueryResult = NonNullable<Awaited<ReturnType<typeof getUploadUsage>>>
+export type GetUploadUsageQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get total upload storage usage and the configured cap
+ */
+
+export function useGetUploadUsage<TData = Awaited<ReturnType<typeof getUploadUsage>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getUploadUsage>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetUploadUsageQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

@@ -160,6 +160,7 @@ export * from './truenasDisk';
 export * from './truenasMetrics';
 export * from './uploadedFile';
 export * from './uploadResult';
+export * from './uploadUsage';
 export * from './userProfile';
 export * from './videoItem';
 export * from './videoLibrariesData';
