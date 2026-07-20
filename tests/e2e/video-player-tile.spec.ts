@@ -6,6 +6,10 @@ import { join } from "node:path";
 // so the <video> element actually loads instead of firing an error.
 const TINY_WEBM = readFileSync(join(__dirname, "assets", "tiny.webm"));
 
+// A 2s seekable mp4 (faststart) for the resume test — the tiny webm has no
+// cue/duration data, so Chromium cannot seek within it.
+const TINY_MP4 = readFileSync(join(__dirname, "assets", "tiny-seekable.mp4"));
+
 // ---------------------------------------------------------------------------
 // Coverage for the Video Player tile.
 //
@@ -242,6 +246,120 @@ test("a configured video URL that fails to load shows the error state, not the y
   await expect(tileEl.getByTestId("videoplayer-error")).toContainText("failed to load");
   await expect(tileEl.getByTestId("videoplayer-demo-badge")).toHaveCount(0);
   await expect(tileEl.getByTestId("videoplayer-video")).toHaveCount(0);
+});
+
+test("video playback position and playlist spot survive switching dashboard pages", async ({
+  page,
+}) => {
+  const { token, authHeaders } = await register(page);
+
+  // A second page to switch away to (the first page exists by default).
+  const pageRes = await page.request.post("/api/pages", {
+    data: { name: "Second" },
+    headers: authHeaders,
+  });
+  expect(pageRes.ok(), `page create failed: ${pageRes.status()}`).toBeTruthy();
+
+  const urls = [
+    "https://example.com/first-clip.mp4",
+    "https://example.com/second-clip.mp4",
+  ];
+  const res = await page.request.post("/api/tiles", {
+    data: {
+      type: "integration",
+      integration: "videoplayer",
+      name: "",
+      gridX: 0,
+      gridY: 0,
+      gridW: 6,
+      gridH: 5,
+      tileSettings: {
+        videoSource: "urls",
+        videoUrls: urls,
+        videoPlayMode: "playlist",
+        videoPlaylistLoop: true,
+        videoShuffle: false,
+        videoMuted: true,
+      },
+    },
+    headers: authHeaders,
+  });
+  expect(res.ok(), `tile create failed: ${res.status()}`).toBeTruthy();
+
+  // Serve the mp4 WITH range-request support: Chromium marks a media
+  // resource unseekable (seekable end = 0) when the server ignores Range
+  // headers, which would make currentTime assignments silently no-op.
+  await page.route("https://example.com/**", (route) => {
+    const range = route.request().headers()["range"];
+    const m = range?.match(/bytes=(\d+)-(\d*)/);
+    if (m) {
+      const start = Number(m[1]);
+      const end = m[2] ? Math.min(Number(m[2]), TINY_MP4.length - 1) : TINY_MP4.length - 1;
+      return route.fulfill({
+        status: 206,
+        contentType: "video/mp4",
+        headers: {
+          "Accept-Ranges": "bytes",
+          "Content-Range": `bytes ${start}-${end}/${TINY_MP4.length}`,
+        },
+        body: TINY_MP4.subarray(start, end + 1),
+      });
+    }
+    return route.fulfill({
+      status: 200,
+      contentType: "video/mp4",
+      headers: { "Accept-Ranges": "bytes" },
+      body: TINY_MP4,
+    });
+  });
+
+  await page.addInitScript((t) => localStorage.setItem("token", t), token);
+  await page.goto("/");
+
+  const tileEl = page.getByTestId("videoplayer-tile");
+  await expect(tileEl).toBeVisible();
+
+  // Pause FIRST (the clip is only 2s — left playing it would end and
+  // auto-advance, racing the assertions), then step to the SECOND playlist
+  // entry and seek, so both the playlist position and the timestamp have
+  // non-default values to remember.
+  await tileEl.hover();
+  await tileEl.getByTestId("videoplayer-playpause").click();
+  await expect
+    .poll(async () =>
+      tileEl.getByTestId("videoplayer-video").evaluate((el) => (el as HTMLVideoElement).paused),
+    )
+    .toBe(true);
+  await tileEl.hover();
+  await tileEl.getByTestId("videoplayer-next").click();
+  await expect
+    .poll(async () => tileEl.getByTestId("videoplayer-video").getAttribute("src"))
+    .toBe(urls[1]);
+  await tileEl.getByTestId("videoplayer-video").evaluate((el) => {
+    (el as HTMLVideoElement).currentTime = 0.3;
+  });
+  await expect
+    .poll(async () =>
+      tileEl
+        .getByTestId("videoplayer-video")
+        .evaluate((el) => (el as HTMLVideoElement).currentTime),
+    )
+    .toBeGreaterThanOrEqual(0.29);
+
+  // Switch to the second page — the tile unmounts entirely.
+  await page.getByRole("button", { name: "Second", exact: true }).click();
+  await expect(tileEl).toHaveCount(0);
+
+  // Switch back: the SAME playlist entry resumes near the saved timestamp
+  // instead of restarting from the first video at 0:00.
+  await page.getByRole("button", { name: "Home", exact: true }).click();
+  await expect(tileEl).toBeVisible();
+  const video = tileEl.getByTestId("videoplayer-video");
+  await expect(video).toBeAttached();
+  await expect.poll(async () => video.getAttribute("src")).toBe(urls[1]);
+  await expect
+    .poll(async () => video.evaluate((el) => (el as HTMLVideoElement).currentTime))
+    .toBeGreaterThanOrEqual(0.29);
 });
 
 test("videoplayer sample mode reports unconfigured Plex, tile shows yule log", async ({

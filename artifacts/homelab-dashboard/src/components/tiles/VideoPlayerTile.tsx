@@ -114,6 +114,34 @@ interface VideoPlayerTileProps {
   editMode: boolean;
 }
 
+// ---------------------------------------------------------------------------
+// Playback memory: the tile unmounts whenever the user switches dashboard
+// pages (each page renders its own tile tree), which used to restart the
+// video from the beginning. A module-level map keyed by tile id remembers
+// the shuffled play order, playlist position, current video URL and the
+// timestamp within it, plus mute/volume — so returning to the page resumes
+// exactly where playback left off. In-memory only (resets on full reload),
+// mirroring the app-level Audio Player engine's session-scoped persistence.
+// ---------------------------------------------------------------------------
+interface PlaybackMemory {
+  // Fingerprint of the playlist the saved state belongs to; ignore the
+  // memory when the resolved video list has since changed.
+  urls: string[];
+  order: number[];
+  pos: number;
+  currentUrl: string;
+  time: number;
+  playing: boolean;
+  muted: boolean;
+  volume: number;
+}
+
+const playbackMemoryByTile = new Map<Tile["id"], PlaybackMemory>();
+
+function sameUrls(a: string[], b: string[]): boolean {
+  return a.length === b.length && a.every((url, i) => url === b[i]);
+}
+
 export default function VideoPlayerTile({ tile, editMode }: VideoPlayerTileProps) {
   const s = tile.tileSettings ?? {};
   const source = s.videoSource ?? null;
@@ -183,30 +211,99 @@ export default function VideoPlayerTile({ tile, editMode }: VideoPlayerTileProps
     playlistQuery.isError,
   ]);
 
+  // Saved playback state from a previous mount of this tile (page switch or
+  // re-render). Read once; consumed as the playlist resolves and the video
+  // element loads its metadata.
+  const savedRef = useRef<PlaybackMemory | null>(
+    playbackMemoryByTile.get(tile.id) ?? null,
+  );
+
   // Play order: identity for ordered playback, a shuffled copy otherwise.
+  // When a saved memory matches the resolved playlist, restore its order and
+  // position instead of starting over (also preserves the shuffle order).
   const [order, setOrder] = useState<number[]>([]);
   useEffect(() => {
+    const urls = videos.map((v) => v.url);
+    const saved = savedRef.current;
+    if (saved && sameUrls(saved.urls, urls) && saved.order.length === videos.length) {
+      setOrder(saved.order);
+      setPos(saved.pos);
+      return;
+    }
     const base = videos.map((_, i) => i);
     setOrder(shuffle && playMode === "playlist" ? shuffled(base) : base);
     setPos(0);
   }, [videos, shuffle, playMode]);
 
   const [pos, setPos] = useState(0);
-  const [playing, setPlaying] = useState(true);
+  const [playing, setPlaying] = useState(savedRef.current?.playing ?? true);
   // Set when a configured (non-demo) media file fails to load/decode — 404,
   // auth, CORS or codec errors on the <video> element itself. Shows the same
   // explicit error state as a failed playlist fetch (never the yule log).
   const [mediaFailed, setMediaFailed] = useState(false);
   useEffect(() => setMediaFailed(false), [videos]);
-  const [muted, setMuted] = useState(startMuted);
-  const [volume, setVolume] = useState(0.7);
-  useEffect(() => setMuted(startMuted), [startMuted]);
+  const [muted, setMuted] = useState(savedRef.current?.muted ?? startMuted);
+  const [volume, setVolume] = useState(savedRef.current?.volume ?? 0.7);
+  const startMutedRef = useRef(startMuted);
+  useEffect(() => {
+    // Only react to actual setting changes; don't clobber a restored value.
+    if (startMutedRef.current !== startMuted) {
+      startMutedRef.current = startMuted;
+      setMuted(startMuted);
+    }
+  }, [startMuted]);
 
   const count = videos.length;
   const currentIndex = order.length > 0 ? order[pos % order.length]! : 0;
   const current = count > 0 ? videos[currentIndex % count] : null;
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
+
+  // Keep a snapshot of the latest playback state so the unmount cleanup can
+  // persist it without stale-closure issues. The timestamp is read straight
+  // off the <video> element at save time.
+  const snapshotRef = useRef<Omit<PlaybackMemory, "time">>({
+    urls: [],
+    order: [],
+    pos: 0,
+    currentUrl: "",
+    playing: true,
+    muted: startMuted,
+    volume: 0.7,
+  });
+  snapshotRef.current = {
+    urls: videos.map((v) => v.url),
+    order,
+    pos,
+    currentUrl: current?.url ?? "",
+    playing,
+    muted,
+    volume,
+  };
+
+  // Latest known playback timestamp. Tracked separately because by the time
+  // the unmount cleanup runs, React has already detached videoRef.
+  const lastTimeRef = useRef(0);
+
+  useEffect(() => {
+    const tileId = tile.id;
+    const save = () => {
+      const snap = snapshotRef.current;
+      if (!snap.currentUrl) return;
+      playbackMemoryByTile.set(tileId, {
+        ...snap,
+        time: videoRef.current?.currentTime ?? lastTimeRef.current,
+      });
+    };
+    // Also save when the tab is hidden/closed so a quick page switch that
+    // happens to coincide with a reload still remembers within the session.
+    document.addEventListener("visibilitychange", save);
+    return () => {
+      document.removeEventListener("visibilitychange", save);
+      save();
+    };
+  }, [tile.id]);
+
   useEffect(() => {
     const el = videoRef.current;
     if (!el) return;
@@ -304,6 +401,36 @@ export default function VideoPlayerTile({ tile, editMode }: VideoPlayerTileProps
             playsInline
             muted={muted}
             loop={loopSingle}
+            onTimeUpdate={(e) => {
+              lastTimeRef.current = e.currentTarget.currentTime;
+            }}
+            onSeeked={(e) => {
+              lastTimeRef.current = e.currentTarget.currentTime;
+            }}
+            onLoadedMetadata={(e) => {
+              // Resume from the remembered timestamp (consumed once) when the
+              // restored video is the same one that was playing before the
+              // tile unmounted.
+              // A new element just loaded — don't let a stale timestamp from
+              // the previous video leak into a save for this one.
+              lastTimeRef.current = e.currentTarget.currentTime;
+              const saved = savedRef.current;
+              if (!saved) return;
+              if (saved.currentUrl === current.url) {
+                const el = e.currentTarget;
+                if (saved.time > 0) {
+                  // Clamp just shy of the end so resuming never instantly
+                  // fires `ended` (which would skip to the next video).
+                  el.currentTime = Number.isFinite(el.duration)
+                    ? Math.min(saved.time, Math.max(0, el.duration - 0.1))
+                    : saved.time;
+                }
+                savedRef.current = null;
+              } else if (!sameUrls(saved.urls, videos.map((v) => v.url))) {
+                // Playlist changed since the memory was written — stale.
+                savedRef.current = null;
+              }
+            }}
             onEnded={() => {
               if (!loopSingle) advance(1);
             }}
