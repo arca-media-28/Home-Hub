@@ -596,6 +596,129 @@ test("restart control clears the saved spot and starts over from the first video
   await expect.poll(async () => videoAfterReload.getAttribute("src")).toBe(urls[0]);
 });
 
+test("playlist pop-out highlights the current video and jumps to a picked entry", async ({
+  page,
+}) => {
+  const { token, authHeaders } = await register(page);
+
+  const urls = [
+    "https://example.com/alpha-clip.mp4",
+    "https://example.com/bravo-clip.mp4",
+    "https://example.com/charlie-clip.mp4",
+  ];
+  const res = await page.request.post("/api/tiles", {
+    data: {
+      type: "integration",
+      integration: "videoplayer",
+      name: "",
+      gridX: 0,
+      gridY: 0,
+      gridW: 6,
+      gridH: 5,
+      tileSettings: {
+        videoSource: "urls",
+        videoUrls: urls,
+        // Single mode: the 0.5s test clip loops in place instead of
+        // auto-advancing through the playlist, so the "current" highlight
+        // stays deterministic. The pop-out behaves identically either way.
+        videoPlayMode: "single",
+        videoShuffle: false,
+        videoMuted: true,
+      },
+    },
+    headers: authHeaders,
+  });
+  expect(res.ok(), `tile create failed: ${res.status()}`).toBeTruthy();
+
+  await page.route("https://example.com/**", (route) =>
+    route.fulfill({ status: 200, contentType: "video/webm", body: TINY_WEBM }),
+  );
+
+  await page.addInitScript((t) => localStorage.setItem("token", t), token);
+  await page.goto("/");
+
+  const tileEl = page.getByTestId("videoplayer-tile");
+  await expect(tileEl).toBeVisible();
+  const video = tileEl.getByTestId("videoplayer-video");
+  await expect(video).toBeAttached();
+  expect(await video.getAttribute("src")).toBe(urls[0]);
+
+  // Open the playlist pop-out from the hover overlay.
+  await tileEl.hover();
+  await tileEl.getByTestId("videoplayer-playlist-toggle").click();
+  const popout = tileEl.getByTestId("videoplayer-playlist");
+  await expect(popout).toBeVisible();
+
+  // All three entries listed, with the first (currently playing) highlighted.
+  const entries = popout.getByTestId("videoplayer-playlist-entry");
+  await expect(entries).toHaveCount(3);
+  await expect(entries.nth(0)).toHaveAttribute("data-current", "true");
+  await expect(entries.nth(0)).toContainText("alpha-clip");
+  await expect(entries.nth(2)).toContainText("charlie-clip");
+  await expect(entries.nth(1)).not.toHaveAttribute("data-current", "true");
+
+  // Clicking the third entry jumps straight to it and closes the pop-out.
+  await entries.nth(2).click();
+  await expect(popout).toHaveCount(0);
+  await expect
+    .poll(async () => tileEl.getByTestId("videoplayer-video").getAttribute("src"))
+    .toBe(urls[2]);
+
+  // Reopen: the highlight followed the jump to the third entry.
+  await tileEl.hover();
+  await tileEl.getByTestId("videoplayer-playlist-toggle").click();
+  await expect(popout).toBeVisible();
+  await expect(entries.nth(2)).toHaveAttribute("data-current", "true");
+  await expect(entries.nth(0)).not.toHaveAttribute("data-current", "true");
+
+  // Close button dismisses the pop-out without changing the video.
+  await popout.getByTestId("videoplayer-playlist-close").click();
+  await expect(popout).toHaveCount(0);
+  expect(
+    await tileEl.getByTestId("videoplayer-video").getAttribute("src"),
+  ).toBe(urls[2]);
+
+  // Prev/next keep working in step with the pop-out's notion of position.
+  await tileEl.hover();
+  await tileEl.getByTestId("videoplayer-prev").click();
+  await expect
+    .poll(async () => tileEl.getByTestId("videoplayer-video").getAttribute("src"))
+    .toBe(urls[1]);
+});
+
+test("playlist pop-out is hidden for a single-video (demo) tile", async ({
+  page,
+}) => {
+  const { token } = await register(page);
+
+  await page.addInitScript((t) => localStorage.setItem("token", t), token);
+
+  const res = await page.request.post("/api/tiles", {
+    data: {
+      type: "integration",
+      integration: "videoplayer",
+      name: "",
+      gridX: 0,
+      gridY: 0,
+      gridW: 6,
+      gridH: 5,
+      tileSettings: {},
+    },
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  expect(res.ok(), `tile create failed: ${res.status()}`).toBeTruthy();
+
+  await page.goto("/");
+  const tileEl = page.getByTestId("videoplayer-tile");
+  await expect(tileEl).toBeVisible();
+  await expect(tileEl.getByTestId("videoplayer-demo-badge")).toBeVisible();
+
+  // Single-entry demo playlist → no playlist toggle in the overlay.
+  await tileEl.hover();
+  await expect(tileEl.getByTestId("videoplayer-playpause")).toBeVisible();
+  await expect(tileEl.getByTestId("videoplayer-playlist-toggle")).toHaveCount(0);
+});
+
 test("videoplayer sample mode reports unconfigured Plex, tile shows yule log", async ({
   page,
 }) => {

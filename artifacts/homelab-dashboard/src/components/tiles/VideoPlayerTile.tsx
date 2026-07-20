@@ -5,6 +5,7 @@ import {
   getGetVideoPlaylistQueryKey,
 } from "@workspace/api-client-react";
 import {
+  ListVideo,
   Pause,
   Play,
   RotateCcw,
@@ -354,6 +355,10 @@ export default function VideoPlayerTile({
   const [mediaFailed, setMediaFailed] = useState(false);
   useEffect(() => setMediaFailed(false), [videos]);
   const [muted, setMuted] = useState(savedRef.current?.muted ?? startMuted);
+  // Playlist pop-out: a scrollable list of all entries (in play order) with
+  // the current one highlighted; clicking an entry jumps straight to it.
+  const [playlistOpen, setPlaylistOpen] = useState(false);
+  useEffect(() => setPlaylistOpen(false), [videos]);
   const [volume, setVolume] = useState(savedRef.current?.volume ?? 0.7);
   const startMutedRef = useRef(startMuted);
   useEffect(() => {
@@ -471,6 +476,24 @@ export default function VideoPlayerTile({
       return;
     }
     setPos(((next % order.length) + order.length) % order.length);
+  }
+
+  // Jump straight to a specific spot in the play order (playlist pop-out).
+  // Discards any pending saved-resume memory so the picked entry starts at
+  // its remembered-free position rather than resurrecting an old timestamp.
+  function jumpTo(orderIdx: number) {
+    if (orderIdx < 0 || orderIdx >= order.length) return;
+    savedRef.current = null;
+    if (orderIdx === pos) {
+      // Re-picking the current entry restarts it from the top.
+      const el = videoRef.current;
+      if (el) el.currentTime = 0;
+      lastTimeRef.current = 0;
+      setCurrentTime(0);
+    } else {
+      setPos(orderIdx);
+    }
+    setPlaying(true);
   }
 
   // "Restart from beginning": intentionally forget the saved spot. Clears
@@ -627,8 +650,76 @@ export default function VideoPlayerTile({
             Yule log
           </span>
         )}
+        {!editMode && playlistOpen && count > 1 && (
+          <div
+            className="absolute inset-x-2 bottom-[60px] top-2 z-10 flex flex-col overflow-hidden rounded-md bg-black/85 backdrop-blur-sm"
+            data-testid="videoplayer-playlist"
+          >
+            <div className="flex items-center justify-between border-b border-white/10 px-2.5 py-1.5">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-white/70">
+                Playlist ({count})
+              </span>
+              <button
+                type="button"
+                aria-label="Close playlist"
+                data-testid="videoplayer-playlist-close"
+                onClick={() => setPlaylistOpen(false)}
+                className="rounded px-1.5 text-[13px] leading-none text-white/60 hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
+            <ul className="min-h-0 flex-1 overflow-y-auto py-1">
+              {order.map((videoIdx, orderIdx) => {
+                const entry = videos[videoIdx];
+                if (!entry) return null;
+                const isCurrent = orderIdx === pos % order.length;
+                return (
+                  <li key={`${entry.id}-${orderIdx}`}>
+                    <button
+                      type="button"
+                      data-testid="videoplayer-playlist-entry"
+                      data-current={isCurrent ? "true" : undefined}
+                      aria-current={isCurrent ? "true" : undefined}
+                      onClick={() => {
+                        jumpTo(orderIdx);
+                        setPlaylistOpen(false);
+                      }}
+                      className={`flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-[11px] leading-tight transition-colors ${
+                        isCurrent
+                          ? "bg-white/15 text-white"
+                          : "text-white/70 hover:bg-white/10 hover:text-white"
+                      }`}
+                      ref={
+                        isCurrent
+                          ? (el) => el?.scrollIntoView({ block: "nearest" })
+                          : undefined
+                      }
+                    >
+                      <span className="w-5 shrink-0 text-right tabular-nums text-white/40">
+                        {orderIdx + 1}
+                      </span>
+                      {isCurrent ? (
+                        <Play className="h-3 w-3 shrink-0 fill-current" />
+                      ) : (
+                        <span className="w-3 shrink-0" />
+                      )}
+                      <span className="min-w-0 flex-1 truncate">
+                        {entry.title}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
         {!editMode && (
-          <div className="absolute inset-x-0 bottom-0 flex flex-col gap-1 bg-gradient-to-t from-black/70 to-transparent px-2 pb-1.5 pt-6 opacity-0 transition-opacity group-hover:opacity-100">
+          <div
+            className={`absolute inset-x-0 bottom-0 flex flex-col gap-1 bg-gradient-to-t from-black/70 to-transparent px-2 pb-1.5 pt-6 transition-opacity ${
+              playlistOpen ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+            }`}
+          >
             <div className="flex items-center gap-1.5">
               <span
                 className="min-w-[30px] text-right text-[10px] tabular-nums text-white/80"
@@ -709,6 +800,20 @@ export default function VideoPlayerTile({
                   <Volume2 className="w-3.5 h-3.5" />
                 )}
               </button>
+              {count > 1 && (
+                <button
+                  type="button"
+                  aria-label={playlistOpen ? "Hide playlist" : "Show playlist"}
+                  title={playlistOpen ? "Hide playlist" : "Show playlist"}
+                  data-testid="videoplayer-playlist-toggle"
+                  onClick={() => setPlaylistOpen((o) => !o)}
+                  className={`rounded-full p-1 text-white hover:bg-black/60 ${
+                    playlistOpen ? "bg-white/25" : "bg-black/40"
+                  }`}
+                >
+                  <ListVideo className="w-3.5 h-3.5" />
+                </button>
+              )}
               <button
                 type="button"
                 aria-label="Restart from beginning"
