@@ -394,6 +394,9 @@ export const uploadStmts = {
   delete: db.prepare<[number, number], void>(
     "DELETE FROM uploaded_files WHERE id = ? AND user_id = ?"
   ),
+  totalSize: db.prepare<[], { total: number }>(
+    "SELECT COALESCE(SUM(size), 0) AS total FROM uploaded_files"
+  ),
 };
 
 export const tileStmts = {

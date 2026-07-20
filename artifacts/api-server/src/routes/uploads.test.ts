@@ -200,6 +200,47 @@ describe("GET /uploads (library listing)", () => {
   });
 });
 
+describe("POST /uploads (total storage cap)", () => {
+  it("rejects an upload that would exceed UPLOADS_MAX_TOTAL_BYTES with a clear error", async () => {
+    const png = await sharp({
+      create: { width: 32, height: 32, channels: 3, background: { r: 4, g: 4, b: 4 } },
+    })
+      .png()
+      .toBuffer();
+
+    process.env["UPLOADS_MAX_TOTAL_BYTES"] = "1"; // 1 byte — anything trips it
+    try {
+      const res = await request(app)
+        .post("/uploads")
+        .attach("file", png, { filename: "capped.png", contentType: "image/png" });
+
+      expect(res.status).toBe(413);
+      expect(res.body.error).toMatch(/total upload limit/i);
+      expect(res.body.url).toBeUndefined();
+    } finally {
+      delete process.env["UPLOADS_MAX_TOTAL_BYTES"];
+    }
+  });
+
+  it("accepts uploads again once under the cap (and after invalid cap values fall back to default)", async () => {
+    const png = await sharp({
+      create: { width: 32, height: 32, channels: 3, background: { r: 8, g: 8, b: 8 } },
+    })
+      .png()
+      .toBuffer();
+
+    process.env["UPLOADS_MAX_TOTAL_BYTES"] = "not-a-number";
+    try {
+      const res = await request(app)
+        .post("/uploads")
+        .attach("file", png, { filename: "ok.png", contentType: "image/png" });
+      expect(res.status).toBe(201);
+    } finally {
+      delete process.env["UPLOADS_MAX_TOTAL_BYTES"];
+    }
+  });
+});
+
 describe("DELETE /uploads/:id", () => {
   it("removes the row and unlinks the file", async () => {
     const png = await sharp({

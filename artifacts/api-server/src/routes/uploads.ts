@@ -21,6 +21,27 @@ const uploadsDir = path.join(dataDir, "uploads");
 // client-supplied mimetype is only a hint — real limits key off sniffed bytes).
 const IMAGE_MAX_BYTES = 10 * 1024 * 1024; // 10MB
 const VIDEO_MAX_BYTES = 200 * 1024 * 1024; // 200MB
+
+// Total cap across ALL stored uploads (all users) so uploads can never fill
+// the data directory — which also holds the SQLite database. Configurable via
+// UPLOADS_MAX_TOTAL_BYTES; defaults to 5GB. Parsed lazily so tests can tweak
+// the env var per request.
+const DEFAULT_MAX_TOTAL_BYTES = 5 * 1024 * 1024 * 1024; // 5GB
+function maxTotalUploadBytes(): number {
+  const raw = process.env["UPLOADS_MAX_TOTAL_BYTES"];
+  if (!raw) return DEFAULT_MAX_TOTAL_BYTES;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    logger.warn({ raw }, "invalid UPLOADS_MAX_TOTAL_BYTES; using default");
+    return DEFAULT_MAX_TOTAL_BYTES;
+  }
+  return Math.floor(parsed);
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes >= 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)}GB`;
+  return `${Math.round(bytes / (1024 * 1024))}MB`;
+}
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: VIDEO_MAX_BYTES },
@@ -190,6 +211,17 @@ router.post("/", requireAuth, upload.single("file"), async (req: AuthRequest, re
         return;
       }
       throw err;
+    }
+
+    // Enforce the total-storage cap on the FINAL (processed) size so uploads
+    // can't fill the disk shared with the SQLite database.
+    const cap = maxTotalUploadBytes();
+    const currentTotal = uploadStmts.totalSize.get()!.total;
+    if (currentTotal + processed.buffer.length > cap) {
+      res.status(413).json({
+        error: `Upload storage is full: this file would exceed the ${formatBytes(cap)} total upload limit (${formatBytes(currentTotal)} in use). Delete some uploads and try again.`,
+      });
+      return;
     }
 
     const filename = `${Date.now()}-${Math.random().toString(36).slice(2)}${processed.ext}`;
