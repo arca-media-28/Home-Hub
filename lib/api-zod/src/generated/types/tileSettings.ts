@@ -473,4 +473,54 @@ export type TileSettings = {
      * @nullable
      */
   frameWidth?: number | null;
+  /**
+     * Where a Video Player tile's videos come from: "uploads" (video files from the upload library), "urls" (a pasted list of direct video file URLs), "youtube" (a YouTube video/playlist embed), "plex" or "jellyfin" (a library on the connected media server). Null or absent means unconfigured — the tile plays the built-in yule log stream.
+     * @nullable
+     */
+  videoSource?: 'uploads' | 'urls' | 'youtube' | 'plex' | 'jellyfin' | null;
+  /**
+     * The uploaded videos (their /api/uploads/files/... URLs) a Video Player tile plays when videoSource is "uploads".
+     * @nullable
+     */
+  videoUploadUrls?: string[] | null;
+  /**
+     * The direct video file URLs a Video Player tile plays (in order) when videoSource is "urls".
+     * @nullable
+     */
+  videoUrls?: string[] | null;
+  /**
+     * The YouTube video or playlist URL a Video Player tile embeds when videoSource is "youtube".
+     * @nullable
+     */
+  videoYoutubeUrl?: string | null;
+  /**
+     * The selected library/collection id for a media-server videoSource ("plex" or "jellyfin"). Null or absent means no library chosen.
+     * @nullable
+     */
+  videoLibraryId?: string | null;
+  /**
+     * "single" loops the first (or only) video forever; "playlist" plays through the list, advancing on end. Null or absent uses playlist.
+     * @nullable
+     */
+  videoPlayMode?: 'single' | 'playlist' | null;
+  /**
+     * Whether a Video Player tile restarts the playlist after the last video ends (playlist mode). Null or absent defaults to true.
+     * @nullable
+     */
+  videoPlaylistLoop?: boolean | null;
+  /**
+     * Whether a Video Player tile shuffles the playlist order (playlist mode). Null or absent defaults to false.
+     * @nullable
+     */
+  videoShuffle?: boolean | null;
+  /**
+     * Whether a Video Player tile starts muted. Null or absent defaults to true (autoplay-safe).
+     * @nullable
+     */
+  videoMuted?: boolean | null;
+  /**
+     * How a Video Player tile scales its video: "cover" (fill, crop) or "contain" (letterbox, whole frame). Null or absent uses cover.
+     * @nullable
+     */
+  videoFit?: 'cover' | 'contain' | null;
 } | null | null;

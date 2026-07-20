@@ -55,6 +55,8 @@ import type {
   GetTilesParams,
   GetTruenasDiagnostics200,
   GetTruenasDiagnostics409,
+  GetVideoLibrariesParams,
+  GetVideoPlaylistParams,
   GetWeatherWidgetParams,
   GoogleAuthIntent,
   GoogleCredentialsInput,
@@ -106,6 +108,8 @@ import type {
   TruenasMetrics,
   UploadedFile,
   UserProfile,
+  VideoLibrariesData,
+  VideoPlaylistData,
   WeatherWidgetData
 } from './api.schemas';
 
@@ -2914,6 +2918,174 @@ export function useGetPhotosWidget<TData = Awaited<ReturnType<typeof getPhotosWi
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetPhotosWidgetQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetVideoLibrariesUrl = (params: GetVideoLibrariesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/widgets/videoplayer/libraries?${stringifiedParams}` : `/api/widgets/videoplayer/libraries`
+}
+
+/**
+ * @summary List video libraries from a connected media server (Plex or Jellyfin)
+ */
+export const getVideoLibraries = async (params: GetVideoLibrariesParams, options?: RequestInit): Promise<VideoLibrariesData> => {
+
+  return customFetch<VideoLibrariesData>(getGetVideoLibrariesUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetVideoLibrariesQueryKey = (params?: GetVideoLibrariesParams,) => {
+    return [
+    `/api/widgets/videoplayer/libraries`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetVideoLibrariesQueryOptions = <TData = Awaited<ReturnType<typeof getVideoLibraries>>, TError = ErrorType<ErrorResponse>>(params: GetVideoLibrariesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getVideoLibraries>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetVideoLibrariesQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getVideoLibraries>>> = ({ signal }) => getVideoLibraries(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getVideoLibraries>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetVideoLibrariesQueryResult = NonNullable<Awaited<ReturnType<typeof getVideoLibraries>>>
+export type GetVideoLibrariesQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary List video libraries from a connected media server (Plex or Jellyfin)
+ */
+
+export function useGetVideoLibraries<TData = Awaited<ReturnType<typeof getVideoLibraries>>, TError = ErrorType<ErrorResponse>>(
+ params: GetVideoLibrariesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getVideoLibraries>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetVideoLibrariesQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetVideoPlaylistUrl = (params: GetVideoPlaylistParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/widgets/videoplayer?${stringifiedParams}` : `/api/widgets/videoplayer`
+}
+
+/**
+ * @summary Get a normalized, direct-playable video playlist for the Video Player tile
+ */
+export const getVideoPlaylist = async (params: GetVideoPlaylistParams, options?: RequestInit): Promise<VideoPlaylistData> => {
+
+  return customFetch<VideoPlaylistData>(getGetVideoPlaylistUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetVideoPlaylistQueryKey = (params?: GetVideoPlaylistParams,) => {
+    return [
+    `/api/widgets/videoplayer`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetVideoPlaylistQueryOptions = <TData = Awaited<ReturnType<typeof getVideoPlaylist>>, TError = ErrorType<ErrorResponse>>(params: GetVideoPlaylistParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getVideoPlaylist>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetVideoPlaylistQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getVideoPlaylist>>> = ({ signal }) => getVideoPlaylist(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getVideoPlaylist>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetVideoPlaylistQueryResult = NonNullable<Awaited<ReturnType<typeof getVideoPlaylist>>>
+export type GetVideoPlaylistQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Get a normalized, direct-playable video playlist for the Video Player tile
+ */
+
+export function useGetVideoPlaylist<TData = Awaited<ReturnType<typeof getVideoPlaylist>>, TError = ErrorType<ErrorResponse>>(
+ params: GetVideoPlaylistParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getVideoPlaylist>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetVideoPlaylistQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

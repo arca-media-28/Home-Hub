@@ -48,4 +48,5 @@ export const TileUpdateIntegration = {
   aquarium: 'aquarium',
   visualizer: 'visualizer',
   pictureframe: 'pictureframe',
+  videoplayer: 'videoplayer',
 } as const;

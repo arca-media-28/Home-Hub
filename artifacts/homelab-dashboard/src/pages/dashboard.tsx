@@ -39,6 +39,7 @@ import BonsaiTile from "@/components/tiles/BonsaiTile";
 import AquariumTile from "@/components/tiles/AquariumTile";
 import VisualizerTile from "@/components/tiles/VisualizerTile";
 import PictureFrameTile from "@/components/tiles/PictureFrameTile";
+import VideoPlayerTile from "@/components/tiles/VideoPlayerTile";
 import TileEditModal, { type EditMode } from "@/components/TileEditModal";
 import { INTEGRATION_SERVICE, CONNECTION_BACKED_INTEGRATIONS } from "@/lib/integrationMeta";
 import { ToastAction } from "@/components/ui/toast";
@@ -259,6 +260,12 @@ function renderTileContent(tile: Tile, status: ServiceStatus | undefined, editMo
   // bypassing the standard integration header like the aquarium/visualizer.
   if (tile.integration === "pictureframe") {
     return <PictureFrameTile tile={tile} editMode={editMode} />;
+  }
+  // The Video Player paints a full-surface video (uploads, URLs, YouTube, or a
+  // Plex/Jellyfin library — yule log when unconfigured), bypassing the
+  // standard integration header like the picture frame.
+  if (tile.integration === "videoplayer") {
+    return <VideoPlayerTile tile={tile} editMode={editMode} />;
   }
   // Every tile renders as a styled app/link card. When an integration is
   // attached it also shows a compact live-status section from that service.

@@ -85,6 +85,7 @@ export const TileIntegration = {
   aquarium: 'aquarium',
   visualizer: 'visualizer',
   pictureframe: 'pictureframe',
+  videoplayer: 'videoplayer',
 } as const;
 
 /**
@@ -588,6 +589,56 @@ export type TileSettings = {
      * @nullable
      */
   frameWidth?: number | null;
+  /**
+     * Where a Video Player tile's videos come from: "uploads" (video files from the upload library), "urls" (a pasted list of direct video file URLs), "youtube" (a YouTube video/playlist embed), "plex" or "jellyfin" (a library on the connected media server). Null or absent means unconfigured — the tile plays the built-in yule log stream.
+     * @nullable
+     */
+  videoSource?: 'uploads' | 'urls' | 'youtube' | 'plex' | 'jellyfin' | null;
+  /**
+     * The uploaded videos (their /api/uploads/files/... URLs) a Video Player tile plays when videoSource is "uploads".
+     * @nullable
+     */
+  videoUploadUrls?: string[] | null;
+  /**
+     * The direct video file URLs a Video Player tile plays (in order) when videoSource is "urls".
+     * @nullable
+     */
+  videoUrls?: string[] | null;
+  /**
+     * The YouTube video or playlist URL a Video Player tile embeds when videoSource is "youtube".
+     * @nullable
+     */
+  videoYoutubeUrl?: string | null;
+  /**
+     * The selected library/collection id for a media-server videoSource ("plex" or "jellyfin"). Null or absent means no library chosen.
+     * @nullable
+     */
+  videoLibraryId?: string | null;
+  /**
+     * "single" loops the first (or only) video forever; "playlist" plays through the list, advancing on end. Null or absent uses playlist.
+     * @nullable
+     */
+  videoPlayMode?: 'single' | 'playlist' | null;
+  /**
+     * Whether a Video Player tile restarts the playlist after the last video ends (playlist mode). Null or absent defaults to true.
+     * @nullable
+     */
+  videoPlaylistLoop?: boolean | null;
+  /**
+     * Whether a Video Player tile shuffles the playlist order (playlist mode). Null or absent defaults to false.
+     * @nullable
+     */
+  videoShuffle?: boolean | null;
+  /**
+     * Whether a Video Player tile starts muted. Null or absent defaults to true (autoplay-safe).
+     * @nullable
+     */
+  videoMuted?: boolean | null;
+  /**
+     * How a Video Player tile scales its video: "cover" (fill, crop) or "contain" (letterbox, whole frame). Null or absent uses cover.
+     * @nullable
+     */
+  videoFit?: 'cover' | 'contain' | null;
 } | null | null;
 
 export interface Tile {
@@ -706,6 +757,7 @@ export const TileInputIntegration = {
   aquarium: 'aquarium',
   visualizer: 'visualizer',
   pictureframe: 'pictureframe',
+  videoplayer: 'videoplayer',
 } as const;
 
 export interface TileInput {
@@ -783,6 +835,7 @@ export const TileUpdateIntegration = {
   aquarium: 'aquarium',
   visualizer: 'visualizer',
   pictureframe: 'pictureframe',
+  videoplayer: 'videoplayer',
 } as const;
 
 export interface TileUpdate {
@@ -1950,6 +2003,50 @@ export interface PhotosData {
   photos: PhotoItem[];
 }
 
+export interface VideoLibrary {
+  /** Server-side library/section identifier. */
+  id: string;
+  /** The library's display name. */
+  title: string;
+  /**
+     * The library's content kind when the server reports it (e.g. movies, shows).
+     * @nullable
+     */
+  kind?: string | null;
+}
+
+export interface VideoLibrariesData {
+  /**
+     * True when the media server is not connected; libraries is empty and the tile stays on its built-in default video.
+     * @nullable
+     */
+  sample?: boolean | null;
+  libraries: VideoLibrary[];
+}
+
+export interface VideoItem {
+  /** Server-side item identifier. */
+  id: string;
+  /** The video's display title. */
+  title: string;
+  /** A direct-play URL the browser's <video> element can load. Carries the media server's own auth token as a query parameter. */
+  streamUrl: string;
+  /**
+     * Runtime in milliseconds when known.
+     * @nullable
+     */
+  durationMs?: number | null;
+}
+
+export interface VideoPlaylistData {
+  /**
+     * True when the media server is not connected; videos is empty and the tile plays its built-in default instead.
+     * @nullable
+     */
+  sample?: boolean | null;
+  videos: VideoItem[];
+}
+
 export interface AudioTrack {
   /** Stable identifier for the track within its source. */
   id: string;
@@ -2213,6 +2310,40 @@ export type GetPhotosWidgetSource = typeof GetPhotosWidgetSource[keyof typeof Ge
 export const GetPhotosWidgetSource = {
   google: 'google',
   immich: 'immich',
+} as const;
+
+export type GetVideoLibrariesParams = {
+/**
+ * Which media server to list video libraries from. "plex" uses the saved Plex connection; "jellyfin" the saved Jellyfin connection.
+ */
+server: GetVideoLibrariesServer;
+};
+
+export type GetVideoLibrariesServer = typeof GetVideoLibrariesServer[keyof typeof GetVideoLibrariesServer];
+
+
+export const GetVideoLibrariesServer = {
+  plex: 'plex',
+  jellyfin: 'jellyfin',
+} as const;
+
+export type GetVideoPlaylistParams = {
+/**
+ * Which media server backs the playlist.
+ */
+server: GetVideoPlaylistServer;
+/**
+ * The library to list. Required once the server is connected.
+ */
+libraryId?: string;
+};
+
+export type GetVideoPlaylistServer = typeof GetVideoPlaylistServer[keyof typeof GetVideoPlaylistServer];
+
+
+export const GetVideoPlaylistServer = {
+  plex: 'plex',
+  jellyfin: 'jellyfin',
 } as const;
 
 export type GetAudioPlayerNowPlayingParams = {

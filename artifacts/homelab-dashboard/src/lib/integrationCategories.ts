@@ -42,6 +42,8 @@ const CATEGORY_BY_KEY: Record<string, Category> = {
   immich: "Media",
   audioplayer: "Media",
   spotify: "Media",
+  pictureframe: "Media",
+  videoplayer: "Media",
   subsonic: "Media",
   // Downloads
   qbittorrent: "Downloads",
@@ -69,7 +71,6 @@ const CATEGORY_BY_KEY: Record<string, Category> = {
   bonsai: "Fun",
   aquarium: "Fun",
   visualizer: "Fun",
-  pictureframe: "Fun",
 };
 
 // The category for a given integration / service key. Unmapped keys land in

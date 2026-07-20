@@ -162,6 +162,8 @@ import {
   getListCalDavAccountsQueryKey,
   useGetPhotoAlbums,
   getGetPhotoAlbumsQueryKey,
+  useGetVideoLibraries,
+  getGetVideoLibrariesQueryKey,
   TileType,
   TileIntegration,
   type Tile,
@@ -236,6 +238,7 @@ const INTEGRATIONS = [
   { value: TileIntegration.aquarium, label: "Aquarium" },
   { value: TileIntegration.visualizer, label: "Audio Visualizer" },
   { value: TileIntegration.pictureframe, label: "Picture Frame" },
+  { value: TileIntegration.videoplayer, label: "Video Player" },
   { value: TileIntegration.note, label: "Note" },
   { value: TileIntegration.spacer, label: "Spacer" },
   { value: TileIntegration.divider, label: "Section Label" },
@@ -616,6 +619,40 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
   );
   const [showFrameColorPicker, setShowFrameColorPicker] = useState(false);
 
+  // Video Player config. Source picks where the videos come from; uploads/urls
+  // carry their own lists, youtube a single URL, plex/jellyfin a library id.
+  const [videoSource, setVideoSource] = useState<string>(
+    tile?.tileSettings?.videoSource ?? "uploads",
+  );
+  const [videoUploadUrls, setVideoUploadUrls] = useState<string[]>(
+    tile?.tileSettings?.videoUploadUrls ?? [],
+  );
+  const [videoUrlsText, setVideoUrlsText] = useState<string>(
+    (tile?.tileSettings?.videoUrls ?? []).join("\n"),
+  );
+  const [videoYoutubeUrl, setVideoYoutubeUrl] = useState<string>(
+    tile?.tileSettings?.videoYoutubeUrl ?? "",
+  );
+  const [videoLibraryId, setVideoLibraryId] = useState<string>(
+    tile?.tileSettings?.videoLibraryId ?? "",
+  );
+  const [videoPlayMode, setVideoPlayMode] = useState<"single" | "playlist">(
+    tile?.tileSettings?.videoPlayMode === "single" ? "single" : "playlist",
+  );
+  const [videoPlaylistLoop, setVideoPlaylistLoop] = useState<boolean>(
+    tile?.tileSettings?.videoPlaylistLoop ?? true,
+  );
+  const [videoShuffle, setVideoShuffle] = useState<boolean>(
+    tile?.tileSettings?.videoShuffle ?? false,
+  );
+  const [videoMuted, setVideoMuted] = useState<boolean>(
+    tile?.tileSettings?.videoMuted ?? true,
+  );
+  const [videoFit, setVideoFit] = useState<"cover" | "contain">(
+    tile?.tileSettings?.videoFit === "contain" ? "contain" : "cover",
+  );
+  const [videoUploading, setVideoUploading] = useState(false);
+
   // Theme-derived colors shown in the pickers/preview when nothing custom is
   // set; recomputed live if the user switches themes while the modal is open.
   const visualizerThemeDefaults = useVisualizerThemeDefaults();
@@ -751,6 +788,16 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
       setFrameColor(tile?.tileSettings?.frameColor ?? DEFAULT_FRAME_COLOR);
       setFrameWidth(tile?.tileSettings?.frameWidth ?? DEFAULT_FRAME_WIDTH);
       setShowFrameColorPicker(false);
+      setVideoSource(tile?.tileSettings?.videoSource ?? "uploads");
+      setVideoUploadUrls(tile?.tileSettings?.videoUploadUrls ?? []);
+      setVideoUrlsText((tile?.tileSettings?.videoUrls ?? []).join("\n"));
+      setVideoYoutubeUrl(tile?.tileSettings?.videoYoutubeUrl ?? "");
+      setVideoLibraryId(tile?.tileSettings?.videoLibraryId ?? "");
+      setVideoPlayMode(tile?.tileSettings?.videoPlayMode === "single" ? "single" : "playlist");
+      setVideoPlaylistLoop(tile?.tileSettings?.videoPlaylistLoop ?? true);
+      setVideoShuffle(tile?.tileSettings?.videoShuffle ?? false);
+      setVideoMuted(tile?.tileSettings?.videoMuted ?? true);
+      setVideoFit(tile?.tileSettings?.videoFit === "contain" ? "contain" : "cover");
       setShowPetColorPicker(false);
       setShowNoteColorPicker(false);
       setShowNoteTextColorPicker(false);
@@ -773,6 +820,19 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
       },
     },
   );
+
+  // Library list for the Video Player's Plex/Jellyfin sources. Only fetched
+  // while the modal is open on a Video Player with a media-server source.
+  const isVideoServerSource = videoSource === "plex" || videoSource === "jellyfin";
+  const videoServerParam = {
+    server: (videoSource === "jellyfin" ? "jellyfin" : "plex") as "plex" | "jellyfin",
+  };
+  const videoLibrariesQuery = useGetVideoLibraries(videoServerParam, {
+    query: {
+      queryKey: getGetVideoLibrariesQueryKey(videoServerParam),
+      enabled: open && integration === TileIntegration.videoplayer && isVideoServerSource,
+    },
+  });
 
   // The image library — the user's previously uploaded images.
   const uploadsQuery = useListUploads({
@@ -858,6 +918,10 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
   // name/URL/image/background/metrics and exposes its photo source, timing,
   // fit, and frame styling instead.
   const isPictureFrame = integration === TileIntegration.pictureframe;
+  // The Video Player is a self-contained full-surface video tile, so the
+  // editor strips name/URL/image/background/metrics and exposes its video
+  // source, playback mode, and fit instead.
+  const isVideoPlayer = integration === TileIntegration.videoplayer;
   // The spacer is a layout-only tile: an invisible gap with no name, URL,
   // image, background, or live data. Only its size/position matter, so the
   // editor strips every content field and shows a short description instead.
@@ -881,7 +945,7 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
   // Tiles that carry no link/image/background content: layout helpers plus the
   // note and timer, which paint their own surface.
   const isContentless =
-    isLayoutTile || isNote || isTimer || isEightball || isDice || isCoinFlip || isFortune || isTamagotchi || isBonsai || isAquarium || isVisualizer || isPictureFrame;
+    isLayoutTile || isNote || isTimer || isEightball || isDice || isCoinFlip || isFortune || isTamagotchi || isBonsai || isAquarium || isVisualizer || isPictureFrame || isVideoPlayer;
 
   // Teams for the chosen leagues, for the dependent team multi-select. Sourced
   // from the baked-in catalog (ESPN's /teams endpoint isn't CORS-enabled), so
@@ -1315,6 +1379,40 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
     }
   }
 
+  // Upload a video file into the library and auto-select it for the Video
+  // Player. Uses the same /api/uploads endpoint (videos pass through
+  // untouched server-side; only their bytes are verified).
+  async function handleVideoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setVideoUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/uploads", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${localStorage.getItem("token") ?? ""}` },
+        body: fd,
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const { url: uploadedUrl } = await res.json();
+      setVideoUploadUrls((prev) =>
+        prev.includes(uploadedUrl) ? prev : [...prev, uploadedUrl],
+      );
+      queryClient.invalidateQueries({ queryKey: getListUploadsQueryKey() });
+      toast({ title: "Video uploaded" });
+    } catch (err: unknown) {
+      toast({
+        title: "Upload failed",
+        description: err instanceof Error ? err.message : "Unknown error",
+        variant: "destructive",
+      });
+    } finally {
+      setVideoUploading(false);
+    }
+  }
+
   // Pick an image from the library / URL and reset placement to defaults so the
   // new image starts centered with the whole picture visible.
   function pickImage(nextUrl: string) {
@@ -1451,7 +1549,7 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
       // A spacer carries no content at all; a divider keeps only its label
       // (name). Both clear url/background/image so converting an existing tile
       // into a layout tile leaves nothing behind.
-      name: isSpacer || isNote || isTimer || isTamagotchi || isBonsai || isAquarium || isVisualizer || isPictureFrame ? "" : name || undefined,
+      name: isSpacer || isNote || isTimer || isTamagotchi || isBonsai || isAquarium || isVisualizer || isPictureFrame || isVideoPlayer ? "" : name || undefined,
       url: isContentless ? "" : url || undefined,
       // Send the raw value so clearing (null) reaches the body and the server
       // writes NULL; otherwise an undefined field is dropped and the old color
@@ -1662,6 +1760,41 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
                                       frameStyle,
                                       frameColor: frameStyle === "custom" ? frameColor : null,
                                       frameWidth: frameStyle === "custom" ? frameWidth : null,
+                                    }
+                                : isVideoPlayer
+                                  ? {
+                                      videoSource: videoSource as
+                                        | "uploads"
+                                        | "urls"
+                                        | "youtube"
+                                        | "plex"
+                                        | "jellyfin",
+                                      videoUploadUrls:
+                                        videoSource === "uploads" && videoUploadUrls.length > 0
+                                          ? videoUploadUrls
+                                          : null,
+                                      videoUrls: (() => {
+                                        if (videoSource !== "urls") return null;
+                                        const list = videoUrlsText
+                                          .split("\n")
+                                          .map((l) => l.trim())
+                                          .filter(Boolean);
+                                        return list.length > 0 ? list : null;
+                                      })(),
+                                      videoYoutubeUrl:
+                                        videoSource === "youtube" && videoYoutubeUrl.trim()
+                                          ? videoYoutubeUrl.trim()
+                                          : null,
+                                      videoLibraryId:
+                                        (videoSource === "plex" || videoSource === "jellyfin") &&
+                                        videoLibraryId
+                                          ? videoLibraryId
+                                          : null,
+                                      videoPlayMode,
+                                      videoPlaylistLoop,
+                                      videoShuffle,
+                                      videoMuted,
+                                      videoFit,
                                     }
                                   : null;
         // The status-dot toggle only applies to connection-backed integrations.
@@ -2683,6 +2816,260 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
                   </div>
                 </div>
               )}
+            </div>
+          )}
+
+          {isVideoPlayer && (
+            <div className="space-y-4 border-t border-border pt-4">
+              <p className="text-sm text-muted-foreground">
+                A video player that fills the tile. Pick where the videos come
+                from and how they play. Until a source is configured it plays
+                a cozy yule log loop.
+              </p>
+
+              <div className="space-y-1.5">
+                <Label>Video source</Label>
+                <Select value={videoSource} onValueChange={setVideoSource}>
+                  <SelectTrigger aria-label="Video source" data-testid="videoplayer-source">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="uploads">Uploaded videos</SelectItem>
+                    <SelectItem value="urls">Video URLs</SelectItem>
+                    <SelectItem value="youtube">YouTube video or playlist</SelectItem>
+                    <SelectItem value="plex">Plex library</SelectItem>
+                    <SelectItem value="jellyfin">Jellyfin library</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {videoSource === "uploads" && (
+                <div className="space-y-1.5">
+                  <Label>Videos from your library</Label>
+                  {(() => {
+                    const videoFiles = (uploadsQuery.data ?? []).filter((f) =>
+                      (f.mimetype ?? "").startsWith("video/"),
+                    );
+                    if (uploadsQuery.isLoading) {
+                      return <p className="text-xs text-muted-foreground">Loading…</p>;
+                    }
+                    if (videoFiles.length === 0) {
+                      return (
+                        <p className="text-xs text-muted-foreground">
+                          No videos uploaded yet. Upload an MP4 or WebM file
+                          below (up to 200MB, no transcoding).
+                        </p>
+                      );
+                    }
+                    return (
+                      <div className="space-y-1 max-h-40 overflow-y-auto pr-1">
+                        {videoFiles.map((file) => {
+                          const selected = videoUploadUrls.includes(file.url);
+                          return (
+                            <button
+                              key={file.id}
+                              type="button"
+                              aria-pressed={selected}
+                              data-testid={`videoplayer-upload-${file.id}`}
+                              onClick={() =>
+                                setVideoUploadUrls((prev) =>
+                                  selected
+                                    ? prev.filter((u) => u !== file.url)
+                                    : [...prev, file.url],
+                                )
+                              }
+                              className={`flex w-full items-center gap-2 rounded-md border px-2 py-1.5 text-left text-sm ${
+                                selected
+                                  ? "border-primary bg-primary/10"
+                                  : "border-border hover:bg-accent"
+                              }`}
+                            >
+                              <span className="truncate">
+                                {file.originalName ?? file.url.split("/").pop()}
+                              </span>
+                              {selected && (
+                                <span className="ml-auto text-xs text-primary">Selected</span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
+                  <div>
+                    <input
+                      type="file"
+                      accept="video/mp4,video/webm"
+                      id="videoplayer-upload-input"
+                      className="hidden"
+                      onChange={handleVideoUpload}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={videoUploading}
+                      onClick={() =>
+                        document.getElementById("videoplayer-upload-input")?.click()
+                      }
+                    >
+                      {videoUploading ? "Uploading…" : "Upload video"}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Click videos to add or remove them from the playlist.
+                    {videoUploadUrls.length > 0 && ` ${videoUploadUrls.length} selected.`}
+                  </p>
+                </div>
+              )}
+
+              {videoSource === "urls" && (
+                <div className="space-y-1.5">
+                  <Label htmlFor="videoplayer-urls">Video URLs (one per line)</Label>
+                  <textarea
+                    id="videoplayer-urls"
+                    data-testid="videoplayer-urls"
+                    value={videoUrlsText}
+                    onChange={(e) => setVideoUrlsText(e.target.value)}
+                    placeholder={"https://example.com/clip1.mp4\nhttps://example.com/clip2.webm"}
+                    rows={4}
+                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-mono placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Direct links to video files (MP4/WebM) the browser can play.
+                  </p>
+                </div>
+              )}
+
+              {videoSource === "youtube" && (
+                <div className="space-y-1.5">
+                  <Label htmlFor="videoplayer-youtube">YouTube video or playlist URL</Label>
+                  <Input
+                    id="videoplayer-youtube"
+                    data-testid="videoplayer-youtube-url"
+                    value={videoYoutubeUrl}
+                    onChange={(e) => setVideoYoutubeUrl(e.target.value)}
+                    placeholder="https://www.youtube.com/watch?v=… or …playlist?list=…"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Plays via the YouTube embedded player (its own controls).
+                  </p>
+                </div>
+              )}
+
+              {isVideoServerSource && (
+                <div className="space-y-1.5">
+                  <Label>Library</Label>
+                  {videoLibrariesQuery.isLoading ? (
+                    <p className="text-xs text-muted-foreground">Loading libraries…</p>
+                  ) : videoLibrariesQuery.isError ? (
+                    <p className="text-xs text-destructive">
+                      {videoSource === "plex"
+                        ? "Couldn't load Plex libraries. Check the Plex connection in Settings, then try again."
+                        : "Couldn't load Jellyfin libraries. Check the Jellyfin connection in Settings, then try again."}
+                    </p>
+                  ) : (
+                    <Select
+                      value={videoLibraryId || NONE}
+                      onValueChange={(v) => setVideoLibraryId(v === NONE ? "" : v)}
+                    >
+                      <SelectTrigger aria-label="Library" data-testid="videoplayer-library">
+                        <SelectValue placeholder="Choose a library" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={NONE}>(choose a library)</SelectItem>
+                        {(videoLibrariesQuery.data?.libraries ?? []).map((l) => (
+                          <SelectItem key={l.id} value={l.id}>
+                            {l.title}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                  {videoLibrariesQuery.data?.sample && (
+                    <p className="text-xs text-muted-foreground">
+                      {videoSource === "plex" ? "Plex" : "Jellyfin"} isn't
+                      connected yet — the tile will play the yule log until it
+                      is.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label>Playback</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {(
+                      [
+                        { value: "single", label: "Loop one video" },
+                        { value: "playlist", label: "Play through list" },
+                      ] as const
+                    ).map((o) => (
+                      <button
+                        key={o.value}
+                        type="button"
+                        aria-pressed={videoPlayMode === o.value}
+                        onClick={() => setVideoPlayMode(o.value)}
+                        className={`rounded-md border px-3 py-2 text-sm transition-colors ${
+                          videoPlayMode === o.value
+                            ? "border-primary bg-primary/10 font-medium"
+                            : "border-border hover:bg-accent"
+                        }`}
+                      >
+                        {o.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Video fit</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {(["cover", "contain"] as const).map((v) => (
+                      <button
+                        key={v}
+                        type="button"
+                        aria-pressed={videoFit === v}
+                        onClick={() => setVideoFit(v)}
+                        className={`rounded-md border px-3 py-2 text-sm transition-colors ${
+                          videoFit === v
+                            ? "border-primary bg-primary/10 font-medium"
+                            : "border-border hover:bg-accent"
+                        }`}
+                      >
+                        {v === "cover" ? "Fill tile" : "Fit whole video"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {videoPlayMode === "playlist" && videoSource !== "youtube" && (
+                <div className="flex flex-wrap gap-x-6 gap-y-2">
+                  <label className="flex items-center gap-2 text-sm">
+                    <Checkbox
+                      checked={videoPlaylistLoop}
+                      onCheckedChange={(v) => setVideoPlaylistLoop(v === true)}
+                    />
+                    Loop playlist
+                  </label>
+                  <label className="flex items-center gap-2 text-sm">
+                    <Checkbox
+                      checked={videoShuffle}
+                      onCheckedChange={(v) => setVideoShuffle(v === true)}
+                    />
+                    Shuffle
+                  </label>
+                </div>
+              )}
+
+              <label className="flex items-center gap-2 text-sm">
+                <Checkbox
+                  checked={videoMuted}
+                  onCheckedChange={(v) => setVideoMuted(v === true)}
+                />
+                Start muted (recommended — browsers block unmuted autoplay)
+              </label>
             </div>
           )}
 

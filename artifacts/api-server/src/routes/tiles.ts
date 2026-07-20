@@ -116,6 +116,16 @@ interface TileSettings {
   frameStyle?: "none" | "wood" | "thin" | "gold" | "polaroid" | "custom" | null;
   frameColor?: string | null;
   frameWidth?: number | null;
+  videoSource?: string | null;
+  videoUploadUrls?: string[] | null;
+  videoUrls?: string[] | null;
+  videoYoutubeUrl?: string | null;
+  videoLibraryId?: string | null;
+  videoPlayMode?: "single" | "playlist" | null;
+  videoPlaylistLoop?: boolean | null;
+  videoShuffle?: boolean | null;
+  videoMuted?: boolean | null;
+  videoFit?: "cover" | "contain" | null;
   truenasMetric?: "cpuram" | "network" | "arc" | "pools" | "disks" | "cputemp" | null;
   truenasShowCpuCores?: boolean | null;
   truenasPools?: string[] | null;
@@ -695,6 +705,67 @@ function pickTileSettings(obj: Record<string, unknown>): TileSettings {
     result.frameWidth = obj["frameWidth"];
   } else if (obj["frameWidth"] === null) {
     result.frameWidth = null;
+  }
+  // Video Player tile settings.
+  if (
+    obj["videoSource"] === "uploads" ||
+    obj["videoSource"] === "urls" ||
+    obj["videoSource"] === "youtube" ||
+    obj["videoSource"] === "plex" ||
+    obj["videoSource"] === "jellyfin"
+  ) {
+    result.videoSource = obj["videoSource"];
+  } else if (obj["videoSource"] === null) {
+    result.videoSource = null;
+  }
+  if (Array.isArray(obj["videoUploadUrls"])) {
+    result.videoUploadUrls = obj["videoUploadUrls"].filter(
+      (x): x is string => typeof x === "string",
+    );
+  } else if (obj["videoUploadUrls"] === null) {
+    result.videoUploadUrls = null;
+  }
+  if (Array.isArray(obj["videoUrls"])) {
+    result.videoUrls = obj["videoUrls"].filter(
+      (x): x is string => typeof x === "string",
+    );
+  } else if (obj["videoUrls"] === null) {
+    result.videoUrls = null;
+  }
+  if (typeof obj["videoYoutubeUrl"] === "string") {
+    result.videoYoutubeUrl = obj["videoYoutubeUrl"];
+  } else if (obj["videoYoutubeUrl"] === null) {
+    result.videoYoutubeUrl = null;
+  }
+  if (typeof obj["videoLibraryId"] === "string") {
+    result.videoLibraryId = obj["videoLibraryId"];
+  } else if (obj["videoLibraryId"] === null) {
+    result.videoLibraryId = null;
+  }
+  if (obj["videoPlayMode"] === "single" || obj["videoPlayMode"] === "playlist") {
+    result.videoPlayMode = obj["videoPlayMode"];
+  } else if (obj["videoPlayMode"] === null) {
+    result.videoPlayMode = null;
+  }
+  if (typeof obj["videoPlaylistLoop"] === "boolean") {
+    result.videoPlaylistLoop = obj["videoPlaylistLoop"];
+  } else if (obj["videoPlaylistLoop"] === null) {
+    result.videoPlaylistLoop = null;
+  }
+  if (typeof obj["videoShuffle"] === "boolean") {
+    result.videoShuffle = obj["videoShuffle"];
+  } else if (obj["videoShuffle"] === null) {
+    result.videoShuffle = null;
+  }
+  if (typeof obj["videoMuted"] === "boolean") {
+    result.videoMuted = obj["videoMuted"];
+  } else if (obj["videoMuted"] === null) {
+    result.videoMuted = null;
+  }
+  if (obj["videoFit"] === "cover" || obj["videoFit"] === "contain") {
+    result.videoFit = obj["videoFit"];
+  } else if (obj["videoFit"] === null) {
+    result.videoFit = null;
   }
   return result;
 }

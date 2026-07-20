@@ -2359,6 +2359,186 @@ router.post("/audioplayer/favorite", requireAuth, async (req: AuthRequest, res) 
   }
 });
 
+// ── Video Player widget ──────────────────────────────────────────────────────
+// Lists video libraries and direct-play playlists from a connected Plex or
+// Jellyfin server. Follows the widget-data convention: sample:true with empty
+// data when the server is not connected, 502 when a configured server fails.
+
+router.get("/videoplayer/libraries", requireAuth, async (req: AuthRequest, res) => {
+  const server = String(req.query["server"] ?? "");
+  if (server !== "plex" && server !== "jellyfin") {
+    res.status(400).json({ error: "server must be plex or jellyfin" });
+    return;
+  }
+  const userId = req.user!.userId;
+  if (server === "plex") {
+    const conn = resolvePlexAudioConnection(userId);
+    if (!conn) {
+      res.json({ sample: true, libraries: [] });
+      return;
+    }
+    try {
+      const r = await httpClient.get(`${conn.baseUrl}/library/sections`, {
+        headers: { "X-Plex-Token": conn.token, Accept: "application/json" },
+      });
+      const dirs = (r.data?.MediaContainer?.Directory ?? []) as Array<{
+        key?: string | number;
+        title?: string;
+        type?: string;
+      }>;
+      const libraries = dirs
+        .filter((d) => d.type === "movie" || d.type === "show")
+        .map((d) => ({
+          id: String(d.key ?? ""),
+          title: d.title ?? "Untitled library",
+          kind: d.type === "movie" ? "movies" : "shows",
+        }));
+      res.json({ sample: false, libraries });
+    } catch (err) {
+      logger.error({ reason: describeHttpError(err) }, "Plex video libraries error");
+      res.status(502).json({ error: "Failed to load video libraries from Plex" });
+    }
+    return;
+  }
+  // Jellyfin
+  const { baseUrl, apiKey } = resolveJellyfinAudioConnection(userId);
+  if (!baseUrl || !apiKey) {
+    res.json({ sample: true, libraries: [] });
+    return;
+  }
+  try {
+    const r = await httpClient.get(`${baseUrl}/Library/MediaFolders`, {
+      params: { api_key: apiKey },
+    });
+    const items = (r.data?.Items ?? []) as Array<{
+      Id?: string;
+      Name?: string;
+      CollectionType?: string;
+    }>;
+    const videoKinds = new Set(["movies", "tvshows", "homevideos", "musicvideos"]);
+    const libraries = items
+      .filter((i) => videoKinds.has(String(i.CollectionType ?? "")))
+      .map((i) => ({
+        id: String(i.Id ?? ""),
+        title: i.Name ?? "Untitled library",
+        kind: i.CollectionType === "movies" ? "movies" : i.CollectionType === "tvshows" ? "shows" : (i.CollectionType ?? null),
+      }));
+    res.json({ sample: false, libraries });
+  } catch (err) {
+    logger.error({ reason: describeHttpError(err) }, "Jellyfin video libraries error");
+    res.status(502).json({ error: "Failed to load video libraries from Jellyfin" });
+  }
+});
+
+// Cap playlists so a huge library doesn't produce megabyte responses.
+const VIDEO_PLAYLIST_LIMIT = 200;
+
+router.get("/videoplayer", requireAuth, async (req: AuthRequest, res) => {
+  const server = String(req.query["server"] ?? "");
+  if (server !== "plex" && server !== "jellyfin") {
+    res.status(400).json({ error: "server must be plex or jellyfin" });
+    return;
+  }
+  const libraryId = String(req.query["libraryId"] ?? "");
+  const userId = req.user!.userId;
+
+  if (server === "plex") {
+    const conn = resolvePlexAudioConnection(userId);
+    if (!conn) {
+      res.json({ sample: true, videos: [] });
+      return;
+    }
+    if (!libraryId) {
+      res.status(400).json({ error: "libraryId is required" });
+      return;
+    }
+    try {
+      const { baseUrl, token } = conn;
+      const fetchRows = async (params?: Record<string, string>) => {
+        const r = await httpClient.get(
+          `${baseUrl}/library/sections/${encodeURIComponent(libraryId)}/all`,
+          { headers: { "X-Plex-Token": token, Accept: "application/json" }, params },
+        );
+        return (r.data?.MediaContainer?.Metadata ?? []) as Array<{
+          ratingKey?: string | number;
+          title?: string;
+          grandparentTitle?: string;
+          type?: string;
+          duration?: number;
+          Media?: Array<{ Part?: Array<{ key?: string }> }>;
+        }>;
+      };
+      let rows = await fetchRows();
+      // Show libraries return show containers (no playable parts); re-query
+      // for episodes (Plex type 4) to get direct-play items.
+      if (rows.length > 0 && rows[0]?.type === "show") {
+        rows = await fetchRows({ type: "4" });
+      }
+      const videos = rows
+        .slice(0, VIDEO_PLAYLIST_LIMIT)
+        .map((m) => {
+          const partKey = m.Media?.[0]?.Part?.[0]?.key;
+          if (!partKey) return null;
+          const title = m.grandparentTitle ? `${m.grandparentTitle} — ${m.title ?? ""}` : (m.title ?? "Untitled");
+          return {
+            id: String(m.ratingKey ?? ""),
+            title,
+            streamUrl: `${baseUrl}${partKey}?X-Plex-Token=${token}`,
+            durationMs: typeof m.duration === "number" ? m.duration : null,
+          };
+        })
+        .filter((v): v is NonNullable<typeof v> => v !== null);
+      res.json({ sample: false, videos });
+    } catch (err) {
+      logger.error({ reason: describeHttpError(err) }, "Plex video playlist error");
+      res.status(502).json({ error: "Failed to load videos from Plex" });
+    }
+    return;
+  }
+
+  // Jellyfin
+  const { baseUrl, apiKey } = resolveJellyfinAudioConnection(userId);
+  if (!baseUrl || !apiKey) {
+    res.json({ sample: true, videos: [] });
+    return;
+  }
+  if (!libraryId) {
+    res.status(400).json({ error: "libraryId is required" });
+    return;
+  }
+  try {
+    const r = await httpClient.get(`${baseUrl}/Items`, {
+      params: {
+        api_key: apiKey,
+        ParentId: libraryId,
+        Recursive: "true",
+        IncludeItemTypes: "Movie,Episode,Video,MusicVideo",
+        Fields: "RunTimeTicks",
+        Limit: String(VIDEO_PLAYLIST_LIMIT),
+      },
+    });
+    const items = (r.data?.Items ?? []) as Array<{
+      Id?: string;
+      Name?: string;
+      SeriesName?: string;
+      RunTimeTicks?: number;
+    }>;
+    const videos = items
+      .filter((i) => i.Id)
+      .map((i) => ({
+        id: String(i.Id),
+        title: i.SeriesName ? `${i.SeriesName} — ${i.Name ?? ""}` : (i.Name ?? "Untitled"),
+        streamUrl: `${baseUrl}/Videos/${encodeURIComponent(String(i.Id))}/stream?static=true&api_key=${apiKey}`,
+        durationMs:
+          typeof i.RunTimeTicks === "number" ? Math.round(i.RunTimeTicks / 10000) : null,
+      }));
+    res.json({ sample: false, videos });
+  } catch (err) {
+    logger.error({ reason: describeHttpError(err) }, "Jellyfin video playlist error");
+    res.status(502).json({ error: "Failed to load videos from Jellyfin" });
+  }
+});
+
 router.get("/audioplayer", requireAuth, async (req: AuthRequest, res) => {
   // Source selects the music backend. Spotify uses the linked OAuth account;
   // anything else resolves to Plex (the original/default source).

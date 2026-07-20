@@ -38,6 +38,7 @@ import {
   AudioLines,
   StickyNote,
   Images,
+  MonitorPlay,
   SquareDashed,
   Heading,
   type LucideIcon,
@@ -185,6 +186,10 @@ export const INTEGRATION_META: Record<string, IntegrationMeta> = {
   [TileIntegration.pictureframe]: {
     icon: Images,
     description: "A photo slideshow from uploads, URLs, or albums.",
+  },
+  [TileIntegration.videoplayer]: {
+    icon: MonitorPlay,
+    description: "Play videos from uploads, URLs, YouTube, or your library.",
   },
   [TileIntegration.note]: {
     icon: StickyNote,

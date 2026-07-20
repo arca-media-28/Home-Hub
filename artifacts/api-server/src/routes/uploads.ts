@@ -16,15 +16,28 @@ const uploadsDir = path.join(dataDir, "uploads");
 
 // Keep the upload in memory so we can optimize it with sharp before writing the
 // final file to disk.
+// Videos are much bigger than tile images; the multer cap is the video limit
+// and a stricter per-type cap for images is enforced in processUpload (the
+// client-supplied mimetype is only a hint — real limits key off sniffed bytes).
+const IMAGE_MAX_BYTES = 10 * 1024 * 1024; // 10MB
+const VIDEO_MAX_BYTES = 200 * 1024 * 1024; // 200MB
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+  limits: { fileSize: VIDEO_MAX_BYTES },
   fileFilter: (_req, file, cb) => {
-    const allowed = ["image/jpeg", "image/png", "image/gif", "image/webp", "image/svg+xml"];
+    const allowed = [
+      "image/jpeg",
+      "image/png",
+      "image/gif",
+      "image/webp",
+      "image/svg+xml",
+      "video/mp4",
+      "video/webm",
+    ];
     if (allowed.includes(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new Error("Only image files are allowed"));
+      cb(new Error("Only image or video files are allowed"));
     }
   },
 });
@@ -52,6 +65,14 @@ const RASTER_EXT: Record<string, string> = {
   "image/webp": ".webp",
 };
 
+// Video formats are stored as-is (no transcoding) once their magic number
+// verifies; the browser's <video> element plays them directly and the static
+// file server handles range requests so seeking works.
+const VIDEO_EXT: Record<string, string> = {
+  "video/mp4": ".mp4",
+  "video/webm": ".webm",
+};
+
 // Inverse lookup used when recording the (server-determined) mimetype for a
 // stored file, plus the SVG case which isn't produced by RASTER_EXT.
 const EXT_MIME: Record<string, string> = {
@@ -60,6 +81,8 @@ const EXT_MIME: Record<string, string> = {
   ".gif": "image/gif",
   ".webp": "image/webp",
   ".svg": "image/svg+xml",
+  ".mp4": "video/mp4",
+  ".webm": "video/webm",
 };
 
 // SVGs are plain XML text, so magic-number sniffing (file-type) can't detect
@@ -91,7 +114,20 @@ function sanitizeSvg(buffer: Buffer): Buffer {
 async function processUpload(buffer: Buffer): Promise<{ buffer: Buffer; ext: string }> {
   const detected = await fileTypeFromBuffer(buffer);
 
+  if (detected && detected.mime in VIDEO_EXT) {
+    // Videos pass through untouched (no transcoding) once the bytes verify as
+    // a supported container. file-type reports Matroska-family containers for
+    // webm, so both video/webm and video/x-matroska sniffs land here.
+    return { buffer, ext: VIDEO_EXT[detected.mime]! };
+  }
+  if (detected && detected.mime === "video/x-matroska") {
+    return { buffer, ext: ".webm" };
+  }
+
   if (detected && detected.mime in RASTER_EXT) {
+    if (buffer.length > IMAGE_MAX_BYTES) {
+      throw new UnsupportedUploadError("Image uploads are limited to 10MB");
+    }
     if (detected.mime === "image/gif") {
       // GIFs (often animated) are passed through untouched once verified.
       return { buffer, ext: ".gif" };

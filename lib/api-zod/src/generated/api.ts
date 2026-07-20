@@ -75,7 +75,7 @@ export const GetTilesResponseItem = zod.object({
   "userId": zod.number(),
   "pageId": zod.number().nullish().describe('The page this tile belongs to. Null only for tiles that predate the multi-page migration and could not be assigned a page.'),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'lidarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('pterodactyl'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('email'),zod.literal('calendar'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal('bonsai'),zod.literal('aquarium'),zod.literal('visualizer'),zod.literal('pictureframe'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('pterodactyl'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('email'),zod.literal('calendar'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal('bonsai'),zod.literal('aquarium'),zod.literal('visualizer'),zod.literal('pictureframe'),zod.literal('videoplayer'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -191,7 +191,17 @@ export const GetTilesResponseItem = zod.object({
   "photoFit": zod.union([zod.literal('cover'),zod.literal('contain'),zod.literal(null)]).nullish().describe('How a Picture Frame tile scales its photos: \"cover\" (fill, crop) or \"contain\" (letterbox, whole image). Null or absent uses cover.'),
   "frameStyle": zod.union([zod.literal('none'),zod.literal('wood'),zod.literal('thin'),zod.literal('gold'),zod.literal('polaroid'),zod.literal('custom'),zod.literal(null)]).nullish().describe('A Picture Frame tile\'s decorative frame: \"none\", \"wood\", \"thin\", \"gold\", \"polaroid\", or \"custom\" (uses frameColor\/frameWidth). Null or absent means no frame.'),
   "frameColor": zod.string().nullish().describe('The frame color (#hex) when frameStyle is \"custom\". Null or absent uses a neutral default.'),
-  "frameWidth": zod.number().nullish().describe('The frame thickness in pixels when frameStyle is \"custom\". Null or absent uses the default.')
+  "frameWidth": zod.number().nullish().describe('The frame thickness in pixels when frameStyle is \"custom\". Null or absent uses the default.'),
+  "videoSource": zod.union([zod.literal('uploads'),zod.literal('urls'),zod.literal('youtube'),zod.literal('plex'),zod.literal('jellyfin'),zod.literal(null)]).nullish().describe('Where a Video Player tile\'s videos come from: \"uploads\" (video files from the upload library), \"urls\" (a pasted list of direct video file URLs), \"youtube\" (a YouTube video\/playlist embed), \"plex\" or \"jellyfin\" (a library on the connected media server). Null or absent means unconfigured — the tile plays the built-in yule log stream.'),
+  "videoUploadUrls": zod.array(zod.string()).nullish().describe('The uploaded videos (their \/api\/uploads\/files\/... URLs) a Video Player tile plays when videoSource is \"uploads\".'),
+  "videoUrls": zod.array(zod.string()).nullish().describe('The direct video file URLs a Video Player tile plays (in order) when videoSource is \"urls\".'),
+  "videoYoutubeUrl": zod.string().nullish().describe('The YouTube video or playlist URL a Video Player tile embeds when videoSource is \"youtube\".'),
+  "videoLibraryId": zod.string().nullish().describe('The selected library\/collection id for a media-server videoSource (\"plex\" or \"jellyfin\"). Null or absent means no library chosen.'),
+  "videoPlayMode": zod.union([zod.literal('single'),zod.literal('playlist'),zod.literal(null)]).nullish().describe('\"single\" loops the first (or only) video forever; \"playlist\" plays through the list, advancing on end. Null or absent uses playlist.'),
+  "videoPlaylistLoop": zod.boolean().nullish().describe('Whether a Video Player tile restarts the playlist after the last video ends (playlist mode). Null or absent defaults to true.'),
+  "videoShuffle": zod.boolean().nullish().describe('Whether a Video Player tile shuffles the playlist order (playlist mode). Null or absent defaults to false.'),
+  "videoMuted": zod.boolean().nullish().describe('Whether a Video Player tile starts muted. Null or absent defaults to true (autoplay-safe).'),
+  "videoFit": zod.union([zod.literal('cover'),zod.literal('contain'),zod.literal(null)]).nullish().describe('How a Video Player tile scales its video: \"cover\" (fill, crop) or \"contain\" (letterbox, whole frame). Null or absent uses cover.')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.'),
   "createdAt": zod.string().optional()
 })
@@ -204,7 +214,7 @@ export const GetTilesResponse = zod.array(GetTilesResponseItem)
 export const CreateTileBody = zod.object({
   "pageId": zod.number().nullish().describe('The page to create this tile on. Omit to fall back to the user\'s first page.'),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'lidarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('pterodactyl'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('email'),zod.literal('calendar'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal('bonsai'),zod.literal('aquarium'),zod.literal('visualizer'),zod.literal('pictureframe'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('pterodactyl'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('email'),zod.literal('calendar'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal('bonsai'),zod.literal('aquarium'),zod.literal('visualizer'),zod.literal('pictureframe'),zod.literal('videoplayer'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -320,7 +330,17 @@ export const CreateTileBody = zod.object({
   "photoFit": zod.union([zod.literal('cover'),zod.literal('contain'),zod.literal(null)]).nullish().describe('How a Picture Frame tile scales its photos: \"cover\" (fill, crop) or \"contain\" (letterbox, whole image). Null or absent uses cover.'),
   "frameStyle": zod.union([zod.literal('none'),zod.literal('wood'),zod.literal('thin'),zod.literal('gold'),zod.literal('polaroid'),zod.literal('custom'),zod.literal(null)]).nullish().describe('A Picture Frame tile\'s decorative frame: \"none\", \"wood\", \"thin\", \"gold\", \"polaroid\", or \"custom\" (uses frameColor\/frameWidth). Null or absent means no frame.'),
   "frameColor": zod.string().nullish().describe('The frame color (#hex) when frameStyle is \"custom\". Null or absent uses a neutral default.'),
-  "frameWidth": zod.number().nullish().describe('The frame thickness in pixels when frameStyle is \"custom\". Null or absent uses the default.')
+  "frameWidth": zod.number().nullish().describe('The frame thickness in pixels when frameStyle is \"custom\". Null or absent uses the default.'),
+  "videoSource": zod.union([zod.literal('uploads'),zod.literal('urls'),zod.literal('youtube'),zod.literal('plex'),zod.literal('jellyfin'),zod.literal(null)]).nullish().describe('Where a Video Player tile\'s videos come from: \"uploads\" (video files from the upload library), \"urls\" (a pasted list of direct video file URLs), \"youtube\" (a YouTube video\/playlist embed), \"plex\" or \"jellyfin\" (a library on the connected media server). Null or absent means unconfigured — the tile plays the built-in yule log stream.'),
+  "videoUploadUrls": zod.array(zod.string()).nullish().describe('The uploaded videos (their \/api\/uploads\/files\/... URLs) a Video Player tile plays when videoSource is \"uploads\".'),
+  "videoUrls": zod.array(zod.string()).nullish().describe('The direct video file URLs a Video Player tile plays (in order) when videoSource is \"urls\".'),
+  "videoYoutubeUrl": zod.string().nullish().describe('The YouTube video or playlist URL a Video Player tile embeds when videoSource is \"youtube\".'),
+  "videoLibraryId": zod.string().nullish().describe('The selected library\/collection id for a media-server videoSource (\"plex\" or \"jellyfin\"). Null or absent means no library chosen.'),
+  "videoPlayMode": zod.union([zod.literal('single'),zod.literal('playlist'),zod.literal(null)]).nullish().describe('\"single\" loops the first (or only) video forever; \"playlist\" plays through the list, advancing on end. Null or absent uses playlist.'),
+  "videoPlaylistLoop": zod.boolean().nullish().describe('Whether a Video Player tile restarts the playlist after the last video ends (playlist mode). Null or absent defaults to true.'),
+  "videoShuffle": zod.boolean().nullish().describe('Whether a Video Player tile shuffles the playlist order (playlist mode). Null or absent defaults to false.'),
+  "videoMuted": zod.boolean().nullish().describe('Whether a Video Player tile starts muted. Null or absent defaults to true (autoplay-safe).'),
+  "videoFit": zod.union([zod.literal('cover'),zod.literal('contain'),zod.literal(null)]).nullish().describe('How a Video Player tile scales its video: \"cover\" (fill, crop) or \"contain\" (letterbox, whole frame). Null or absent uses cover.')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.')
 })
 
@@ -337,7 +357,7 @@ export const GetTileResponse = zod.object({
   "userId": zod.number(),
   "pageId": zod.number().nullish().describe('The page this tile belongs to. Null only for tiles that predate the multi-page migration and could not be assigned a page.'),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'lidarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('pterodactyl'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('email'),zod.literal('calendar'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal('bonsai'),zod.literal('aquarium'),zod.literal('visualizer'),zod.literal('pictureframe'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('pterodactyl'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('email'),zod.literal('calendar'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal('bonsai'),zod.literal('aquarium'),zod.literal('visualizer'),zod.literal('pictureframe'),zod.literal('videoplayer'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -453,7 +473,17 @@ export const GetTileResponse = zod.object({
   "photoFit": zod.union([zod.literal('cover'),zod.literal('contain'),zod.literal(null)]).nullish().describe('How a Picture Frame tile scales its photos: \"cover\" (fill, crop) or \"contain\" (letterbox, whole image). Null or absent uses cover.'),
   "frameStyle": zod.union([zod.literal('none'),zod.literal('wood'),zod.literal('thin'),zod.literal('gold'),zod.literal('polaroid'),zod.literal('custom'),zod.literal(null)]).nullish().describe('A Picture Frame tile\'s decorative frame: \"none\", \"wood\", \"thin\", \"gold\", \"polaroid\", or \"custom\" (uses frameColor\/frameWidth). Null or absent means no frame.'),
   "frameColor": zod.string().nullish().describe('The frame color (#hex) when frameStyle is \"custom\". Null or absent uses a neutral default.'),
-  "frameWidth": zod.number().nullish().describe('The frame thickness in pixels when frameStyle is \"custom\". Null or absent uses the default.')
+  "frameWidth": zod.number().nullish().describe('The frame thickness in pixels when frameStyle is \"custom\". Null or absent uses the default.'),
+  "videoSource": zod.union([zod.literal('uploads'),zod.literal('urls'),zod.literal('youtube'),zod.literal('plex'),zod.literal('jellyfin'),zod.literal(null)]).nullish().describe('Where a Video Player tile\'s videos come from: \"uploads\" (video files from the upload library), \"urls\" (a pasted list of direct video file URLs), \"youtube\" (a YouTube video\/playlist embed), \"plex\" or \"jellyfin\" (a library on the connected media server). Null or absent means unconfigured — the tile plays the built-in yule log stream.'),
+  "videoUploadUrls": zod.array(zod.string()).nullish().describe('The uploaded videos (their \/api\/uploads\/files\/... URLs) a Video Player tile plays when videoSource is \"uploads\".'),
+  "videoUrls": zod.array(zod.string()).nullish().describe('The direct video file URLs a Video Player tile plays (in order) when videoSource is \"urls\".'),
+  "videoYoutubeUrl": zod.string().nullish().describe('The YouTube video or playlist URL a Video Player tile embeds when videoSource is \"youtube\".'),
+  "videoLibraryId": zod.string().nullish().describe('The selected library\/collection id for a media-server videoSource (\"plex\" or \"jellyfin\"). Null or absent means no library chosen.'),
+  "videoPlayMode": zod.union([zod.literal('single'),zod.literal('playlist'),zod.literal(null)]).nullish().describe('\"single\" loops the first (or only) video forever; \"playlist\" plays through the list, advancing on end. Null or absent uses playlist.'),
+  "videoPlaylistLoop": zod.boolean().nullish().describe('Whether a Video Player tile restarts the playlist after the last video ends (playlist mode). Null or absent defaults to true.'),
+  "videoShuffle": zod.boolean().nullish().describe('Whether a Video Player tile shuffles the playlist order (playlist mode). Null or absent defaults to false.'),
+  "videoMuted": zod.boolean().nullish().describe('Whether a Video Player tile starts muted. Null or absent defaults to true (autoplay-safe).'),
+  "videoFit": zod.union([zod.literal('cover'),zod.literal('contain'),zod.literal(null)]).nullish().describe('How a Video Player tile scales its video: \"cover\" (fill, crop) or \"contain\" (letterbox, whole frame). Null or absent uses cover.')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.'),
   "createdAt": zod.string().optional()
 })
@@ -467,7 +497,7 @@ export const UpdateTileParams = zod.object({
 })
 
 export const UpdateTileBody = zod.object({
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('pterodactyl'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('email'),zod.literal('calendar'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal('bonsai'),zod.literal('aquarium'),zod.literal('visualizer'),zod.literal('pictureframe'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('pterodactyl'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('email'),zod.literal('calendar'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal('bonsai'),zod.literal('aquarium'),zod.literal('visualizer'),zod.literal('pictureframe'),zod.literal('videoplayer'),zod.literal(null)]).nullish(),
   "gridX": zod.number().optional(),
   "gridY": zod.number().optional(),
   "gridW": zod.number().optional(),
@@ -583,7 +613,17 @@ export const UpdateTileBody = zod.object({
   "photoFit": zod.union([zod.literal('cover'),zod.literal('contain'),zod.literal(null)]).nullish().describe('How a Picture Frame tile scales its photos: \"cover\" (fill, crop) or \"contain\" (letterbox, whole image). Null or absent uses cover.'),
   "frameStyle": zod.union([zod.literal('none'),zod.literal('wood'),zod.literal('thin'),zod.literal('gold'),zod.literal('polaroid'),zod.literal('custom'),zod.literal(null)]).nullish().describe('A Picture Frame tile\'s decorative frame: \"none\", \"wood\", \"thin\", \"gold\", \"polaroid\", or \"custom\" (uses frameColor\/frameWidth). Null or absent means no frame.'),
   "frameColor": zod.string().nullish().describe('The frame color (#hex) when frameStyle is \"custom\". Null or absent uses a neutral default.'),
-  "frameWidth": zod.number().nullish().describe('The frame thickness in pixels when frameStyle is \"custom\". Null or absent uses the default.')
+  "frameWidth": zod.number().nullish().describe('The frame thickness in pixels when frameStyle is \"custom\". Null or absent uses the default.'),
+  "videoSource": zod.union([zod.literal('uploads'),zod.literal('urls'),zod.literal('youtube'),zod.literal('plex'),zod.literal('jellyfin'),zod.literal(null)]).nullish().describe('Where a Video Player tile\'s videos come from: \"uploads\" (video files from the upload library), \"urls\" (a pasted list of direct video file URLs), \"youtube\" (a YouTube video\/playlist embed), \"plex\" or \"jellyfin\" (a library on the connected media server). Null or absent means unconfigured — the tile plays the built-in yule log stream.'),
+  "videoUploadUrls": zod.array(zod.string()).nullish().describe('The uploaded videos (their \/api\/uploads\/files\/... URLs) a Video Player tile plays when videoSource is \"uploads\".'),
+  "videoUrls": zod.array(zod.string()).nullish().describe('The direct video file URLs a Video Player tile plays (in order) when videoSource is \"urls\".'),
+  "videoYoutubeUrl": zod.string().nullish().describe('The YouTube video or playlist URL a Video Player tile embeds when videoSource is \"youtube\".'),
+  "videoLibraryId": zod.string().nullish().describe('The selected library\/collection id for a media-server videoSource (\"plex\" or \"jellyfin\"). Null or absent means no library chosen.'),
+  "videoPlayMode": zod.union([zod.literal('single'),zod.literal('playlist'),zod.literal(null)]).nullish().describe('\"single\" loops the first (or only) video forever; \"playlist\" plays through the list, advancing on end. Null or absent uses playlist.'),
+  "videoPlaylistLoop": zod.boolean().nullish().describe('Whether a Video Player tile restarts the playlist after the last video ends (playlist mode). Null or absent defaults to true.'),
+  "videoShuffle": zod.boolean().nullish().describe('Whether a Video Player tile shuffles the playlist order (playlist mode). Null or absent defaults to false.'),
+  "videoMuted": zod.boolean().nullish().describe('Whether a Video Player tile starts muted. Null or absent defaults to true (autoplay-safe).'),
+  "videoFit": zod.union([zod.literal('cover'),zod.literal('contain'),zod.literal(null)]).nullish().describe('How a Video Player tile scales its video: \"cover\" (fill, crop) or \"contain\" (letterbox, whole frame). Null or absent uses cover.')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.')
 })
 
@@ -592,7 +632,7 @@ export const UpdateTileResponse = zod.object({
   "userId": zod.number(),
   "pageId": zod.number().nullish().describe('The page this tile belongs to. Null only for tiles that predate the multi-page migration and could not be assigned a page.'),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'lidarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('pterodactyl'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('email'),zod.literal('calendar'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal('bonsai'),zod.literal('aquarium'),zod.literal('visualizer'),zod.literal('pictureframe'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('pterodactyl'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('email'),zod.literal('calendar'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal('bonsai'),zod.literal('aquarium'),zod.literal('visualizer'),zod.literal('pictureframe'),zod.literal('videoplayer'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -708,7 +748,17 @@ export const UpdateTileResponse = zod.object({
   "photoFit": zod.union([zod.literal('cover'),zod.literal('contain'),zod.literal(null)]).nullish().describe('How a Picture Frame tile scales its photos: \"cover\" (fill, crop) or \"contain\" (letterbox, whole image). Null or absent uses cover.'),
   "frameStyle": zod.union([zod.literal('none'),zod.literal('wood'),zod.literal('thin'),zod.literal('gold'),zod.literal('polaroid'),zod.literal('custom'),zod.literal(null)]).nullish().describe('A Picture Frame tile\'s decorative frame: \"none\", \"wood\", \"thin\", \"gold\", \"polaroid\", or \"custom\" (uses frameColor\/frameWidth). Null or absent means no frame.'),
   "frameColor": zod.string().nullish().describe('The frame color (#hex) when frameStyle is \"custom\". Null or absent uses a neutral default.'),
-  "frameWidth": zod.number().nullish().describe('The frame thickness in pixels when frameStyle is \"custom\". Null or absent uses the default.')
+  "frameWidth": zod.number().nullish().describe('The frame thickness in pixels when frameStyle is \"custom\". Null or absent uses the default.'),
+  "videoSource": zod.union([zod.literal('uploads'),zod.literal('urls'),zod.literal('youtube'),zod.literal('plex'),zod.literal('jellyfin'),zod.literal(null)]).nullish().describe('Where a Video Player tile\'s videos come from: \"uploads\" (video files from the upload library), \"urls\" (a pasted list of direct video file URLs), \"youtube\" (a YouTube video\/playlist embed), \"plex\" or \"jellyfin\" (a library on the connected media server). Null or absent means unconfigured — the tile plays the built-in yule log stream.'),
+  "videoUploadUrls": zod.array(zod.string()).nullish().describe('The uploaded videos (their \/api\/uploads\/files\/... URLs) a Video Player tile plays when videoSource is \"uploads\".'),
+  "videoUrls": zod.array(zod.string()).nullish().describe('The direct video file URLs a Video Player tile plays (in order) when videoSource is \"urls\".'),
+  "videoYoutubeUrl": zod.string().nullish().describe('The YouTube video or playlist URL a Video Player tile embeds when videoSource is \"youtube\".'),
+  "videoLibraryId": zod.string().nullish().describe('The selected library\/collection id for a media-server videoSource (\"plex\" or \"jellyfin\"). Null or absent means no library chosen.'),
+  "videoPlayMode": zod.union([zod.literal('single'),zod.literal('playlist'),zod.literal(null)]).nullish().describe('\"single\" loops the first (or only) video forever; \"playlist\" plays through the list, advancing on end. Null or absent uses playlist.'),
+  "videoPlaylistLoop": zod.boolean().nullish().describe('Whether a Video Player tile restarts the playlist after the last video ends (playlist mode). Null or absent defaults to true.'),
+  "videoShuffle": zod.boolean().nullish().describe('Whether a Video Player tile shuffles the playlist order (playlist mode). Null or absent defaults to false.'),
+  "videoMuted": zod.boolean().nullish().describe('Whether a Video Player tile starts muted. Null or absent defaults to true (autoplay-safe).'),
+  "videoFit": zod.union([zod.literal('cover'),zod.literal('contain'),zod.literal(null)]).nullish().describe('How a Video Player tile scales its video: \"cover\" (fill, crop) or \"contain\" (letterbox, whole frame). Null or absent uses cover.')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.'),
   "createdAt": zod.string().optional()
 })
@@ -741,7 +791,7 @@ export const SaveLayoutResponseItem = zod.object({
   "userId": zod.number(),
   "pageId": zod.number().nullish().describe('The page this tile belongs to. Null only for tiles that predate the multi-page migration and could not be assigned a page.'),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'lidarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('pterodactyl'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('email'),zod.literal('calendar'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal('bonsai'),zod.literal('aquarium'),zod.literal('visualizer'),zod.literal('pictureframe'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('pterodactyl'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('email'),zod.literal('calendar'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal('bonsai'),zod.literal('aquarium'),zod.literal('visualizer'),zod.literal('pictureframe'),zod.literal('videoplayer'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -857,7 +907,17 @@ export const SaveLayoutResponseItem = zod.object({
   "photoFit": zod.union([zod.literal('cover'),zod.literal('contain'),zod.literal(null)]).nullish().describe('How a Picture Frame tile scales its photos: \"cover\" (fill, crop) or \"contain\" (letterbox, whole image). Null or absent uses cover.'),
   "frameStyle": zod.union([zod.literal('none'),zod.literal('wood'),zod.literal('thin'),zod.literal('gold'),zod.literal('polaroid'),zod.literal('custom'),zod.literal(null)]).nullish().describe('A Picture Frame tile\'s decorative frame: \"none\", \"wood\", \"thin\", \"gold\", \"polaroid\", or \"custom\" (uses frameColor\/frameWidth). Null or absent means no frame.'),
   "frameColor": zod.string().nullish().describe('The frame color (#hex) when frameStyle is \"custom\". Null or absent uses a neutral default.'),
-  "frameWidth": zod.number().nullish().describe('The frame thickness in pixels when frameStyle is \"custom\". Null or absent uses the default.')
+  "frameWidth": zod.number().nullish().describe('The frame thickness in pixels when frameStyle is \"custom\". Null or absent uses the default.'),
+  "videoSource": zod.union([zod.literal('uploads'),zod.literal('urls'),zod.literal('youtube'),zod.literal('plex'),zod.literal('jellyfin'),zod.literal(null)]).nullish().describe('Where a Video Player tile\'s videos come from: \"uploads\" (video files from the upload library), \"urls\" (a pasted list of direct video file URLs), \"youtube\" (a YouTube video\/playlist embed), \"plex\" or \"jellyfin\" (a library on the connected media server). Null or absent means unconfigured — the tile plays the built-in yule log stream.'),
+  "videoUploadUrls": zod.array(zod.string()).nullish().describe('The uploaded videos (their \/api\/uploads\/files\/... URLs) a Video Player tile plays when videoSource is \"uploads\".'),
+  "videoUrls": zod.array(zod.string()).nullish().describe('The direct video file URLs a Video Player tile plays (in order) when videoSource is \"urls\".'),
+  "videoYoutubeUrl": zod.string().nullish().describe('The YouTube video or playlist URL a Video Player tile embeds when videoSource is \"youtube\".'),
+  "videoLibraryId": zod.string().nullish().describe('The selected library\/collection id for a media-server videoSource (\"plex\" or \"jellyfin\"). Null or absent means no library chosen.'),
+  "videoPlayMode": zod.union([zod.literal('single'),zod.literal('playlist'),zod.literal(null)]).nullish().describe('\"single\" loops the first (or only) video forever; \"playlist\" plays through the list, advancing on end. Null or absent uses playlist.'),
+  "videoPlaylistLoop": zod.boolean().nullish().describe('Whether a Video Player tile restarts the playlist after the last video ends (playlist mode). Null or absent defaults to true.'),
+  "videoShuffle": zod.boolean().nullish().describe('Whether a Video Player tile shuffles the playlist order (playlist mode). Null or absent defaults to false.'),
+  "videoMuted": zod.boolean().nullish().describe('Whether a Video Player tile starts muted. Null or absent defaults to true (autoplay-safe).'),
+  "videoFit": zod.union([zod.literal('cover'),zod.literal('contain'),zod.literal(null)]).nullish().describe('How a Video Player tile scales its video: \"cover\" (fill, crop) or \"contain\" (letterbox, whole frame). Null or absent uses cover.')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.'),
   "createdAt": zod.string().optional()
 })
@@ -1069,7 +1129,17 @@ export const ExportAllPagesResponse = zod.object({
   "photoFit": zod.union([zod.literal('cover'),zod.literal('contain'),zod.literal(null)]).nullish().describe('How a Picture Frame tile scales its photos: \"cover\" (fill, crop) or \"contain\" (letterbox, whole image). Null or absent uses cover.'),
   "frameStyle": zod.union([zod.literal('none'),zod.literal('wood'),zod.literal('thin'),zod.literal('gold'),zod.literal('polaroid'),zod.literal('custom'),zod.literal(null)]).nullish().describe('A Picture Frame tile\'s decorative frame: \"none\", \"wood\", \"thin\", \"gold\", \"polaroid\", or \"custom\" (uses frameColor\/frameWidth). Null or absent means no frame.'),
   "frameColor": zod.string().nullish().describe('The frame color (#hex) when frameStyle is \"custom\". Null or absent uses a neutral default.'),
-  "frameWidth": zod.number().nullish().describe('The frame thickness in pixels when frameStyle is \"custom\". Null or absent uses the default.')
+  "frameWidth": zod.number().nullish().describe('The frame thickness in pixels when frameStyle is \"custom\". Null or absent uses the default.'),
+  "videoSource": zod.union([zod.literal('uploads'),zod.literal('urls'),zod.literal('youtube'),zod.literal('plex'),zod.literal('jellyfin'),zod.literal(null)]).nullish().describe('Where a Video Player tile\'s videos come from: \"uploads\" (video files from the upload library), \"urls\" (a pasted list of direct video file URLs), \"youtube\" (a YouTube video\/playlist embed), \"plex\" or \"jellyfin\" (a library on the connected media server). Null or absent means unconfigured — the tile plays the built-in yule log stream.'),
+  "videoUploadUrls": zod.array(zod.string()).nullish().describe('The uploaded videos (their \/api\/uploads\/files\/... URLs) a Video Player tile plays when videoSource is \"uploads\".'),
+  "videoUrls": zod.array(zod.string()).nullish().describe('The direct video file URLs a Video Player tile plays (in order) when videoSource is \"urls\".'),
+  "videoYoutubeUrl": zod.string().nullish().describe('The YouTube video or playlist URL a Video Player tile embeds when videoSource is \"youtube\".'),
+  "videoLibraryId": zod.string().nullish().describe('The selected library\/collection id for a media-server videoSource (\"plex\" or \"jellyfin\"). Null or absent means no library chosen.'),
+  "videoPlayMode": zod.union([zod.literal('single'),zod.literal('playlist'),zod.literal(null)]).nullish().describe('\"single\" loops the first (or only) video forever; \"playlist\" plays through the list, advancing on end. Null or absent uses playlist.'),
+  "videoPlaylistLoop": zod.boolean().nullish().describe('Whether a Video Player tile restarts the playlist after the last video ends (playlist mode). Null or absent defaults to true.'),
+  "videoShuffle": zod.boolean().nullish().describe('Whether a Video Player tile shuffles the playlist order (playlist mode). Null or absent defaults to false.'),
+  "videoMuted": zod.boolean().nullish().describe('Whether a Video Player tile starts muted. Null or absent defaults to true (autoplay-safe).'),
+  "videoFit": zod.union([zod.literal('cover'),zod.literal('contain'),zod.literal(null)]).nullish().describe('How a Video Player tile scales its video: \"cover\" (fill, crop) or \"contain\" (letterbox, whole frame). Null or absent uses cover.')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.')
 }).describe('A tile inside an export envelope. Mirrors Tile but omits every identity field (id, userId, pageId, createdAt) so it can be re-imported under any user\/page. Carries no credential data — integrations are referenced by type only.'))
 }).describe('A single page within an export envelope.'))
@@ -1209,7 +1279,17 @@ export const ExportPageResponse = zod.object({
   "photoFit": zod.union([zod.literal('cover'),zod.literal('contain'),zod.literal(null)]).nullish().describe('How a Picture Frame tile scales its photos: \"cover\" (fill, crop) or \"contain\" (letterbox, whole image). Null or absent uses cover.'),
   "frameStyle": zod.union([zod.literal('none'),zod.literal('wood'),zod.literal('thin'),zod.literal('gold'),zod.literal('polaroid'),zod.literal('custom'),zod.literal(null)]).nullish().describe('A Picture Frame tile\'s decorative frame: \"none\", \"wood\", \"thin\", \"gold\", \"polaroid\", or \"custom\" (uses frameColor\/frameWidth). Null or absent means no frame.'),
   "frameColor": zod.string().nullish().describe('The frame color (#hex) when frameStyle is \"custom\". Null or absent uses a neutral default.'),
-  "frameWidth": zod.number().nullish().describe('The frame thickness in pixels when frameStyle is \"custom\". Null or absent uses the default.')
+  "frameWidth": zod.number().nullish().describe('The frame thickness in pixels when frameStyle is \"custom\". Null or absent uses the default.'),
+  "videoSource": zod.union([zod.literal('uploads'),zod.literal('urls'),zod.literal('youtube'),zod.literal('plex'),zod.literal('jellyfin'),zod.literal(null)]).nullish().describe('Where a Video Player tile\'s videos come from: \"uploads\" (video files from the upload library), \"urls\" (a pasted list of direct video file URLs), \"youtube\" (a YouTube video\/playlist embed), \"plex\" or \"jellyfin\" (a library on the connected media server). Null or absent means unconfigured — the tile plays the built-in yule log stream.'),
+  "videoUploadUrls": zod.array(zod.string()).nullish().describe('The uploaded videos (their \/api\/uploads\/files\/... URLs) a Video Player tile plays when videoSource is \"uploads\".'),
+  "videoUrls": zod.array(zod.string()).nullish().describe('The direct video file URLs a Video Player tile plays (in order) when videoSource is \"urls\".'),
+  "videoYoutubeUrl": zod.string().nullish().describe('The YouTube video or playlist URL a Video Player tile embeds when videoSource is \"youtube\".'),
+  "videoLibraryId": zod.string().nullish().describe('The selected library\/collection id for a media-server videoSource (\"plex\" or \"jellyfin\"). Null or absent means no library chosen.'),
+  "videoPlayMode": zod.union([zod.literal('single'),zod.literal('playlist'),zod.literal(null)]).nullish().describe('\"single\" loops the first (or only) video forever; \"playlist\" plays through the list, advancing on end. Null or absent uses playlist.'),
+  "videoPlaylistLoop": zod.boolean().nullish().describe('Whether a Video Player tile restarts the playlist after the last video ends (playlist mode). Null or absent defaults to true.'),
+  "videoShuffle": zod.boolean().nullish().describe('Whether a Video Player tile shuffles the playlist order (playlist mode). Null or absent defaults to false.'),
+  "videoMuted": zod.boolean().nullish().describe('Whether a Video Player tile starts muted. Null or absent defaults to true (autoplay-safe).'),
+  "videoFit": zod.union([zod.literal('cover'),zod.literal('contain'),zod.literal(null)]).nullish().describe('How a Video Player tile scales its video: \"cover\" (fill, crop) or \"contain\" (letterbox, whole frame). Null or absent uses cover.')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.')
 }).describe('A tile inside an export envelope. Mirrors Tile but omits every identity field (id, userId, pageId, createdAt) so it can be re-imported under any user\/page. Carries no credential data — integrations are referenced by type only.'))
 }).describe('A single page within an export envelope.'))
@@ -1345,7 +1425,17 @@ export const ImportPagesBody = zod.object({
   "photoFit": zod.union([zod.literal('cover'),zod.literal('contain'),zod.literal(null)]).nullish().describe('How a Picture Frame tile scales its photos: \"cover\" (fill, crop) or \"contain\" (letterbox, whole image). Null or absent uses cover.'),
   "frameStyle": zod.union([zod.literal('none'),zod.literal('wood'),zod.literal('thin'),zod.literal('gold'),zod.literal('polaroid'),zod.literal('custom'),zod.literal(null)]).nullish().describe('A Picture Frame tile\'s decorative frame: \"none\", \"wood\", \"thin\", \"gold\", \"polaroid\", or \"custom\" (uses frameColor\/frameWidth). Null or absent means no frame.'),
   "frameColor": zod.string().nullish().describe('The frame color (#hex) when frameStyle is \"custom\". Null or absent uses a neutral default.'),
-  "frameWidth": zod.number().nullish().describe('The frame thickness in pixels when frameStyle is \"custom\". Null or absent uses the default.')
+  "frameWidth": zod.number().nullish().describe('The frame thickness in pixels when frameStyle is \"custom\". Null or absent uses the default.'),
+  "videoSource": zod.union([zod.literal('uploads'),zod.literal('urls'),zod.literal('youtube'),zod.literal('plex'),zod.literal('jellyfin'),zod.literal(null)]).nullish().describe('Where a Video Player tile\'s videos come from: \"uploads\" (video files from the upload library), \"urls\" (a pasted list of direct video file URLs), \"youtube\" (a YouTube video\/playlist embed), \"plex\" or \"jellyfin\" (a library on the connected media server). Null or absent means unconfigured — the tile plays the built-in yule log stream.'),
+  "videoUploadUrls": zod.array(zod.string()).nullish().describe('The uploaded videos (their \/api\/uploads\/files\/... URLs) a Video Player tile plays when videoSource is \"uploads\".'),
+  "videoUrls": zod.array(zod.string()).nullish().describe('The direct video file URLs a Video Player tile plays (in order) when videoSource is \"urls\".'),
+  "videoYoutubeUrl": zod.string().nullish().describe('The YouTube video or playlist URL a Video Player tile embeds when videoSource is \"youtube\".'),
+  "videoLibraryId": zod.string().nullish().describe('The selected library\/collection id for a media-server videoSource (\"plex\" or \"jellyfin\"). Null or absent means no library chosen.'),
+  "videoPlayMode": zod.union([zod.literal('single'),zod.literal('playlist'),zod.literal(null)]).nullish().describe('\"single\" loops the first (or only) video forever; \"playlist\" plays through the list, advancing on end. Null or absent uses playlist.'),
+  "videoPlaylistLoop": zod.boolean().nullish().describe('Whether a Video Player tile restarts the playlist after the last video ends (playlist mode). Null or absent defaults to true.'),
+  "videoShuffle": zod.boolean().nullish().describe('Whether a Video Player tile shuffles the playlist order (playlist mode). Null or absent defaults to false.'),
+  "videoMuted": zod.boolean().nullish().describe('Whether a Video Player tile starts muted. Null or absent defaults to true (autoplay-safe).'),
+  "videoFit": zod.union([zod.literal('cover'),zod.literal('contain'),zod.literal(null)]).nullish().describe('How a Video Player tile scales its video: \"cover\" (fill, crop) or \"contain\" (letterbox, whole frame). Null or absent uses cover.')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.')
 }).describe('A tile inside an export envelope. Mirrors Tile but omits every identity field (id, userId, pageId, createdAt) so it can be re-imported under any user\/page. Carries no credential data — integrations are referenced by type only.'))
 }).describe('A single page within an export envelope.'))
@@ -1683,6 +1773,42 @@ export const GetPhotosWidgetResponse = zod.object({
   "photos": zod.array(zod.object({
   "id": zod.string().describe('Source-side photo identifier.'),
   "url": zod.string().describe('URL the tile loads the image from. For server-backed sources this is an authenticated API proxy path (fetched with the bearer token and rendered via an object URL), never a raw upstream URL.')
+}))
+})
+
+
+/**
+ * @summary List video libraries from a connected media server (Plex or Jellyfin)
+ */
+export const GetVideoLibrariesQueryParams = zod.object({
+  "server": zod.enum(['plex', 'jellyfin']).describe('Which media server to list video libraries from. \"plex\" uses the saved Plex connection; \"jellyfin\" the saved Jellyfin connection.')
+})
+
+export const GetVideoLibrariesResponse = zod.object({
+  "sample": zod.boolean().nullish().describe('True when the media server is not connected; libraries is empty and the tile stays on its built-in default video.'),
+  "libraries": zod.array(zod.object({
+  "id": zod.string().describe('Server-side library\/section identifier.'),
+  "title": zod.string().describe('The library\'s display name.'),
+  "kind": zod.string().nullish().describe('The library\'s content kind when the server reports it (e.g. movies, shows).')
+}))
+})
+
+
+/**
+ * @summary Get a normalized, direct-playable video playlist for the Video Player tile
+ */
+export const GetVideoPlaylistQueryParams = zod.object({
+  "server": zod.enum(['plex', 'jellyfin']).describe('Which media server backs the playlist.'),
+  "libraryId": zod.coerce.string().optional().describe('The library to list. Required once the server is connected.')
+})
+
+export const GetVideoPlaylistResponse = zod.object({
+  "sample": zod.boolean().nullish().describe('True when the media server is not connected; videos is empty and the tile plays its built-in default instead.'),
+  "videos": zod.array(zod.object({
+  "id": zod.string().describe('Server-side item identifier.'),
+  "title": zod.string().describe('The video\'s display title.'),
+  "streamUrl": zod.string().describe('A direct-play URL the browser\'s <video> element can load. Carries the media server\'s own auth token as a query parameter.'),
+  "durationMs": zod.number().nullish().describe('Runtime in milliseconds when known.')
 }))
 })
 

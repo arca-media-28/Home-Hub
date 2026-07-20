@@ -824,6 +824,77 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /widgets/videoplayer/libraries:
+    get:
+      operationId: getVideoLibraries
+      tags: [widgets]
+      summary: List video libraries from a connected media server (Plex or Jellyfin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: server
+          in: query
+          required: true
+          description: >-
+            Which media server to list video libraries from. "plex" uses the
+            saved Plex connection; "jellyfin" the saved Jellyfin connection.
+          schema:
+            type: string
+            enum: [plex, jellyfin]
+      responses:
+        "200":
+          description: >-
+            The server's movie/TV libraries, or sample:true with an empty list
+            when the server is not connected.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VideoLibrariesData"
+        "502":
+          description: The configured media server could not be reached
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /widgets/videoplayer:
+    get:
+      operationId: getVideoPlaylist
+      tags: [widgets]
+      summary: Get a normalized, direct-playable video playlist for the Video Player tile
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: server
+          in: query
+          required: true
+          description: Which media server backs the playlist.
+          schema:
+            type: string
+            enum: [plex, jellyfin]
+        - name: libraryId
+          in: query
+          required: false
+          description: The library to list. Required once the server is connected.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: >-
+            The library's videos with direct-play stream URLs, or sample:true
+            with an empty list when the server is not connected (the tile then
+            plays its built-in default).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VideoPlaylistData"
+        "502":
+          description: The configured media server could not be reached
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /widgets/audioplayer:
     get:
       operationId: getAudioPlayerNowPlaying
@@ -2057,7 +2128,7 @@ components:
           enum: [app, truenas, media, sonarr, radarr, lidarr, qbittorrent]
         integration:
           type: ["string", "null"]
-          enum: [truenas, media, jellyfin, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, pterodactyl, tailscale, ersatztv, audioplayer, clock, timer, weather, sports, news, stocks, sleeper, email, calendar, note, spacer, divider, eightball, dice, coinflip, fortune, tamagotchi, bonsai, aquarium, visualizer, pictureframe, null]
+          enum: [truenas, media, jellyfin, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, pterodactyl, tailscale, ersatztv, audioplayer, clock, timer, weather, sports, news, stocks, sleeper, email, calendar, note, spacer, divider, eightball, dice, coinflip, fortune, tamagotchi, bonsai, aquarium, visualizer, pictureframe, videoplayer, null]
         gridX:
           type: integer
         gridY:
@@ -2141,7 +2212,7 @@ components:
           enum: [app, truenas, media, sonarr, radarr, lidarr, qbittorrent]
         integration:
           type: ["string", "null"]
-          enum: [truenas, media, jellyfin, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, pterodactyl, tailscale, ersatztv, audioplayer, clock, timer, weather, sports, news, stocks, sleeper, email, calendar, note, spacer, divider, eightball, dice, coinflip, fortune, tamagotchi, bonsai, aquarium, visualizer, pictureframe, null]
+          enum: [truenas, media, jellyfin, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, pterodactyl, tailscale, ersatztv, audioplayer, clock, timer, weather, sports, news, stocks, sleeper, email, calendar, note, spacer, divider, eightball, dice, coinflip, fortune, tamagotchi, bonsai, aquarium, visualizer, pictureframe, videoplayer, null]
         gridX:
           type: integer
         gridY:
@@ -2184,7 +2255,7 @@ components:
       properties:
         integration:
           type: ["string", "null"]
-          enum: [truenas, media, jellyfin, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, pterodactyl, tailscale, ersatztv, audioplayer, clock, timer, weather, sports, news, stocks, sleeper, email, calendar, note, spacer, divider, eightball, dice, coinflip, fortune, tamagotchi, bonsai, aquarium, visualizer, pictureframe, null]
+          enum: [truenas, media, jellyfin, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, pterodactyl, tailscale, ersatztv, audioplayer, clock, timer, weather, sports, news, stocks, sleeper, email, calendar, note, spacer, divider, eightball, dice, coinflip, fortune, tamagotchi, bonsai, aquarium, visualizer, pictureframe, videoplayer, null]
         gridX:
           type: integer
         gridY:
@@ -2800,6 +2871,67 @@ components:
             The frame thickness in pixels when frameStyle is "custom". Null or
             absent uses the default.
           type: ["number", "null"]
+        videoSource:
+          description: >-
+            Where a Video Player tile's videos come from: "uploads" (video
+            files from the upload library), "urls" (a pasted list of direct
+            video file URLs), "youtube" (a YouTube video/playlist embed),
+            "plex" or "jellyfin" (a library on the connected media server).
+            Null or absent means unconfigured — the tile plays the built-in
+            yule log stream.
+          type: ["string", "null"]
+          enum: ["uploads", "urls", "youtube", "plex", "jellyfin", null]
+        videoUploadUrls:
+          description: >-
+            The uploaded videos (their /api/uploads/files/... URLs) a Video
+            Player tile plays when videoSource is "uploads".
+          type: ["array", "null"]
+          items:
+            type: string
+        videoUrls:
+          description: >-
+            The direct video file URLs a Video Player tile plays (in order)
+            when videoSource is "urls".
+          type: ["array", "null"]
+          items:
+            type: string
+        videoYoutubeUrl:
+          description: >-
+            The YouTube video or playlist URL a Video Player tile embeds when
+            videoSource is "youtube".
+          type: ["string", "null"]
+        videoLibraryId:
+          description: >-
+            The selected library/collection id for a media-server videoSource
+            ("plex" or "jellyfin"). Null or absent means no library chosen.
+          type: ["string", "null"]
+        videoPlayMode:
+          description: >-
+            "single" loops the first (or only) video forever; "playlist" plays
+            through the list, advancing on end. Null or absent uses playlist.
+          type: ["string", "null"]
+          enum: ["single", "playlist", null]
+        videoPlaylistLoop:
+          description: >-
+            Whether a Video Player tile restarts the playlist after the last
+            video ends (playlist mode). Null or absent defaults to true.
+          type: ["boolean", "null"]
+        videoShuffle:
+          description: >-
+            Whether a Video Player tile shuffles the playlist order (playlist
+            mode). Null or absent defaults to false.
+          type: ["boolean", "null"]
+        videoMuted:
+          description: >-
+            Whether a Video Player tile starts muted. Null or absent defaults
+            to true (autoplay-safe).
+          type: ["boolean", "null"]
+        videoFit:
+          description: >-
+            How a Video Player tile scales its video: "cover" (fill, crop) or
+            "contain" (letterbox, whole frame). Null or absent uses cover.
+          type: ["string", "null"]
+          enum: ["cover", "contain", null]
 
     NoteChecklistItem:
       type: object
@@ -4383,6 +4515,67 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/PhotoItem"
+
+    VideoLibrary:
+      type: object
+      required: [id, title]
+      properties:
+        id:
+          description: Server-side library/section identifier.
+          type: string
+        title:
+          description: The library's display name.
+          type: string
+        kind:
+          description: The library's content kind when the server reports it (e.g. movies, shows).
+          type: ["string", "null"]
+
+    VideoLibrariesData:
+      type: object
+      required: [libraries]
+      properties:
+        sample:
+          description: >-
+            True when the media server is not connected; libraries is empty
+            and the tile stays on its built-in default video.
+          type: ["boolean", "null"]
+        libraries:
+          type: array
+          items:
+            $ref: "#/components/schemas/VideoLibrary"
+
+    VideoItem:
+      type: object
+      required: [id, title, streamUrl]
+      properties:
+        id:
+          description: Server-side item identifier.
+          type: string
+        title:
+          description: The video's display title.
+          type: string
+        streamUrl:
+          description: >-
+            A direct-play URL the browser's <video> element can load. Carries
+            the media server's own auth token as a query parameter.
+          type: string
+        durationMs:
+          description: Runtime in milliseconds when known.
+          type: ["number", "null"]
+
+    VideoPlaylistData:
+      type: object
+      required: [videos]
+      properties:
+        sample:
+          description: >-
+            True when the media server is not connected; videos is empty and
+            the tile plays its built-in default instead.
+          type: ["boolean", "null"]
+        videos:
+          type: array
+          items:
+            $ref: "#/components/schemas/VideoItem"
 
     AudioTrack:
       type: object
