@@ -248,6 +248,108 @@ test("a configured video URL that fails to load shows the error state, not the y
   await expect(tileEl.getByTestId("videoplayer-video")).toHaveCount(0);
 });
 
+test("seek bar shows time/duration and dragging it seeks the video", async ({ page }) => {
+  const { token, authHeaders } = await register(page);
+
+  const res = await page.request.post("/api/tiles", {
+    data: {
+      type: "integration",
+      integration: "videoplayer",
+      name: "",
+      gridX: 0,
+      gridY: 0,
+      gridW: 6,
+      gridH: 5,
+      tileSettings: {
+        videoSource: "urls",
+        videoUrls: ["https://example.com/seek-clip.mp4"],
+        videoPlayMode: "single",
+        videoMuted: true,
+      },
+    },
+    headers: authHeaders,
+  });
+  expect(res.ok(), `tile create failed: ${res.status()}`).toBeTruthy();
+
+  // Serve the mp4 WITH range-request support — Chromium marks media
+  // unseekable when the server ignores Range headers.
+  await page.route("https://example.com/**", (route) => {
+    const range = route.request().headers()["range"];
+    const m = range?.match(/bytes=(\d+)-(\d*)/);
+    if (m) {
+      const start = Number(m[1]);
+      const end = m[2] ? Math.min(Number(m[2]), TINY_MP4.length - 1) : TINY_MP4.length - 1;
+      return route.fulfill({
+        status: 206,
+        contentType: "video/mp4",
+        headers: {
+          "Accept-Ranges": "bytes",
+          "Content-Range": `bytes ${start}-${end}/${TINY_MP4.length}`,
+        },
+        body: TINY_MP4.subarray(start, end + 1),
+      });
+    }
+    return route.fulfill({
+      status: 200,
+      contentType: "video/mp4",
+      headers: { "Accept-Ranges": "bytes" },
+      body: TINY_MP4,
+    });
+  });
+
+  await page.addInitScript((t) => localStorage.setItem("token", t), token);
+  await page.goto("/");
+
+  const tileEl = page.getByTestId("videoplayer-tile");
+  await expect(tileEl).toBeVisible();
+  const video = tileEl.getByTestId("videoplayer-video");
+  await expect(video).toBeAttached();
+
+  // Pause first so playback doesn't race the assertions (2s clip).
+  await tileEl.hover();
+  await tileEl.getByTestId("videoplayer-playpause").click();
+  await expect
+    .poll(async () => video.evaluate((el) => (el as HTMLVideoElement).paused))
+    .toBe(true);
+
+  // Once metadata is loaded the duration label shows the clip length and
+  // the seek bar's max matches it.
+  await tileEl.hover();
+  const seek = tileEl.getByTestId("videoplayer-seek");
+  await expect(seek).toBeVisible();
+  await expect.poll(async () => seek.getAttribute("max").then(Number)).toBeGreaterThan(1);
+  await expect(tileEl.getByTestId("videoplayer-time-duration")).toContainText("0:0");
+
+  // Drag the seek bar to ~1s: the <video> currentTime follows, and the
+  // current-time label leaves 0:00... (sub-minute so still "0:0x", check
+  // the element's currentTime directly instead).
+  await seek.evaluate((el) => {
+    const input = el as HTMLInputElement;
+    const setter = Object.getOwnPropertyDescriptor(
+      window.HTMLInputElement.prototype,
+      "value",
+    )!.set!;
+    setter.call(input, "1");
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await expect
+    .poll(async () => video.evaluate((el) => (el as HTMLVideoElement).currentTime))
+    .toBeGreaterThanOrEqual(0.9);
+
+  // The saved resume position tracks the seek: reload and the video
+  // resumes near the sought timestamp.
+  await page.reload();
+  await expect(tileEl).toBeVisible();
+  const videoAfterReload = tileEl.getByTestId("videoplayer-video");
+  await expect(videoAfterReload).toBeAttached();
+  await expect
+    .poll(async () =>
+      videoAfterReload.evaluate((el) => (el as HTMLVideoElement).currentTime),
+    )
+    .toBeGreaterThanOrEqual(0.9);
+});
+
 test("video playback position and playlist spot survive switching dashboard pages", async ({
   page,
 }) => {

@@ -99,9 +99,23 @@ function shuffled<T>(list: T[]): T[] {
   return out;
 }
 
+// mm:ss (or h:mm:ss) for the seek bar's time labels.
+export function formatClock(seconds: number): string {
+  if (!Number.isFinite(seconds) || seconds < 0) return "0:00";
+  const total = Math.floor(seconds);
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  return h > 0
+    ? `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`
+    : `${m}:${String(s).padStart(2, "0")}`;
+}
+
 function fileTitle(url: string): string {
   try {
-    const path = decodeURIComponent(new URL(url, window.location.origin).pathname);
+    const path = decodeURIComponent(
+      new URL(url, window.location.origin).pathname,
+    );
     const base = path.split("/").pop() ?? url;
     return base.replace(/\.[a-z0-9]+$/i, "") || url;
   } catch {
@@ -152,10 +166,13 @@ function readPlaybackStore(): Record<string, StoredPlaybackMemory> {
     const raw = localStorage.getItem(PLAYBACK_STORAGE_KEY);
     if (!raw) return {};
     const parsed: unknown = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
+      return {};
     const now = Date.now();
     const store: Record<string, StoredPlaybackMemory> = {};
-    for (const [tileId, entry] of Object.entries(parsed as Record<string, unknown>)) {
+    for (const [tileId, entry] of Object.entries(
+      parsed as Record<string, unknown>,
+    )) {
       const e = entry as Partial<StoredPlaybackMemory> | null;
       if (
         !e ||
@@ -217,7 +234,10 @@ function sameUrls(a: string[], b: string[]): boolean {
   return a.length === b.length && a.every((url, i) => url === b[i]);
 }
 
-export default function VideoPlayerTile({ tile, editMode }: VideoPlayerTileProps) {
+export default function VideoPlayerTile({
+  tile,
+  editMode,
+}: VideoPlayerTileProps) {
   const s = tile.tileSettings ?? {};
   const source = s.videoSource ?? null;
   const playMode = s.videoPlayMode === "single" ? "single" : "playlist";
@@ -229,7 +249,9 @@ export default function VideoPlayerTile({ tile, editMode }: VideoPlayerTileProps
   const isServerSource = source === "plex" || source === "jellyfin";
   const libraryId = s.videoLibraryId ?? null;
   const serverParams = {
-    server: (source === "jellyfin" ? "jellyfin" : "plex") as "plex" | "jellyfin",
+    server: (source === "jellyfin" ? "jellyfin" : "plex") as
+      | "plex"
+      | "jellyfin",
     libraryId: libraryId ?? undefined,
   };
   const playlistQuery = useGetVideoPlaylist(serverParams, {
@@ -248,14 +270,20 @@ export default function VideoPlayerTile({ tile, editMode }: VideoPlayerTileProps
     demo: boolean;
     failed: boolean;
   } => {
-    const yule: VideoEntry[] = [{ id: "yule-log", title: "Yule log", url: YULE_LOG_URL }];
+    const yule: VideoEntry[] = [
+      { id: "yule-log", title: "Yule log", url: YULE_LOG_URL },
+    ];
     if (source === "uploads" || source === "urls") {
-      const list = ((source === "uploads" ? s.videoUploadUrls : s.videoUrls) ?? []).filter(
-        Boolean,
-      );
+      const list = (
+        (source === "uploads" ? s.videoUploadUrls : s.videoUrls) ?? []
+      ).filter(Boolean);
       return list.length > 0
         ? {
-            videos: list.map((url, i) => ({ id: `${source}-${i}`, title: fileTitle(url), url })),
+            videos: list.map((url, i) => ({
+              id: `${source}-${i}`,
+              title: fileTitle(url),
+              url,
+            })),
             demo: false,
             failed: false,
           }
@@ -263,14 +291,19 @@ export default function VideoPlayerTile({ tile, editMode }: VideoPlayerTileProps
     }
     if (isServerSource) {
       if (!libraryId) return { videos: yule, demo: true, failed: false };
-      if (playlistQuery.isError) return { videos: [], demo: false, failed: true };
+      if (playlistQuery.isError)
+        return { videos: [], demo: false, failed: true };
       const data = playlistQuery.data;
       if (!data) return { videos: [], demo: false, failed: false };
       if (data.sample || data.videos.length === 0) {
         return { videos: yule, demo: true, failed: false };
       }
       return {
-        videos: data.videos.map((v) => ({ id: v.id, title: v.title, url: v.streamUrl })),
+        videos: data.videos.map((v) => ({
+          id: v.id,
+          title: v.title,
+          url: v.streamUrl,
+        })),
         demo: false,
         failed: false,
       };
@@ -298,7 +331,11 @@ export default function VideoPlayerTile({ tile, editMode }: VideoPlayerTileProps
   useEffect(() => {
     const urls = videos.map((v) => v.url);
     const saved = savedRef.current;
-    if (saved && sameUrls(saved.urls, urls) && saved.order.length === videos.length) {
+    if (
+      saved &&
+      sameUrls(saved.urls, urls) &&
+      saved.order.length === videos.length
+    ) {
       setOrder(saved.order);
       setPos(saved.pos);
       return;
@@ -331,6 +368,27 @@ export default function VideoPlayerTile({ tile, editMode }: VideoPlayerTileProps
   const current = count > 0 ? videos[currentIndex % count] : null;
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
+
+  // Seek bar state: current playback position and total duration of the
+  // active video. Kept in React state (throttled naturally by timeupdate's
+  // ~4Hz cadence) so the progress bar and time labels re-render as the
+  // video plays. Reset whenever the video URL changes (the <video> element
+  // remounts via its key).
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  useEffect(() => {
+    setCurrentTime(0);
+    setDuration(0);
+  }, [current?.url]);
+
+  function seekTo(seconds: number) {
+    const el = videoRef.current;
+    if (!el || !Number.isFinite(el.duration)) return;
+    const t = Math.min(Math.max(0, seconds), Math.max(0, el.duration - 0.1));
+    el.currentTime = t;
+    setCurrentTime(t);
+    lastTimeRef.current = t;
+  }
 
   // Keep a snapshot of the latest playback state so the unmount cleanup can
   // persist it without stale-closure issues. The timestamp is read straight
@@ -432,7 +490,9 @@ export default function VideoPlayerTile({ tile, editMode }: VideoPlayerTileProps
         data-testid="videoplayer-error"
       >
         <VideoOff className="w-5 h-5 opacity-50" />
-        <span>{mediaFailed ? "Video failed to load" : "Videos unavailable"}</span>
+        <span>
+          {mediaFailed ? "Video failed to load" : "Videos unavailable"}
+        </span>
       </div>
     );
   } else if (source === "youtube") {
@@ -455,7 +515,12 @@ export default function VideoPlayerTile({ tile, editMode }: VideoPlayerTileProps
         <span>Invalid YouTube link</span>
       </div>
     );
-  } else if (isServerSource && libraryId && !playlistQuery.data && playlistQuery.isLoading) {
+  } else if (
+    isServerSource &&
+    libraryId &&
+    !playlistQuery.data &&
+    playlistQuery.isLoading
+  ) {
     body = (
       <div className="w-full h-full flex items-center justify-center text-muted-foreground text-sm bg-black/80">
         Loading videos…
@@ -479,9 +544,15 @@ export default function VideoPlayerTile({ tile, editMode }: VideoPlayerTileProps
             loop={loopSingle}
             onTimeUpdate={(e) => {
               lastTimeRef.current = e.currentTarget.currentTime;
+              setCurrentTime(e.currentTarget.currentTime);
             }}
             onSeeked={(e) => {
               lastTimeRef.current = e.currentTarget.currentTime;
+              setCurrentTime(e.currentTarget.currentTime);
+            }}
+            onDurationChange={(e) => {
+              const d = e.currentTarget.duration;
+              setDuration(Number.isFinite(d) ? d : 0);
             }}
             onLoadedMetadata={(e) => {
               // Resume from the remembered timestamp (consumed once) when the
@@ -502,7 +573,12 @@ export default function VideoPlayerTile({ tile, editMode }: VideoPlayerTileProps
                     : saved.time;
                 }
                 savedRef.current = null;
-              } else if (!sameUrls(saved.urls, videos.map((v) => v.url))) {
+              } else if (
+                !sameUrls(
+                  saved.urls,
+                  videos.map((v) => v.url),
+                )
+              ) {
                 // Playlist changed since the memory was written — stale.
                 // Drop it from the persistent store too so it can't linger.
                 savedRef.current = null;
@@ -531,68 +607,109 @@ export default function VideoPlayerTile({ tile, editMode }: VideoPlayerTileProps
           </span>
         )}
         {!editMode && (
-          <div className="absolute inset-x-0 bottom-0 flex items-center gap-1.5 bg-gradient-to-t from-black/70 to-transparent px-2 pb-1.5 pt-5 opacity-0 transition-opacity group-hover:opacity-100">
-            {count > 1 && (
-              <button
-                type="button"
-                aria-label="Previous video"
-                data-testid="videoplayer-prev"
-                onClick={() => setPos(((pos - 1) % order.length + order.length) % order.length)}
-                className="rounded-full bg-black/40 p-1 text-white hover:bg-black/60"
+          <div className="absolute inset-x-0 bottom-0 flex flex-col gap-1 bg-gradient-to-t from-black/70 to-transparent px-2 pb-1.5 pt-6 opacity-0 transition-opacity group-hover:opacity-100">
+            <div className="flex items-center gap-1.5">
+              <span
+                className="min-w-[30px] text-right text-[10px] tabular-nums text-white/80"
+                data-testid="videoplayer-time-current"
               >
-                <SkipBack className="w-3.5 h-3.5" />
-              </button>
-            )}
-            <button
-              type="button"
-              aria-label={playing ? "Pause" : "Play"}
-              data-testid="videoplayer-playpause"
-              onClick={() => setPlaying((p) => !p)}
-              className="rounded-full bg-black/40 p-1.5 text-white hover:bg-black/60"
-            >
-              {playing ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-            </button>
-            {count > 1 && (
-              <button
-                type="button"
-                aria-label="Next video"
-                data-testid="videoplayer-next"
-                onClick={() => advance(1)}
-                className="rounded-full bg-black/40 p-1 text-white hover:bg-black/60"
-              >
-                <SkipForward className="w-3.5 h-3.5" />
-              </button>
-            )}
-            <button
-              type="button"
-              aria-label={muted ? "Unmute" : "Mute"}
-              data-testid="videoplayer-mute"
-              onClick={() => setMuted((m) => !m)}
-              className="rounded-full bg-black/40 p-1 text-white hover:bg-black/60"
-            >
-              {muted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
-            </button>
-            <input
-              type="range"
-              min={0}
-              max={1}
-              step={0.05}
-              value={muted ? 0 : volume}
-              aria-label="Volume"
-              data-testid="videoplayer-volume"
-              onChange={(e) => {
-                const v = Number(e.target.value);
-                setVolume(v);
-                if (v > 0 && muted) setMuted(false);
-                if (v === 0) setMuted(true);
-              }}
-              className="h-1 w-16 accent-white/90"
-            />
-            {current && !demo && (
-              <span className="ml-auto max-w-[45%] truncate text-[10px] text-white/80">
-                {current.title}
+                {formatClock(currentTime)}
               </span>
-            )}
+              <input
+                type="range"
+                min={0}
+                max={duration > 0 ? duration : 0}
+                step={0.1}
+                value={Math.min(currentTime, duration > 0 ? duration : 0)}
+                disabled={duration <= 0}
+                aria-label="Seek"
+                data-testid="videoplayer-seek"
+                onChange={(e) => seekTo(Number(e.target.value))}
+                className="h-1 min-w-0 flex-1 accent-white/90 disabled:opacity-40"
+              />
+              <span
+                className="min-w-[30px] text-[10px] tabular-nums text-white/60"
+                data-testid="videoplayer-time-duration"
+              >
+                {formatClock(duration)}
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              {count > 1 && (
+                <button
+                  type="button"
+                  aria-label="Previous video"
+                  data-testid="videoplayer-prev"
+                  onClick={() =>
+                    setPos(
+                      (((pos - 1) % order.length) + order.length) %
+                        order.length,
+                    )
+                  }
+                  className="rounded-full bg-black/40 p-1 text-white hover:bg-black/60"
+                >
+                  <SkipBack className="w-3.5 h-3.5" />
+                </button>
+              )}
+              <button
+                type="button"
+                aria-label={playing ? "Pause" : "Play"}
+                data-testid="videoplayer-playpause"
+                onClick={() => setPlaying((p) => !p)}
+                className="rounded-full bg-black/40 p-1.5 text-white hover:bg-black/60"
+              >
+                {playing ? (
+                  <Pause className="w-4 h-4" />
+                ) : (
+                  <Play className="w-4 h-4" />
+                )}
+              </button>
+              {count > 1 && (
+                <button
+                  type="button"
+                  aria-label="Next video"
+                  data-testid="videoplayer-next"
+                  onClick={() => advance(1)}
+                  className="rounded-full bg-black/40 p-1 text-white hover:bg-black/60"
+                >
+                  <SkipForward className="w-3.5 h-3.5" />
+                </button>
+              )}
+              <button
+                type="button"
+                aria-label={muted ? "Unmute" : "Mute"}
+                data-testid="videoplayer-mute"
+                onClick={() => setMuted((m) => !m)}
+                className="rounded-full bg-black/40 p-1 text-white hover:bg-black/60"
+              >
+                {muted ? (
+                  <VolumeX className="w-3.5 h-3.5" />
+                ) : (
+                  <Volume2 className="w-3.5 h-3.5" />
+                )}
+              </button>
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.05}
+                value={muted ? 0 : volume}
+                aria-label="Volume"
+                data-testid="videoplayer-volume"
+                onChange={(e) => {
+                  const v = Number(e.target.value);
+                  setVolume(v);
+                  if (v > 0 && muted) setMuted(false);
+                  if (v === 0) setMuted(true);
+                }}
+                className="h-1 w-16 accent-white/90"
+              />
+              {current && !demo && (
+                <span className="ml-auto max-w-[45%] truncate text-[10px] text-white/80">
+                  {current.title}
+                </span>
+              )}
+            </div>
           </div>
         )}
       </div>
