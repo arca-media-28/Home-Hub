@@ -176,6 +176,16 @@ import { Trash2, X, Pipette, RotateCcw, ChevronUp, ChevronDown } from "lucide-re
 
 export type EditMode = "create" | "edit";
 
+// Human-readable file size for the upload library lists. Video uploads can be
+// up to 200MB each, so surfacing the size helps users decide what to delete.
+function formatUploadSize(bytes: number | null | undefined): string {
+  if (bytes == null || !Number.isFinite(bytes)) return "";
+  if (bytes >= 1e9) return `${(bytes / 1e9).toFixed(1)} GB`;
+  if (bytes >= 1e6) return `${(bytes / 1e6).toFixed(1)} MB`;
+  if (bytes >= 1e3) return `${(bytes / 1e3).toFixed(0)} KB`;
+  return `${bytes} B`;
+}
+
 interface TileEditModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -844,7 +854,7 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
         queryClient.invalidateQueries({ queryKey: getListUploadsQueryKey() });
       },
       onError: (err) => {
-        toast({ title: "Failed to delete image", description: err.message, variant: "destructive" });
+        toast({ title: "Failed to delete file", description: err.message, variant: "destructive" });
       },
     },
   });
@@ -1435,6 +1445,13 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
   function handleDeleteUpload(id: number, fileUrl: string) {
     deleteUpload.mutate({ id });
     if (imageUrl === fileUrl) clearImage();
+  }
+
+  // Delete a video from the library; also drop it from the tile's selected
+  // playlist so we don't reference a now-missing file.
+  function handleDeleteVideoUpload(id: number, fileUrl: string) {
+    deleteUpload.mutate({ id });
+    setVideoUploadUrls((prev) => prev.filter((u) => u !== fileUrl));
   }
 
   // Eyedropper: pick any color on screen using the browser EyeDropper API.
@@ -2866,31 +2883,45 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
                         {videoFiles.map((file) => {
                           const selected = videoUploadUrls.includes(file.url);
                           return (
-                            <button
-                              key={file.id}
-                              type="button"
-                              aria-pressed={selected}
-                              data-testid={`videoplayer-upload-${file.id}`}
-                              onClick={() =>
-                                setVideoUploadUrls((prev) =>
+                            <div key={file.id} className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                aria-pressed={selected}
+                                data-testid={`videoplayer-upload-${file.id}`}
+                                onClick={() =>
+                                  setVideoUploadUrls((prev) =>
+                                    selected
+                                      ? prev.filter((u) => u !== file.url)
+                                      : [...prev, file.url],
+                                  )
+                                }
+                                className={`flex min-w-0 flex-1 items-center gap-2 rounded-md border px-2 py-1.5 text-left text-sm ${
                                   selected
-                                    ? prev.filter((u) => u !== file.url)
-                                    : [...prev, file.url],
-                                )
-                              }
-                              className={`flex w-full items-center gap-2 rounded-md border px-2 py-1.5 text-left text-sm ${
-                                selected
-                                  ? "border-primary bg-primary/10"
-                                  : "border-border hover:bg-accent"
-                              }`}
-                            >
-                              <span className="truncate">
-                                {file.originalName ?? file.url.split("/").pop()}
-                              </span>
-                              {selected && (
-                                <span className="ml-auto text-xs text-primary">Selected</span>
-                              )}
-                            </button>
+                                    ? "border-primary bg-primary/10"
+                                    : "border-border hover:bg-accent"
+                                }`}
+                              >
+                                <span className="truncate">
+                                  {file.originalName ?? file.url.split("/").pop()}
+                                </span>
+                                <span className="ml-auto shrink-0 text-xs text-muted-foreground">
+                                  {formatUploadSize(file.size)}
+                                </span>
+                                {selected && (
+                                  <span className="shrink-0 text-xs text-primary">Selected</span>
+                                )}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteVideoUpload(file.id, file.url)}
+                                data-testid={`videoplayer-upload-delete-${file.id}`}
+                                className="shrink-0 rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                                title="Delete video from library"
+                                aria-label={`Delete video ${file.originalName ?? file.url.split("/").pop()}`}
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
                           );
                         })}
                       </div>
