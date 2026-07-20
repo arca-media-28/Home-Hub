@@ -477,6 +477,125 @@ test("video playback position and playlist spot survive switching dashboard page
     .toBeGreaterThanOrEqual(0.29);
 });
 
+test("restart control clears the saved spot and starts over from the first video", async ({
+  page,
+}) => {
+  const { token, authHeaders } = await register(page);
+
+  const urls = [
+    "https://example.com/first-clip.mp4",
+    "https://example.com/second-clip.mp4",
+  ];
+  const res = await page.request.post("/api/tiles", {
+    data: {
+      type: "integration",
+      integration: "videoplayer",
+      name: "",
+      gridX: 0,
+      gridY: 0,
+      gridW: 6,
+      gridH: 5,
+      tileSettings: {
+        videoSource: "urls",
+        videoUrls: urls,
+        videoPlayMode: "playlist",
+        videoPlaylistLoop: true,
+        videoShuffle: false,
+        videoMuted: true,
+      },
+    },
+    headers: authHeaders,
+  });
+  expect(res.ok(), `tile create failed: ${res.status()}`).toBeTruthy();
+
+  // Range-request-capable serving so seeks actually work (see above).
+  await page.route("https://example.com/**", (route) => {
+    const range = route.request().headers()["range"];
+    const m = range?.match(/bytes=(\d+)-(\d*)/);
+    if (m) {
+      const start = Number(m[1]);
+      const end = m[2] ? Math.min(Number(m[2]), TINY_MP4.length - 1) : TINY_MP4.length - 1;
+      return route.fulfill({
+        status: 206,
+        contentType: "video/mp4",
+        headers: {
+          "Accept-Ranges": "bytes",
+          "Content-Range": `bytes ${start}-${end}/${TINY_MP4.length}`,
+        },
+        body: TINY_MP4.subarray(start, end + 1),
+      });
+    }
+    return route.fulfill({
+      status: 200,
+      contentType: "video/mp4",
+      headers: { "Accept-Ranges": "bytes" },
+      body: TINY_MP4,
+    });
+  });
+
+  await page.addInitScript((t) => localStorage.setItem("token", t), token);
+  await page.goto("/");
+
+  const tileEl = page.getByTestId("videoplayer-tile");
+  await expect(tileEl).toBeVisible();
+
+  // Move off the defaults: pause, step to the second entry, seek into it.
+  await tileEl.hover();
+  await tileEl.getByTestId("videoplayer-playpause").click();
+  await expect
+    .poll(async () =>
+      tileEl.getByTestId("videoplayer-video").evaluate((el) => (el as HTMLVideoElement).paused),
+    )
+    .toBe(true);
+  await tileEl.hover();
+  await tileEl.getByTestId("videoplayer-next").click();
+  await expect
+    .poll(async () => tileEl.getByTestId("videoplayer-video").getAttribute("src"))
+    .toBe(urls[1]);
+  await tileEl.getByTestId("videoplayer-video").evaluate((el) => {
+    (el as HTMLVideoElement).currentTime = 0.3;
+  });
+  await expect
+    .poll(async () =>
+      tileEl
+        .getByTestId("videoplayer-video")
+        .evaluate((el) => (el as HTMLVideoElement).currentTime),
+    )
+    .toBeGreaterThanOrEqual(0.29);
+
+  // Persist the spot (page hide triggers a save), so restart has a real
+  // localStorage entry to remove.
+  await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
+  const storedBefore = await page.evaluate(
+    () => localStorage.getItem("homehub:videoPlayback") ?? "",
+  );
+  expect(storedBefore).toContain("second-clip");
+
+  // Restart from beginning: back to the FIRST video at 0:00, playing again,
+  // and the persisted memory entry for this tile is gone.
+  await tileEl.hover();
+  await tileEl.getByTestId("videoplayer-restart").click();
+  await expect
+    .poll(async () => tileEl.getByTestId("videoplayer-video").getAttribute("src"))
+    .toBe(urls[0]);
+  const video = tileEl.getByTestId("videoplayer-video");
+  await expect
+    .poll(async () => video.evaluate((el) => (el as HTMLVideoElement).currentTime))
+    .toBeLessThan(0.25);
+  const storedAfter = await page.evaluate(
+    () => localStorage.getItem("homehub:videoPlayback") ?? "{}",
+  );
+  expect(Object.keys(JSON.parse(storedAfter || "{}"))).toHaveLength(0);
+
+  // Reload immediately: with the memory cleared, playback starts over at
+  // the first video instead of resurrecting the old spot.
+  await page.reload();
+  await expect(tileEl).toBeVisible();
+  const videoAfterReload = tileEl.getByTestId("videoplayer-video");
+  await expect(videoAfterReload).toBeAttached();
+  await expect.poll(async () => videoAfterReload.getAttribute("src")).toBe(urls[0]);
+});
+
 test("videoplayer sample mode reports unconfigured Plex, tile shows yule log", async ({
   page,
 }) => {

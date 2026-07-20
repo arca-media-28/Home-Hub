@@ -7,6 +7,7 @@ import {
 import {
   Pause,
   Play,
+  RotateCcw,
   SkipBack,
   SkipForward,
   VideoOff,
@@ -472,6 +473,26 @@ export default function VideoPlayerTile({
     setPos(((next % order.length) + order.length) % order.length);
   }
 
+  // "Restart from beginning": intentionally forget the saved spot. Clears
+  // the persisted playback memory for this tile, resets the play order
+  // (fresh shuffle when enabled) back to the first entry, and rewinds the
+  // current element to 0:00 in case the first video is already showing
+  // (a position reset alone wouldn't remount the <video>).
+  function restartFromBeginning() {
+    savedRef.current = null;
+    clearPlaybackMemory(tile.id);
+    const base = videos.map((_, i) => i);
+    setOrder(shuffle && playMode === "playlist" ? shuffled(base) : base);
+    setPos(0);
+    const el = videoRef.current;
+    if (el) {
+      el.currentTime = 0;
+    }
+    lastTimeRef.current = 0;
+    setCurrentTime(0);
+    setPlaying(true);
+  }
+
   // ── YouTube: hand playback to the iframe (its own controls). ──────────────
   const youtubeSrc =
     source === "youtube"
@@ -687,6 +708,16 @@ export default function VideoPlayerTile({
                 ) : (
                   <Volume2 className="w-3.5 h-3.5" />
                 )}
+              </button>
+              <button
+                type="button"
+                aria-label="Restart from beginning"
+                title="Restart from beginning"
+                data-testid="videoplayer-restart"
+                onClick={restartFromBeginning}
+                className="rounded-full bg-black/40 p-1 text-white hover:bg-black/60"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
               </button>
               <input
                 type="range"
