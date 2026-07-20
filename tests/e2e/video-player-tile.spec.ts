@@ -360,6 +360,19 @@ test("video playback position and playlist spot survive switching dashboard page
   await expect
     .poll(async () => video.evaluate((el) => (el as HTMLVideoElement).currentTime))
     .toBeGreaterThanOrEqual(0.29);
+
+  // Full browser reload: the playback memory now lives in localStorage, so
+  // the same playlist entry and timestamp must survive a page refresh too.
+  await page.reload();
+  await expect(tileEl).toBeVisible();
+  const videoAfterReload = tileEl.getByTestId("videoplayer-video");
+  await expect(videoAfterReload).toBeAttached();
+  await expect.poll(async () => videoAfterReload.getAttribute("src")).toBe(urls[1]);
+  await expect
+    .poll(async () =>
+      videoAfterReload.evaluate((el) => (el as HTMLVideoElement).currentTime),
+    )
+    .toBeGreaterThanOrEqual(0.29);
 });
 
 test("videoplayer sample mode reports unconfigured Plex, tile shows yule log", async ({

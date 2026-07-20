@@ -117,11 +117,14 @@ interface VideoPlayerTileProps {
 // ---------------------------------------------------------------------------
 // Playback memory: the tile unmounts whenever the user switches dashboard
 // pages (each page renders its own tile tree), which used to restart the
-// video from the beginning. A module-level map keyed by tile id remembers
-// the shuffled play order, playlist position, current video URL and the
-// timestamp within it, plus mute/volume — so returning to the page resumes
-// exactly where playback left off. In-memory only (resets on full reload),
-// mirroring the app-level Audio Player engine's session-scoped persistence.
+// video from the beginning. A localStorage-backed store keyed by tile id
+// remembers the shuffled play order, playlist position, current video URL
+// and the timestamp within it, plus mute/volume — so returning to the page
+// (or reloading the browser entirely) resumes where playback left off.
+// The saved playlist URL fingerprint guards against stale entries: if the
+// resolved video list has changed, the memory is discarded. Entries expire
+// after MAX_AGE (so long-finished videos don't resurrect weeks later) and
+// the store is capped so deleted tiles' entries eventually age out.
 // ---------------------------------------------------------------------------
 interface PlaybackMemory {
   // Fingerprint of the playlist the saved state belongs to; ignore the
@@ -136,7 +139,79 @@ interface PlaybackMemory {
   volume: number;
 }
 
-const playbackMemoryByTile = new Map<Tile["id"], PlaybackMemory>();
+interface StoredPlaybackMemory extends PlaybackMemory {
+  savedAt: number;
+}
+
+const PLAYBACK_STORAGE_KEY = "homehub:videoPlayback";
+const PLAYBACK_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000; // 2 weeks
+const PLAYBACK_MAX_ENTRIES = 40;
+
+function readPlaybackStore(): Record<string, StoredPlaybackMemory> {
+  try {
+    const raw = localStorage.getItem(PLAYBACK_STORAGE_KEY);
+    if (!raw) return {};
+    const parsed: unknown = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+    const now = Date.now();
+    const store: Record<string, StoredPlaybackMemory> = {};
+    for (const [tileId, entry] of Object.entries(parsed as Record<string, unknown>)) {
+      const e = entry as Partial<StoredPlaybackMemory> | null;
+      if (
+        !e ||
+        typeof e !== "object" ||
+        typeof e.savedAt !== "number" ||
+        now - e.savedAt > PLAYBACK_MAX_AGE_MS ||
+        !Array.isArray(e.urls) ||
+        !Array.isArray(e.order) ||
+        typeof e.pos !== "number" ||
+        typeof e.currentUrl !== "string" ||
+        typeof e.time !== "number"
+      ) {
+        continue; // drop expired / malformed entries
+      }
+      store[tileId] = e as StoredPlaybackMemory;
+    }
+    return store;
+  } catch {
+    return {};
+  }
+}
+
+function writePlaybackStore(store: Record<string, StoredPlaybackMemory>) {
+  try {
+    localStorage.setItem(PLAYBACK_STORAGE_KEY, JSON.stringify(store));
+  } catch {
+    // Storage full/unavailable — playback memory is best-effort.
+  }
+}
+
+function loadPlaybackMemory(tileId: Tile["id"]): PlaybackMemory | null {
+  return readPlaybackStore()[String(tileId)] ?? null;
+}
+
+function savePlaybackMemory(tileId: Tile["id"], memory: PlaybackMemory) {
+  const store = readPlaybackStore();
+  store[String(tileId)] = { ...memory, savedAt: Date.now() };
+  // Cap the store so entries for deleted tiles can't accumulate forever:
+  // evict the oldest-saved entries beyond the cap.
+  const keys = Object.keys(store);
+  if (keys.length > PLAYBACK_MAX_ENTRIES) {
+    keys
+      .sort((a, b) => store[a]!.savedAt - store[b]!.savedAt)
+      .slice(0, keys.length - PLAYBACK_MAX_ENTRIES)
+      .forEach((k) => delete store[k]);
+  }
+  writePlaybackStore(store);
+}
+
+function clearPlaybackMemory(tileId: Tile["id"]) {
+  const store = readPlaybackStore();
+  if (String(tileId) in store) {
+    delete store[String(tileId)];
+    writePlaybackStore(store);
+  }
+}
 
 function sameUrls(a: string[], b: string[]): boolean {
   return a.length === b.length && a.every((url, i) => url === b[i]);
@@ -214,9 +289,7 @@ export default function VideoPlayerTile({ tile, editMode }: VideoPlayerTileProps
   // Saved playback state from a previous mount of this tile (page switch or
   // re-render). Read once; consumed as the playlist resolves and the video
   // element loads its metadata.
-  const savedRef = useRef<PlaybackMemory | null>(
-    playbackMemoryByTile.get(tile.id) ?? null,
-  );
+  const savedRef = useRef<PlaybackMemory | null>(loadPlaybackMemory(tile.id));
 
   // Play order: identity for ordered playback, a shuffled copy otherwise.
   // When a saved memory matches the resolved playlist, restore its order and
@@ -290,16 +363,19 @@ export default function VideoPlayerTile({ tile, editMode }: VideoPlayerTileProps
     const save = () => {
       const snap = snapshotRef.current;
       if (!snap.currentUrl) return;
-      playbackMemoryByTile.set(tileId, {
+      savePlaybackMemory(tileId, {
         ...snap,
         time: videoRef.current?.currentTime ?? lastTimeRef.current,
       });
     };
-    // Also save when the tab is hidden/closed so a quick page switch that
-    // happens to coincide with a reload still remembers within the session.
+    // Save when the tab is hidden or the page is being unloaded (reload,
+    // navigation away, browser close) so the position survives a full
+    // refresh — plus on unmount for in-app page switches.
     document.addEventListener("visibilitychange", save);
+    window.addEventListener("pagehide", save);
     return () => {
       document.removeEventListener("visibilitychange", save);
+      window.removeEventListener("pagehide", save);
       save();
     };
   }, [tile.id]);
@@ -428,7 +504,9 @@ export default function VideoPlayerTile({ tile, editMode }: VideoPlayerTileProps
                 savedRef.current = null;
               } else if (!sameUrls(saved.urls, videos.map((v) => v.url))) {
                 // Playlist changed since the memory was written — stale.
+                // Drop it from the persistent store too so it can't linger.
                 savedRef.current = null;
+                clearPlaybackMemory(tile.id);
               }
             }}
             onEnded={() => {
