@@ -211,7 +211,7 @@ export default function IntegrationTile({ tile, status, editMode = false }: Inte
       <Tooltip>
         <TooltipTrigger asChild>
           <span
-            className="flex h-2 w-2 flex-shrink-0 cursor-default"
+            className="relative flex h-2 w-2 flex-shrink-0 cursor-default"
             aria-label={statusSummary}
             onClick={(e) => e.stopPropagation()}
           >
