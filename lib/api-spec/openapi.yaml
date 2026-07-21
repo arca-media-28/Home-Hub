@@ -2881,10 +2881,11 @@ components:
         visualizerStyle:
           description: >-
             An Audio Visualizer tile's render style: "bars" (frequency bar
-            graph), "lava" (morphing lava-lamp blobs), or "vu" (retro VU
-            meter). Null or absent defaults to "bars".
+            graph), "lava" (morphing lava-lamp blobs), "vu" (retro VU meter),
+            "vinyl" (spinning record with album-art label), or "cd" (top-down
+            CD player with album-art disc). Null or absent defaults to "bars".
           type: ["string", "null"]
-          enum: ["bars", "lava", "vu", null]
+          enum: ["bars", "lava", "vu", "vinyl", "cd", null]
         visualizerPrimary:
           description: >-
             An Audio Visualizer tile's primary accent color as a #hex value —

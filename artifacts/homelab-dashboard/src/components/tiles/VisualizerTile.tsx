@@ -10,9 +10,12 @@ import {
 import VisualizerBarGraph from "./visualizer/VisualizerBarGraph";
 import VisualizerLavaLamp from "./visualizer/VisualizerLavaLamp";
 import VisualizerVuMeter from "./visualizer/VisualizerVuMeter";
+import VisualizerVinyl from "./visualizer/VisualizerVinyl";
+import VisualizerCdPlayer from "./visualizer/VisualizerCdPlayer";
+import { useAlbumArt } from "./visualizer/albumArt";
 
 // ── Shared style/color contract (imported by the tile editor too) ─────────────
-export type VisualizerStyle = "bars" | "lava" | "vu";
+export type VisualizerStyle = "bars" | "lava" | "vu" | "vinyl" | "cd";
 export const DEFAULT_VISUALIZER_STYLE: VisualizerStyle = "bars";
 // Last-resort hex fallbacks; the real defaults are theme-derived at runtime
 // (see lib/themeColors.ts) so an unconfigured visualizer follows the theme.
@@ -27,10 +30,14 @@ export const VISUALIZER_STYLE_OPTIONS: {
   { value: "bars", label: "Bar Graph", description: "Sharp frequency bars" },
   { value: "lava", label: "Lava Lamp", description: "Morphing glow blobs" },
   { value: "vu", label: "VU Meter", description: "Retro needle dials" },
+  { value: "vinyl", label: "Vinyl Record", description: "Spinning record + album art" },
+  { value: "cd", label: "CD Player", description: "Spinning disc + album art" },
 ];
 
 export function normalizeVisualizerStyle(v: string | null | undefined): VisualizerStyle {
-  return v === "lava" || v === "vu" || v === "bars" ? v : DEFAULT_VISUALIZER_STYLE;
+  return v === "lava" || v === "vu" || v === "bars" || v === "vinyl" || v === "cd"
+    ? v
+    : DEFAULT_VISUALIZER_STYLE;
 }
 
 interface Props {
@@ -44,7 +51,7 @@ interface Props {
 // animation when nothing is. Like the Bonsai/Tamagotchi it renders its own
 // surface, bypassing the standard integration header.
 export default function VisualizerTile({ tile }: Props) {
-  const { analyser, isPlaying, enableVisualizer } = useAudioPlayer();
+  const { analyser, isPlaying, enableVisualizer, currentTrack } = useAudioPlayer();
 
   // Ask the player to build its analyser graph once this tile exists. Lazy on
   // purpose — see audioPlayer.tsx for why the graph isn't always-on.
@@ -53,6 +60,11 @@ export default function VisualizerTile({ tile }: Props) {
   }, [enableVisualizer]);
 
   const sample = useVisualizer(analyser, isPlaying);
+
+  // Current track's album art, loaded CORS-safe for canvas drawing. Null while
+  // loading, when the track has no artwork, or when the source blocks CORS —
+  // the vinyl/CD renderers show a generic label/disc design in that case.
+  const albumArt = useAlbumArt(currentTrack?.artwork);
 
   // Theme-derived defaults: an unconfigured visualizer follows the active
   // theme (and re-colors live on theme switch); explicit settings always win.
@@ -92,6 +104,12 @@ export default function VisualizerTile({ tile }: Props) {
           )}
           {style === "vu" && (
             <VisualizerVuMeter sample={sample} primary={primary} background={background} width={size.w} height={size.h} />
+          )}
+          {style === "vinyl" && (
+            <VisualizerVinyl sample={sample} primary={primary} background={background} width={size.w} height={size.h} art={albumArt} isPlaying={isPlaying} />
+          )}
+          {style === "cd" && (
+            <VisualizerCdPlayer sample={sample} primary={primary} background={background} width={size.w} height={size.h} art={albumArt} isPlaying={isPlaying} />
           )}
         </>
       )}

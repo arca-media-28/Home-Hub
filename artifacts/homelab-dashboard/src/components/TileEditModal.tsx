@@ -2563,6 +2563,35 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
                               ))}
                             </span>
                           )}
+                          {o.value === "vinyl" && (
+                            <span className="flex h-full w-full items-center justify-center pb-0">
+                              <span
+                                className="relative flex h-8 w-8 items-center justify-center rounded-full"
+                                style={{ background: "#141414", border: "1px solid rgba(255,255,255,0.25)" }}
+                              >
+                                <span
+                                  className="flex h-3 w-3 items-center justify-center rounded-full"
+                                  style={{ background: effVisualizerPrimary }}
+                                >
+                                  <span className="h-1 w-1 rounded-full bg-black" />
+                                </span>
+                              </span>
+                            </span>
+                          )}
+                          {o.value === "cd" && (
+                            <span className="flex h-full w-full items-center justify-center pb-0">
+                              <span
+                                className="relative flex h-8 w-8 items-center justify-center rounded-full"
+                                style={{
+                                  background: `conic-gradient(${effVisualizerPrimary}, #cfd4ff, #ffd4ee, ${effVisualizerPrimary})`,
+                                }}
+                              >
+                                <span className="flex h-3 w-3 items-center justify-center rounded-full bg-white/70">
+                                  <span className="h-1.5 w-1.5 rounded-full bg-black/80" />
+                                </span>
+                              </span>
+                            </span>
+                          )}
                         </span>
                       </span>
                       <span className="text-xs font-medium">{o.label}</span>

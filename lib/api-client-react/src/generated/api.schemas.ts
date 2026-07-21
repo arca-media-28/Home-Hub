@@ -530,10 +530,10 @@ export type TileSettings = {
      */
   aquariumProps?: string[] | null;
   /**
-     * An Audio Visualizer tile's render style: "bars" (frequency bar graph), "lava" (morphing lava-lamp blobs), or "vu" (retro VU meter). Null or absent defaults to "bars".
+     * An Audio Visualizer tile's render style: "bars" (frequency bar graph), "lava" (morphing lava-lamp blobs), "vu" (retro VU meter), "vinyl" (spinning record with album-art label), or "cd" (top-down CD player with album-art disc). Null or absent defaults to "bars".
      * @nullable
      */
-  visualizerStyle?: 'bars' | 'lava' | 'vu' | null;
+  visualizerStyle?: 'bars' | 'lava' | 'vu' | 'vinyl' | 'cd' | null;
   /**
      * An Audio Visualizer tile's primary accent color as a #hex value — the bars/blobs/needles/lit LEDs. Null or absent uses the default.
      * @nullable
