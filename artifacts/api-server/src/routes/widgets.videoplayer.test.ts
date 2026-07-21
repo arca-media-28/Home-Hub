@@ -163,6 +163,187 @@ describe("GET /api/widgets/videoplayer/libraries", () => {
   });
 });
 
+describe("GET /api/widgets/videoplayer/browse", () => {
+  it("rejects a non-plex server", async () => {
+    const res = await request(makeApp()).get(
+      "/api/widgets/videoplayer/browse?server=jellyfin&kind=shows&libraryId=1",
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it("rejects an unknown kind", async () => {
+    const res = await request(makeApp()).get(
+      "/api/widgets/videoplayer/browse?server=plex&kind=movies&libraryId=1",
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it("requires libraryId for kind=shows", async () => {
+    const res = await request(makeApp()).get(
+      "/api/widgets/videoplayer/browse?server=plex&kind=shows",
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it.each(["seasons", "episodes", "show_episodes"])(
+    "requires id for kind=%s",
+    async (kind) => {
+      const res = await request(makeApp()).get(
+        `/api/widgets/videoplayer/browse?server=plex&kind=${kind}`,
+      );
+      expect(res.status).toBe(400);
+    },
+  );
+
+  it("returns sample when Plex is not connected", async () => {
+    const res = await request(makeApp()).get(
+      "/api/widgets/videoplayer/browse?server=plex&kind=shows&libraryId=1",
+    );
+    expect(res.status).toBe(200);
+    expect(res.body.sample).toBe(true);
+    expect(httpGet).not.toHaveBeenCalled();
+  });
+
+  it("lists a TV library's shows with tokenized thumbnails", async () => {
+    findByService.mockImplementation((_userId: number, service: string) =>
+      service === "plex" ? plexRow : undefined,
+    );
+    httpGet.mockResolvedValue({
+      data: {
+        MediaContainer: {
+          Metadata: [
+            {
+              ratingKey: 5,
+              title: "A Show",
+              type: "show",
+              year: 2020,
+              leafCount: 12,
+              thumb: "/library/metadata/5/thumb/1",
+            },
+            // Non-show rows (e.g. mixed content) are dropped.
+            { ratingKey: 6, title: "Stray Movie", type: "movie" },
+          ],
+        },
+      },
+    });
+    const res = await request(makeApp()).get(
+      "/api/widgets/videoplayer/browse?server=plex&kind=shows&libraryId=2",
+    );
+    expect(res.status).toBe(200);
+    expect(httpGet.mock.calls[0]![0]).toBe(
+      "http://plex.local:32400/library/sections/2/all",
+    );
+    expect(res.body.containers).toEqual([
+      {
+        id: "5",
+        kind: "show",
+        title: "A Show",
+        subtitle: "2020 · 12 episodes",
+        thumb:
+          "http://plex.local:32400/library/metadata/5/thumb/1?X-Plex-Token=plex-token",
+      },
+    ]);
+  });
+
+  it("lists a show's seasons via children, dropping pseudo-entries", async () => {
+    findByService.mockImplementation((_userId: number, service: string) =>
+      service === "plex" ? plexRow : undefined,
+    );
+    httpGet.mockResolvedValue({
+      data: {
+        MediaContainer: {
+          Metadata: [
+            // Plex "All episodes" pseudo-row has no season type.
+            { ratingKey: 7, title: "All episodes", type: "directory" },
+            { ratingKey: 8, title: "Season 1", type: "season", leafCount: 1 },
+          ],
+        },
+      },
+    });
+    const res = await request(makeApp()).get(
+      "/api/widgets/videoplayer/browse?server=plex&kind=seasons&id=5",
+    );
+    expect(res.status).toBe(200);
+    expect(httpGet.mock.calls[0]![0]).toBe(
+      "http://plex.local:32400/library/metadata/5/children",
+    );
+    expect(res.body.containers).toEqual([
+      {
+        id: "8",
+        kind: "season",
+        title: "Season 1",
+        subtitle: "1 episode",
+        thumb: null,
+      },
+    ]);
+  });
+
+  it("lists a season's playable episodes with index prefixes", async () => {
+    findByService.mockImplementation((_userId: number, service: string) =>
+      service === "plex" ? plexRow : undefined,
+    );
+    httpGet.mockResolvedValue({
+      data: {
+        MediaContainer: {
+          Metadata: [
+            {
+              ratingKey: 9,
+              title: "Pilot",
+              type: "episode",
+              index: 1,
+              duration: 1800000,
+              Media: [{ Part: [{ key: "/library/parts/9/ep.mkv" }] }],
+            },
+            // No playable part → dropped.
+            { ratingKey: 10, title: "Broken", type: "episode", index: 2 },
+          ],
+        },
+      },
+    });
+    const res = await request(makeApp()).get(
+      "/api/widgets/videoplayer/browse?server=plex&kind=episodes&id=8",
+    );
+    expect(res.status).toBe(200);
+    expect(res.body.videos).toEqual([
+      {
+        id: "9",
+        title: "1. Pilot",
+        streamUrl:
+          "http://plex.local:32400/library/parts/9/ep.mkv?X-Plex-Token=plex-token",
+        durationMs: 1800000,
+      },
+    ]);
+  });
+
+  it("flattens a whole show via allLeaves for kind=show_episodes", async () => {
+    findByService.mockImplementation((_userId: number, service: string) =>
+      service === "plex" ? plexRow : undefined,
+    );
+    httpGet.mockResolvedValue({
+      data: { MediaContainer: { Metadata: [] } },
+    });
+    const res = await request(makeApp()).get(
+      "/api/widgets/videoplayer/browse?server=plex&kind=show_episodes&id=5",
+    );
+    expect(res.status).toBe(200);
+    expect(httpGet.mock.calls[0]![0]).toBe(
+      "http://plex.local:32400/library/metadata/5/allLeaves",
+    );
+    expect(res.body.videos).toEqual([]);
+  });
+
+  it("returns 502 when a configured Plex fails (never sample fallback)", async () => {
+    findByService.mockImplementation((_userId: number, service: string) =>
+      service === "plex" ? plexRow : undefined,
+    );
+    httpGet.mockRejectedValue(new Error("boom"));
+    const res = await request(makeApp()).get(
+      "/api/widgets/videoplayer/browse?server=plex&kind=shows&libraryId=1",
+    );
+    expect(res.status).toBe(502);
+  });
+});
+
 describe("GET /api/widgets/videoplayer", () => {
   it("rejects a bad server param", async () => {
     const res = await request(makeApp()).get("/api/widgets/videoplayer?server=nope&libraryId=1");

@@ -910,6 +910,71 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /widgets/videoplayer/browse:
+    get:
+      operationId: browseVideoLibrary
+      tags: [widgets]
+      summary: Drill into a Plex video library (shows → seasons → episodes)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: server
+          in: query
+          required: true
+          description: >-
+            Which media server to browse. Only "plex" supports video
+            drill-down; other sources use the flat playlist endpoint.
+          schema:
+            type: string
+            enum: [plex]
+        - name: kind
+          in: query
+          required: true
+          description: >-
+            What to list. "shows" lists a TV library's shows (requires
+            libraryId); "seasons" lists a show's seasons (requires id);
+            "episodes" lists a season's playable episodes (requires id);
+            "show_episodes" lists every playable episode of a show in order
+            (requires id), used to queue a whole show.
+          schema:
+            type: string
+            enum: [shows, seasons, episodes, show_episodes]
+        - name: libraryId
+          in: query
+          required: false
+          description: The library section to list shows from. Required for kind=shows.
+          schema:
+            type: string
+        - name: id
+          in: query
+          required: false
+          description: >-
+            The container id (show or season ratingKey) to drill into.
+            Required for kind=seasons, kind=episodes, and kind=show_episodes.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: >-
+            The requested listing: containers (shows or seasons) or playable
+            videos (episodes), or sample:true when Plex is not connected.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VideoBrowseResult"
+        "400":
+          description: Unknown kind or a required libraryId/id was missing
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "502":
+          description: The configured media server could not be reached
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /widgets/audioplayer:
     get:
       operationId: getAudioPlayerNowPlaying
@@ -4599,6 +4664,55 @@ components:
             the tile plays its built-in default instead.
           type: ["boolean", "null"]
         videos:
+          type: array
+          items:
+            $ref: "#/components/schemas/VideoItem"
+
+    VideoContainer:
+      type: object
+      required: [id, kind, title]
+      properties:
+        id:
+          description: >-
+            Stable identifier (Plex ratingKey) used to drill into this
+            container via the browse endpoint.
+          type: string
+        kind:
+          description: What this container is, so the client knows how to expand it.
+          type: string
+          enum: [show, season]
+        title:
+          description: Display name of the show or season.
+          type: string
+        subtitle:
+          description: Secondary line (episode/season counts, year). Null when none.
+          type: ["string", "null"]
+        thumb:
+          description: >-
+            Fully-qualified, authenticated poster/thumbnail URL the browser can
+            load directly (Plex token appended). Null when unavailable.
+          type: ["string", "null"]
+
+    VideoBrowseResult:
+      type: object
+      required: [sample]
+      properties:
+        sample:
+          description: >-
+            True when the media server is not connected; listings are empty
+            and the tile stays on its built-in default video.
+          type: boolean
+        containers:
+          description: >-
+            Drillable containers (shows or seasons). Absent when the request
+            returned playable videos instead.
+          type: array
+          items:
+            $ref: "#/components/schemas/VideoContainer"
+        videos:
+          description: >-
+            Playable episodes with direct-play stream URLs. Absent when the
+            request returned containers instead.
           type: array
           items:
             $ref: "#/components/schemas/VideoItem"

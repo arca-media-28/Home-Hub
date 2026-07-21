@@ -1823,6 +1823,34 @@ export const GetVideoPlaylistResponse = zod.object({
 
 
 /**
+ * @summary Drill into a Plex video library (shows → seasons → episodes)
+ */
+export const BrowseVideoLibraryQueryParams = zod.object({
+  "server": zod.enum(['plex']).describe('Which media server to browse. Only \"plex\" supports video drill-down; other sources use the flat playlist endpoint.'),
+  "kind": zod.enum(['shows', 'seasons', 'episodes', 'show_episodes']).describe('What to list. \"shows\" lists a TV library\'s shows (requires libraryId); \"seasons\" lists a show\'s seasons (requires id); \"episodes\" lists a season\'s playable episodes (requires id); \"show_episodes\" lists every playable episode of a show in order (requires id), used to queue a whole show.'),
+  "libraryId": zod.coerce.string().optional().describe('The library section to list shows from. Required for kind=shows.'),
+  "id": zod.coerce.string().optional().describe('The container id (show or season ratingKey) to drill into. Required for kind=seasons, kind=episodes, and kind=show_episodes.')
+})
+
+export const BrowseVideoLibraryResponse = zod.object({
+  "sample": zod.boolean().describe('True when the media server is not connected; listings are empty and the tile stays on its built-in default video.'),
+  "containers": zod.array(zod.object({
+  "id": zod.string().describe('Stable identifier (Plex ratingKey) used to drill into this container via the browse endpoint.'),
+  "kind": zod.enum(['show', 'season']).describe('What this container is, so the client knows how to expand it.'),
+  "title": zod.string().describe('Display name of the show or season.'),
+  "subtitle": zod.string().nullish().describe('Secondary line (episode\/season counts, year). Null when none.'),
+  "thumb": zod.string().nullish().describe('Fully-qualified, authenticated poster\/thumbnail URL the browser can load directly (Plex token appended). Null when unavailable.')
+})).optional().describe('Drillable containers (shows or seasons). Absent when the request returned playable videos instead.'),
+  "videos": zod.array(zod.object({
+  "id": zod.string().describe('Server-side item identifier.'),
+  "title": zod.string().describe('The video\'s display title.'),
+  "streamUrl": zod.string().describe('A direct-play URL the browser\'s <video> element can load. Carries the media server\'s own auth token as a query parameter.'),
+  "durationMs": zod.number().nullish().describe('Runtime in milliseconds when known.')
+})).optional().describe('Playable episodes with direct-play stream URLs. Absent when the request returned containers instead.')
+})
+
+
+/**
  * @summary Get the current/last music track and a playable queue for the Audio Player tile
  */
 export const GetAudioPlayerNowPlayingQueryParams = zod.object({

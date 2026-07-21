@@ -27,6 +27,7 @@ import type {
   AuthCredentials,
   AuthResponse,
   BrowseAudioLibraryParams,
+  BrowseVideoLibraryParams,
   CalDavAccount,
   CalDavAccountInput,
   CalendarEventsData,
@@ -109,6 +110,7 @@ import type {
   UploadUsage,
   UploadedFile,
   UserProfile,
+  VideoBrowseResult,
   VideoLibrariesData,
   VideoPlaylistData,
   WeatherWidgetData
@@ -3164,6 +3166,90 @@ export function useGetVideoPlaylist<TData = Awaited<ReturnType<typeof getVideoPl
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetVideoPlaylistQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getBrowseVideoLibraryUrl = (params: BrowseVideoLibraryParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/widgets/videoplayer/browse?${stringifiedParams}` : `/api/widgets/videoplayer/browse`
+}
+
+/**
+ * @summary Drill into a Plex video library (shows → seasons → episodes)
+ */
+export const browseVideoLibrary = async (params: BrowseVideoLibraryParams, options?: RequestInit): Promise<VideoBrowseResult> => {
+
+  return customFetch<VideoBrowseResult>(getBrowseVideoLibraryUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getBrowseVideoLibraryQueryKey = (params?: BrowseVideoLibraryParams,) => {
+    return [
+    `/api/widgets/videoplayer/browse`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getBrowseVideoLibraryQueryOptions = <TData = Awaited<ReturnType<typeof browseVideoLibrary>>, TError = ErrorType<ErrorResponse>>(params: BrowseVideoLibraryParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof browseVideoLibrary>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getBrowseVideoLibraryQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof browseVideoLibrary>>> = ({ signal }) => browseVideoLibrary(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof browseVideoLibrary>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type BrowseVideoLibraryQueryResult = NonNullable<Awaited<ReturnType<typeof browseVideoLibrary>>>
+export type BrowseVideoLibraryQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Drill into a Plex video library (shows → seasons → episodes)
+ */
+
+export function useBrowseVideoLibrary<TData = Awaited<ReturnType<typeof browseVideoLibrary>>, TError = ErrorType<ErrorResponse>>(
+ params: BrowseVideoLibraryParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof browseVideoLibrary>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getBrowseVideoLibraryQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

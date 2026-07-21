@@ -2433,6 +2433,118 @@ router.get("/videoplayer/libraries", requireAuth, async (req: AuthRequest, res) 
 // Cap playlists so a huge library doesn't produce megabyte responses.
 const VIDEO_PLAYLIST_LIMIT = 200;
 
+// GET /widgets/videoplayer/browse — Plex-only gradual drill-down for the
+// Video Player tile's browser: shows in a TV library → a show's seasons → a
+// season's playable episodes. `show_episodes` flattens a whole show into an
+// ordered episode queue (Plex allLeaves). Movie libraries keep using the flat
+// /videoplayer playlist endpoint, so no artificial empty levels exist here.
+const VIDEO_BROWSE_KINDS = ["shows", "seasons", "episodes", "show_episodes"];
+const VIDEO_BROWSE_KINDS_NEEDING_ID = ["seasons", "episodes", "show_episodes"];
+
+router.get("/videoplayer/browse", requireAuth, async (req: AuthRequest, res) => {
+  const server = String(req.query["server"] ?? "");
+  if (server !== "plex") {
+    res.status(400).json({ error: "server must be plex" });
+    return;
+  }
+  const kind = String(req.query["kind"] ?? "");
+  const libraryId = String(req.query["libraryId"] ?? "").trim();
+  const id = String(req.query["id"] ?? "").trim();
+  if (!VIDEO_BROWSE_KINDS.includes(kind)) {
+    res.status(400).json({ error: "Unknown browse kind" });
+    return;
+  }
+  if (kind === "shows" && !libraryId) {
+    res.status(400).json({ error: "kind=shows requires a libraryId" });
+    return;
+  }
+  if (VIDEO_BROWSE_KINDS_NEEDING_ID.includes(kind) && !id) {
+    res.status(400).json({ error: `kind=${kind} requires an id` });
+    return;
+  }
+  const conn = resolvePlexAudioConnection(req.user!.userId);
+  if (!conn) {
+    res.json({ sample: true, containers: [], videos: [] });
+    return;
+  }
+  const { baseUrl, token } = conn;
+  // Authenticated poster URL the browser can load directly (same pattern as
+  // stream URLs — the tile already talks to Plex directly for media).
+  const thumbUrl = (thumb: unknown): string | null =>
+    typeof thumb === "string" && thumb.startsWith("/")
+      ? `${baseUrl}${thumb}?X-Plex-Token=${token}`
+      : null;
+  try {
+    const path =
+      kind === "shows"
+        ? `/library/sections/${encodeURIComponent(libraryId)}/all`
+        : kind === "show_episodes"
+          ? `/library/metadata/${encodeURIComponent(id)}/allLeaves`
+          : `/library/metadata/${encodeURIComponent(id)}/children`;
+    const r = await httpClient.get(`${baseUrl}${path}`, {
+      headers: { "X-Plex-Token": token, Accept: "application/json" },
+    });
+    const rows = (r.data?.MediaContainer?.Metadata ?? []) as Array<{
+      ratingKey?: string | number;
+      title?: string;
+      grandparentTitle?: string;
+      parentTitle?: string;
+      type?: string;
+      index?: number;
+      year?: number;
+      leafCount?: number;
+      childCount?: number;
+      thumb?: string;
+      duration?: number;
+      Media?: Array<{ Part?: Array<{ key?: string }> }>;
+    }>;
+    if (kind === "shows" || kind === "seasons") {
+      const containers = rows
+        // Plex season listings can include an "All episodes" pseudo-entry
+        // whose type is not "season"; keep only real containers.
+        .filter((m) => (kind === "shows" ? m.type === "show" : m.type === "season"))
+        .slice(0, VIDEO_PLAYLIST_LIMIT)
+        .map((m) => {
+          const count = m.leafCount ?? m.childCount;
+          const parts = [
+            kind === "shows" && m.year ? String(m.year) : null,
+            typeof count === "number"
+              ? `${count} episode${count === 1 ? "" : "s"}`
+              : null,
+          ].filter(Boolean);
+          return {
+            id: String(m.ratingKey ?? ""),
+            kind: kind === "shows" ? "show" : "season",
+            title: m.title ?? "Untitled",
+            subtitle: parts.length > 0 ? parts.join(" · ") : null,
+            thumb: thumbUrl(m.thumb),
+          };
+        });
+      res.json({ sample: false, containers });
+      return;
+    }
+    // episodes / show_episodes → playable videos.
+    const videos = rows
+      .slice(0, VIDEO_PLAYLIST_LIMIT)
+      .map((m) => {
+        const partKey = m.Media?.[0]?.Part?.[0]?.key;
+        if (!partKey) return null;
+        const prefix = typeof m.index === "number" ? `${m.index}. ` : "";
+        return {
+          id: String(m.ratingKey ?? ""),
+          title: `${prefix}${m.title ?? "Untitled"}`,
+          streamUrl: `${baseUrl}${partKey}?X-Plex-Token=${token}`,
+          durationMs: typeof m.duration === "number" ? m.duration : null,
+        };
+      })
+      .filter((v): v is NonNullable<typeof v> => v !== null);
+    res.json({ sample: false, videos });
+  } catch (err) {
+    logger.error({ reason: describeHttpError(err) }, "Plex video browse error");
+    res.status(502).json({ error: "Failed to browse videos from Plex" });
+  }
+});
+
 router.get("/videoplayer", requireAuth, async (req: AuthRequest, res) => {
   const server = String(req.query["server"] ?? "");
   if (server !== "plex" && server !== "jellyfin") {

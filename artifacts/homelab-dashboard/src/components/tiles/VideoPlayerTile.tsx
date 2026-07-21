@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import type { Tile } from "@workspace/api-client-react";
 import {
   useGetVideoPlaylist,
@@ -15,6 +15,10 @@ import {
   Volume2,
   VolumeX,
 } from "lucide-react";
+
+// The drill-down browser is Plex-only and dialog-heavy; load it lazily so
+// tiles with other sources never pay for it.
+const VideoBrowser = lazy(() => import("./VideoBrowser"));
 
 // ---------------------------------------------------------------------------
 // Video Player tile: a full-surface video player. Sources chosen in the tile
@@ -153,6 +157,10 @@ interface PlaybackMemory {
   playing: boolean;
   muted: boolean;
   volume: number;
+  // When the user picked a queue via the Plex drill-down browser, the queue
+  // itself is remembered so a page switch/reload resumes the picked episodes
+  // instead of falling back to the flat library playlist.
+  queue?: VideoEntry[];
 }
 
 interface StoredPlaybackMemory extends PlaybackMemory {
@@ -265,9 +273,40 @@ export default function VideoPlayerTile({
     },
   });
 
+  // Saved playback state from a previous mount of this tile (page switch or
+  // re-render). Read once; consumed as the playlist resolves and the video
+  // element loads its metadata.
+  const savedRef = useRef<PlaybackMemory | null>(loadPlaybackMemory(tile.id));
+
+  // A queue picked via the Plex drill-down browser. While set, it replaces
+  // the flat library playlist as the tile's video list. Restored from the
+  // playback memory so a page switch/reload resumes the picked episodes.
+  const [overrideQueue, setOverrideQueue] = useState<VideoEntry[] | null>(
+    () => {
+      const saved = savedRef.current;
+      return source === "plex" && saved?.queue && saved.queue.length > 0
+        ? saved.queue
+        : null;
+    },
+  );
+  // Drop the picked queue when the tile is re-pointed at another source or
+  // library (skip the initial mount so the restored queue survives).
+  const sourceKeyRef = useRef(`${source}|${libraryId}`);
+  useEffect(() => {
+    const key = `${source}|${libraryId}`;
+    if (sourceKeyRef.current !== key) {
+      sourceKeyRef.current = key;
+      setOverrideQueue(null);
+    }
+  }, [source, libraryId]);
+
   // Resolve the playlist for the chosen source. `demo` = built-in yule log;
   // `failed` = configured source errored (explicit error state, no fallback).
-  const { videos, demo, failed } = useMemo((): {
+  const {
+    videos: resolvedVideos,
+    demo,
+    failed,
+  } = useMemo((): {
     videos: VideoEntry[];
     demo: boolean;
     failed: boolean;
@@ -292,6 +331,10 @@ export default function VideoPlayerTile({
         : { videos: yule, demo: true, failed: false };
     }
     if (isServerSource) {
+      // A queue picked in the drill-down browser wins over the flat playlist.
+      if (source === "plex" && overrideQueue && overrideQueue.length > 0) {
+        return { videos: overrideQueue, demo: false, failed: false };
+      }
       if (!libraryId) return { videos: yule, demo: true, failed: false };
       if (playlistQuery.isError)
         return { videos: [], demo: false, failed: true };
@@ -317,19 +360,37 @@ export default function VideoPlayerTile({
     s.videoUrls,
     isServerSource,
     libraryId,
+    overrideQueue,
     playlistQuery.data,
     playlistQuery.isError,
   ]);
 
-  // Saved playback state from a previous mount of this tile (page switch or
-  // re-render). Read once; consumed as the playlist resolves and the video
-  // element loads its metadata.
-  const savedRef = useRef<PlaybackMemory | null>(loadPlaybackMemory(tile.id));
+  // Keep the videos array reference stable across background refetches that
+  // return the same content. Downstream effects (play-order reset, media
+  // error reset) key off this identity, so a refetch that changes nothing
+  // must not disturb playback or any open pop-out.
+  const stableVideosRef = useRef(resolvedVideos);
+  if (
+    stableVideosRef.current !== resolvedVideos &&
+    !(
+      resolvedVideos.length === stableVideosRef.current.length &&
+      resolvedVideos.every((v, i) => {
+        const prev = stableVideosRef.current[i]!;
+        return v.id === prev.id && v.title === prev.title && v.url === prev.url;
+      })
+    )
+  ) {
+    stableVideosRef.current = resolvedVideos;
+  }
+  const videos = stableVideosRef.current;
 
   // Play order: identity for ordered playback, a shuffled copy otherwise.
   // When a saved memory matches the resolved playlist, restore its order and
   // position instead of starting over (also preserves the shuffle order).
   const [order, setOrder] = useState<number[]>([]);
+  // Start index requested by the drill-down browser for the queue it just
+  // handed over; consumed once when the play order is rebuilt for it.
+  const pendingStartRef = useRef<number | null>(null);
   useEffect(() => {
     const urls = videos.map((v) => v.url);
     const saved = savedRef.current;
@@ -343,8 +404,12 @@ export default function VideoPlayerTile({
       return;
     }
     const base = videos.map((_, i) => i);
-    setOrder(shuffle && playMode === "playlist" ? shuffled(base) : base);
-    setPos(0);
+    const nextOrder =
+      shuffle && playMode === "playlist" ? shuffled(base) : base;
+    setOrder(nextOrder);
+    const want = pendingStartRef.current;
+    pendingStartRef.current = null;
+    setPos(want != null ? Math.max(0, nextOrder.indexOf(want)) : 0);
   }, [videos, shuffle, playMode]);
 
   const [pos, setPos] = useState(0);
@@ -357,8 +422,12 @@ export default function VideoPlayerTile({
   const [muted, setMuted] = useState(savedRef.current?.muted ?? startMuted);
   // Playlist pop-out: a scrollable list of all entries (in play order) with
   // the current one highlighted; clicking an entry jumps straight to it.
+  // Note: intentionally NOT closed when `videos` changes — background
+  // playlist refetches must never yank the pop-out shut (or reset its
+  // scroll) while the user is browsing it.
   const [playlistOpen, setPlaylistOpen] = useState(false);
-  useEffect(() => setPlaylistOpen(false), [videos]);
+  // Plex drill-down browser dialog (replaces the flat pop-out for Plex).
+  const [browserOpen, setBrowserOpen] = useState(false);
   const [volume, setVolume] = useState(savedRef.current?.volume ?? 0.7);
   const startMutedRef = useRef(startMuted);
   useEffect(() => {
@@ -416,6 +485,9 @@ export default function VideoPlayerTile({
     playing,
     muted,
     volume,
+    ...(overrideQueue && overrideQueue.length > 0
+      ? { queue: overrideQueue }
+      : {}),
   };
 
   // Latest known playback timestamp. Tracked separately because by the time
@@ -515,6 +587,33 @@ export default function VideoPlayerTile({
     setCurrentTime(0);
     setPlaying(true);
   }
+
+  // Queue handed over by the Plex drill-down browser. If it matches the
+  // current list, just jump; otherwise swap the tile's video list for the
+  // picked queue (the play-order effect consumes the pending start index).
+  function playFromBrowser(entries: VideoEntry[], startIndex: number) {
+    if (entries.length === 0) return;
+    const urls = entries.map((e) => e.url);
+    if (
+      sameUrls(
+        urls,
+        videos.map((v) => v.url),
+      )
+    ) {
+      const orderIdx = order.indexOf(startIndex);
+      jumpTo(orderIdx >= 0 ? orderIdx : 0);
+    } else {
+      savedRef.current = null;
+      pendingStartRef.current = startIndex;
+      setOverrideQueue(entries);
+      setPlaying(true);
+    }
+    setBrowserOpen(false);
+  }
+
+  // Whether this tile uses the drill-down browser instead of the flat
+  // pop-out: Plex only (other sources keep their existing flat playlist).
+  const usesBrowser = source === "plex" && !!libraryId;
 
   // ── YouTube: hand playback to the iframe (its own controls). ──────────────
   const youtubeSrc =
@@ -650,7 +749,16 @@ export default function VideoPlayerTile({
             Yule log
           </span>
         )}
-        {!editMode && playlistOpen && count > 1 && (
+        {!editMode && usesBrowser && (
+          <Suspense fallback={null}>
+            <VideoBrowser
+              open={browserOpen}
+              onOpenChange={setBrowserOpen}
+              onPlay={playFromBrowser}
+            />
+          </Suspense>
+        )}
+        {!editMode && !usesBrowser && playlistOpen && count > 1 && (
           <div
             className="absolute inset-x-2 bottom-[60px] top-2 z-10 flex flex-col overflow-hidden rounded-md bg-black/85 backdrop-blur-sm"
             data-testid="videoplayer-playlist"
@@ -800,19 +908,36 @@ export default function VideoPlayerTile({
                   <Volume2 className="w-3.5 h-3.5" />
                 )}
               </button>
-              {count > 1 && (
+              {usesBrowser ? (
                 <button
                   type="button"
-                  aria-label={playlistOpen ? "Hide playlist" : "Show playlist"}
-                  title={playlistOpen ? "Hide playlist" : "Show playlist"}
+                  aria-label="Browse videos"
+                  title="Browse videos"
                   data-testid="videoplayer-playlist-toggle"
-                  onClick={() => setPlaylistOpen((o) => !o)}
+                  onClick={() => setBrowserOpen(true)}
                   className={`rounded-full p-1 text-white hover:bg-black/60 ${
-                    playlistOpen ? "bg-white/25" : "bg-black/40"
+                    browserOpen ? "bg-white/25" : "bg-black/40"
                   }`}
                 >
                   <ListVideo className="w-3.5 h-3.5" />
                 </button>
+              ) : (
+                count > 1 && (
+                  <button
+                    type="button"
+                    aria-label={
+                      playlistOpen ? "Hide playlist" : "Show playlist"
+                    }
+                    title={playlistOpen ? "Hide playlist" : "Show playlist"}
+                    data-testid="videoplayer-playlist-toggle"
+                    onClick={() => setPlaylistOpen((o) => !o)}
+                    className={`rounded-full p-1 text-white hover:bg-black/60 ${
+                      playlistOpen ? "bg-white/25" : "bg-black/40"
+                    }`}
+                  >
+                    <ListVideo className="w-3.5 h-3.5" />
+                  </button>
+                )
               )}
               <button
                 type="button"

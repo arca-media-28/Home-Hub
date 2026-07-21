@@ -2054,6 +2054,45 @@ export interface VideoPlaylistData {
   videos: VideoItem[];
 }
 
+/**
+ * What this container is, so the client knows how to expand it.
+ */
+export type VideoContainerKind = typeof VideoContainerKind[keyof typeof VideoContainerKind];
+
+
+export const VideoContainerKind = {
+  show: 'show',
+  season: 'season',
+} as const;
+
+export interface VideoContainer {
+  /** Stable identifier (Plex ratingKey) used to drill into this container via the browse endpoint. */
+  id: string;
+  /** What this container is, so the client knows how to expand it. */
+  kind: VideoContainerKind;
+  /** Display name of the show or season. */
+  title: string;
+  /**
+     * Secondary line (episode/season counts, year). Null when none.
+     * @nullable
+     */
+  subtitle?: string | null;
+  /**
+     * Fully-qualified, authenticated poster/thumbnail URL the browser can load directly (Plex token appended). Null when unavailable.
+     * @nullable
+     */
+  thumb?: string | null;
+}
+
+export interface VideoBrowseResult {
+  /** True when the media server is not connected; listings are empty and the tile stays on its built-in default video. */
+  sample: boolean;
+  /** Drillable containers (shows or seasons). Absent when the request returned playable videos instead. */
+  containers?: VideoContainer[];
+  /** Playable episodes with direct-play stream URLs. Absent when the request returned containers instead. */
+  videos?: VideoItem[];
+}
+
 export interface AudioTrack {
   /** Stable identifier for the track within its source. */
   id: string;
@@ -2351,6 +2390,42 @@ export type GetVideoPlaylistServer = typeof GetVideoPlaylistServer[keyof typeof 
 export const GetVideoPlaylistServer = {
   plex: 'plex',
   jellyfin: 'jellyfin',
+} as const;
+
+export type BrowseVideoLibraryParams = {
+/**
+ * Which media server to browse. Only "plex" supports video drill-down; other sources use the flat playlist endpoint.
+ */
+server: BrowseVideoLibraryServer;
+/**
+ * What to list. "shows" lists a TV library's shows (requires libraryId); "seasons" lists a show's seasons (requires id); "episodes" lists a season's playable episodes (requires id); "show_episodes" lists every playable episode of a show in order (requires id), used to queue a whole show.
+ */
+kind: BrowseVideoLibraryKind;
+/**
+ * The library section to list shows from. Required for kind=shows.
+ */
+libraryId?: string;
+/**
+ * The container id (show or season ratingKey) to drill into. Required for kind=seasons, kind=episodes, and kind=show_episodes.
+ */
+id?: string;
+};
+
+export type BrowseVideoLibraryServer = typeof BrowseVideoLibraryServer[keyof typeof BrowseVideoLibraryServer];
+
+
+export const BrowseVideoLibraryServer = {
+  plex: 'plex',
+} as const;
+
+export type BrowseVideoLibraryKind = typeof BrowseVideoLibraryKind[keyof typeof BrowseVideoLibraryKind];
+
+
+export const BrowseVideoLibraryKind = {
+  shows: 'shows',
+  seasons: 'seasons',
+  episodes: 'episodes',
+  show_episodes: 'show_episodes',
 } as const;
 
 export type GetAudioPlayerNowPlayingParams = {
