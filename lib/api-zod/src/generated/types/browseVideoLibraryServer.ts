@@ -11,4 +11,5 @@ export type BrowseVideoLibraryServer = typeof BrowseVideoLibraryServer[keyof typ
 
 export const BrowseVideoLibraryServer = {
   plex: 'plex',
+  jellyfin: 'jellyfin',
 } as const;

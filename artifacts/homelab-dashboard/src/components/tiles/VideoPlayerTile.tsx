@@ -612,8 +612,8 @@ export default function VideoPlayerTile({
   }
 
   // Whether this tile uses the drill-down browser instead of the flat
-  // pop-out: Plex only (other sources keep their existing flat playlist).
-  const usesBrowser = source === "plex" && !!libraryId;
+  // pop-out: Plex and Jellyfin (other sources keep their flat playlist).
+  const usesBrowser = (source === "plex" || source === "jellyfin") && !!libraryId;
 
   // ── YouTube: hand playback to the iframe (its own controls). ──────────────
   const youtubeSrc =
@@ -755,6 +755,7 @@ export default function VideoPlayerTile({
               open={browserOpen}
               onOpenChange={setBrowserOpen}
               onPlay={playFromBrowser}
+              server={source === "jellyfin" ? "jellyfin" : "plex"}
             />
           </Suspense>
         )}

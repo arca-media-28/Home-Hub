@@ -1823,10 +1823,10 @@ export const GetVideoPlaylistResponse = zod.object({
 
 
 /**
- * @summary Drill into a Plex video library (shows → seasons → episodes)
+ * @summary Drill into a Plex or Jellyfin video library (shows → seasons → episodes)
  */
 export const BrowseVideoLibraryQueryParams = zod.object({
-  "server": zod.enum(['plex']).describe('Which media server to browse. Only \"plex\" supports video drill-down; other sources use the flat playlist endpoint.'),
+  "server": zod.enum(['plex', 'jellyfin']).describe('Which media server to browse. \"plex\" and \"jellyfin\" support video drill-down; other sources use the flat playlist endpoint.'),
   "kind": zod.enum(['shows', 'seasons', 'episodes', 'show_episodes']).describe('What to list. \"shows\" lists a TV library\'s shows (requires libraryId); \"seasons\" lists a show\'s seasons (requires id); \"episodes\" lists a season\'s playable episodes (requires id); \"show_episodes\" lists every playable episode of a show in order (requires id), used to queue a whole show.'),
   "libraryId": zod.coerce.string().optional().describe('The library section to list shows from. Required for kind=shows.'),
   "id": zod.coerce.string().optional().describe('The container id (show or season ratingKey) to drill into. Required for kind=seasons, kind=episodes, and kind=show_episodes.')

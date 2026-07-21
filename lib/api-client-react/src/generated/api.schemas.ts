@@ -2394,7 +2394,7 @@ export const GetVideoPlaylistServer = {
 
 export type BrowseVideoLibraryParams = {
 /**
- * Which media server to browse. Only "plex" supports video drill-down; other sources use the flat playlist endpoint.
+ * Which media server to browse. "plex" and "jellyfin" support video drill-down; other sources use the flat playlist endpoint.
  */
 server: BrowseVideoLibraryServer;
 /**
@@ -2416,6 +2416,7 @@ export type BrowseVideoLibraryServer = typeof BrowseVideoLibraryServer[keyof typ
 
 export const BrowseVideoLibraryServer = {
   plex: 'plex',
+  jellyfin: 'jellyfin',
 } as const;
 
 export type BrowseVideoLibraryKind = typeof BrowseVideoLibraryKind[keyof typeof BrowseVideoLibraryKind];

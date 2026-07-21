@@ -164,9 +164,9 @@ describe("GET /api/widgets/videoplayer/libraries", () => {
 });
 
 describe("GET /api/widgets/videoplayer/browse", () => {
-  it("rejects a non-plex server", async () => {
+  it("rejects an unsupported server", async () => {
     const res = await request(makeApp()).get(
-      "/api/widgets/videoplayer/browse?server=jellyfin&kind=shows&libraryId=1",
+      "/api/widgets/videoplayer/browse?server=emby&kind=shows&libraryId=1",
     );
     expect(res.status).toBe(400);
   });
@@ -339,6 +339,143 @@ describe("GET /api/widgets/videoplayer/browse", () => {
     httpGet.mockRejectedValue(new Error("boom"));
     const res = await request(makeApp()).get(
       "/api/widgets/videoplayer/browse?server=plex&kind=shows&libraryId=1",
+    );
+    expect(res.status).toBe(502);
+  });
+
+  // ── Jellyfin ───────────────────────────────────────────────────────────────
+
+  it("returns sample when Jellyfin is not connected", async () => {
+    const res = await request(makeApp()).get(
+      "/api/widgets/videoplayer/browse?server=jellyfin&kind=shows&libraryId=lib1",
+    );
+    expect(res.status).toBe(200);
+    expect(res.body.sample).toBe(true);
+    expect(httpGet).not.toHaveBeenCalled();
+  });
+
+  it("lists a Jellyfin library's series with Primary-image thumbnails", async () => {
+    findByService.mockImplementation((_userId: number, service: string) =>
+      service === "jellyfin" ? jellyfinRow : undefined,
+    );
+    httpGet.mockResolvedValue({
+      data: {
+        Items: [
+          {
+            Id: "s1",
+            Name: "A Show",
+            Type: "Series",
+            ProductionYear: 2020,
+            RecursiveItemCount: 12,
+            ImageTags: { Primary: "tag1" },
+          },
+          // No Primary image → thumb null.
+          { Id: "s2", Name: "Plain Show", Type: "Series" },
+        ],
+      },
+    });
+    const res = await request(makeApp()).get(
+      "/api/widgets/videoplayer/browse?server=jellyfin&kind=shows&libraryId=lib1",
+    );
+    expect(res.status).toBe(200);
+    expect(httpGet.mock.calls[0]![0]).toBe("http://jf.local:8096/Items");
+    const params = (httpGet.mock.calls[0]![1] as { params: Record<string, string> }).params;
+    expect(params["ParentId"]).toBe("lib1");
+    expect(params["IncludeItemTypes"]).toBe("Series");
+    expect(params["Recursive"]).toBe("true");
+    expect(res.body.containers).toEqual([
+      {
+        id: "s1",
+        kind: "show",
+        title: "A Show",
+        subtitle: "2020 · 12 episodes",
+        thumb: "http://jf.local:8096/Items/s1/Images/Primary?api_key=jf-key",
+      },
+      { id: "s2", kind: "show", title: "Plain Show", subtitle: null, thumb: null },
+    ]);
+  });
+
+  it("lists a Jellyfin show's seasons", async () => {
+    findByService.mockImplementation((_userId: number, service: string) =>
+      service === "jellyfin" ? jellyfinRow : undefined,
+    );
+    httpGet.mockResolvedValue({
+      data: {
+        Items: [
+          { Id: "se1", Name: "Season 1", Type: "Season", RecursiveItemCount: 1 },
+        ],
+      },
+    });
+    const res = await request(makeApp()).get(
+      "/api/widgets/videoplayer/browse?server=jellyfin&kind=seasons&id=s1",
+    );
+    expect(res.status).toBe(200);
+    const params = (httpGet.mock.calls[0]![1] as { params: Record<string, string> }).params;
+    expect(params["ParentId"]).toBe("s1");
+    expect(params["IncludeItemTypes"]).toBe("Season");
+    expect(res.body.containers).toEqual([
+      { id: "se1", kind: "season", title: "Season 1", subtitle: "1 episode", thumb: null },
+    ]);
+  });
+
+  it("lists a Jellyfin season's playable episodes with index prefixes", async () => {
+    findByService.mockImplementation((_userId: number, service: string) =>
+      service === "jellyfin" ? jellyfinRow : undefined,
+    );
+    httpGet.mockResolvedValue({
+      data: {
+        Items: [
+          {
+            Id: "e1",
+            Name: "Pilot",
+            Type: "Episode",
+            IndexNumber: 1,
+            RunTimeTicks: 18_000_000_000,
+          },
+        ],
+      },
+    });
+    const res = await request(makeApp()).get(
+      "/api/widgets/videoplayer/browse?server=jellyfin&kind=episodes&id=se1",
+    );
+    expect(res.status).toBe(200);
+    const params = (httpGet.mock.calls[0]![1] as { params: Record<string, string> }).params;
+    expect(params["ParentId"]).toBe("se1");
+    expect(params["IncludeItemTypes"]).toBe("Episode");
+    expect(res.body.videos).toEqual([
+      {
+        id: "e1",
+        title: "1. Pilot",
+        streamUrl: "http://jf.local:8096/Videos/e1/stream?static=true&api_key=jf-key",
+        durationMs: 1_800_000,
+      },
+    ]);
+  });
+
+  it("flattens a Jellyfin show recursively for kind=show_episodes", async () => {
+    findByService.mockImplementation((_userId: number, service: string) =>
+      service === "jellyfin" ? jellyfinRow : undefined,
+    );
+    httpGet.mockResolvedValue({ data: { Items: [] } });
+    const res = await request(makeApp()).get(
+      "/api/widgets/videoplayer/browse?server=jellyfin&kind=show_episodes&id=s1",
+    );
+    expect(res.status).toBe(200);
+    const params = (httpGet.mock.calls[0]![1] as { params: Record<string, string> }).params;
+    expect(params["ParentId"]).toBe("s1");
+    expect(params["Recursive"]).toBe("true");
+    expect(params["IncludeItemTypes"]).toBe("Episode");
+    expect(params["SortBy"]).toBe("ParentIndexNumber,IndexNumber,SortName");
+    expect(res.body.videos).toEqual([]);
+  });
+
+  it("returns 502 when a configured Jellyfin fails (never sample fallback)", async () => {
+    findByService.mockImplementation((_userId: number, service: string) =>
+      service === "jellyfin" ? jellyfinRow : undefined,
+    );
+    httpGet.mockRejectedValue(new Error("boom"));
+    const res = await request(makeApp()).get(
+      "/api/widgets/videoplayer/browse?server=jellyfin&kind=shows&libraryId=lib1",
     );
     expect(res.status).toBe(502);
   });

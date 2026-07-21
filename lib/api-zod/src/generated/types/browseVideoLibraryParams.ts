@@ -10,7 +10,7 @@ import type { BrowseVideoLibraryServer } from './browseVideoLibraryServer';
 
 export type BrowseVideoLibraryParams = {
 /**
- * Which media server to browse. Only "plex" supports video drill-down; other sources use the flat playlist endpoint.
+ * Which media server to browse. "plex" and "jellyfin" support video drill-down; other sources use the flat playlist endpoint.
  */
 server: BrowseVideoLibraryServer;
 /**

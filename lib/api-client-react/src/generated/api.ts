@@ -3194,7 +3194,7 @@ export const getBrowseVideoLibraryUrl = (params: BrowseVideoLibraryParams,) => {
 }
 
 /**
- * @summary Drill into a Plex video library (shows → seasons → episodes)
+ * @summary Drill into a Plex or Jellyfin video library (shows → seasons → episodes)
  */
 export const browseVideoLibrary = async (params: BrowseVideoLibraryParams, options?: RequestInit): Promise<VideoBrowseResult> => {
 
@@ -3241,7 +3241,7 @@ export type BrowseVideoLibraryQueryError = ErrorType<ErrorResponse>
 
 
 /**
- * @summary Drill into a Plex video library (shows → seasons → episodes)
+ * @summary Drill into a Plex or Jellyfin video library (shows → seasons → episodes)
  */
 
 export function useBrowseVideoLibrary<TData = Awaited<ReturnType<typeof browseVideoLibrary>>, TError = ErrorType<ErrorResponse>>(

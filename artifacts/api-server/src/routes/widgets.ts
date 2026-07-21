@@ -2433,18 +2433,19 @@ router.get("/videoplayer/libraries", requireAuth, async (req: AuthRequest, res) 
 // Cap playlists so a huge library doesn't produce megabyte responses.
 const VIDEO_PLAYLIST_LIMIT = 200;
 
-// GET /widgets/videoplayer/browse — Plex-only gradual drill-down for the
-// Video Player tile's browser: shows in a TV library → a show's seasons → a
-// season's playable episodes. `show_episodes` flattens a whole show into an
-// ordered episode queue (Plex allLeaves). Movie libraries keep using the flat
-// /videoplayer playlist endpoint, so no artificial empty levels exist here.
+// GET /widgets/videoplayer/browse — gradual drill-down for the Video Player
+// tile's browser: shows in a TV library → a show's seasons → a season's
+// playable episodes. `show_episodes` flattens a whole show into an ordered
+// episode queue (Plex allLeaves; Jellyfin recursive episode query). Movie
+// libraries keep using the flat /videoplayer playlist endpoint, so no
+// artificial empty levels exist here. Supports Plex and Jellyfin.
 const VIDEO_BROWSE_KINDS = ["shows", "seasons", "episodes", "show_episodes"];
 const VIDEO_BROWSE_KINDS_NEEDING_ID = ["seasons", "episodes", "show_episodes"];
 
 router.get("/videoplayer/browse", requireAuth, async (req: AuthRequest, res) => {
   const server = String(req.query["server"] ?? "");
-  if (server !== "plex") {
-    res.status(400).json({ error: "server must be plex" });
+  if (server !== "plex" && server !== "jellyfin") {
+    res.status(400).json({ error: "server must be plex or jellyfin" });
     return;
   }
   const kind = String(req.query["kind"] ?? "");
@@ -2462,6 +2463,105 @@ router.get("/videoplayer/browse", requireAuth, async (req: AuthRequest, res) => 
     res.status(400).json({ error: `kind=${kind} requires an id` });
     return;
   }
+
+  if (server === "jellyfin") {
+    // Jellyfin drill-down via the Items API. Containers (Series/Season) come
+    // back as VideoContainer rows; episodes are mapped to direct-play videos
+    // exactly like the flat /videoplayer playlist route.
+    const { baseUrl, apiKey } = resolveJellyfinAudioConnection(req.user!.userId);
+    if (!baseUrl || !apiKey) {
+      res.json({ sample: true, containers: [], videos: [] });
+      return;
+    }
+    // Primary poster the browser can load directly, mirroring how the tile
+    // streams straight from Jellyfin. Only items with a Primary image tag get
+    // a URL so missing art falls back to the glyph.
+    const thumbUrl = (item: { Id?: string; ImageTags?: Record<string, string> }): string | null =>
+      item.Id && item.ImageTags?.["Primary"]
+        ? `${baseUrl}/Items/${encodeURIComponent(String(item.Id))}/Images/Primary?api_key=${apiKey}`
+        : null;
+    try {
+      const params: Record<string, string> = {
+        api_key: apiKey,
+        Limit: String(VIDEO_PLAYLIST_LIMIT),
+      };
+      if (kind === "shows") {
+        params["ParentId"] = libraryId;
+        params["Recursive"] = "true";
+        params["IncludeItemTypes"] = "Series";
+        params["Fields"] = "RecursiveItemCount,ProductionYear";
+        params["SortBy"] = "SortName";
+      } else if (kind === "seasons") {
+        params["ParentId"] = id;
+        params["IncludeItemTypes"] = "Season";
+        params["Fields"] = "RecursiveItemCount";
+      } else if (kind === "episodes") {
+        params["ParentId"] = id;
+        params["IncludeItemTypes"] = "Episode";
+        params["Fields"] = "RunTimeTicks";
+      } else {
+        // show_episodes: every episode of a show, in season/episode order.
+        params["ParentId"] = id;
+        params["Recursive"] = "true";
+        params["IncludeItemTypes"] = "Episode";
+        params["Fields"] = "RunTimeTicks";
+        params["SortBy"] = "ParentIndexNumber,IndexNumber,SortName";
+      }
+      const r = await httpClient.get(`${baseUrl}/Items`, { params });
+      const items = (r.data?.Items ?? []) as Array<{
+        Id?: string;
+        Name?: string;
+        Type?: string;
+        ProductionYear?: number;
+        RecursiveItemCount?: number;
+        ChildCount?: number;
+        IndexNumber?: number;
+        RunTimeTicks?: number;
+        ImageTags?: Record<string, string>;
+      }>;
+      if (kind === "shows" || kind === "seasons") {
+        const containers = items
+          .filter((i) => i.Id)
+          .map((i) => {
+            const count = i.RecursiveItemCount ?? i.ChildCount;
+            const parts = [
+              kind === "shows" && i.ProductionYear ? String(i.ProductionYear) : null,
+              typeof count === "number"
+                ? `${count} episode${count === 1 ? "" : "s"}`
+                : null,
+            ].filter(Boolean);
+            return {
+              id: String(i.Id),
+              kind: kind === "shows" ? "show" : "season",
+              title: i.Name ?? "Untitled",
+              subtitle: parts.length > 0 ? parts.join(" · ") : null,
+              thumb: thumbUrl(i),
+            };
+          });
+        res.json({ sample: false, containers });
+        return;
+      }
+      // episodes / show_episodes → playable videos.
+      const videos = items
+        .filter((i) => i.Id)
+        .map((i) => {
+          const prefix = typeof i.IndexNumber === "number" ? `${i.IndexNumber}. ` : "";
+          return {
+            id: String(i.Id),
+            title: `${prefix}${i.Name ?? "Untitled"}`,
+            streamUrl: `${baseUrl}/Videos/${encodeURIComponent(String(i.Id))}/stream?static=true&api_key=${apiKey}`,
+            durationMs:
+              typeof i.RunTimeTicks === "number" ? Math.round(i.RunTimeTicks / 10000) : null,
+          };
+        });
+      res.json({ sample: false, videos });
+    } catch (err) {
+      logger.error({ reason: describeHttpError(err) }, "Jellyfin video browse error");
+      res.status(502).json({ error: "Failed to browse videos from Jellyfin" });
+    }
+    return;
+  }
+
   const conn = resolvePlexAudioConnection(req.user!.userId);
   if (!conn) {
     res.json({ sample: true, containers: [], videos: [] });

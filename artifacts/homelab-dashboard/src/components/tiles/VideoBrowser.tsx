@@ -69,11 +69,14 @@ export default function VideoBrowser({
   open,
   onOpenChange,
   onPlay,
+  server,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   // Hand a resolved playable queue back to the tile, starting at startIndex.
   onPlay: (entries: VideoEntry[], startIndex: number) => void;
+  // Which media server backs this tile's browser.
+  server: "plex" | "jellyfin";
 }) {
   const [stack, setStack] = useState<Loader[]>([]);
   const [result, setResult] = useState<BrowseState | null>(null);
@@ -81,30 +84,33 @@ export default function VideoBrowser({
   const [error, setError] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
 
-  const fetchLoader = useCallback(async (loader: Loader): Promise<BrowseState> => {
-    if (loader.type === "libraries") {
-      const r = await getVideoLibraries({ server: "plex" });
-      return { sample: r.sample ?? false, libraries: r.libraries };
-    }
-    if (loader.type === "movies") {
-      const r = await getVideoPlaylist({ server: "plex", libraryId: loader.libraryId });
-      return { sample: r.sample ?? false, videos: r.videos };
-    }
-    if (loader.type === "shows") {
+  const fetchLoader = useCallback(
+    async (loader: Loader): Promise<BrowseState> => {
+      if (loader.type === "libraries") {
+        const r = await getVideoLibraries({ server });
+        return { sample: r.sample ?? false, libraries: r.libraries };
+      }
+      if (loader.type === "movies") {
+        const r = await getVideoPlaylist({ server, libraryId: loader.libraryId });
+        return { sample: r.sample ?? false, videos: r.videos };
+      }
+      if (loader.type === "shows") {
+        const r = await browseVideoLibrary({
+          server,
+          kind: "shows",
+          libraryId: loader.libraryId,
+        });
+        return { sample: r.sample, containers: r.containers, videos: r.videos };
+      }
       const r = await browseVideoLibrary({
-        server: "plex",
-        kind: "shows",
-        libraryId: loader.libraryId,
+        server,
+        kind: loader.type,
+        id: loader.id,
       });
       return { sample: r.sample, containers: r.containers, videos: r.videos };
-    }
-    const r = await browseVideoLibrary({
-      server: "plex",
-      kind: loader.type,
-      id: loader.id,
-    });
-    return { sample: r.sample, containers: r.containers, videos: r.videos };
-  }, []);
+    },
+    [server],
+  );
 
   // Replace the navigation stack and load whatever is now on top.
   const loadStack = useCallback(
@@ -171,7 +177,7 @@ export default function VideoBrowser({
     setError(false);
     try {
       const r = await browseVideoLibrary({
-        server: "plex",
+        server,
         kind: c.kind === "show" ? "show_episodes" : "episodes",
         id: c.id,
       });
@@ -208,7 +214,8 @@ export default function VideoBrowser({
         <DialogHeader>
           <DialogTitle>Find videos</DialogTitle>
           <DialogDescription>
-            Browse your Plex video libraries and pick something to play.
+            Browse your {server === "jellyfin" ? "Jellyfin" : "Plex"} video
+            libraries and pick something to play.
           </DialogDescription>
         </DialogHeader>
 
@@ -246,7 +253,8 @@ export default function VideoBrowser({
           )}
           {!loading && !error && sample && (
             <div className="mb-2 rounded bg-muted/60 px-2 py-1 text-[11px] uppercase tracking-wide text-muted-foreground">
-              Demo — connect Plex in Settings to browse your libraries
+              Demo — connect {server === "jellyfin" ? "Jellyfin" : "Plex"} in
+              Settings to browse your libraries
             </div>
           )}
           {isEmpty && (

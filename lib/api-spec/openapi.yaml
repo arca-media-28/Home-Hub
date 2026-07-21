@@ -914,7 +914,7 @@ paths:
     get:
       operationId: browseVideoLibrary
       tags: [widgets]
-      summary: Drill into a Plex video library (shows → seasons → episodes)
+      summary: Drill into a Plex or Jellyfin video library (shows → seasons → episodes)
       security:
         - bearerAuth: []
       parameters:
@@ -922,11 +922,11 @@ paths:
           in: query
           required: true
           description: >-
-            Which media server to browse. Only "plex" supports video
+            Which media server to browse. "plex" and "jellyfin" support video
             drill-down; other sources use the flat playlist endpoint.
           schema:
             type: string
-            enum: [plex]
+            enum: [plex, jellyfin]
         - name: kind
           in: query
           required: true
