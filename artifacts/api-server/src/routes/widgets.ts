@@ -49,7 +49,7 @@ import {
   demoCalendarEvents,
   type CalendarEvent,
 } from "../lib/calendar.js";
-import { guessGameType, queryGamePlayers, type PlayerCount } from "../lib/gameQuery.js";
+import { guessGameType, queryGamePlayersDetailed, type PlayerCount } from "../lib/gameQuery.js";
 
 const router = Router();
 
@@ -4317,6 +4317,91 @@ router.get("/prowlarr", requireAuth, async (req: AuthRequest, res) => {
 // per-server /resources endpoint. Resource calls are additive: a failing one
 // leaves that server row with state "unknown" and null stats instead of
 // failing the whole tile, since the list call already proved the panel is up.
+// The subset of a Pterodactyl client-API server object the widget reads.
+interface PteroServerAttrs {
+  identifier?: string;
+  name?: string;
+  limits?: { memory?: number | null };
+  invocation?: string | null;
+  docker_image?: string | null;
+  sftp_details?: { ip?: string | null };
+  relationships?: {
+    allocations?: {
+      data?: Array<{
+        attributes?: {
+          ip?: string | null;
+          ip_alias?: string | null;
+          port?: number | null;
+          is_default?: boolean;
+        };
+      }>;
+    };
+  };
+}
+
+// Plan the best-effort player query for one server: guess the game from panel
+// metadata, then list candidate host:port targets in preference order (alias
+// hostname first, then the routable raw IP, then the node's SFTP host — the
+// panel API itself has no player information). For Minecraft the standard
+// server port (25565) is also tried as a fallback, since panels often proxy
+// the public address on the default port while allocating a different one.
+// Returns a structured reason instead of candidates when planning fails.
+function planPterodactylPlayerQuery(s: PteroServerAttrs):
+  | { game: string; candidates: Array<{ host: string; port: number }>; reason: null }
+  | { game: string | null; candidates: []; reason: "unknown-game" | "no-allocation" } {
+  const game = guessGameType(`${s.name ?? ""} ${s.invocation ?? ""} ${s.docker_image ?? ""}`);
+  if (!game) return { game: null, candidates: [], reason: "unknown-game" };
+
+  const allocations = s.relationships?.allocations?.data ?? [];
+  const def =
+    allocations.find((a) => a.attributes?.is_default)?.attributes ??
+    allocations[0]?.attributes;
+  if (!def || typeof def.port !== "number") {
+    return { game: game.type, candidates: [], reason: "no-allocation" };
+  }
+  const rawIp = def.ip ?? "";
+  const routableIp = rawIp && !/^(0\.0\.0\.0|127\.|::)/.test(rawIp) ? rawIp : null;
+  // Distinct hosts in preference order; try the next when the first fails.
+  const hosts = [...new Set([def.ip_alias, routableIp, s.sftp_details?.ip].filter(
+    (h): h is string => Boolean(h),
+  ))];
+  if (hosts.length === 0) return { game: game.type, candidates: [], reason: "no-allocation" };
+
+  const port = def.port + game.portOffset;
+  const candidates = hosts.map((host) => ({ host, port }));
+  if (game.type === "minecraft" && port !== 25565) {
+    // Standard Minecraft port as a last resort — one extra attempt on the
+    // preferred host only, to bound total query time.
+    candidates.push({ host: hosts[0]!, port: 25565 });
+  }
+  return { game: game.type, candidates, reason: null };
+}
+
+// Run the planned query attempts in order until one succeeds. Additive: never
+// throws; failure yields the reason from the LAST attempt (with all attempt
+// details for logging/diagnostics).
+async function runPterodactylPlayerQuery(
+  game: string,
+  candidates: Array<{ host: string; port: number }>,
+): Promise<{
+  players: PlayerCount | null;
+  reason: "timeout" | "unreachable" | null;
+  attempts: Array<{ host: string; port: number; outcome: string }>;
+}> {
+  const attempts: Array<{ host: string; port: number; outcome: string }> = [];
+  let lastReason: "timeout" | "unreachable" = "timeout";
+  for (const c of candidates) {
+    const r = await queryGamePlayersDetailed(game, c.host, c.port);
+    if (r.players) {
+      attempts.push({ host: c.host, port: c.port, outcome: "ok" });
+      return { players: r.players, reason: null, attempts };
+    }
+    lastReason = r.reason;
+    attempts.push({ host: c.host, port: c.port, outcome: `${r.reason}: ${r.detail}` });
+  }
+  return { players: null, reason: lastReason, attempts };
+}
+
 router.get("/pterodactyl", requireAuth, async (req: AuthRequest, res) => {
   const saved = getSavedConnection(req.user!.userId, "pterodactyl");
   const baseUrl = saved.url || process.env["PTERODACTYL_URL"];
@@ -4326,10 +4411,10 @@ router.get("/pterodactyl", requireAuth, async (req: AuthRequest, res) => {
     // Sample data only when the service is genuinely unconfigured.
     res.json({
       servers: [
-        { id: "a1b2c3d4", name: "Minecraft SMP", state: "running", cpuPercent: 42.5, memUsedMb: 3072, memLimitMb: 8192, players: { current: 3, max: 20 } },
-        { id: "e5f6a7b8", name: "Valheim", state: "running", cpuPercent: 18.2, memUsedMb: 2048, memLimitMb: 4096, players: { current: 0, max: 10 } },
-        { id: "c9d0e1f2", name: "Terraria", state: "starting", cpuPercent: 5.1, memUsedMb: 256, memLimitMb: 2048, players: null },
-        { id: "b3c4d5e6", name: "Ark Survival", state: "offline", cpuPercent: 0, memUsedMb: 0, memLimitMb: 16384, players: null },
+        { id: "a1b2c3d4", name: "Minecraft SMP", state: "running", cpuPercent: 42.5, memUsedMb: 3072, memLimitMb: 8192, players: { current: 3, max: 20 }, playersUnavailableReason: null },
+        { id: "e5f6a7b8", name: "Valheim", state: "running", cpuPercent: 18.2, memUsedMb: 2048, memLimitMb: 4096, players: { current: 0, max: 10 }, playersUnavailableReason: null },
+        { id: "c9d0e1f2", name: "Terraria", state: "starting", cpuPercent: 5.1, memUsedMb: 256, memLimitMb: 2048, players: null, playersUnavailableReason: null },
+        { id: "b3c4d5e6", name: "Ark Survival", state: "offline", cpuPercent: 0, memUsedMb: 0, memLimitMb: 16384, players: null, playersUnavailableReason: null },
       ],
     });
     return;
@@ -4344,49 +4429,9 @@ router.get("/pterodactyl", requireAuth, async (req: AuthRequest, res) => {
       params: { per_page: 100 },
     });
 
-    const rawServers = ((listRes.data?.data ?? []) as Array<{
-      attributes?: {
-        identifier?: string;
-        name?: string;
-        limits?: { memory?: number | null };
-        invocation?: string | null;
-        docker_image?: string | null;
-        sftp_details?: { ip?: string | null };
-        relationships?: {
-          allocations?: {
-            data?: Array<{
-              attributes?: {
-                ip?: string | null;
-                ip_alias?: string | null;
-                port?: number | null;
-                is_default?: boolean;
-              };
-            }>;
-          };
-        };
-      };
-    }>)
+    const rawServers = ((listRes.data?.data ?? []) as Array<{ attributes?: PteroServerAttrs }>)
       .map((s) => s.attributes)
       .filter((a): a is NonNullable<typeof a> => Boolean(a?.identifier));
-
-    // Best-effort player occupancy: pick the server's public address from its
-    // default allocation (alias hostname first; the raw IP only when routable,
-    // else the node's SFTP host) and query the game itself — the panel API has
-    // no player information. Unknown game or unreachable query → null.
-    const queryTargetFor = (s: (typeof rawServers)[number]) => {
-      const allocations = s.relationships?.allocations?.data ?? [];
-      const def =
-        allocations.find((a) => a.attributes?.is_default)?.attributes ??
-        allocations[0]?.attributes;
-      if (!def || typeof def.port !== "number") return null;
-      const rawIp = def.ip ?? "";
-      const routableIp = rawIp && !/^(0\.0\.0\.0|127\.|::)/.test(rawIp) ? rawIp : null;
-      const host = def.ip_alias || routableIp || s.sftp_details?.ip || null;
-      if (!host) return null;
-      const game = guessGameType(`${s.name ?? ""} ${s.invocation ?? ""} ${s.docker_image ?? ""}`);
-      if (!game) return null;
-      return { type: game.type, host, port: def.port + game.portOffset };
-    };
 
     const servers = await Promise.all(
       rawServers.map(async (s) => {
@@ -4411,11 +4456,34 @@ router.get("/pterodactyl", requireAuth, async (req: AuthRequest, res) => {
           const memBytes = attrs.resources?.memory_bytes;
 
           // Player occupancy only makes sense for a running server; the game
-          // query itself is additive and resolves to null on any failure.
+          // query itself is additive and never fails the row — instead the
+          // failure REASON is surfaced so the tile can explain the gap.
           let players: PlayerCount | null = null;
+          let playersUnavailableReason:
+            | "unknown-game"
+            | "no-allocation"
+            | "timeout"
+            | "unreachable"
+            | null = null;
           if (state === "running") {
-            const target = queryTargetFor(s);
-            if (target) players = await queryGamePlayers(target.type, target.host, target.port);
+            const plan = planPterodactylPlayerQuery(s);
+            if (plan.reason) {
+              playersUnavailableReason = plan.reason;
+              logger.warn(
+                { id, name: s.name, reason: plan.reason, game: plan.game },
+                "Pterodactyl player query skipped",
+              );
+            } else {
+              const result = await runPterodactylPlayerQuery(plan.game, plan.candidates);
+              players = result.players;
+              if (!players) {
+                playersUnavailableReason = result.reason;
+                logger.warn(
+                  { id, name: s.name, game: plan.game, reason: result.reason, attempts: result.attempts },
+                  "Pterodactyl player query failed",
+                );
+              }
+            }
           }
 
           return {
@@ -4427,6 +4495,7 @@ router.get("/pterodactyl", requireAuth, async (req: AuthRequest, res) => {
               typeof memBytes === "number" ? Math.round(memBytes / (1024 * 1024)) : null,
             memLimitMb,
             players,
+            playersUnavailableReason,
           };
         } catch (err) {
           // Additive: keep the row so the tile still lists the server.
@@ -4434,7 +4503,7 @@ router.get("/pterodactyl", requireAuth, async (req: AuthRequest, res) => {
             { id, reason: normalizeHttpError(err) },
             "Pterodactyl per-server resources fetch failed",
           );
-          return { id, name: s.name ?? id, state: "unknown", cpuPercent: null, memUsedMb: null, memLimitMb, players: null };
+          return { id, name: s.name ?? id, state: "unknown", cpuPercent: null, memUsedMb: null, memLimitMb, players: null, playersUnavailableReason: null };
         }
       }),
     );
@@ -4482,6 +4551,108 @@ router.post("/pterodactyl/power", requireAuth, async (req: AuthRequest, res) => 
       "Pterodactyl power signal failed",
     );
     res.status(502).json({ error: `Failed to ${signal} the server` });
+  }
+});
+
+// Read-only diagnostic for the player-count pipeline (mirrors the TrueNAS
+// diagnostics pattern). For every server it reports the metadata hints the
+// game guess reads, the guessed game type, the candidate query targets, and a
+// LIVE query attempt per candidate with its outcome — so a missing player
+// count can be pinpointed (unrecognized game, no allocation, unreachable
+// host, closed query port) without reading server logs. Never echoes the key.
+router.get("/pterodactyl/diagnostics", requireAuth, async (req: AuthRequest, res) => {
+  const saved = getSavedConnection(req.user!.userId, "pterodactyl");
+  const baseUrl = saved.url || process.env["PTERODACTYL_URL"];
+  const apiKey = saved.apiKey || process.env["PTERODACTYL_API_KEY"];
+
+  if (!baseUrl || !apiKey) {
+    // No sample data — diagnosing an unconfigured service is meaningless.
+    res.status(409).json({
+      configured: false,
+      message:
+        "Pterodactyl is not configured. Save a panel URL and client API key first, then run this diagnostic from a box that can reach the game servers.",
+    });
+    return;
+  }
+
+  const headers = { Authorization: `Bearer ${apiKey}`, Accept: "application/json" };
+  try {
+    const listRes = await httpClient.get(`${baseUrl}/api/client`, {
+      headers,
+      params: { per_page: 100 },
+    });
+    const rawServers = ((listRes.data?.data ?? []) as Array<{ attributes?: PteroServerAttrs }>)
+      .map((s) => s.attributes)
+      .filter((a): a is NonNullable<typeof a> => Boolean(a?.identifier));
+
+    const servers = await Promise.all(
+      rawServers.map(async (s) => {
+        const id = s.identifier!;
+        // Power state matters: a stopped server legitimately has no players.
+        let state = "unknown";
+        try {
+          const r = await httpClient.get(
+            `${baseUrl}/api/client/servers/${encodeURIComponent(id)}/resources`,
+            { headers },
+          );
+          state = (r.data?.attributes?.current_state as string) ?? "unknown";
+        } catch {
+          // state stays "unknown" — the row still diagnoses the query plan.
+        }
+
+        const hints = {
+          name: s.name ?? null,
+          invocation: s.invocation ?? null,
+          dockerImage: s.docker_image ?? null,
+          allocations: (s.relationships?.allocations?.data ?? []).map((a) => ({
+            ip: a.attributes?.ip ?? null,
+            ipAlias: a.attributes?.ip_alias ?? null,
+            port: a.attributes?.port ?? null,
+            isDefault: a.attributes?.is_default ?? false,
+          })),
+          sftpHost: s.sftp_details?.ip ?? null,
+        };
+
+        const plan = planPterodactylPlayerQuery(s);
+        if (plan.reason) {
+          return {
+            id,
+            name: s.name ?? id,
+            state,
+            hints,
+            guessedGame: plan.game,
+            candidates: [],
+            outcome: { players: null, reason: plan.reason },
+          };
+        }
+
+        const result = await runPterodactylPlayerQuery(plan.game, plan.candidates);
+        return {
+          id,
+          name: s.name ?? id,
+          state,
+          hints,
+          guessedGame: plan.game,
+          candidates: plan.candidates,
+          outcome: {
+            players: result.players,
+            reason: result.reason,
+            attempts: result.attempts,
+          },
+        };
+      }),
+    );
+
+    res.json({ configured: true, panel: baseUrl, servers });
+  } catch (err) {
+    // Even the diagnostic reports the panel failure as data, not a 5xx — the
+    // whole point is to surface WHY things fail.
+    res.status(200).json({
+      configured: true,
+      panel: baseUrl,
+      servers: [],
+      panelError: describeHttpError(err),
+    });
   }
 });
 

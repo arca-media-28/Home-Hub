@@ -30,6 +30,20 @@ const STATE_STYLE: Record<string, { dot: string; label: string; text: string }> 
   unknown: { dot: "bg-muted-foreground", label: "Unknown", text: "text-muted-foreground" },
 };
 
+// Tooltip text per player-count failure category. Shown on the subtle dash
+// that replaces the player count on a running server, so the gap explains
+// itself instead of silently hiding the line.
+const PLAYERS_UNAVAILABLE_HINT: Record<string, string> = {
+  "unknown-game":
+    "Players unavailable: the game type couldn't be recognized from the server's name or image.",
+  "no-allocation":
+    "Players unavailable: the server has no public address/port allocation to query.",
+  unreachable:
+    "Players unavailable: the server's query host could not be reached.",
+  timeout:
+    "Players unavailable: no response on the query port (it may be closed or not exposed).",
+};
+
 function formatMem(usedMb: number | null, limitMb: number | null): string | null {
   if (usedMb == null) return null;
   const used = usedMb >= 1024 ? `${(usedMb / 1024).toFixed(1)}G` : `${Math.round(usedMb)}M`;
@@ -408,7 +422,7 @@ export default function PterodactylTile({ enabled, density, tileSettings, editMo
             <span className={`${rowSubText} uppercase tracking-wider ${style.text}`}>
               {style.label}
             </span>
-            {s.players != null && (
+            {s.players != null ? (
               <span
                 className={`flex items-center gap-1 ${rowSubText} tabular-nums ${
                   s.players.current > 0 ? "text-foreground" : "text-muted-foreground"
@@ -419,6 +433,18 @@ export default function PterodactylTile({ enabled, density, tileSettings, editMo
                 {s.players.current}
                 {s.players.max != null && ` / ${s.players.max}`}
               </span>
+            ) : (
+              s.state === "running" &&
+              s.playersUnavailableReason != null && (
+                <span
+                  className={`flex items-center gap-1 ${rowSubText} text-muted-foreground/70`}
+                  title={PLAYERS_UNAVAILABLE_HINT[s.playersUnavailableReason]}
+                  aria-label={`Players unavailable for ${s.name}`}
+                >
+                  <Users className={`${rowScale === 2 ? "w-3.5 h-3.5" : "w-3 h-3"} opacity-60`} />
+                  —
+                </span>
+              )
             )}
           </span>
           {powerControls(s)}

@@ -21,6 +21,7 @@ let mockServers: Array<{
   memUsedMb: number | null;
   memLimitMb: number | null;
   players: { current: number; max: number | null } | null;
+  playersUnavailableReason?: string | null;
 }> = [];
 
 vi.mock("@workspace/api-client-react", async (importOriginal) => ({
@@ -126,5 +127,51 @@ describe("PterodactylTile power controls", () => {
     expect(screen.queryByLabelText("Stop Minecraft")).toBeNull();
     expect(screen.queryByLabelText("Restart Minecraft")).toBeNull();
     expect(screen.queryByLabelText("Start Valheim")).toBeNull();
+  });
+});
+
+describe("PterodactylTile players-unavailable state", () => {
+  it("shows a dash with an explanatory tooltip when a running server has no player count", () => {
+    mockServers = [
+      {
+        id: "run1",
+        name: "Minecraft",
+        state: "running",
+        cpuPercent: 12,
+        memUsedMb: 1024,
+        memLimitMb: 4096,
+        players: null,
+        playersUnavailableReason: "timeout",
+      },
+    ];
+    renderTile();
+    const indicator = screen.getByLabelText("Players unavailable for Minecraft");
+    expect(indicator.textContent).toContain("—");
+    expect(indicator.getAttribute("title")).toMatch(/query port/i);
+  });
+
+  it("hides the indicator for non-running servers and when players are present", () => {
+    mockServers = [
+      { id: "off1", name: "Valheim", state: "offline", cpuPercent: 0, memUsedMb: 0, memLimitMb: 4096, players: null, playersUnavailableReason: null },
+      { id: "run1", name: "Minecraft", state: "running", cpuPercent: 12, memUsedMb: 1024, memLimitMb: 4096, players: { current: 2, max: 20 }, playersUnavailableReason: null },
+    ];
+    renderTile();
+    expect(screen.queryByLabelText(/Players unavailable/)).toBeNull();
+    // The normal player count still renders.
+    expect(screen.getByTitle("Players online").textContent).toContain("2");
+  });
+
+  it("keeps the reason-specific tooltips distinct per failure category", () => {
+    mockServers = [
+      { id: "r1", name: "Alpha", state: "running", cpuPercent: 1, memUsedMb: 1, memLimitMb: 4096, players: null, playersUnavailableReason: "unknown-game" },
+      { id: "r2", name: "Beta", state: "running", cpuPercent: 1, memUsedMb: 1, memLimitMb: 4096, players: null, playersUnavailableReason: "unreachable" },
+    ];
+    renderTile();
+    expect(
+      screen.getByLabelText("Players unavailable for Alpha").getAttribute("title"),
+    ).toMatch(/recognized/i);
+    expect(
+      screen.getByLabelText("Players unavailable for Beta").getAttribute("title"),
+    ).toMatch(/reached/i);
   });
 });

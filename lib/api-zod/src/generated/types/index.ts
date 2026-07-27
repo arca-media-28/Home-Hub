@@ -60,6 +60,8 @@ export * from './getPhotoAlbumsParams';
 export * from './getPhotoAlbumsSource';
 export * from './getPhotosWidgetParams';
 export * from './getPhotosWidgetSource';
+export * from './getPterodactylDiagnostics200';
+export * from './getPterodactylDiagnostics409';
 export * from './getStockCandlesParams';
 export * from './getStocksWidgetParams';
 export * from './getTilesParams';

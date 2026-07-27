@@ -51,6 +51,8 @@ import type {
   GetNewsWidgetParams,
   GetPhotoAlbumsParams,
   GetPhotosWidgetParams,
+  GetPterodactylDiagnostics200,
+  GetPterodactylDiagnostics409,
   GetStockCandlesParams,
   GetStocksWidgetParams,
   GetTilesParams,
@@ -2687,6 +2689,83 @@ export const useSendPterodactylPower = <TError = ErrorType<ErrorResponse>,
       > => {
       return useMutation(getSendPterodactylPowerMutationOptions(options));
     }
+
+export const getGetPterodactylDiagnosticsUrl = () => {
+
+
+
+
+  return `/api/widgets/pterodactyl/diagnostics`
+}
+
+/**
+ * @summary Run a read-only diagnostic of the player-count pipeline against the live panel: per server, the metadata hints, the guessed game type, the candidate query host/port targets, and the live game-query outcome or error. Used to pinpoint why a player count is missing. The API key is never echoed.
+ */
+export const getPterodactylDiagnostics = async ( options?: RequestInit): Promise<GetPterodactylDiagnostics200> => {
+
+  return customFetch<GetPterodactylDiagnostics200>(getGetPterodactylDiagnosticsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPterodactylDiagnosticsQueryKey = () => {
+    return [
+    `/api/widgets/pterodactyl/diagnostics`
+    ] as const;
+    }
+
+
+export const getGetPterodactylDiagnosticsQueryOptions = <TData = Awaited<ReturnType<typeof getPterodactylDiagnostics>>, TError = ErrorType<GetPterodactylDiagnostics409>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPterodactylDiagnostics>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPterodactylDiagnosticsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPterodactylDiagnostics>>> = ({ signal }) => getPterodactylDiagnostics({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPterodactylDiagnostics>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPterodactylDiagnosticsQueryResult = NonNullable<Awaited<ReturnType<typeof getPterodactylDiagnostics>>>
+export type GetPterodactylDiagnosticsQueryError = ErrorType<GetPterodactylDiagnostics409>
+
+
+/**
+ * @summary Run a read-only diagnostic of the player-count pipeline against the live panel: per server, the metadata hints, the guessed game type, the candidate query host/port targets, and the live game-query outcome or error. Used to pinpoint why a player count is missing. The API key is never echoed.
+ */
+
+export function useGetPterodactylDiagnostics<TData = Awaited<ReturnType<typeof getPterodactylDiagnostics>>, TError = ErrorType<GetPterodactylDiagnostics409>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPterodactylDiagnostics>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPterodactylDiagnosticsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 
 export const getGetTailscaleStatusUrl = () => {
 

@@ -1694,7 +1694,8 @@ export const GetPterodactylWidgetResponse = zod.object({
   "players": zod.union([zod.object({
   "current": zod.number().describe('Number of players currently connected.'),
   "max": zod.number().nullable().describe('Configured player slot limit, or null when unknown.')
-}),zod.null()]).describe('Live player occupancy queried directly from the game server (the panel API has no player data). Null when the server is not running, the game could not be identified, or the query failed.')
+}),zod.null()]).describe('Live player occupancy queried directly from the game server (the panel API has no player data). Null when the server is not running, the game could not be identified, or the query failed.'),
+  "playersUnavailableReason": zod.union([zod.enum(['unknown-game', 'no-allocation', 'unreachable', 'timeout']),zod.null()]).describe('Why the player count is missing for a RUNNING server: the game could not be identified from the panel metadata, the server has no usable public allocation, the query host was unreachable, or nothing answered on the query port. Null when players are present or the server is not running.')
 }))
 })
 
@@ -1711,6 +1712,12 @@ export const SendPterodactylPowerResponse = zod.object({
   "ok": zod.boolean().describe('True when the signal was accepted.'),
   "demo": zod.boolean().describe('True when no Pterodactyl connection is configured — the request was acknowledged but nothing was sent (the tile is showing sample data).')
 })
+
+
+/**
+ * @summary Run a read-only diagnostic of the player-count pipeline against the live panel: per server, the metadata hints, the guessed game type, the candidate query host/port targets, and the live game-query outcome or error. Used to pinpoint why a player count is missing. The API key is never echoed.
+ */
+export const GetPterodactylDiagnosticsResponse = zod.record(zod.string(), zod.unknown())
 
 
 /**

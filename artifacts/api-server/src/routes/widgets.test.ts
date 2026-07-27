@@ -78,8 +78,12 @@ vi.mock("../lib/gameQuery.js", async (importOriginal) => {
   return {
     ...real,
     queryGamePlayers: (...args: unknown[]) => queryGamePlayers(...args),
+    queryGamePlayersDetailed: (...args: unknown[]) => queryGamePlayersDetailed(...args),
   };
 });
+// Detailed variant used by the pterodactyl widget: structured result with a
+// failure reason. Defaults to a timeout so unstubbed tests never hang.
+const queryGamePlayersDetailed = vi.fn();
 
 // Imported after the mocks are registered (vi.mock is hoisted above imports).
 const { default: widgetsRouter } = await import("./widgets.js");
@@ -127,6 +131,11 @@ beforeEach(() => {
   cloudGet.mockReset();
   cloudPost.mockReset();
   httpDelete.mockResolvedValue({ data: {} });
+  queryGamePlayers.mockReset();
+  queryGamePlayersDetailed.mockReset();
+  // Default: the game query fails with a timeout so unstubbed tests get the
+  // additive "no players + reason" path instead of hanging on real gamedig.
+  queryGamePlayersDetailed.mockResolvedValue({ players: null, reason: "timeout", detail: "stubbed" });
   // Default: every service is unconfigured unless a test says otherwise.
   findByService.mockReturnValue(undefined);
 });
@@ -1999,6 +2008,9 @@ describe("GET /widgets/pterodactyl", () => {
         memUsedMb: 2048,
         memLimitMb: 4096,
         players: null,
+        // Running Minecraft server without any allocation: the gap is
+        // explained instead of silently omitted.
+        playersUnavailableReason: "no-allocation",
       },
       {
         id: "def456",
@@ -2008,6 +2020,8 @@ describe("GET /widgets/pterodactyl", () => {
         memUsedMb: 0,
         memLimitMb: null,
         players: null,
+        // Not running — no player query is expected, so no reason either.
+        playersUnavailableReason: null,
       },
     ]);
 
@@ -2015,14 +2029,14 @@ describe("GET /widgets/pterodactyl", () => {
     const [, listOpts] = httpGet.mock.calls[0]!;
     expect(listOpts.headers.Authorization).toBe("Bearer ptlc_key");
     // Without allocations there is no query target, so no game query happens.
-    expect(queryGamePlayers).not.toHaveBeenCalled();
+    expect(queryGamePlayersDetailed).not.toHaveBeenCalled();
   });
 
   it("queries live player occupancy for running servers via their allocation", async () => {
     findByService.mockReturnValue(
       connRow({ service: "pterodactyl", url: "https://panel.local", api_key: "ptlc_key" }),
     );
-    queryGamePlayers.mockResolvedValue({ current: 2, max: 10 });
+    queryGamePlayersDetailed.mockResolvedValue({ players: { current: 2, max: 10 }, reason: null });
 
     httpGet.mockImplementation((url: string) => {
       if (url.endsWith("/api/client")) {
@@ -2067,17 +2081,163 @@ describe("GET /widgets/pterodactyl", () => {
     const res = await request(app).get("/widgets/pterodactyl");
     expect(res.status).toBe(200);
     expect(res.body.servers[0].players).toEqual({ current: 2, max: 10 });
+    expect(res.body.servers[0].playersUnavailableReason).toBeNull();
     // The game was identified from the java invocation and queried at the
     // default allocation's alias hostname and port.
-    expect(queryGamePlayers).toHaveBeenCalledWith("minecraft", "mc.example.com", 25565);
+    expect(queryGamePlayersDetailed).toHaveBeenCalledWith("minecraft", "mc.example.com", 25565);
 
-    // Regression: an unreachable game query stays additive — players comes
-    // back null and the row (and the whole widget) still succeeds.
-    queryGamePlayers.mockResolvedValue(null);
+    // Regression: a failing game query stays additive — players comes back
+    // null WITH the failure reason and the row (and widget) still succeeds.
+    queryGamePlayersDetailed.mockResolvedValue({ players: null, reason: "timeout", detail: "no response" });
     const res2 = await request(app).get("/widgets/pterodactyl");
     expect(res2.status).toBe(200);
     expect(res2.body.servers[0].players).toBeNull();
     expect(res2.body.servers[0].state).toBe("running");
+    expect(res2.body.servers[0].playersUnavailableReason).toBe("timeout");
+  });
+
+  it("falls back to the next candidate host when the first query fails", async () => {
+    findByService.mockReturnValue(
+      connRow({ service: "pterodactyl", url: "https://panel.local", api_key: "ptlc_key" }),
+    );
+    // Alias host times out; the node's SFTP host answers.
+    queryGamePlayersDetailed.mockImplementation(async (...args: unknown[]) =>
+      args[1] === "node.lan"
+        ? { players: { current: 5, max: 20 }, reason: null }
+        : { players: null, reason: "timeout" as const, detail: "no response" },
+    );
+
+    httpGet.mockImplementation((url: string) => {
+      if (url.endsWith("/api/client")) {
+        return Promise.resolve({
+          data: {
+            data: [
+              {
+                attributes: {
+                  identifier: "abc123",
+                  name: "Valheim Dedicated",
+                  limits: { memory: 4096 },
+                  sftp_details: { ip: "node.lan" },
+                  relationships: {
+                    allocations: {
+                      data: [
+                        { attributes: { ip: "0.0.0.0", ip_alias: "vh.example.com", port: 2456, is_default: true } },
+                      ],
+                    },
+                  },
+                },
+              },
+            ],
+          },
+        });
+      }
+      if (url.includes("/resources")) {
+        return Promise.resolve({
+          data: { attributes: { current_state: "running", resources: { memory_bytes: 0, cpu_absolute: 0 } } },
+        });
+      }
+      return Promise.reject(httpError(404));
+    });
+
+    const res = await request(app).get("/widgets/pterodactyl");
+    expect(res.status).toBe(200);
+    expect(res.body.servers[0].players).toEqual({ current: 5, max: 20 });
+    // Valheim answers Steam queries on game port + 1 (2457) — first the alias
+    // host, then the SFTP host fallback.
+    expect(queryGamePlayersDetailed).toHaveBeenNthCalledWith(1, "valheim", "vh.example.com", 2457);
+    expect(queryGamePlayersDetailed).toHaveBeenNthCalledWith(2, "valheim", "node.lan", 2457);
+  });
+
+  it("also tries the standard Minecraft port when the allocation port fails", async () => {
+    findByService.mockReturnValue(
+      connRow({ service: "pterodactyl", url: "https://panel.local", api_key: "ptlc_key" }),
+    );
+    queryGamePlayersDetailed.mockImplementation(async (...args: unknown[]) =>
+      args[2] === 25565
+        ? { players: { current: 1, max: 20 }, reason: null }
+        : { players: null, reason: "timeout" as const, detail: "no response" },
+    );
+
+    httpGet.mockImplementation((url: string) => {
+      if (url.endsWith("/api/client")) {
+        return Promise.resolve({
+          data: {
+            data: [
+              {
+                attributes: {
+                  identifier: "abc123",
+                  name: "Paper Lobby",
+                  limits: { memory: 4096 },
+                  relationships: {
+                    allocations: {
+                      data: [
+                        { attributes: { ip: "0.0.0.0", ip_alias: "mc.example.com", port: 25570, is_default: true } },
+                      ],
+                    },
+                  },
+                },
+              },
+            ],
+          },
+        });
+      }
+      if (url.includes("/resources")) {
+        return Promise.resolve({
+          data: { attributes: { current_state: "running", resources: { memory_bytes: 0, cpu_absolute: 0 } } },
+        });
+      }
+      return Promise.reject(httpError(404));
+    });
+
+    const res = await request(app).get("/widgets/pterodactyl");
+    expect(res.status).toBe(200);
+    expect(res.body.servers[0].players).toEqual({ current: 1, max: 20 });
+    expect(queryGamePlayersDetailed).toHaveBeenCalledWith("minecraft", "mc.example.com", 25570);
+    expect(queryGamePlayersDetailed).toHaveBeenCalledWith("minecraft", "mc.example.com", 25565);
+  });
+
+  it("reports unknown-game for a running server whose game can't be guessed", async () => {
+    findByService.mockReturnValue(
+      connRow({ service: "pterodactyl", url: "https://panel.local", api_key: "ptlc_key" }),
+    );
+
+    httpGet.mockImplementation((url: string) => {
+      if (url.endsWith("/api/client")) {
+        return Promise.resolve({
+          data: {
+            data: [
+              {
+                attributes: {
+                  identifier: "abc123",
+                  name: "Mystery Server",
+                  limits: { memory: 2048 },
+                  relationships: {
+                    allocations: {
+                      data: [
+                        { attributes: { ip: "0.0.0.0", ip_alias: "srv.example.com", port: 7777, is_default: true } },
+                      ],
+                    },
+                  },
+                },
+              },
+            ],
+          },
+        });
+      }
+      if (url.includes("/resources")) {
+        return Promise.resolve({
+          data: { attributes: { current_state: "running", resources: { memory_bytes: 0, cpu_absolute: 0 } } },
+        });
+      }
+      return Promise.reject(httpError(404));
+    });
+
+    const res = await request(app).get("/widgets/pterodactyl");
+    expect(res.status).toBe(200);
+    expect(res.body.servers[0].players).toBeNull();
+    expect(res.body.servers[0].playersUnavailableReason).toBe("unknown-game");
+    // No query target could even be planned, so no live query happened.
+    expect(queryGamePlayersDetailed).not.toHaveBeenCalled();
   });
 
   it("keeps a server row with state unknown when its resources call fails", async () => {
@@ -2109,6 +2269,7 @@ describe("GET /widgets/pterodactyl", () => {
         memUsedMb: null,
         memLimitMb: 4096,
         players: null,
+        playersUnavailableReason: null,
       },
     ]);
   });
@@ -2184,6 +2345,100 @@ describe("POST /widgets/pterodactyl/power", () => {
       .send({ serverId: "abc123", signal: "start" });
     expect(res.status).toBe(502);
     expect(res.body.error).toMatch(/start/i);
+  });
+});
+
+describe("GET /widgets/pterodactyl/diagnostics", () => {
+  it("returns 409 when unconfigured (no sample data)", async () => {
+    const res = await request(app).get("/widgets/pterodactyl/diagnostics");
+    expect(res.status).toBe(409);
+    expect(res.body.configured).toBe(false);
+    expect(httpGet).not.toHaveBeenCalled();
+  });
+
+  it("reports hints, guessed game, candidates, and live query outcome per server", async () => {
+    findByService.mockReturnValue(
+      connRow({ service: "pterodactyl", url: "https://panel.local", api_key: "ptlc_key" }),
+    );
+    queryGamePlayersDetailed.mockResolvedValue({ players: null, reason: "timeout", detail: "no response" });
+
+    httpGet.mockImplementation((url: string) => {
+      if (url.endsWith("/api/client")) {
+        return Promise.resolve({
+          data: {
+            data: [
+              {
+                attributes: {
+                  identifier: "abc123",
+                  name: "Minecraft SMP",
+                  invocation: "java -jar server.jar",
+                  docker_image: "ghcr.io/pterodactyl/yolks:java_21",
+                  sftp_details: { ip: "node.lan" },
+                  relationships: {
+                    allocations: {
+                      data: [
+                        { attributes: { ip: "0.0.0.0", ip_alias: "mc.example.com", port: 25565, is_default: true } },
+                      ],
+                    },
+                  },
+                },
+              },
+              {
+                attributes: {
+                  identifier: "def456",
+                  name: "Mystery Server",
+                },
+              },
+            ],
+          },
+        });
+      }
+      if (url.includes("/resources")) {
+        return Promise.resolve({
+          data: { attributes: { current_state: "running", resources: {} } },
+        });
+      }
+      return Promise.reject(httpError(404));
+    });
+
+    const res = await request(app).get("/widgets/pterodactyl/diagnostics");
+    expect(res.status).toBe(200);
+    expect(res.body.configured).toBe(true);
+    expect(res.body.servers).toHaveLength(2);
+
+    const mc = res.body.servers[0];
+    expect(mc.guessedGame).toBe("minecraft");
+    expect(mc.state).toBe("running");
+    expect(mc.hints.name).toBe("Minecraft SMP");
+    expect(mc.hints.allocations).toEqual([
+      { ip: "0.0.0.0", ipAlias: "mc.example.com", port: 25565, isDefault: true },
+    ]);
+    expect(mc.candidates).toEqual([
+      { host: "mc.example.com", port: 25565 },
+      { host: "node.lan", port: 25565 },
+    ]);
+    expect(mc.outcome.players).toBeNull();
+    expect(mc.outcome.reason).toBe("timeout");
+    expect(mc.outcome.attempts).toHaveLength(2);
+    expect(mc.outcome.attempts[0].outcome).toContain("no response");
+
+    const mystery = res.body.servers[1];
+    expect(mystery.guessedGame).toBeNull();
+    expect(mystery.outcome).toEqual({ players: null, reason: "unknown-game" });
+    expect(mystery.candidates).toEqual([]);
+  });
+
+  it("surfaces a panel failure as data instead of a 5xx", async () => {
+    findByService.mockReturnValue(
+      connRow({ service: "pterodactyl", url: "https://panel.local", api_key: "ptlc_key" }),
+    );
+    httpGet.mockRejectedValue(httpError(500));
+
+    const res = await request(app).get("/widgets/pterodactyl/diagnostics");
+    expect(res.status).toBe(200);
+    expect(res.body.configured).toBe(true);
+    expect(res.body.servers).toEqual([]);
+    expect(res.body.panelError).toBeTruthy();
   });
 });
 

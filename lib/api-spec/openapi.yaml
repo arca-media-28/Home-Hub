@@ -736,6 +736,34 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /widgets/pterodactyl/diagnostics:
+    get:
+      operationId: getPterodactylDiagnostics
+      tags: [widgets]
+      summary: >-
+        Run a read-only diagnostic of the player-count pipeline against the
+        live panel: per server, the metadata hints, the guessed game type,
+        the candidate query host/port targets, and the live game-query
+        outcome or error. Used to pinpoint why a player count is missing.
+        The API key is never echoed.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Diagnostic results per server
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        "409":
+          description: Pterodactyl is not configured
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
   /widgets/tailscale:
     get:
       operationId: getTailscaleStatus
@@ -4368,7 +4396,7 @@ components:
 
     PterodactylServer:
       type: object
-      required: [id, name, state, cpuPercent, memUsedMb, memLimitMb, players]
+      required: [id, name, state, cpuPercent, memUsedMb, memLimitMb, players, playersUnavailableReason]
       properties:
         id:
           description: The server's short identifier from the panel.
@@ -4397,6 +4425,17 @@ components:
             the game could not be identified, or the query failed.
           oneOf:
             - $ref: "#/components/schemas/PterodactylPlayers"
+            - type: "null"
+        playersUnavailableReason:
+          description: >-
+            Why the player count is missing for a RUNNING server: the game
+            could not be identified from the panel metadata, the server has no
+            usable public allocation, the query host was unreachable, or
+            nothing answered on the query port. Null when players are present
+            or the server is not running.
+          oneOf:
+            - type: string
+              enum: [unknown-game, no-allocation, unreachable, timeout]
             - type: "null"
 
     PterodactylPlayers:
