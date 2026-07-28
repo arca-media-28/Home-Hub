@@ -388,6 +388,13 @@ export default function Dashboard() {
   const [renameDraft, setRenameDraft] = useState("");
   // Page queued for deletion; drives the confirm dialog.
   const [pagePendingDelete, setPagePendingDelete] = useState<Page | null>(null);
+  // Copy-layout source queued for confirmation because the current layout
+  // already has tiles that the copy would replace.
+  const [copyPendingReplace, setCopyPendingReplace] = useState<{
+    deviceModeId: number | null;
+    variant: string | null;
+    tileCount: number;
+  } | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const savedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -991,7 +998,11 @@ export default function Dashboard() {
     return deviceModes.find((m) => m.id === id)?.name ?? "Unknown mode";
   }
 
-  function handleCopyLayout(fromDeviceModeId: number | null, fromVariant: string | null) {
+  function handleCopyLayout(
+    fromDeviceModeId: number | null,
+    fromVariant: string | null,
+    replace = false,
+  ) {
     if (activePageId == null || activeDeviceModeId == null || fromDeviceModeId == null) return;
     copyPageLayout.mutate({
       id: activePageId,
@@ -1000,8 +1011,29 @@ export default function Dashboard() {
         fromVariant,
         toDeviceModeId: activeDeviceModeId,
         toVariant: activeVariant,
+        replace,
       },
     });
+  }
+
+  // Entry point used by both copy pickers. If the current layout already has
+  // tiles, queue a confirmation dialog instead of copying straight away.
+  function requestCopyLayout(src: {
+    deviceModeId: number | null;
+    variant: string | null;
+    tileCount: number;
+  }) {
+    if (tiles.length > 0) {
+      setCopyPendingReplace(src);
+    } else {
+      handleCopyLayout(src.deviceModeId, src.variant);
+    }
+  }
+
+  function confirmCopyReplace() {
+    const src = copyPendingReplace;
+    setCopyPendingReplace(null);
+    if (src) handleCopyLayout(src.deviceModeId, src.variant, true);
   }
 
   // Import a previously exported file. On success the new pages are appended,
@@ -1550,6 +1582,45 @@ export default function Dashboard() {
                     )}
                     Import page
                   </Button>
+                  {/* Copy layout from another mode/variant even when this
+                      layout already has tiles — replacement is confirmed
+                      via a dialog before anything is overwritten. */}
+                  {tiles.length > 0 && copySources.length > 0 && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="gap-1.5 shrink-0 h-7"
+                          disabled={copyPageLayout.isPending}
+                          data-testid="copy-layout-trigger"
+                        >
+                          {copyPageLayout.isPending ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <Download className="w-3.5 h-3.5" />
+                          )}
+                          Copy layout from…
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="center" className="w-64">
+                        <DropdownMenuLabel>
+                          Replace this layout's tiles with
+                        </DropdownMenuLabel>
+                        {copySources.map((src) => (
+                          <DropdownMenuItem
+                            key={`${src.deviceModeId ?? "none"}:${src.variant ?? "base"}`}
+                            onClick={() => requestCopyLayout(src)}
+                          >
+                            {modeName(src.deviceModeId)} · {variantLabel(src.variant)}
+                            <span className="ml-auto text-xs text-muted-foreground">
+                              {src.tileCount} {src.tileCount === 1 ? "tile" : "tiles"}
+                            </span>
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
                   <Button
                     size="sm"
                     variant="ghost"
@@ -1623,7 +1694,7 @@ export default function Dashboard() {
                   {copySources.map((src) => (
                     <DropdownMenuItem
                       key={`${src.deviceModeId ?? "none"}:${src.variant ?? "base"}`}
-                      onClick={() => handleCopyLayout(src.deviceModeId, src.variant)}
+                      onClick={() => requestCopyLayout(src)}
                     >
                       {modeName(src.deviceModeId)} · {variantLabel(src.variant)}
                       <span className="ml-auto text-xs text-muted-foreground">
@@ -1859,6 +1930,45 @@ export default function Dashboard() {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Delete page
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Confirm replacing the current layout's tiles with a copied layout. */}
+      <AlertDialog
+        open={copyPendingReplace !== null}
+        onOpenChange={(open) => {
+          if (!open) setCopyPendingReplace(null);
+        }}
+      >
+        <AlertDialogContent data-testid="copy-replace-dialog">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Replace this layout?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This replaces the {tiles.length}{" "}
+              {tiles.length === 1 ? "tile" : "tiles"} in the current layout with{" "}
+              {copyPendingReplace ? (
+                <>
+                  the {copyPendingReplace.tileCount}{" "}
+                  {copyPendingReplace.tileCount === 1 ? "tile" : "tiles"} from{" "}
+                  {modeName(copyPendingReplace.deviceModeId)} ·{" "}
+                  {variantLabel(copyPendingReplace.variant)}
+                </>
+              ) : (
+                "the copied layout"
+              )}
+              . The existing tiles here will be deleted. This can't be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmCopyReplace}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="copy-replace-confirm"
+            >
+              Replace layout
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

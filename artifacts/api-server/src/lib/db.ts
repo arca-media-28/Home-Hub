@@ -484,6 +484,13 @@ export const tileStmts = {
   delete: db.prepare<[number, number], void>(
     "DELETE FROM tiles WHERE id = ? AND user_id = ?"
   ),
+  // Remove every tile in one (page, device mode, variant) layout scope —
+  // used by copy-layout's replace flag before re-seeding the scope.
+  deleteByPageScope: db.prepare<[number, number, number, string | null], void>(
+    `DELETE FROM tiles
+     WHERE user_id = ? AND page_id = ? AND device_mode_id = ?
+       AND variant IS ?`
+  ),
 };
 
 export const pageStmts = {

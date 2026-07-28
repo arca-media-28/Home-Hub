@@ -282,7 +282,9 @@ router.get("/:id/layouts", requireAuth, (req: AuthRequest, res) => {
 // POST /api/pages/:id/copy-layout — duplicate every tile from one
 // (deviceModeId, variant) scope of a page into another scope on the same page.
 // Used to seed an empty variant or a new device mode from an existing layout.
-// The target scope must be empty so a copy can never silently merge/overwrite.
+// By default the target scope must be empty so a copy can never silently
+// merge/overwrite; passing replace:true (after an explicit client-side
+// confirmation) deletes the target scope's tiles and replaces them.
 router.post("/:id/copy-layout", requireAuth, (req: AuthRequest, res) => {
   const id = parseInt(String(req.params["id"]));
   const page = Number.isNaN(id) ? undefined : pageStmts.findById.get(id, req.user!.userId);
@@ -295,6 +297,7 @@ router.post("/:id/copy-layout", requireAuth, (req: AuthRequest, res) => {
     fromVariant?: string | null;
     toDeviceModeId?: number;
     toVariant?: string | null;
+    replace?: boolean;
   };
   const fromMode =
     body.fromDeviceModeId != null
@@ -326,11 +329,14 @@ router.post("/:id/copy-layout", requireAuth, (req: AuthRequest, res) => {
     toMode.id,
     toVariant,
   );
-  if (existing.length > 0) {
+  if (existing.length > 0 && body.replace !== true) {
     res.status(400).json({ error: "Target layout already has tiles" });
     return;
   }
   const copyAll = db.transaction(() => {
+    if (existing.length > 0) {
+      tileStmts.deleteByPageScope.run(req.user!.userId, page.id, toMode.id, toVariant);
+    }
     for (const tile of source) {
       createImportedTile(req.user!.userId, page.id, exportTile(tile), toMode.id, toVariant);
     }

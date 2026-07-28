@@ -69,6 +69,19 @@ test("device modes hold independent tile sets, support copy-from, and persist pe
   await page.getByRole("menuitem", { name: /1 tile$/ }).first().click();
   await expect(page.locator(".react-grid-item")).toHaveCount(1);
 
+  // --- Re-copy into the now-populated layout (replace with confirmation) -----
+  // The copy action stays available in edit mode even though this layout has
+  // tiles; picking a source now asks for confirmation before replacing.
+  const headerCopyTrigger = page.getByTestId("copy-layout-trigger");
+  await expect(headerCopyTrigger).toBeVisible();
+  await headerCopyTrigger.click();
+  await page.getByRole("menuitem", { name: /1 tile$/ }).first().click();
+  const replaceDialog = page.getByTestId("copy-replace-dialog");
+  await expect(replaceDialog).toBeVisible();
+  await page.getByTestId("copy-replace-confirm").click();
+  await expect(replaceDialog).not.toBeVisible();
+  await expect(page.locator(".react-grid-item")).toHaveCount(1);
+
   // --- Switch back to the original mode: its own tile is untouched -----------
   await modeTrigger.click();
   await page.getByRole("menuitemradio").first().click();

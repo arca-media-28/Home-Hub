@@ -1940,8 +1940,9 @@ export const CopyPageLayoutBody = zod.object({
   "fromDeviceModeId": zod.number(),
   "fromVariant": zod.string().nullish(),
   "toDeviceModeId": zod.number(),
-  "toVariant": zod.string().nullish()
-}).describe('Source and target layout scopes for copying a page\'s tiles. The target scope must be empty.')
+  "toVariant": zod.string().nullish(),
+  "replace": zod.boolean().optional().describe('When true, delete any tiles already in the target scope and replace them with the copied layout.')
+}).describe('Source and target layout scopes for copying a page\'s tiles. The target scope must be empty unless replace is true, in which case its existing tiles are deleted and replaced by the copy.')
 
 
 /**

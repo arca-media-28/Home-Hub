@@ -610,7 +610,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/CopyLayoutResult"
         "400":
-          description: Target layout not empty, or source equals target
+          description: Target layout not empty (without replace), or source equals target
           content:
             application/json:
               schema:
@@ -4020,7 +4020,8 @@ components:
     CopyLayoutBody:
       description: >-
         Source and target layout scopes for copying a page's tiles. The target
-        scope must be empty.
+        scope must be empty unless replace is true, in which case its existing
+        tiles are deleted and replaced by the copy.
       type: object
       required: [fromDeviceModeId, toDeviceModeId]
       properties:
@@ -4032,6 +4033,11 @@ components:
           type: integer
         toVariant:
           type: ["string", "null"]
+        replace:
+          description: >-
+            When true, delete any tiles already in the target scope and
+            replace them with the copied layout.
+          type: boolean
 
     CopyLayoutResult:
       type: object

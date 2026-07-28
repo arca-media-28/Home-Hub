@@ -7,7 +7,7 @@
  */
 
 /**
- * Source and target layout scopes for copying a page's tiles. The target scope must be empty.
+ * Source and target layout scopes for copying a page's tiles. The target scope must be empty unless replace is true, in which case its existing tiles are deleted and replaced by the copy.
  */
 export interface CopyLayoutBody {
   fromDeviceModeId: number;
@@ -16,4 +16,6 @@ export interface CopyLayoutBody {
   toDeviceModeId: number;
   /** @nullable */
   toVariant?: string | null;
+  /** When true, delete any tiles already in the target scope and replace them with the copied layout. */
+  replace?: boolean;
 }

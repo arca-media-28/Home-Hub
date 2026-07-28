@@ -261,6 +261,30 @@ describe("page layouts + copy-layout", () => {
       });
     expect(again.status).toBe(400);
 
+    // With replace:true the populated target is wiped and re-seeded.
+    await createTile({ pageId: copyPageId, variant: "fhd-landscape", name: "C" });
+    const replaced = await request(app)
+      .post(`/pages/${copyPageId}/copy-layout`)
+      .set("x-user-id", "1")
+      .send({
+        fromDeviceModeId: defaultModeId,
+        fromVariant: "fhd-landscape",
+        toDeviceModeId: defaultModeId,
+        toVariant: "compact-portrait",
+        replace: true,
+      });
+    expect(replaced.status).toBe(201);
+    expect(replaced.body.copied).toBe(3);
+    const replacedTarget = await request(app)
+      .get(`/tiles?pageId=${copyPageId}&deviceModeId=${defaultModeId}&variant=compact-portrait`)
+      .set("x-user-id", "1");
+    expect(replacedTarget.body).toHaveLength(3);
+    // Source scope is untouched.
+    const sourceScope = await request(app)
+      .get(`/tiles?pageId=${copyPageId}&deviceModeId=${defaultModeId}&variant=fhd-landscape`)
+      .set("x-user-id", "1");
+    expect(sourceScope.body).toHaveLength(3);
+
     // Source == target is rejected.
     const same = await request(app)
       .post(`/pages/${copyPageId}/copy-layout`)
