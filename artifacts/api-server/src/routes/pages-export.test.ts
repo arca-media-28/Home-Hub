@@ -111,7 +111,7 @@ describe("page export/import", () => {
       .set("x-user-id", "1");
     expect(exported.status).toBe(200);
     expect(exported.body.format).toBe("homelab-dashboard-pages");
-    expect(exported.body.version).toBe(1);
+    expect(exported.body.version).toBe(2);
     expect(exported.body.pages).toHaveLength(1);
     expect(exported.body.pages[0].name).toBe("Media");
     expect(exported.body.pages[0].tiles).toHaveLength(2);

@@ -18,6 +18,16 @@ export interface Tile {
      * @nullable
      */
   pageId?: number | null;
+  /**
+     * The device mode (layout profile) this tile belongs to. Null only for rows that predate device modes and could not be assigned one.
+     * @nullable
+     */
+  deviceModeId?: number | null;
+  /**
+     * Adaptive layout variant key this tile belongs to (e.g. "fhd-landscape"). Null means the base layout used by auto/fixed pages.
+     * @nullable
+     */
+  variant?: string | null;
   type: TileType;
   /** @nullable */
   integration?: TileIntegration;

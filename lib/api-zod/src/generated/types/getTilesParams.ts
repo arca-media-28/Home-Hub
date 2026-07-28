@@ -11,4 +11,12 @@ export type GetTilesParams = {
  * When provided, return only the tiles belonging to this page. Omitting it returns every tile the user owns.
  */
 pageId?: number;
+/**
+ * When provided together with pageId, return only the tiles that belong to this device mode's layout. Omitting it returns the page's tiles across all modes (legacy behavior).
+ */
+deviceModeId?: number;
+/**
+ * Adaptive layout variant key (e.g. "fhd-landscape") to scope the result to, used with deviceModeId. Omitting it selects the base layout (variant null) used by auto/fixed pages.
+ */
+variant?: string;
 };

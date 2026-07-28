@@ -7,13 +7,14 @@
  */
 
 /**
- * Fixed scale preset that maps to a locked column count. "auto" (the default) keeps today's responsive behavior (columns derived from window width). Any other value locks the page to a fixed column count that is CSS-scaled to fit the viewport so tiles never reflow.
+ * Fixed scale preset that maps to a locked column count. "auto" (the default) keeps today's responsive behavior (columns derived from window width). "adaptive" auto-resolves a fixed preset and orientation from the viewport, with an independently saved layout per scale+orientation variant. Any other value locks the page to a fixed column count that is CSS-scaled to fit the viewport so tiles never reflow.
  */
 export type PageLayoutPreset = typeof PageLayoutPreset[keyof typeof PageLayoutPreset];
 
 
 export const PageLayoutPreset = {
   auto: 'auto',
+  adaptive: 'adaptive',
   compact: 'compact',
   fhd: 'fhd',
   qhd: 'qhd',

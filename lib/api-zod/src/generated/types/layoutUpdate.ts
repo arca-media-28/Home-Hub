@@ -13,5 +13,15 @@ export interface LayoutUpdate {
      * @nullable
      */
   pageId?: number | null;
+  /**
+     * When provided with pageId, the response is narrowed to that device mode's layout (matching GET /tiles for the same scope).
+     * @nullable
+     */
+  deviceModeId?: number | null;
+  /**
+     * Adaptive layout variant key that further narrows the response scope, used with deviceModeId. Omit or null for the base layout.
+     * @nullable
+     */
+  variant?: string | null;
   tiles: LayoutItem[];
 }

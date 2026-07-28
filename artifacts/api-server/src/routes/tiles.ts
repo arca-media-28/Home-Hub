@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, tileStmts, pageStmts, type DbTile } from "../lib/db.js";
+import { db, tileStmts, pageStmts, deviceModeStmts, defaultDeviceModeId, type DbTile } from "../lib/db.js";
 import { requireAuth, type AuthRequest } from "../lib/auth.js";
 
 const router = Router();
@@ -797,6 +797,8 @@ export function formatTile(t: DbTile) {
     id: t.id,
     userId: t.user_id,
     pageId: t.page_id,
+    deviceModeId: t.device_mode_id,
+    variant: t.variant,
     type: t.type,
     integration: t.integration,
     gridX: t.grid_x,
@@ -826,10 +828,12 @@ export function formatTile(t: DbTile) {
 // data lives on tiles — integrations are referenced by type only — so the
 // allow-listed visual/settings fields are all that travel.
 export function exportTile(t: DbTile) {
-  const { id, userId, pageId, createdAt, ...rest } = formatTile(t);
+  const { id, userId, pageId, deviceModeId, variant, createdAt, ...rest } = formatTile(t);
   void id;
   void userId;
   void pageId;
+  void deviceModeId;
+  void variant;
   void createdAt;
   return rest;
 }
@@ -837,11 +841,11 @@ export function exportTile(t: DbTile) {
 // Shared INSERT for new tiles, reused by the create route and the page-import
 // flow so both honor exactly the same columns and the same settings allow-list.
 const insertTileStmt = db.prepare<
-  [number, number | null, string, string | null, number, number, number, number, string | null, string | null, string | null, string | null, string | null, string | null, number | null, string | null, string | null, string | null, number, string | null, string | null],
+  [number, number | null, number | null, string | null, string, string | null, number, number, number, number, string | null, string | null, string | null, string | null, string | null, string | null, number | null, string | null, string | null, string | null, number, string | null, string | null],
   { id: number }
 >(
-  `INSERT INTO tiles (user_id, page_id, type, integration, grid_x, grid_y, grid_w, grid_h, name, url, bg_color, image_url, image_fit, image_position, image_scale, title_size, title_position, title_color, hide_title, metrics, tile_settings)
-   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`
+  `INSERT INTO tiles (user_id, page_id, device_mode_id, variant, type, integration, grid_x, grid_y, grid_w, grid_h, name, url, bg_color, image_url, image_fit, image_position, image_scale, title_size, title_position, title_color, hide_title, metrics, tile_settings)
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`
 );
 
 // Helpers that coerce an untrusted import value to the right column type,
@@ -857,11 +861,19 @@ function importNumber(v: unknown, fallback: number | null): number | null {
 // page. Unknown/garbage fields are dropped, tileSettings is run through the
 // pickTileSettings allow-list, and any credential-like field simply has no
 // column to land in — so nothing unexpected can be imported.
-export function createImportedTile(userId: number, pageId: number, raw: unknown): void {
+export function createImportedTile(
+  userId: number,
+  pageId: number,
+  raw: unknown,
+  deviceModeId: number | null = null,
+  variant: string | null = null,
+): void {
   const obj = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
   insertTileStmt.run(
     userId,
     pageId,
+    deviceModeId,
+    variant,
     importString(obj["type"]) ?? "app",
     importString(obj["integration"]),
     importNumber(obj["gridX"], 0)!,
@@ -884,15 +896,43 @@ export function createImportedTile(userId: number, pageId: number, raw: unknown)
   );
 }
 
-// GET /api/tiles?pageId= — when a pageId is supplied, return only that page's
-// tiles (after verifying the page belongs to the caller). Omitting pageId
-// returns every tile the user owns, preserving the pre-multi-page behavior.
+// Normalize an incoming variant value: a non-empty string is kept (trimmed,
+// capped), anything else means "the base layout" (NULL).
+export function cleanVariant(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const trimmed = raw.trim();
+  return trimmed ? trimmed.slice(0, 40) : null;
+}
+
+// GET /api/tiles?pageId=&deviceModeId=&variant= — when a pageId is supplied,
+// return only that page's tiles (after verifying the page belongs to the
+// caller). A deviceModeId narrows further to that mode's layout, and variant
+// selects an adaptive scale/orientation layout (omitted = the base layout).
+// Omitting pageId returns every tile the user owns; omitting deviceModeId
+// returns all of the page's tiles across modes, preserving legacy behavior.
 router.get("/", requireAuth, (req: AuthRequest, res) => {
   const pageIdRaw = req.query["pageId"];
   if (pageIdRaw !== undefined) {
     const pageId = parseInt(String(pageIdRaw));
     if (Number.isNaN(pageId) || !pageStmts.findById.get(pageId, req.user!.userId)) {
       res.status(404).json({ error: "Page not found" });
+      return;
+    }
+    const modeIdRaw = req.query["deviceModeId"];
+    if (modeIdRaw !== undefined) {
+      const modeId = parseInt(String(modeIdRaw));
+      if (Number.isNaN(modeId) || !deviceModeStmts.findById.get(modeId, req.user!.userId)) {
+        res.status(404).json({ error: "Device mode not found" });
+        return;
+      }
+      const variant = cleanVariant(req.query["variant"]);
+      const tiles = tileStmts.findAllByPageScope.all(
+        req.user!.userId,
+        pageId,
+        modeId,
+        variant,
+      );
+      res.json(tiles.map(formatTile));
       return;
     }
     const tiles = tileStmts.findAllByPage.all(req.user!.userId, pageId);
@@ -907,6 +947,8 @@ router.get("/", requireAuth, (req: AuthRequest, res) => {
 router.post("/", requireAuth, (req: AuthRequest, res) => {
   const body = req.body as {
     pageId?: number | null;
+    deviceModeId?: number | null;
+    variant?: string | null;
     type?: string;
     integration?: string | null;
     gridX?: number;
@@ -945,9 +987,26 @@ router.post("/", requireAuth, (req: AuthRequest, res) => {
     pageId = pages[0]?.id ?? null;
   }
 
+  // Resolve which device mode the tile belongs to. An explicit deviceModeId
+  // must belong to the caller; otherwise fall back to the user's default mode
+  // so legacy clients keep working unchanged.
+  let deviceModeId: number;
+  if (body.deviceModeId != null) {
+    const mode = deviceModeStmts.findById.get(body.deviceModeId, req.user!.userId);
+    if (!mode) {
+      res.status(404).json({ error: "Device mode not found" });
+      return;
+    }
+    deviceModeId = mode.id;
+  } else {
+    deviceModeId = defaultDeviceModeId(req.user!.userId);
+  }
+
   const row = insertTileStmt.get(
     req.user!.userId,
     pageId,
+    deviceModeId,
+    cleanVariant(body.variant),
     body.type ?? "app",
     body.integration ?? null,
     body.gridX ?? 0,

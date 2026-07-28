@@ -1,8 +1,15 @@
 import { Router } from "express";
 import { ImportPagesBody } from "@workspace/api-zod";
-import { db, pageStmts, tileStmts, type DbPage } from "../lib/db.js";
+import {
+  db,
+  pageStmts,
+  tileStmts,
+  deviceModeStmts,
+  defaultDeviceModeId,
+  type DbPage,
+} from "../lib/db.js";
 import { requireAuth, type AuthRequest } from "../lib/auth.js";
-import { exportTile, createImportedTile } from "./tiles.js";
+import { exportTile, createImportedTile, cleanVariant } from "./tiles.js";
 
 const router = Router();
 
@@ -10,23 +17,45 @@ const router = Router();
 // and rejected on import. Bump EXPORT_VERSION whenever the shape changes in a
 // way older importers can't read.
 const EXPORT_FORMAT = "homelab-dashboard-pages";
-const EXPORT_VERSION = 1;
+const EXPORT_VERSION = 2;
 
 // Build a shareable export envelope for the given pages. Each page carries its
 // name and an ordered list of tiles (via exportTile, which strips ids and owner
 // fields). No credential data lives on pages or tiles, so the envelope is safe
 // to share.
-function buildExport(pages: DbPage[]) {
+//
+// v2 adds `layouts`: every (device mode, variant) grouping of the page's tiles
+// with the mode referenced by NAME (ids don't survive a round-trip between
+// accounts). `tiles` still carries the flat list so a v2 file remains readable
+// by eye; importers use `layouts` when present.
+function buildExport(userId: number, pages: DbPage[]) {
+  const modes = deviceModeStmts.findAllByUser.all(userId);
+  const modeName = new Map(modes.map((m) => [m.id, m.name]));
   return {
     format: EXPORT_FORMAT,
     version: EXPORT_VERSION,
     exportedAt: new Date().toISOString(),
-    pages: pages.map((p) => ({
-      name: p.name,
-      layoutPreset: p.layout_preset ?? "auto",
-      layoutOrientation: p.layout_orientation ?? "landscape",
-      tiles: tileStmts.findAllByPage.all(p.user_id, p.id).map(exportTile),
-    })),
+    pages: pages.map((p) => {
+      const tiles = tileStmts.findAllByPage.all(p.user_id, p.id);
+      const groups = new Map<string, { deviceMode: string; variant: string | null; tiles: ReturnType<typeof exportTile>[] }>();
+      for (const t of tiles) {
+        const name = (t.device_mode_id != null && modeName.get(t.device_mode_id)) || "Default";
+        const key = `${name}\u0000${t.variant ?? ""}`;
+        let group = groups.get(key);
+        if (!group) {
+          group = { deviceMode: name, variant: t.variant ?? null, tiles: [] };
+          groups.set(key, group);
+        }
+        group.tiles.push(exportTile(t));
+      }
+      return {
+        name: p.name,
+        layoutPreset: p.layout_preset ?? "auto",
+        layoutOrientation: p.layout_orientation ?? "landscape",
+        tiles: tiles.map(exportTile),
+        layouts: Array.from(groups.values()),
+      };
+    }),
   };
 }
 
@@ -65,7 +94,7 @@ function cleanName(raw: unknown): string {
 
 // The valid scale presets and orientations. Anything outside these sets is
 // ignored (treated as "not provided") so a bad value can never be stored.
-const LAYOUT_PRESETS = new Set(["auto", "compact", "fhd", "qhd", "uhd"]);
+const LAYOUT_PRESETS = new Set(["auto", "adaptive", "compact", "fhd", "qhd", "uhd"]);
 const LAYOUT_ORIENTATIONS = new Set(["landscape", "portrait"]);
 
 // Normalize an incoming preset/orientation. Returns the validated string, or
@@ -121,7 +150,7 @@ router.post("/", requireAuth, (req: AuthRequest, res) => {
 // by the id param.
 router.get("/export", requireAuth, (req: AuthRequest, res) => {
   const pages = pageStmts.findAllByUser.all(req.user!.userId);
-  res.json(buildExport(pages));
+  res.json(buildExport(req.user!.userId, pages));
 });
 
 // GET /api/pages/:id/export — export a single page as a downloadable envelope.
@@ -132,7 +161,7 @@ router.get("/:id/export", requireAuth, (req: AuthRequest, res) => {
     res.status(404).json({ error: "Page not found" });
     return;
   }
-  res.json(buildExport([page]));
+  res.json(buildExport(req.user!.userId, [page]));
 });
 
 // POST /api/pages/import — recreate one or more pages from a previously
@@ -157,7 +186,9 @@ router.post("/import", requireAuth, (req: AuthRequest, res) => {
     res.status(400).json({ error: "This file is not a valid dashboard page export." });
     return;
   }
-  if (envelope.version !== EXPORT_VERSION) {
+  // v1 files carry only a flat `tiles` list (pre device modes); v2 files add
+  // per-(deviceMode, variant) `layouts`. Both are accepted.
+  if (envelope.version !== 1 && envelope.version !== EXPORT_VERSION) {
     res.status(400).json({
       error: `Unsupported export version: ${envelope.version}. This file was created by a different version.`,
     });
@@ -169,6 +200,24 @@ router.post("/import", requireAuth, (req: AuthRequest, res) => {
   );
   const { maxPos } = pageStmts.maxPosition.get(req.user!.userId)!;
 
+  // Device modes referenced by NAME in v2 files are matched to the importer's
+  // existing modes case-insensitively; unknown names get created on the fly.
+  const modesByName = new Map(
+    deviceModeStmts.findAllByUser
+      .all(req.user!.userId)
+      .map((m) => [m.name.toLowerCase(), m.id]),
+  );
+  const resolveModeId = (rawName: unknown): number => {
+    const name =
+      typeof rawName === "string" && rawName.trim() ? rawName.trim().slice(0, 40) : "Default";
+    const existing = modesByName.get(name.toLowerCase());
+    if (existing != null) return existing;
+    const maxModePos = deviceModeStmts.maxPosition.get(req.user!.userId)?.maxPos ?? -1;
+    const row = deviceModeStmts.create.get(req.user!.userId, name, maxModePos + 1)!;
+    modesByName.set(name.toLowerCase(), row.id);
+    return row.id;
+  };
+
   const createdIds: number[] = [];
   const importAll = db.transaction(() => {
     let position = (maxPos ?? -1) + 1;
@@ -179,8 +228,22 @@ router.post("/import", requireAuth, (req: AuthRequest, res) => {
       applyLayoutUpdate(req.user!.userId, pageRow.id, incoming);
       position++;
       createdIds.push(pageRow.id);
-      for (const tile of incoming.tiles) {
-        createImportedTile(req.user!.userId, pageRow.id, tile);
+      const layouts = (incoming as { layouts?: Array<{ deviceMode?: string; variant?: string | null; tiles: unknown[] }> }).layouts;
+      if (Array.isArray(layouts) && layouts.length > 0) {
+        for (const layout of layouts) {
+          const modeId = resolveModeId(layout.deviceMode);
+          const variant = cleanVariant(layout.variant);
+          for (const tile of layout.tiles ?? []) {
+            createImportedTile(req.user!.userId, pageRow.id, tile, modeId, variant);
+          }
+        }
+      } else {
+        // v1 (or a v2 file without layouts): everything lands in the
+        // importer's default mode as the base layout.
+        const modeId = defaultDeviceModeId(req.user!.userId);
+        for (const tile of incoming.tiles) {
+          createImportedTile(req.user!.userId, pageRow.id, tile, modeId, null);
+        }
       }
     }
   });
@@ -188,6 +251,98 @@ router.post("/import", requireAuth, (req: AuthRequest, res) => {
 
   const created = createdIds.map((id) => pageStmts.findById.get(id, req.user!.userId)!);
   res.status(201).json(created.map(formatPage));
+});
+
+// GET /api/pages/:id/layouts — list every non-empty (device mode, variant)
+// layout scope on a page with its tile count. Feeds the "copy layout from…"
+// picker for empty variants/modes.
+router.get("/:id/layouts", requireAuth, (req: AuthRequest, res) => {
+  const id = parseInt(String(req.params["id"]));
+  const page = Number.isNaN(id) ? undefined : pageStmts.findById.get(id, req.user!.userId);
+  if (!page) {
+    res.status(404).json({ error: "Page not found" });
+    return;
+  }
+  const rows = db
+    .prepare<[number, number], { device_mode_id: number | null; variant: string | null; count: number }>(
+      `SELECT device_mode_id, variant, COUNT(*) AS count
+       FROM tiles WHERE user_id = ? AND page_id = ?
+       GROUP BY device_mode_id, variant`
+    )
+    .all(req.user!.userId, page.id);
+  res.json(
+    rows.map((r) => ({
+      deviceModeId: r.device_mode_id,
+      variant: r.variant,
+      tileCount: r.count,
+    })),
+  );
+});
+
+// POST /api/pages/:id/copy-layout — duplicate every tile from one
+// (deviceModeId, variant) scope of a page into another scope on the same page.
+// Used to seed an empty variant or a new device mode from an existing layout.
+// The target scope must be empty so a copy can never silently merge/overwrite.
+router.post("/:id/copy-layout", requireAuth, (req: AuthRequest, res) => {
+  const id = parseInt(String(req.params["id"]));
+  const page = Number.isNaN(id) ? undefined : pageStmts.findById.get(id, req.user!.userId);
+  if (!page) {
+    res.status(404).json({ error: "Page not found" });
+    return;
+  }
+  const body = req.body as {
+    fromDeviceModeId?: number;
+    fromVariant?: string | null;
+    toDeviceModeId?: number;
+    toVariant?: string | null;
+  };
+  const fromMode =
+    body.fromDeviceModeId != null
+      ? deviceModeStmts.findById.get(body.fromDeviceModeId, req.user!.userId)
+      : undefined;
+  const toMode =
+    body.toDeviceModeId != null
+      ? deviceModeStmts.findById.get(body.toDeviceModeId, req.user!.userId)
+      : undefined;
+  if (!fromMode || !toMode) {
+    res.status(404).json({ error: "Device mode not found" });
+    return;
+  }
+  const fromVariant = cleanVariant(body.fromVariant);
+  const toVariant = cleanVariant(body.toVariant);
+  if (fromMode.id === toMode.id && fromVariant === toVariant) {
+    res.status(400).json({ error: "Source and target layouts are the same" });
+    return;
+  }
+  const source = tileStmts.findAllByPageScope.all(
+    req.user!.userId,
+    page.id,
+    fromMode.id,
+    fromVariant,
+  );
+  const existing = tileStmts.findAllByPageScope.all(
+    req.user!.userId,
+    page.id,
+    toMode.id,
+    toVariant,
+  );
+  if (existing.length > 0) {
+    res.status(400).json({ error: "Target layout already has tiles" });
+    return;
+  }
+  const copyAll = db.transaction(() => {
+    for (const tile of source) {
+      createImportedTile(req.user!.userId, page.id, exportTile(tile), toMode.id, toVariant);
+    }
+  });
+  copyAll();
+  const copied = tileStmts.findAllByPageScope.all(
+    req.user!.userId,
+    page.id,
+    toMode.id,
+    toVariant,
+  );
+  res.status(201).json({ copied: copied.length });
 });
 
 // PUT /api/pages/reorder — persist a new page order. Body: { order: number[] }

@@ -11,6 +11,7 @@ export type PageInputLayoutPreset = typeof PageInputLayoutPreset[keyof typeof Pa
 
 export const PageInputLayoutPreset = {
   auto: 'auto',
+  adaptive: 'adaptive',
   compact: 'compact',
   fhd: 'fhd',
   qhd: 'qhd',

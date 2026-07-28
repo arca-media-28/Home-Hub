@@ -51,6 +51,14 @@ db.exec(`
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
+  CREATE TABLE IF NOT EXISTS device_modes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name TEXT NOT NULL DEFAULT 'Default',
+    position INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
   CREATE TABLE IF NOT EXISTS uploaded_files (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -288,6 +296,45 @@ if (!pageColumns.some((c) => c.name === "layout_orientation")) {
   db.exec("ALTER TABLE pages ADD COLUMN layout_orientation TEXT");
 }
 
+// 1k. Device modes. Each user can define multiple named layout profiles (e.g.
+//     "PC", "Phone"); every tile belongs to exactly one. Adaptive pages
+//     additionally split layouts per scale+orientation via `variant` (e.g.
+//     "fhd-landscape"); NULL variant is the base layout used by auto/fixed
+//     pages. Both columns are added guarded, then backfilled: every user gets
+//     a "Default" mode and all their existing tiles are attached to it — so a
+//     pre-device-modes dashboard migrates losslessly into the default mode.
+if (!tileColumns.some((c) => c.name === "device_mode_id")) {
+  db.exec(
+    "ALTER TABLE tiles ADD COLUMN device_mode_id INTEGER REFERENCES device_modes(id) ON DELETE CASCADE"
+  );
+}
+if (!tileColumns.some((c) => c.name === "variant")) {
+  db.exec("ALTER TABLE tiles ADD COLUMN variant TEXT");
+}
+const usersWithoutMode = db
+  .prepare("SELECT id FROM users WHERE id NOT IN (SELECT user_id FROM device_modes)")
+  .all() as { id: number }[];
+const insertDefaultMode = db.prepare(
+  "INSERT INTO device_modes (user_id, name, position) VALUES (?, 'Default', 0)"
+);
+const backfillModes = db.transaction(() => {
+  for (const u of usersWithoutMode) {
+    insertDefaultMode.run(u.id);
+  }
+  // Attach any tile without a mode to its owner's first device mode.
+  db.exec(`
+    UPDATE tiles
+    SET device_mode_id = (
+      SELECT m.id FROM device_modes m
+      WHERE m.user_id = tiles.user_id
+      ORDER BY m.position ASC, m.id ASC
+      LIMIT 1
+    )
+    WHERE device_mode_id IS NULL
+  `);
+});
+backfillModes();
+
 // 2. One-time data migration: existing integration-typed tiles become app/link
 //    tiles whose `integration` carries the old type. Styling fields are left
 //    untouched. After this runs `type` is 'app' so it never matches again.
@@ -333,10 +380,20 @@ export interface DbPage {
   created_at: string;
 }
 
+export interface DbDeviceMode {
+  id: number;
+  user_id: number;
+  name: string;
+  position: number;
+  created_at: string;
+}
+
 export interface DbTile {
   id: number;
   user_id: number;
   page_id: number | null;
+  device_mode_id: number | null;
+  variant: string | null;
   type: string;
   integration: string | null;
   grid_x: number;
@@ -406,6 +463,14 @@ export const tileStmts = {
   findAllByPage: db.prepare<[number, number], DbTile>(
     "SELECT * FROM tiles WHERE user_id = ? AND page_id = ? ORDER BY created_at ASC"
   ),
+  // Variant-scoped page tiles: a specific device mode plus a layout variant
+  // (NULL variant = the base layout used by auto/fixed pages).
+  findAllByPageScope: db.prepare<[number, number, number, string | null], DbTile>(
+    `SELECT * FROM tiles
+     WHERE user_id = ? AND page_id = ? AND device_mode_id = ?
+       AND variant IS ?
+     ORDER BY created_at ASC`
+  ),
   findById: db.prepare<[number, number], DbTile>(
     "SELECT * FROM tiles WHERE id = ? AND user_id = ?"
   ),
@@ -456,6 +521,45 @@ export const pageStmts = {
 export function createDefaultPage(userId: number): number {
   const row = pageStmts.create.get(userId, "Home", 0)!;
   return row.id;
+}
+
+export const deviceModeStmts = {
+  findAllByUser: db.prepare<[number], DbDeviceMode>(
+    "SELECT * FROM device_modes WHERE user_id = ? ORDER BY position ASC, id ASC"
+  ),
+  findById: db.prepare<[number, number], DbDeviceMode>(
+    "SELECT * FROM device_modes WHERE id = ? AND user_id = ?"
+  ),
+  countByUser: db.prepare<[number], { count: number }>(
+    "SELECT COUNT(*) AS count FROM device_modes WHERE user_id = ?"
+  ),
+  maxPosition: db.prepare<[number], { maxPos: number | null }>(
+    "SELECT MAX(position) AS maxPos FROM device_modes WHERE user_id = ?"
+  ),
+  create: db.prepare<[number, string, number], { id: number }>(
+    "INSERT INTO device_modes (user_id, name, position) VALUES (?, ?, ?) RETURNING id"
+  ),
+  rename: db.prepare<[string, number, number], void>(
+    "UPDATE device_modes SET name = ? WHERE id = ? AND user_id = ?"
+  ),
+  delete: db.prepare<[number, number], void>(
+    "DELETE FROM device_modes WHERE id = ? AND user_id = ?"
+  ),
+};
+
+// Create a user's default device mode. Used on signup so every new user always
+// has exactly one mode for their tiles to belong to. Returns the mode id.
+export function createDefaultDeviceMode(userId: number): number {
+  const row = deviceModeStmts.create.get(userId, "Default", 0)!;
+  return row.id;
+}
+
+// Resolve the user's default (first) device mode id, creating one if the user
+// somehow has none. Used as the fallback scope for legacy requests that don't
+// name a device mode.
+export function defaultDeviceModeId(userId: number): number {
+  const first = deviceModeStmts.findAllByUser.get(userId);
+  return first ? first.id : createDefaultDeviceMode(userId);
 }
 
 export interface DbServiceConnection {

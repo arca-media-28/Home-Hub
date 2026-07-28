@@ -15,6 +15,16 @@ export interface TileInput {
      * @nullable
      */
   pageId?: number | null;
+  /**
+     * The device mode (layout profile) to create this tile in. Omit to fall back to the user's default (first) mode.
+     * @nullable
+     */
+  deviceModeId?: number | null;
+  /**
+     * Adaptive layout variant key to create this tile in (e.g. "fhd-landscape"). Omit or null for the base layout.
+     * @nullable
+     */
+  variant?: string | null;
   type: TileInputType;
   /** @nullable */
   integration?: TileInputIntegration;

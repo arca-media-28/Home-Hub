@@ -4,6 +4,7 @@ import authRouter from "./auth.js";
 import tilesRouter from "./tiles.js";
 import pagesRouter from "./pages.js";
 import layoutRouter from "./layout.js";
+import deviceModesRouter from "./device-modes.js";
 import uploadsRouter from "./uploads.js";
 import widgetsRouter from "./widgets.js";
 import connectionsRouter from "./connections.js";
@@ -17,6 +18,7 @@ router.use("/auth", authRouter);
 router.use("/tiles/layout", layoutRouter);
 router.use("/tiles", tilesRouter);
 router.use("/pages", pagesRouter);
+router.use("/device-modes", deviceModesRouter);
 router.use("/uploads", uploadsRouter);
 router.use("/widgets", widgetsRouter);
 // Spotify's dedicated OAuth + control endpoints. Mounted before the generic

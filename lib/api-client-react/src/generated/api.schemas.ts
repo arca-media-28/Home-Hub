@@ -649,6 +649,16 @@ export interface Tile {
      * @nullable
      */
   pageId?: number | null;
+  /**
+     * The device mode (layout profile) this tile belongs to. Null only for rows that predate device modes and could not be assigned one.
+     * @nullable
+     */
+  deviceModeId?: number | null;
+  /**
+     * Adaptive layout variant key this tile belongs to (e.g. "fhd-landscape"). Null means the base layout used by auto/fixed pages.
+     * @nullable
+     */
+  variant?: string | null;
   type: TileType;
   /** @nullable */
   integration?: TileIntegration;
@@ -766,6 +776,16 @@ export interface TileInput {
      * @nullable
      */
   pageId?: number | null;
+  /**
+     * The device mode (layout profile) to create this tile in. Omit to fall back to the user's default (first) mode.
+     * @nullable
+     */
+  deviceModeId?: number | null;
+  /**
+     * Adaptive layout variant key to create this tile in (e.g. "fhd-landscape"). Omit or null for the base layout.
+     * @nullable
+     */
+  variant?: string | null;
   type: TileInputType;
   /** @nullable */
   integration?: TileInputIntegration;
@@ -1236,17 +1256,28 @@ export interface LayoutUpdate {
      * @nullable
      */
   pageId?: number | null;
+  /**
+     * When provided with pageId, the response is narrowed to that device mode's layout (matching GET /tiles for the same scope).
+     * @nullable
+     */
+  deviceModeId?: number | null;
+  /**
+     * Adaptive layout variant key that further narrows the response scope, used with deviceModeId. Omit or null for the base layout.
+     * @nullable
+     */
+  variant?: string | null;
   tiles: LayoutItem[];
 }
 
 /**
- * Fixed scale preset that maps to a locked column count. "auto" (the default) keeps today's responsive behavior (columns derived from window width). Any other value locks the page to a fixed column count that is CSS-scaled to fit the viewport so tiles never reflow.
+ * Fixed scale preset that maps to a locked column count. "auto" (the default) keeps today's responsive behavior (columns derived from window width). "adaptive" auto-resolves a fixed preset and orientation from the viewport, with an independently saved layout per scale+orientation variant. Any other value locks the page to a fixed column count that is CSS-scaled to fit the viewport so tiles never reflow.
  */
 export type PageLayoutPreset = typeof PageLayoutPreset[keyof typeof PageLayoutPreset];
 
 
 export const PageLayoutPreset = {
   auto: 'auto',
+  adaptive: 'adaptive',
   compact: 'compact',
   fhd: 'fhd',
   qhd: 'qhd',
@@ -1269,7 +1300,7 @@ export interface Page {
   userId: number;
   name: string;
   position: number;
-  /** Fixed scale preset that maps to a locked column count. "auto" (the default) keeps today's responsive behavior (columns derived from window width). Any other value locks the page to a fixed column count that is CSS-scaled to fit the viewport so tiles never reflow. */
+  /** Fixed scale preset that maps to a locked column count. "auto" (the default) keeps today's responsive behavior (columns derived from window width). "adaptive" auto-resolves a fixed preset and orientation from the viewport, with an independently saved layout per scale+orientation variant. Any other value locks the page to a fixed column count that is CSS-scaled to fit the viewport so tiles never reflow. */
   layoutPreset?: PageLayoutPreset;
   /** How a fixed-preset page is scaled to fit. "landscape" fits to width, "portrait" fits to height. Ignored when layoutPreset is "auto". */
   layoutOrientation?: PageLayoutOrientation;
@@ -1281,6 +1312,7 @@ export type PageInputLayoutPreset = typeof PageInputLayoutPreset[keyof typeof Pa
 
 export const PageInputLayoutPreset = {
   auto: 'auto',
+  adaptive: 'adaptive',
   compact: 'compact',
   fhd: 'fhd',
   qhd: 'qhd',
@@ -1348,6 +1380,7 @@ export type ExportedPageLayoutPreset = typeof ExportedPageLayoutPreset[keyof typ
 
 export const ExportedPageLayoutPreset = {
   auto: 'auto',
+  adaptive: 'adaptive',
   compact: 'compact',
   fhd: 'fhd',
   qhd: 'qhd',
@@ -1363,13 +1396,78 @@ export const ExportedPageLayoutOrientation = {
 } as const;
 
 /**
+ * One (device mode, variant) layout scope of a page inside a v2 export envelope.
+ */
+export interface ExportedLayout {
+  /** Device mode name (matched case-insensitively on import). */
+  deviceMode: string;
+  /**
+     * Adaptive variant key (e.g. "fhd-landscape"); null for the base layout.
+     * @nullable
+     */
+  variant?: string | null;
+  tiles: ExportedTile[];
+}
+
+/**
  * A single page within an export envelope.
  */
 export interface ExportedPage {
   name: string;
   layoutPreset?: ExportedPageLayoutPreset;
   layoutOrientation?: ExportedPageLayoutOrientation;
+  /** Flat list of every tile on the page across all device modes and variants. v1 importers read this; v2 importers prefer `layouts` when present. */
   tiles: ExportedTile[];
+  /** v2 only. The page's tiles grouped per (device mode, variant) layout scope, with modes referenced by name so they can be matched or recreated on import. */
+  layouts?: ExportedLayout[];
+}
+
+export interface SuccessResponse {
+  success: boolean;
+}
+
+/**
+ * A named, user-created layout profile (e.g. "PC", "Phone"). Every tile belongs to exactly one device mode; switching modes switches the whole dashboard's tile set.
+ */
+export interface DeviceMode {
+  id: number;
+  userId: number;
+  name: string;
+  position: number;
+  createdAt?: string;
+}
+
+export interface DeviceModeInput {
+  /** Display name for the device mode (trimmed, max 40 chars). */
+  name: string;
+}
+
+/**
+ * One non-empty (device mode, variant) layout scope on a page, with its tile count. Feeds the "copy layout from…" picker.
+ */
+export interface PageLayoutInfo {
+  /** @nullable */
+  deviceModeId: number | null;
+  /** @nullable */
+  variant: string | null;
+  tileCount: number;
+}
+
+/**
+ * Source and target layout scopes for copying a page's tiles. The target scope must be empty.
+ */
+export interface CopyLayoutBody {
+  fromDeviceModeId: number;
+  /** @nullable */
+  fromVariant?: string | null;
+  toDeviceModeId: number;
+  /** @nullable */
+  toVariant?: string | null;
+}
+
+export interface CopyLayoutResult {
+  /** Number of tiles copied into the target layout. */
+  copied: number;
 }
 
 /**
@@ -2290,6 +2388,14 @@ export type GetTilesParams = {
  * When provided, return only the tiles belonging to this page. Omitting it returns every tile the user owns.
  */
 pageId?: number;
+/**
+ * When provided together with pageId, return only the tiles that belong to this device mode's layout. Omitting it returns the page's tiles across all modes (legacy behavior).
+ */
+deviceModeId?: number;
+/**
+ * Adaptive layout variant key (e.g. "fhd-landscape") to scope the result to, used with deviceModeId. Omitting it selects the base layout (variant null) used by auto/fixed pages.
+ */
+variant?: string;
 };
 
 export type GetTruenasDiagnostics200 = { [key: string]: unknown };

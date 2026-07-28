@@ -200,6 +200,10 @@ interface TileEditModalProps {
   // The page a brand-new tile should be created on (the active page). Only used
   // when creating; edits keep the tile on its existing page.
   pageId?: number | null;
+  // The device mode and adaptive layout variant a brand-new tile belongs to.
+  // Only used when creating; edits keep the tile in its existing scope.
+  deviceModeId?: number | null;
+  variant?: string | null;
 }
 
 const NONE = "none";
@@ -259,7 +263,7 @@ const INTEGRATIONS = [
 
 type ImageSource = "upload" | "library" | "url";
 
-export default function TileEditModal({ open, onOpenChange, tile, mode, defaultGridPos, pageId }: TileEditModalProps) {
+export default function TileEditModal({ open, onOpenChange, tile, mode, defaultGridPos, pageId, deviceModeId, variant }: TileEditModalProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -1842,7 +1846,14 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
     };
 
     if (mode === "create") {
-      createTile.mutate({ data: { ...data, pageId: pageId ?? null } });
+      createTile.mutate({
+        data: {
+          ...data,
+          pageId: pageId ?? null,
+          deviceModeId: deviceModeId ?? null,
+          variant: variant ?? null,
+        },
+      });
     } else if (tile) {
       updateTile.mutate({ id: tile.id, data });
     }

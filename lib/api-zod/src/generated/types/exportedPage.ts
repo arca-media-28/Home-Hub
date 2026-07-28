@@ -5,6 +5,7 @@
  * Tachboard API
  * OpenAPI spec version: 0.1.0
  */
+import type { ExportedLayout } from './exportedLayout';
 import type { ExportedPageLayoutOrientation } from './exportedPageLayoutOrientation';
 import type { ExportedPageLayoutPreset } from './exportedPageLayoutPreset';
 import type { ExportedTile } from './exportedTile';
@@ -16,5 +17,8 @@ export interface ExportedPage {
   name: string;
   layoutPreset?: ExportedPageLayoutPreset;
   layoutOrientation?: ExportedPageLayoutOrientation;
+  /** Flat list of every tile on the page across all device modes and variants. v1 importers read this; v2 importers prefer `layouts` when present. */
   tiles: ExportedTile[];
+  /** v2 only. The page's tiles grouped per (device mode, variant) layout scope, with modes referenced by name so they can be matched or recreated on import. */
+  layouts?: ExportedLayout[];
 }

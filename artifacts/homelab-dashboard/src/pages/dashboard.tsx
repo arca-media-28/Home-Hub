@@ -14,18 +14,28 @@ import {
   useDeletePage,
   useReorderPages,
   useImportPages,
+  useGetDeviceModes,
+  useCreateDeviceMode,
+  useUpdateDeviceMode,
+  useDeleteDeviceMode,
+  useGetPageLayouts,
+  useCopyPageLayout,
   exportPage,
   exportAllPages,
   getGetMeQueryKey,
   getGetTilesQueryKey,
   getGetPagesQueryKey,
   getGetConnectionsStatusQueryKey,
+  getGetDeviceModesQueryKey,
+  getGetPageLayoutsQueryKey,
   TileType,
   type Tile,
   type Page,
   type PageInput,
   type PageExport,
   type ServiceStatus,
+  type DeviceMode,
+  type GetTilesParams,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -126,12 +136,50 @@ const PRESET_COLS: Record<string, number> = {
 // Human-friendly labels for the layout dropdown.
 const PRESET_LABEL: Record<string, string> = {
   auto: "Auto / responsive",
+  adaptive: "Adaptive",
   compact: "Compact",
   fhd: "1080p",
   qhd: "2K",
   uhd: "4K",
 };
-const PRESET_ORDER = ["auto", "compact", "fhd", "qhd", "uhd"] as const;
+const PRESET_ORDER = ["auto", "adaptive", "compact", "fhd", "qhd", "uhd"] as const;
+
+// ---- Adaptive pages -------------------------------------------------------
+// An "adaptive" page auto-resolves a fixed scale preset + orientation from the
+// current viewport and keeps an independently saved layout per resolved
+// (preset, orientation) pair — the "variant". Variant keys look like
+// "fhd-landscape". Auto/fixed pages always use the base layout (variant null).
+
+const ORIENTATIONS = ["landscape", "portrait"] as const;
+
+// Width breakpoints (CSS px) that pick the fixed preset an adaptive page
+// resolves to. Chosen to sit between the widths the presets echo (compact
+// ~<1400, 1080p ~1920, 2K ~2560, 4K ~3840).
+function resolveAdaptive(width: number, height: number): {
+  preset: string;
+  orientation: string;
+} {
+  const orientation = height > width ? "portrait" : "landscape";
+  // In portrait the long side still describes the screen class, so classify by
+  // the larger dimension rather than raw width.
+  const major = Math.max(width, height);
+  const preset =
+    major >= 3200 ? "uhd" : major >= 2240 ? "qhd" : major >= 1600 ? "fhd" : "compact";
+  return { preset, orientation };
+}
+
+function variantKey(preset: string, orientation: string): string {
+  return `${preset}-${orientation}`;
+}
+
+// Human label for a variant key, e.g. "fhd-landscape" → "1080p · Landscape".
+function variantLabel(variant: string | null | undefined): string {
+  if (!variant) return "Base layout";
+  const [p, o] = variant.split("-");
+  const preset = PRESET_LABEL[p ?? ""] ?? p ?? "?";
+  const orient = o === "portrait" ? "Vertical" : "Landscape";
+  return `${preset} · ${orient}`;
+}
 
 // A page is locked to a fixed layout when its preset is a known non-auto preset.
 function isFixedPreset(preset: string | undefined): boolean {
@@ -314,6 +362,27 @@ export default function Dashboard() {
     const n = stored ? parseInt(stored, 10) : NaN;
     return Number.isNaN(n) ? null : n;
   });
+  // The device mode this browser shows. Persisted so a PC and a wall tablet can
+  // each remember their own mode. null until modes load / are reconciled.
+  const [activeDeviceModeId, setActiveDeviceModeId] = useState<number | null>(() => {
+    const stored = localStorage.getItem("activeDeviceModeId");
+    const n = stored ? parseInt(stored, 10) : NaN;
+    return Number.isNaN(n) ? null : n;
+  });
+  // Dialog state for creating/renaming a device mode, plus its name draft.
+  const [modeDialog, setModeDialog] = useState<null | { kind: "create" | "rename" }>(null);
+  const [modeNameDraft, setModeNameDraft] = useState("");
+  // Device mode queued for deletion; drives the confirm dialog.
+  const [modePendingDelete, setModePendingDelete] = useState<DeviceMode | null>(null);
+  // Viewport-resolved scale for adaptive pages, re-resolved on resize.
+  const [adaptiveResolved, setAdaptiveResolved] = useState(() =>
+    resolveAdaptive(window.innerWidth, window.innerHeight),
+  );
+  // While editing an adaptive page the user can pin a specific variant to work
+  // on (instead of the one the current screen resolves to). null = follow the
+  // screen. Cleared when leaving edit mode or switching pages.
+  const [editVariantOverride, setEditVariantOverride] = useState<string | null>(null);
+
   // Page id whose name is being edited inline (edit mode only), plus its draft.
   const [renamingPageId, setRenamingPageId] = useState<number | null>(null);
   const [renameDraft, setRenameDraft] = useState("");
@@ -383,17 +452,74 @@ export default function Dashboard() {
     if (activePageId != null) localStorage.setItem("activePageId", String(activePageId));
   }, [activePageId]);
 
-  const { data: tiles = [], isLoading } = useGetTiles(
-    activePageId != null ? { pageId: activePageId } : undefined,
-    {
-      query: {
-        queryKey: getGetTilesQueryKey(
-          activePageId != null ? { pageId: activePageId } : undefined,
-        ),
-        enabled: Boolean(me) && activePageId != null,
-      },
+  // Device modes: switchable layout profiles (e.g. "PC", "Phone"). Every user
+  // has at least one; each keeps an independent set of tiles per page.
+  const { data: deviceModes = [] } = useGetDeviceModes({
+    query: { queryKey: getGetDeviceModesQueryKey(), enabled: Boolean(me) },
+  });
+
+  // Reconcile the active mode against the loaded list (mirrors the page logic).
+  useEffect(() => {
+    if (deviceModes.length === 0) return;
+    setActiveDeviceModeId((current) => {
+      if (current != null && deviceModes.some((m) => m.id === current)) return current;
+      return deviceModes[0]!.id;
+    });
+  }, [deviceModes]);
+
+  // Persist the active mode so this browser reopens in the same profile.
+  useEffect(() => {
+    if (activeDeviceModeId != null) {
+      localStorage.setItem("activeDeviceModeId", String(activeDeviceModeId));
+    }
+  }, [activeDeviceModeId]);
+
+  // Re-resolve the adaptive scale whenever the viewport changes.
+  useEffect(() => {
+    const onResize = () =>
+      setAdaptiveResolved((prev) => {
+        const next = resolveAdaptive(window.innerWidth, window.innerHeight);
+        return next.preset === prev.preset && next.orientation === prev.orientation
+          ? prev
+          : next;
+      });
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  // Resolve the active page + its scale settings early: the tile query below is
+  // scoped by the adaptive variant, which depends on the page's preset.
+  const activePage = pages.find((p) => p.id === activePageId) ?? null;
+  const preset = activePage?.layoutPreset ?? "auto";
+  const orientation = activePage?.layoutOrientation ?? "landscape";
+  const isAdaptive = preset === "adaptive";
+
+  // The layout variant currently shown. Only adaptive pages use variants; in
+  // edit mode a pinned variant (the edit-mode switcher) wins over the one the
+  // screen resolves to.
+  const activeVariant = isAdaptive
+    ? editMode && editVariantOverride
+      ? editVariantOverride
+      : variantKey(adaptiveResolved.preset, adaptiveResolved.orientation)
+    : null;
+
+  // Tile query params: page + device mode always; variant only for adaptive
+  // pages. One shared object so the query key and cache writes always agree.
+  const tilesParams: GetTilesParams | undefined =
+    activePageId != null && activeDeviceModeId != null
+      ? {
+          pageId: activePageId,
+          deviceModeId: activeDeviceModeId,
+          ...(activeVariant != null ? { variant: activeVariant } : {}),
+        }
+      : undefined;
+
+  const { data: tiles = [], isLoading } = useGetTiles(tilesParams, {
+    query: {
+      queryKey: getGetTilesQueryKey(tilesParams),
+      enabled: Boolean(me) && tilesParams !== undefined,
     },
-  );
+  });
 
   // Poll service reachability so each live-widget tile shows an up/down badge.
   // Refetches on a timer and whenever the dashboard regains focus (e.g. after
@@ -412,12 +538,10 @@ export default function Dashboard() {
   // Surface a toast whenever a previously-healthy service goes unreachable.
   useHealthAlerts(Boolean(me));
 
-  // Query key for the active page's tiles. All cache reads/writes for tiles go
-  // through this so each page keeps its own independently-cached tile list.
-  const tilesQueryKey =
-    activePageId != null
-      ? getGetTilesQueryKey({ pageId: activePageId })
-      : getGetTilesQueryKey();
+  // Query key for the active (page, device mode, variant) tile scope. All cache
+  // reads/writes for tiles go through this so each scope keeps its own
+  // independently-cached tile list.
+  const tilesQueryKey = getGetTilesQueryKey(tilesParams);
 
   const saveLayout = useSaveLayout({
     mutation: {
@@ -493,6 +617,72 @@ export default function Dashboard() {
     },
   });
 
+  // Device-mode CRUD. Create switches this browser to the new mode; delete
+  // drops the mode's cached tile scopes and lets the reconcile effect pick a
+  // surviving mode.
+  const createDeviceMode = useCreateDeviceMode({
+    mutation: {
+      onSuccess: (mode) => {
+        queryClient.invalidateQueries({ queryKey: getGetDeviceModesQueryKey() });
+        setActiveDeviceModeId(mode.id);
+      },
+      onError: (err) => {
+        toast({ title: "Failed to create mode", description: err.message, variant: "destructive" });
+      },
+    },
+  });
+
+  const updateDeviceMode = useUpdateDeviceMode({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getGetDeviceModesQueryKey() });
+      },
+      onError: (err) => {
+        toast({ title: "Failed to rename mode", description: err.message, variant: "destructive" });
+      },
+    },
+  });
+
+  const deleteDeviceMode = useDeleteDeviceMode({
+    mutation: {
+      onSuccess: () => {
+        queryClient.removeQueries({ queryKey: getGetTilesQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getGetDeviceModesQueryKey() });
+      },
+      onError: (err) => {
+        toast({ title: "Failed to delete mode", description: err.message, variant: "destructive" });
+      },
+    },
+  });
+
+  // "Copy layout from…" for an empty (mode, variant) scope. Lists the page's
+  // non-empty scopes and clones one into the current scope.
+  const { data: pageLayouts = [] } = useGetPageLayouts(activePageId ?? 0, {
+    query: {
+      queryKey: getGetPageLayoutsQueryKey(activePageId ?? 0),
+      enabled: Boolean(me) && activePageId != null,
+    },
+  });
+
+  const copyPageLayout = useCopyPageLayout({
+    mutation: {
+      onSuccess: (result) => {
+        queryClient.invalidateQueries({ queryKey: getGetTilesQueryKey() });
+        if (activePageId != null) {
+          queryClient.invalidateQueries({
+            queryKey: getGetPageLayoutsQueryKey(activePageId),
+          });
+        }
+        toast({
+          title: result.copied === 1 ? "Copied 1 tile" : `Copied ${result.copied} tiles`,
+        });
+      },
+      onError: (err) => {
+        toast({ title: "Copy failed", description: err.message, variant: "destructive" });
+      },
+    },
+  });
+
   const reorderPages = useReorderPages({
     mutation: {
       onSuccess: (data) => {
@@ -507,17 +697,17 @@ export default function Dashboard() {
 
   const layout = tiles.map(tileToLayout);
 
-  // Resolve the active page's fixed-scale settings. A fixed preset locks the
-  // grid to a preset column count (independent of window width); "auto" keeps
-  // the responsive behavior. Orientation only matters for a fixed page: it
-  // selects fit-to-width (landscape) vs fit-to-height (portrait) scaling.
-  const activePage = pages.find((p) => p.id === activePageId) ?? null;
-  const preset = activePage?.layoutPreset ?? "auto";
-  const orientation = activePage?.layoutOrientation ?? "landscape";
-  const fixedLayout = isFixedPreset(preset);
+  // Effective scale settings. An adaptive page behaves exactly like a fixed
+  // page whose preset/orientation come from the active variant (screen-resolved
+  // or pinned in edit mode); auto/fixed pages use the page's own settings.
+  const effPreset = isAdaptive ? (activeVariant?.split("-")[0] ?? "fhd") : preset;
+  const effOrientation = isAdaptive
+    ? (activeVariant?.split("-")[1] ?? "landscape")
+    : orientation;
+  const fixedLayout = isFixedPreset(effPreset);
 
   const cols = fixedLayout
-    ? PRESET_COLS[preset]!
+    ? PRESET_COLS[effPreset]!
     : gridWidth !== null
       ? colsForWidth(gridWidth)
       : MIN_COLS;
@@ -537,7 +727,7 @@ export default function Dashboard() {
     gridWidth !== null ? gridWidth / intrinsicGridWidth(cols) : 1;
   const scale =
     fixedLayout && !editMode
-      ? orientation === "portrait"
+      ? effOrientation === "portrait"
         ? availHeight !== null && intrinsicHeight
           ? Math.min(availHeight / intrinsicHeight, widthScale)
           : 1
@@ -569,10 +759,18 @@ export default function Dashboard() {
       );
 
       // Persist immediately on drag/resize end — no debounce. Scope the save to
-      // the active page so the response (and reconcile) carries only its tiles.
-      saveLayout.mutate({ data: { tiles: mapped, pageId: activePageId } });
+      // the active (page, mode, variant) so the response (and reconcile)
+      // carries only this scope's tiles.
+      saveLayout.mutate({
+        data: {
+          tiles: mapped,
+          pageId: activePageId,
+          deviceModeId: activeDeviceModeId,
+          variant: activeVariant,
+        },
+      });
     },
-    [editMode, saveLayout, queryClient, tilesQueryKey, activePageId],
+    [editMode, saveLayout, queryClient, tilesQueryKey, activePageId, activeDeviceModeId, activeVariant],
   );
 
   // Measure the fixed grid's intrinsic (unscaled) height so a portrait page can
@@ -659,6 +857,8 @@ export default function Dashboard() {
     createTile.mutate({
       data: {
         pageId: activePageId,
+        deviceModeId: activeDeviceModeId,
+        variant: activeVariant,
         type: TileType.app,
         integration: "spacer",
         gridX: pos.x,
@@ -677,6 +877,8 @@ export default function Dashboard() {
     createTile.mutate({
       data: {
         pageId: activePageId,
+        deviceModeId: activeDeviceModeId,
+        variant: activeVariant,
         type: TileType.app,
         integration: "divider",
         name: "Section",
@@ -698,6 +900,7 @@ export default function Dashboard() {
   function handleSelectPage(id: number) {
     if (id === activePageId) return;
     setRenamingPageId(null);
+    setEditVariantOverride(null);
     setActivePageId(id);
   }
 
@@ -741,6 +944,64 @@ export default function Dashboard() {
     const page = pagePendingDelete;
     setPagePendingDelete(null);
     if (page) deletePage.mutate({ id: page.id });
+  }
+
+  const activeDeviceMode =
+    deviceModes.find((m) => m.id === activeDeviceModeId) ?? null;
+
+  // Open the create/rename mode dialog with the right starting draft.
+  function openModeDialog(kind: "create" | "rename") {
+    setModeNameDraft(kind === "rename" ? (activeDeviceMode?.name ?? "") : "");
+    setModeDialog({ kind });
+  }
+
+  function commitModeDialog() {
+    const kind = modeDialog?.kind;
+    const name = modeNameDraft.trim();
+    setModeDialog(null);
+    if (!kind || !name) return;
+    if (kind === "create") {
+      createDeviceMode.mutate({ data: { name } });
+    } else if (activeDeviceModeId != null) {
+      updateDeviceMode.mutate({ id: activeDeviceModeId, data: { name } });
+    }
+  }
+
+  function confirmDeleteMode() {
+    const mode = modePendingDelete;
+    setModePendingDelete(null);
+    if (mode) deleteDeviceMode.mutate({ id: mode.id });
+  }
+
+  // The variant the current screen resolves to (adaptive pages only) — used to
+  // mark "this screen" in the edit-mode variant switcher.
+  const screenVariant = variantKey(adaptiveResolved.preset, adaptiveResolved.orientation);
+
+  // Layout scopes offered by the "copy layout from…" picker: every non-empty
+  // scope on this page except the one currently shown.
+  const copySources = pageLayouts.filter(
+    (l) =>
+      !(
+        l.deviceModeId === activeDeviceModeId &&
+        (l.variant ?? null) === (activeVariant ?? null)
+      ),
+  );
+
+  function modeName(id: number | null): string {
+    return deviceModes.find((m) => m.id === id)?.name ?? "Unknown mode";
+  }
+
+  function handleCopyLayout(fromDeviceModeId: number | null, fromVariant: string | null) {
+    if (activePageId == null || activeDeviceModeId == null || fromDeviceModeId == null) return;
+    copyPageLayout.mutate({
+      id: activePageId,
+      data: {
+        fromDeviceModeId,
+        fromVariant,
+        toDeviceModeId: activeDeviceModeId,
+        toVariant: activeVariant,
+      },
+    });
   }
 
   // Import a previously exported file. On success the new pages are appended,
@@ -950,7 +1211,14 @@ export default function Dashboard() {
               size="sm"
               variant={editMode ? "secondary" : "outline"}
               className="gap-1.5"
-              onClick={() => setEditMode((v) => !v)}
+              onClick={() =>
+                setEditMode((v) => {
+                  // Leaving edit mode drops any pinned variant so the page
+                  // returns to the layout the current screen resolves to.
+                  if (v) setEditVariantOverride(null);
+                  return !v;
+                })
+              }
             >
               {editMode ? (
                 <>
@@ -964,6 +1232,65 @@ export default function Dashboard() {
                 </>
               )}
             </Button>
+
+            {/* Device-mode switcher: which layout profile this browser shows. */}
+            {deviceModes.length > 0 && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="gap-1.5"
+                    title="Device mode — separate tile layouts per device (PC, phone, …)"
+                    data-testid="device-mode-trigger"
+                  >
+                    <MonitorSmartphone className="w-3.5 h-3.5" />
+                    <span className="max-w-24 truncate text-sm">
+                      {activeDeviceMode?.name ?? "Mode"}
+                    </span>
+                    <ChevronDown className="w-3.5 h-3.5 opacity-60" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-52">
+                  <DropdownMenuLabel>Device mode</DropdownMenuLabel>
+                  <DropdownMenuRadioGroup
+                    value={activeDeviceModeId != null ? String(activeDeviceModeId) : ""}
+                    onValueChange={(v) => setActiveDeviceModeId(parseInt(v, 10))}
+                  >
+                    {deviceModes.map((m) => (
+                      <DropdownMenuRadioItem key={m.id} value={String(m.id)}>
+                        {m.name}
+                      </DropdownMenuRadioItem>
+                    ))}
+                  </DropdownMenuRadioGroup>
+                  {editMode && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => openModeDialog("create")} className="gap-2">
+                        <Plus className="w-3.5 h-3.5" />
+                        New mode…
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => openModeDialog("rename")}
+                        className="gap-2"
+                        disabled={!activeDeviceMode}
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                        Rename current…
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => activeDeviceMode && setModePendingDelete(activeDeviceMode)}
+                        className="gap-2 text-destructive"
+                        disabled={!activeDeviceMode || deviceModes.length <= 1}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        Delete current…
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
 
             <Button
               size="sm"
@@ -1104,7 +1431,7 @@ export default function Dashboard() {
                         >
                           <MonitorSmartphone className="w-3.5 h-3.5" />
                           {PRESET_LABEL[preset] ?? "Auto / responsive"}
-                          {fixedLayout && (
+                          {!isAdaptive && fixedLayout && (
                             <span className="text-muted-foreground">
                               · {orientation === "portrait" ? "Vertical" : "Landscape"}
                             </span>
@@ -1129,12 +1456,72 @@ export default function Dashboard() {
                           value={orientation}
                           onValueChange={(v) => setPageLayout({ layoutOrientation: v })}
                         >
-                          <DropdownMenuRadioItem value="landscape" disabled={!fixedLayout}>
+                          <DropdownMenuRadioItem
+                            value="landscape"
+                            disabled={isAdaptive || !fixedLayout}
+                          >
                             Landscape (fit width)
                           </DropdownMenuRadioItem>
-                          <DropdownMenuRadioItem value="portrait" disabled={!fixedLayout}>
+                          <DropdownMenuRadioItem
+                            value="portrait"
+                            disabled={isAdaptive || !fixedLayout}
+                          >
                             Vertical (fit height)
                           </DropdownMenuRadioItem>
+                        </DropdownMenuRadioGroup>
+                        {isAdaptive && (
+                          <p className="px-2 py-1.5 text-xs text-muted-foreground">
+                            Adaptive pages pick scale and orientation from the
+                            screen automatically.
+                          </p>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
+
+                  {/* Edit-mode variant switcher for adaptive pages: pin any
+                      scale+orientation variant to edit its layout, regardless
+                      of what this screen resolves to. */}
+                  {activePage && isAdaptive && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="gap-1.5 shrink-0 h-7"
+                          title="Which adaptive layout variant you're editing"
+                          data-testid="variant-switcher-trigger"
+                        >
+                          <LayoutGrid className="w-3.5 h-3.5" />
+                          {variantLabel(activeVariant)}
+                          {activeVariant === screenVariant && (
+                            <span className="text-muted-foreground">· this screen</span>
+                          )}
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start" className="w-56">
+                        <DropdownMenuLabel>Editing layout for</DropdownMenuLabel>
+                        <DropdownMenuRadioGroup
+                          value={activeVariant ?? ""}
+                          onValueChange={(v) =>
+                            setEditVariantOverride(v === screenVariant ? null : v)
+                          }
+                        >
+                          {PRESET_ORDER.filter((p) => p in PRESET_COLS).flatMap((p) =>
+                            ORIENTATIONS.map((o) => {
+                              const key = variantKey(p, o);
+                              return (
+                                <DropdownMenuRadioItem key={key} value={key}>
+                                  {variantLabel(key)}
+                                  {key === screenVariant && (
+                                    <span className="ml-1 text-muted-foreground text-xs">
+                                      (this screen)
+                                    </span>
+                                  )}
+                                </DropdownMenuRadioItem>
+                              );
+                            }),
+                          )}
                         </DropdownMenuRadioGroup>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -1214,6 +1601,39 @@ export default function Dashboard() {
               <Plus className="w-4 h-4" />
               Add your first tile
             </Button>
+            {copySources.length > 0 && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="gap-1.5"
+                    disabled={copyPageLayout.isPending}
+                    data-testid="copy-layout-trigger"
+                  >
+                    {copyPageLayout.isPending ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Download className="w-4 h-4" />
+                    )}
+                    Copy layout from…
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="center" className="w-64">
+                  <DropdownMenuLabel>Copy this page's tiles from</DropdownMenuLabel>
+                  {copySources.map((src) => (
+                    <DropdownMenuItem
+                      key={`${src.deviceModeId ?? "none"}:${src.variant ?? "base"}`}
+                      onClick={() => handleCopyLayout(src.deviceModeId, src.variant)}
+                    >
+                      {modeName(src.deviceModeId)} · {variantLabel(src.variant)}
+                      <span className="ml-auto text-xs text-muted-foreground">
+                        {src.tileCount} {src.tileCount === 1 ? "tile" : "tiles"}
+                      </span>
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </div>
         ) : (
           <div>
@@ -1347,7 +1767,76 @@ export default function Dashboard() {
         mode={modalMode}
         defaultGridPos={createGridPos}
         pageId={activePageId}
+        deviceModeId={activeDeviceModeId}
+        variant={activeVariant}
       />
+
+      {/* Create / rename a device mode */}
+      <AlertDialog
+        open={modeDialog !== null}
+        onOpenChange={(open) => {
+          if (!open) setModeDialog(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {modeDialog?.kind === "rename" ? "Rename device mode" : "New device mode"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {modeDialog?.kind === "rename"
+                ? "Give this device mode a new name."
+                : "A device mode is a separate layout profile — e.g. one for your PC and one for your phone. Each browser remembers which mode it shows."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <Input
+            autoFocus
+            value={modeNameDraft}
+            onChange={(e) => setModeNameDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") commitModeDialog();
+            }}
+            placeholder="e.g. Phone"
+            data-testid="mode-name-input"
+          />
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={commitModeDialog}
+              disabled={!modeNameDraft.trim()}
+            >
+              {modeDialog?.kind === "rename" ? "Rename" : "Create mode"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Confirm device-mode deletion */}
+      <AlertDialog
+        open={modePendingDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) setModePendingDelete(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete “{modePendingDelete?.name}”?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This permanently removes the device mode and every tile layout it
+              holds on all pages. This can't be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeleteMode}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete mode
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog
         open={pagePendingDelete !== null}

@@ -67,13 +67,17 @@ export const GetMeResponse = zod.object({
  * @summary List tiles for the authenticated user (optionally scoped to a page)
  */
 export const GetTilesQueryParams = zod.object({
-  "pageId": zod.coerce.number().optional().describe('When provided, return only the tiles belonging to this page. Omitting it returns every tile the user owns.')
+  "pageId": zod.coerce.number().optional().describe('When provided, return only the tiles belonging to this page. Omitting it returns every tile the user owns.'),
+  "deviceModeId": zod.coerce.number().optional().describe('When provided together with pageId, return only the tiles that belong to this device mode\'s layout. Omitting it returns the page\'s tiles across all modes (legacy behavior).'),
+  "variant": zod.coerce.string().optional().describe('Adaptive layout variant key (e.g. \"fhd-landscape\") to scope the result to, used with deviceModeId. Omitting it selects the base layout (variant null) used by auto\/fixed pages.')
 })
 
 export const GetTilesResponseItem = zod.object({
   "id": zod.number(),
   "userId": zod.number(),
   "pageId": zod.number().nullish().describe('The page this tile belongs to. Null only for tiles that predate the multi-page migration and could not be assigned a page.'),
+  "deviceModeId": zod.number().nullish().describe('The device mode (layout profile) this tile belongs to. Null only for rows that predate device modes and could not be assigned one.'),
+  "variant": zod.string().nullish().describe('Adaptive layout variant key this tile belongs to (e.g. \"fhd-landscape\"). Null means the base layout used by auto\/fixed pages.'),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'lidarr', 'qbittorrent']),
   "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('pterodactyl'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('email'),zod.literal('calendar'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal('bonsai'),zod.literal('aquarium'),zod.literal('visualizer'),zod.literal('pictureframe'),zod.literal('videoplayer'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
@@ -213,6 +217,8 @@ export const GetTilesResponse = zod.array(GetTilesResponseItem)
  */
 export const CreateTileBody = zod.object({
   "pageId": zod.number().nullish().describe('The page to create this tile on. Omit to fall back to the user\'s first page.'),
+  "deviceModeId": zod.number().nullish().describe('The device mode (layout profile) to create this tile in. Omit to fall back to the user\'s default (first) mode.'),
+  "variant": zod.string().nullish().describe('Adaptive layout variant key to create this tile in (e.g. \"fhd-landscape\"). Omit or null for the base layout.'),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'lidarr', 'qbittorrent']),
   "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('pterodactyl'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('email'),zod.literal('calendar'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal('bonsai'),zod.literal('aquarium'),zod.literal('visualizer'),zod.literal('pictureframe'),zod.literal('videoplayer'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
@@ -356,6 +362,8 @@ export const GetTileResponse = zod.object({
   "id": zod.number(),
   "userId": zod.number(),
   "pageId": zod.number().nullish().describe('The page this tile belongs to. Null only for tiles that predate the multi-page migration and could not be assigned a page.'),
+  "deviceModeId": zod.number().nullish().describe('The device mode (layout profile) this tile belongs to. Null only for rows that predate device modes and could not be assigned one.'),
+  "variant": zod.string().nullish().describe('Adaptive layout variant key this tile belongs to (e.g. \"fhd-landscape\"). Null means the base layout used by auto\/fixed pages.'),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'lidarr', 'qbittorrent']),
   "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('pterodactyl'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('email'),zod.literal('calendar'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal('bonsai'),zod.literal('aquarium'),zod.literal('visualizer'),zod.literal('pictureframe'),zod.literal('videoplayer'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
@@ -631,6 +639,8 @@ export const UpdateTileResponse = zod.object({
   "id": zod.number(),
   "userId": zod.number(),
   "pageId": zod.number().nullish().describe('The page this tile belongs to. Null only for tiles that predate the multi-page migration and could not be assigned a page.'),
+  "deviceModeId": zod.number().nullish().describe('The device mode (layout profile) this tile belongs to. Null only for rows that predate device modes and could not be assigned one.'),
+  "variant": zod.string().nullish().describe('Adaptive layout variant key this tile belongs to (e.g. \"fhd-landscape\"). Null means the base layout used by auto\/fixed pages.'),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'lidarr', 'qbittorrent']),
   "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('pterodactyl'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('email'),zod.literal('calendar'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal('bonsai'),zod.literal('aquarium'),zod.literal('visualizer'),zod.literal('pictureframe'),zod.literal('videoplayer'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
@@ -777,6 +787,8 @@ export const DeleteTileParams = zod.object({
  */
 export const SaveLayoutBody = zod.object({
   "pageId": zod.number().nullish().describe('The page whose layout is being saved. When provided, the response returns only that page\'s tiles; omit for all of the user\'s tiles.'),
+  "deviceModeId": zod.number().nullish().describe('When provided with pageId, the response is narrowed to that device mode\'s layout (matching GET \/tiles for the same scope).'),
+  "variant": zod.string().nullish().describe('Adaptive layout variant key that further narrows the response scope, used with deviceModeId. Omit or null for the base layout.'),
   "tiles": zod.array(zod.object({
   "id": zod.number(),
   "gridX": zod.number(),
@@ -790,6 +802,8 @@ export const SaveLayoutResponseItem = zod.object({
   "id": zod.number(),
   "userId": zod.number(),
   "pageId": zod.number().nullish().describe('The page this tile belongs to. Null only for tiles that predate the multi-page migration and could not be assigned a page.'),
+  "deviceModeId": zod.number().nullish().describe('The device mode (layout profile) this tile belongs to. Null only for rows that predate device modes and could not be assigned one.'),
+  "variant": zod.string().nullish().describe('Adaptive layout variant key this tile belongs to (e.g. \"fhd-landscape\"). Null means the base layout used by auto\/fixed pages.'),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'lidarr', 'qbittorrent']),
   "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('pterodactyl'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('email'),zod.literal('calendar'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal('bonsai'),zod.literal('aquarium'),zod.literal('visualizer'),zod.literal('pictureframe'),zod.literal('videoplayer'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
@@ -925,6 +939,59 @@ export const SaveLayoutResponse = zod.array(SaveLayoutResponseItem)
 
 
 /**
+ * @summary List the authenticated user's device modes
+ */
+export const GetDeviceModesResponseItem = zod.object({
+  "id": zod.number(),
+  "userId": zod.number(),
+  "name": zod.string(),
+  "position": zod.number(),
+  "createdAt": zod.string().optional()
+}).describe('A named, user-created layout profile (e.g. \"PC\", \"Phone\"). Every tile belongs to exactly one device mode; switching modes switches the whole dashboard\'s tile set.')
+export const GetDeviceModesResponse = zod.array(GetDeviceModesResponseItem)
+
+
+/**
+ * @summary Create a new device mode
+ */
+export const CreateDeviceModeBody = zod.object({
+  "name": zod.string().describe('Display name for the device mode (trimmed, max 40 chars).')
+})
+
+
+/**
+ * @summary Rename a device mode
+ */
+export const UpdateDeviceModeParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateDeviceModeBody = zod.object({
+  "name": zod.string().describe('Display name for the device mode (trimmed, max 40 chars).')
+})
+
+export const UpdateDeviceModeResponse = zod.object({
+  "id": zod.number(),
+  "userId": zod.number(),
+  "name": zod.string(),
+  "position": zod.number(),
+  "createdAt": zod.string().optional()
+}).describe('A named, user-created layout profile (e.g. \"PC\", \"Phone\"). Every tile belongs to exactly one device mode; switching modes switches the whole dashboard\'s tile set.')
+
+
+/**
+ * @summary Delete a device mode and every tile in it
+ */
+export const DeleteDeviceModeParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const DeleteDeviceModeResponse = zod.object({
+  "success": zod.boolean()
+})
+
+
+/**
  * @summary List the authenticated user's dashboard pages
  */
 export const GetPagesResponseItem = zod.object({
@@ -932,7 +999,7 @@ export const GetPagesResponseItem = zod.object({
   "userId": zod.number(),
   "name": zod.string(),
   "position": zod.number(),
-  "layoutPreset": zod.enum(['auto', 'compact', 'fhd', 'qhd', 'uhd']).optional().describe('Fixed scale preset that maps to a locked column count. \"auto\" (the default) keeps today\'s responsive behavior (columns derived from window width). Any other value locks the page to a fixed column count that is CSS-scaled to fit the viewport so tiles never reflow.'),
+  "layoutPreset": zod.enum(['auto', 'adaptive', 'compact', 'fhd', 'qhd', 'uhd']).optional().describe('Fixed scale preset that maps to a locked column count. \"auto\" (the default) keeps today\'s responsive behavior (columns derived from window width). \"adaptive\" auto-resolves a fixed preset and orientation from the viewport, with an independently saved layout per scale+orientation variant. Any other value locks the page to a fixed column count that is CSS-scaled to fit the viewport so tiles never reflow.'),
   "layoutOrientation": zod.enum(['landscape', 'portrait']).optional().describe('How a fixed-preset page is scaled to fit. \"landscape\" fits to width, \"portrait\" fits to height. Ignored when layoutPreset is \"auto\".'),
   "createdAt": zod.string().optional()
 })
@@ -944,7 +1011,7 @@ export const GetPagesResponse = zod.array(GetPagesResponseItem)
  */
 export const CreatePageBody = zod.object({
   "name": zod.string().optional(),
-  "layoutPreset": zod.enum(['auto', 'compact', 'fhd', 'qhd', 'uhd']).optional(),
+  "layoutPreset": zod.enum(['auto', 'adaptive', 'compact', 'fhd', 'qhd', 'uhd']).optional(),
   "layoutOrientation": zod.enum(['landscape', 'portrait']).optional()
 })
 
@@ -961,7 +1028,7 @@ export const ReorderPagesResponseItem = zod.object({
   "userId": zod.number(),
   "name": zod.string(),
   "position": zod.number(),
-  "layoutPreset": zod.enum(['auto', 'compact', 'fhd', 'qhd', 'uhd']).optional().describe('Fixed scale preset that maps to a locked column count. \"auto\" (the default) keeps today\'s responsive behavior (columns derived from window width). Any other value locks the page to a fixed column count that is CSS-scaled to fit the viewport so tiles never reflow.'),
+  "layoutPreset": zod.enum(['auto', 'adaptive', 'compact', 'fhd', 'qhd', 'uhd']).optional().describe('Fixed scale preset that maps to a locked column count. \"auto\" (the default) keeps today\'s responsive behavior (columns derived from window width). \"adaptive\" auto-resolves a fixed preset and orientation from the viewport, with an independently saved layout per scale+orientation variant. Any other value locks the page to a fixed column count that is CSS-scaled to fit the viewport so tiles never reflow.'),
   "layoutOrientation": zod.enum(['landscape', 'portrait']).optional().describe('How a fixed-preset page is scaled to fit. \"landscape\" fits to width, \"portrait\" fits to height. Ignored when layoutPreset is \"auto\".'),
   "createdAt": zod.string().optional()
 })
@@ -977,7 +1044,7 @@ export const UpdatePageParams = zod.object({
 
 export const UpdatePageBody = zod.object({
   "name": zod.string().optional(),
-  "layoutPreset": zod.enum(['auto', 'compact', 'fhd', 'qhd', 'uhd']).optional(),
+  "layoutPreset": zod.enum(['auto', 'adaptive', 'compact', 'fhd', 'qhd', 'uhd']).optional(),
   "layoutOrientation": zod.enum(['landscape', 'portrait']).optional()
 })
 
@@ -986,7 +1053,7 @@ export const UpdatePageResponse = zod.object({
   "userId": zod.number(),
   "name": zod.string(),
   "position": zod.number(),
-  "layoutPreset": zod.enum(['auto', 'compact', 'fhd', 'qhd', 'uhd']).optional().describe('Fixed scale preset that maps to a locked column count. \"auto\" (the default) keeps today\'s responsive behavior (columns derived from window width). Any other value locks the page to a fixed column count that is CSS-scaled to fit the viewport so tiles never reflow.'),
+  "layoutPreset": zod.enum(['auto', 'adaptive', 'compact', 'fhd', 'qhd', 'uhd']).optional().describe('Fixed scale preset that maps to a locked column count. \"auto\" (the default) keeps today\'s responsive behavior (columns derived from window width). \"adaptive\" auto-resolves a fixed preset and orientation from the viewport, with an independently saved layout per scale+orientation variant. Any other value locks the page to a fixed column count that is CSS-scaled to fit the viewport so tiles never reflow.'),
   "layoutOrientation": zod.enum(['landscape', 'portrait']).optional().describe('How a fixed-preset page is scaled to fit. \"landscape\" fits to width, \"portrait\" fits to height. Ignored when layoutPreset is \"auto\".'),
   "createdAt": zod.string().optional()
 })
@@ -1009,7 +1076,7 @@ export const ExportAllPagesResponse = zod.object({
   "exportedAt": zod.string().optional().describe('ISO timestamp of when the file was produced.'),
   "pages": zod.array(zod.object({
   "name": zod.string(),
-  "layoutPreset": zod.enum(['auto', 'compact', 'fhd', 'qhd', 'uhd']).optional(),
+  "layoutPreset": zod.enum(['auto', 'adaptive', 'compact', 'fhd', 'qhd', 'uhd']).optional(),
   "layoutOrientation": zod.enum(['landscape', 'portrait']).optional(),
   "tiles": zod.array(zod.object({
   "type": zod.string(),
@@ -1141,7 +1208,142 @@ export const ExportAllPagesResponse = zod.object({
   "videoMuted": zod.boolean().nullish().describe('Whether a Video Player tile starts muted. Null or absent defaults to true (autoplay-safe).'),
   "videoFit": zod.union([zod.literal('cover'),zod.literal('contain'),zod.literal(null)]).nullish().describe('How a Video Player tile scales its video: \"cover\" (fill, crop) or \"contain\" (letterbox, whole frame). Null or absent uses cover.')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.')
+}).describe('A tile inside an export envelope. Mirrors Tile but omits every identity field (id, userId, pageId, createdAt) so it can be re-imported under any user\/page. Carries no credential data — integrations are referenced by type only.')).describe('Flat list of every tile on the page across all device modes and variants. v1 importers read this; v2 importers prefer `layouts` when present.'),
+  "layouts": zod.array(zod.object({
+  "deviceMode": zod.string().describe('Device mode name (matched case-insensitively on import).'),
+  "variant": zod.string().nullish().describe('Adaptive variant key (e.g. \"fhd-landscape\"); null for the base layout.'),
+  "tiles": zod.array(zod.object({
+  "type": zod.string(),
+  "integration": zod.string().nullish(),
+  "gridX": zod.number(),
+  "gridY": zod.number(),
+  "gridW": zod.number(),
+  "gridH": zod.number(),
+  "name": zod.string().nullish(),
+  "url": zod.string().nullish(),
+  "bgColor": zod.string().nullish(),
+  "imageUrl": zod.string().nullish(),
+  "imageFit": zod.string().nullish(),
+  "imagePosition": zod.string().nullish(),
+  "imageScale": zod.number().nullish(),
+  "titleSize": zod.string().nullish(),
+  "titlePosition": zod.string().nullish(),
+  "titleColor": zod.string().nullish(),
+  "hideTitle": zod.boolean().optional(),
+  "metrics": zod.array(zod.string()).nullish(),
+  "tileSettings": zod.object({
+  "categoryFilter": zod.array(zod.string()).nullish().describe('Allow-list of qBittorrent categories to show on the tile. Null (or absent) means show all categories.'),
+  "groupByCategory": zod.boolean().nullish().describe('When true, the qBittorrent tile groups its torrents under category headers instead of showing a flat list. Absent or false means a flat list (the default).'),
+  "clockFormat": zod.union([zod.literal('12'),zod.literal('24'),zod.literal(null)]).nullish().describe('Time format for the Local Time tile: \"12\" for 12-hour with AM\/PM, \"24\" for 24-hour. Absent or null defaults to \"24\".'),
+  "clockShowSeconds": zod.boolean().nullish().describe('When true, the Local Time tile shows seconds. Absent or false hides them (the default).'),
+  "clockShowDate": zod.boolean().nullish().describe('When true, the Local Time tile shows the current date. Absent or false hides it (the default).'),
+  "weatherAutoLocate": zod.boolean().nullish().describe('When true, the Weather tile auto-detects the user\'s location via the browser. Absent or true defaults to auto-detect; false uses the typed weatherLocation instead.'),
+  "weatherLocation": zod.string().nullish().describe('City\/place name to geocode for the Weather tile when auto-detect is off (or as a fallback). Null or absent means none set.'),
+  "weatherUnits": zod.union([zod.literal('c'),zod.literal('f'),zod.literal(null)]).nullish().describe('Temperature units for the Weather tile: \"c\" for Celsius, \"f\" for Fahrenheit. Absent or null defaults to \"c\".'),
+  "sportsLeagues": zod.array(zod.string()).nullish().describe('League keys the Sports tile follows (e.g. \"nfl\", \"nba\", \"eng.1\"). Null or absent means none selected yet (the tile shows an empty state until at least one league is chosen).'),
+  "sportsTeams": zod.array(zod.string()).nullish().describe('Optional team allow-list for the Sports tile, scoped per league as \"<leagueKey>:<teamId>\" (e.g. \"nfl:12\"). When a league has no entries here, all of its teams are shown. Null or absent means no team filtering (all teams in every selected league).'),
+  "sportsShowScores": zod.boolean().nullish().describe('When true, the Sports tile shows live\/recent scores. Absent or null defaults to true. At least one of sportsShowScores \/ sportsShowNews must be on.'),
+  "sportsShowNews": zod.boolean().nullish().describe('When true, the Sports tile shows the latest headlines. Absent or null defaults to false. At least one of sportsShowScores \/ sportsShowNews must be on.'),
+  "newsFeedUrl": zod.string().nullish().describe('RSS or Atom feed URL the News tile pulls headlines from. Null or absent means none set, in which case the tile shows demo headlines.'),
+  "newsMaxItems": zod.number().nullish().describe('Maximum number of headlines the News tile requests\/shows. Null or absent defaults to a sensible value (clamped server-side).'),
+  "newsShowTimestamp": zod.boolean().nullish().describe('When true, the News tile shows each headline\'s published time (as room allows). Absent or false hides it (the default).'),
+  "stockWatchlist": zod.array(zod.object({
+  "symbol": zod.string().describe('Ticker symbol (e.g. \"AAPL\"), stored uppercased.'),
+  "shares": zod.number().nullish().describe('Optional number of shares held. When present (and > 0) the tile shows this row\'s position value and gain\/loss.'),
+  "costBasis": zod.number().nullish().describe('Optional average cost per share. Used with shares to compute gain\/loss. Null or absent when not tracking cost.')
+})).nullish().describe('Per-tile watchlist of stock symbols for the Stocks tile. Each entry carries an uppercased ticker symbol and optional share quantity and average cost basis per share, which turn the watchlist into a lightweight portfolio. Null or absent means none set (the tile shows demo\/sample quotes).'),
+  "sleeperUsername": zod.string().nullish().describe('Sleeper account username the Fantasy tile follows. Used to resolve the user\'s id and locate their roster in the league. Null or absent means none set (the tile shows an empty state until configured).'),
+  "sleeperLeagueId": zod.string().nullish().describe('Sleeper league id the Fantasy tile shows. Sleeper\'s read endpoints are public for any league id. Null or absent means none chosen yet.'),
+  "sleeperSport": zod.string().nullish().describe('Sport the Fantasy tile\'s league belongs to (e.g. \"nfl\", \"nba\"). Absent or null defaults to \"nfl\".'),
+  "sleeperSeason": zod.string().nullish().describe('Season year the Fantasy tile\'s league belongs to (e.g. \"2025\"). Absent or null defaults to the current NFL season.'),
+  "sleeperShowMatchup": zod.boolean().nullish().describe('When true, the Fantasy tile shows the user\'s current-week matchup. Absent or null defaults to true.'),
+  "sleeperShowStandings": zod.boolean().nullish().describe('When true, the Fantasy tile shows the league standings. Absent or null defaults to true.'),
+  "sleeperShowTransactions": zod.boolean().nullish().describe('When true, the Fantasy tile shows recent waiver\/trade transactions. Absent or null defaults to true.'),
+  "audioSource": zod.string().nullish().describe('Which music source backs an Audio Player tile (e.g. \"plex\"). Absent or null defaults to \"plex\". This is the seam additional sources (Spotify, Jellyfin, Navidrome) plug into later.'),
+  "audioFindMusic": zod.boolean().nullish().describe('When true, the Audio Player tile shows the \"Find music\" button that opens the music browser (Plex \/ Subsonic only). Absent or null defaults to true.'),
+  "audioSearch": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Search tab (Plex \/ Subsonic only). Absent or null defaults to true.'),
+  "audioBrowse": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Browse tab (recently added \/ albums \/ artists, Plex \/ Subsonic only). Absent or null defaults to true.'),
+  "audioPlaylists": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Playlists tab (Plex \/ Subsonic only). Absent or null defaults to true.'),
+  "emailAccounts": zod.array(zod.string()).nullish().describe('Allow-list of mail account keys the Email tile aggregates: \"gmail\" for the linked Google account, or the id of a saved IMAP account. Null or absent means all configured accounts.'),
+  "emailMaxMessages": zod.number().nullish().describe('Maximum number of messages the Email tile requests\/shows. Null or absent defaults to a sensible value (clamped server-side).'),
+  "emailUnreadOnly": zod.boolean().nullish().describe('When true, the Email tile shows only unread messages. Absent or false shows the most recent messages regardless of read state.'),
+  "calendarAccounts": zod.array(zod.string()).nullish().describe('Allow-list of calendar account keys the Calendar tile aggregates: \"google\" for the linked Google account, or the id of a saved CalDAV account. Null or absent means all configured accounts.'),
+  "calendarDaysAhead": zod.number().nullish().describe('How many days ahead the Calendar tile looks for upcoming events. Null or absent defaults to a sensible value (clamped server-side).'),
+  "calendarMaxEvents": zod.number().nullish().describe('Maximum number of events the Calendar tile requests\/shows. Null or absent defaults to a sensible value (clamped server-side).'),
+  "scrollable": zod.boolean().nullish().describe('When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).'),
+  "hideStatusDot": zod.boolean().nullish().describe('When true, the tile header hides the service-reachability status dot even when the backing connection is configured. Absent or false shows the dot (the default).'),
+  "truenasMetric": zod.union([zod.literal('cpuram'),zod.literal('network'),zod.literal('arc'),zod.literal('pools'),zod.literal('disks'),zod.literal('cputemp'),zod.literal(null)]).nullish().describe('Which single TrueNAS metric a dedicated TrueNAS tile renders with its bespoke visual: \"cpuram\", \"network\", \"arc\", \"pools\", \"disks\", or \"cputemp\". Null or absent means the tile shows the combined multi-section view (the default, backward-compatible behavior).'),
+  "truenasShowCpuCores": zod.boolean().nullish().describe('When true (or absent, the default), the dedicated CPU-temperature TrueNAS tile shows the per-core temperature readout beneath the gauge. Set false for a simpler tile with just the headline gauge.'),
+  "truenasPools": zod.array(zod.string()).nullish().describe('Allow-list of TrueNAS ZFS pool (volume) names to show on the tile. Applies to both the dedicated ZFS Pools view and the pools section of the combined view. Null, absent, or empty means show all pools (the default, backward-compatible behavior).'),
+  "truenasPoolOrder": zod.array(zod.string()).nullish().describe('Explicit display order of TrueNAS ZFS pool (volume) names. Pools whose name appears here are shown first, in this order; any remaining pools follow in their server-reported order. Applies to both the dedicated ZFS Pools view and the pools section of the combined view. Null, absent, or empty keeps the server-reported order (the default, backward-compatible behavior).'),
+  "pterodactylServers": zod.array(zod.string()).nullish().describe('Allow-list of Pterodactyl server identifiers to show on the tile. Null, absent, or empty means show all servers (the default, backward-compatible behavior).'),
+  "noteBody": zod.string().nullish().describe('Free-form note text for a Note (post-it) tile. Null or absent means an empty note.'),
+  "noteItems": zod.array(zod.object({
+  "text": zod.string().describe('The checklist item\'s label text.'),
+  "done": zod.boolean().describe('Whether the item is checked off. When true the tile renders it with a strike-through.')
+})).nullish().describe('Checklist \/ to-do items for a Note tile. Each item has text and a done flag (rendered with a strike-through when done). Null or absent means no checklist.'),
+  "noteColor": zod.string().nullish().describe('Background color of a Note (post-it) tile as a CSS color string (e.g. a preset note color or a custom hex). Null or absent uses the default post-it yellow.'),
+  "noteFontSize": zod.union([zod.literal('sm'),zod.literal('md'),zod.literal('lg'),zod.literal(null)]).nullish().describe('Font size for a Note tile\'s text: \"sm\", \"md\", or \"lg\". Absent or null defaults to \"md\".'),
+  "noteTextColor": zod.string().nullish().describe('CSS color for a Note tile\'s text (note body and checklist). Null or absent uses a sensible dark default that reads on light post-it colors.'),
+  "timerMode": zod.union([zod.literal('countup'),zod.literal('countdown'),zod.literal('pomodoro'),zod.literal(null)]).nullish().describe('Mode for a Timer tile: \"countup\" for a stopwatch counting elapsed time from zero, \"countdown\" for counting down from timerDuration to zero, \"pomodoro\" for an auto-cycling focus\/break timer. Absent or null defaults to \"countup\".'),
+  "timerDuration": zod.number().nullish().describe('Starting duration in seconds for a countdown Timer tile. Ignored in count-up mode. Null or absent defaults to a sensible value.'),
+  "timerRunning": zod.boolean().nullish().describe('Whether a Timer tile is currently running. When true the live display advances from timerStartedAt; when false it is paused at timerAccumulatedMs. Absent or false means paused (the default).'),
+  "timerStartedAt": zod.number().nullish().describe('Epoch milliseconds when the Timer tile\'s current run segment began. Combined with timerAccumulatedMs this lets the live display resume accurately after a refresh or page navigation. Null or absent when the timer is paused.'),
+  "timerAccumulatedMs": zod.number().nullish().describe('Elapsed milliseconds accumulated across previous run segments of a Timer tile (i.e. before timerStartedAt). Null or absent means zero.'),
+  "pomodoroFocusMinutes": zod.number().nullish().describe('Length in minutes of a focus interval for a Timer tile in pomodoro mode. Null or absent defaults to 25.'),
+  "pomodoroShortBreakMinutes": zod.number().nullish().describe('Length in minutes of a short break for a Timer tile in pomodoro mode. Null or absent defaults to 5.'),
+  "pomodoroLongBreakMinutes": zod.number().nullish().describe('Length in minutes of the long break for a Timer tile in pomodoro mode. Null or absent defaults to 15.'),
+  "pomodoroSessionsBeforeLongBreak": zod.number().nullish().describe('How many focus sessions complete before a Timer tile in pomodoro mode runs a long break. Null or absent defaults to 4.'),
+  "pomodoroPhase": zod.union([zod.literal('focus'),zod.literal('shortBreak'),zod.literal('longBreak'),zod.literal(null)]).nullish().describe('Current phase of a Timer tile in pomodoro mode: \"focus\", a \"shortBreak\", or the \"longBreak\". Combined with the anchor timestamp this lets the live display resume the correct phase after a refresh or page navigation. Null or absent defaults to \"focus\".'),
+  "pomodoroCompletedSessions": zod.number().nullish().describe('Number of focus sessions completed in the current pomodoro cycle for a Timer tile (resets to zero after a long break). Null or absent means zero.'),
+  "timerAlertEnabled": zod.boolean().nullish().describe('Whether a Timer tile alerts on completion (countdown) or phase change (pomodoro) by playing a sound and\/or firing a browser notification. Null or absent means disabled.'),
+  "timerAlertSound": zod.union([zod.literal('chime'),zod.literal('bell'),zod.literal('beep'),zod.literal('digital'),zod.literal('none'),zod.literal(null)]).nullish().describe('Which alert sound a Timer tile plays when it alerts: \"chime\", \"bell\", \"beep\", or \"digital\", or \"none\" for a browser notification only. Honored for both countdown completion and pomodoro phase transitions. Null or absent defaults to \"chime\".'),
+  "diceType": zod.union([zod.literal('d3'),zod.literal('d4'),zod.literal('d6'),zod.literal('d8'),zod.literal('d10'),zod.literal('d12'),zod.literal('d20'),zod.literal('d100'),zod.literal(null)]).nullish().describe('Die type for a Dice Roller tile, e.g. \"d4\", \"d6\", \"d20\". The number after the \"d\" is the number of sides each die has. Null or absent defaults to \"d6\".'),
+  "diceCount": zod.number().nullish().describe('How many dice a Dice Roller tile rolls at once (1-6). Null or absent defaults to 2.'),
+  "petHunger": zod.number().nullish().describe('A Tamagotchi pet tile\'s hunger satisfaction, 0 (starving) to 100 (full). Decays over real elapsed time and rises when the pet is fed. Null or absent starts at a healthy default.'),
+  "petHappiness": zod.number().nullish().describe('A Tamagotchi pet tile\'s happiness, 0 (sad) to 100 (delighted). Decays over real elapsed time and rises when the pet is played with. Null or absent starts at a healthy default.'),
+  "petEnergy": zod.number().nullish().describe('A Tamagotchi pet tile\'s energy, 0 (exhausted) to 100 (rested). Decays over real elapsed time and rises when the pet rests. Null or absent starts at a healthy default.'),
+  "petUpdatedAt": zod.number().nullish().describe('Epoch milliseconds when a Tamagotchi pet tile\'s stats were last computed. On mount the client recomputes decay from the elapsed wall-clock time since this anchor so the pet keeps living across reloads and sessions. Null or absent means \"just now\".'),
+  "petBodyColor": zod.string().nullish().describe('A Tamagotchi pet tile\'s body color: a preset key (e.g. \"green\", \"blue\", \"pink\") or a custom #hex value. Null or absent uses the default preset.'),
+  "petEyes": zod.string().nullish().describe('A Tamagotchi pet tile\'s eye style (e.g. \"round\", \"dot\", \"happy\", \"sleepy\", \"star\", \"wink\"). Null or absent uses the default.'),
+  "petNose": zod.string().nullish().describe('A Tamagotchi pet tile\'s nose style (e.g. \"none\", \"dot\", \"round\", \"triangle\", \"heart\"). Null or absent uses the default.'),
+  "petMouth": zod.string().nullish().describe('A Tamagotchi pet tile\'s mouth style (e.g. \"smile\", \"neutral\", \"open\", \"cat\", \"frown\"). Null or absent uses the default.'),
+  "bonsaiHydration": zod.number().nullish().describe('A Bonsai tile\'s soil hydration, 0 (bone dry) to 100 (well watered). Slowly drops over real elapsed time and rises when the tree is watered. Null or absent starts at a healthy default.'),
+  "bonsaiOvergrowth": zod.number().nullish().describe('A Bonsai tile\'s overgrowth, 0 (freshly pruned \/ tidy) to 100 (wild and untidy). Slowly rises over real elapsed time and is cut back when the tree is pruned. Null or absent starts at a tidy default.'),
+  "bonsaiGrowth": zod.number().nullish().describe('A Bonsai tile\'s accumulated growth progress, 0 to 100, which drives its visible growth stage (sapling -> young -> mature). Advances while the tree is kept healthy and stalls or slowly regresses when neglected. Null or absent starts at 0 (a fresh sapling).'),
+  "bonsaiUpdatedAt": zod.number().nullish().describe('Epoch milliseconds when a Bonsai tile\'s state was last computed. On mount the client recomputes hydration\/overgrowth\/growth from the elapsed wall-clock time since this anchor so the tree keeps living across reloads and sessions. Null or absent means \"just now\".'),
+  "bonsaiPotColor": zod.string().nullish().describe('A Bonsai tile\'s pot color: a preset key (e.g. \"terracotta\", \"slate\", \"glazed\") or a custom #hex value. Cosmetic only. Null or absent uses the default preset.'),
+  "bonsaiLeafColor": zod.string().nullish().describe('A Bonsai tile\'s foliage color: a preset key (e.g. \"green\", \"emerald\", \"maple\") or a custom #hex value. The chosen color is the healthy tone; the tree still fades toward dry tan when thirsty. Cosmetic only. Null or absent uses the default preset.'),
+  "bonsaiBlossom": zod.string().nullish().describe('A Bonsai tile\'s blossom color: \"none\" for a plain canopy or a preset key (e.g. \"pink\", \"white\", \"red\") that scatters flowers over the foliage. Cosmetic only. Null or absent means no blossoms.'),
+  "bonsaiStyle": zod.string().nullish().describe('A Bonsai tile\'s tree shape\/style (e.g. \"upright\", \"slanted\", \"windswept\", \"cascade\"). Cosmetic only. Null or absent uses the default upright style.'),
+  "aquariumFishTypes": zod.array(zod.string()).nullish().describe('An Aquarium tile\'s three fish species slots (e.g. \"clownfish\", \"bluetang\", \"angelfish\", \"pufferfish\", \"goldfish\", \"betta\"). Each slot may be \"none\" to leave it empty. Null or absent uses the defaults.'),
+  "aquariumSandColor": zod.string().nullish().describe('An Aquarium tile\'s sand floor color: a preset key (e.g. \"tan\", \"white\", \"dark\") or a custom #hex value. Null or absent uses the default tan sand.'),
+  "aquariumProps": zod.array(zod.string()).nullish().describe('An Aquarium tile\'s three decoration prop slots (e.g. \"seaweed\", \"coral\", \"chest\", \"anchor\", \"castle\", \"rock\"). Each slot may be \"none\" to leave it empty. Null or absent uses the defaults.'),
+  "visualizerStyle": zod.union([zod.literal('bars'),zod.literal('lava'),zod.literal('vu'),zod.literal('vinyl'),zod.literal('cd'),zod.literal(null)]).nullish().describe('An Audio Visualizer tile\'s render style: \"bars\" (frequency bar graph), \"lava\" (morphing lava-lamp blobs), \"vu\" (retro VU meter), \"vinyl\" (spinning record with album-art label), or \"cd\" (top-down CD player with album-art disc). Null or absent defaults to \"bars\".'),
+  "visualizerPrimary": zod.string().nullish().describe('An Audio Visualizer tile\'s primary accent color as a #hex value — the bars\/blobs\/needles\/lit LEDs. Null or absent uses the default.'),
+  "visualizerBackground": zod.string().nullish().describe('An Audio Visualizer tile\'s background \/ glow color as a #hex value — the canvas backdrop and halo glow. Null or absent uses the default.'),
+  "photoSource": zod.union([zod.literal('uploads'),zod.literal('urls'),zod.literal('google'),zod.literal('immich'),zod.literal(null)]).nullish().describe('Where a Picture Frame tile\'s photos come from: \"uploads\" (images from the upload library), \"urls\" (a pasted list of image URLs), \"google\" (a Google Photos album), or \"immich\" (an Immich album). Null or absent means unconfigured — the tile shows demo photos.'),
+  "photoUploadUrls": zod.array(zod.string()).nullish().describe('The uploaded images (their \/api\/uploads\/files\/... URLs) a Picture Frame tile cycles through when photoSource is \"uploads\".'),
+  "photoUrls": zod.array(zod.string()).nullish().describe('The image URLs a Picture Frame tile cycles through when photoSource is \"urls\".'),
+  "photoAlbumId": zod.string().nullish().describe('The selected album id for a server-backed photoSource (\"google\" or \"immich\"). Null or absent means no album chosen yet.'),
+  "photoInterval": zod.number().nullish().describe('Seconds between automatic slide advances on a Picture Frame tile. 0 disables auto-advance (manual only). Null or absent uses the default (30s).'),
+  "photoFit": zod.union([zod.literal('cover'),zod.literal('contain'),zod.literal(null)]).nullish().describe('How a Picture Frame tile scales its photos: \"cover\" (fill, crop) or \"contain\" (letterbox, whole image). Null or absent uses cover.'),
+  "frameStyle": zod.union([zod.literal('none'),zod.literal('wood'),zod.literal('thin'),zod.literal('gold'),zod.literal('polaroid'),zod.literal('custom'),zod.literal(null)]).nullish().describe('A Picture Frame tile\'s decorative frame: \"none\", \"wood\", \"thin\", \"gold\", \"polaroid\", or \"custom\" (uses frameColor\/frameWidth). Null or absent means no frame.'),
+  "frameColor": zod.string().nullish().describe('The frame color (#hex) when frameStyle is \"custom\". Null or absent uses a neutral default.'),
+  "frameWidth": zod.number().nullish().describe('The frame thickness in pixels when frameStyle is \"custom\". Null or absent uses the default.'),
+  "videoSource": zod.union([zod.literal('uploads'),zod.literal('urls'),zod.literal('youtube'),zod.literal('plex'),zod.literal('jellyfin'),zod.literal(null)]).nullish().describe('Where a Video Player tile\'s videos come from: \"uploads\" (video files from the upload library), \"urls\" (a pasted list of direct video file URLs), \"youtube\" (a YouTube video\/playlist embed), \"plex\" or \"jellyfin\" (a library on the connected media server). Null or absent means unconfigured — the tile plays the built-in yule log stream.'),
+  "videoUploadUrls": zod.array(zod.string()).nullish().describe('The uploaded videos (their \/api\/uploads\/files\/... URLs) a Video Player tile plays when videoSource is \"uploads\".'),
+  "videoUrls": zod.array(zod.string()).nullish().describe('The direct video file URLs a Video Player tile plays (in order) when videoSource is \"urls\".'),
+  "videoYoutubeUrl": zod.string().nullish().describe('The YouTube video or playlist URL a Video Player tile embeds when videoSource is \"youtube\".'),
+  "videoLibraryId": zod.string().nullish().describe('The selected library\/collection id for a media-server videoSource (\"plex\" or \"jellyfin\"). Null or absent means no library chosen.'),
+  "videoPlayMode": zod.union([zod.literal('single'),zod.literal('playlist'),zod.literal(null)]).nullish().describe('\"single\" loops the first (or only) video forever; \"playlist\" plays through the list, advancing on end. Null or absent uses playlist.'),
+  "videoPlaylistLoop": zod.boolean().nullish().describe('Whether a Video Player tile restarts the playlist after the last video ends (playlist mode). Null or absent defaults to true.'),
+  "videoShuffle": zod.boolean().nullish().describe('Whether a Video Player tile shuffles the playlist order (playlist mode). Null or absent defaults to false.'),
+  "videoMuted": zod.boolean().nullish().describe('Whether a Video Player tile starts muted. Null or absent defaults to true (autoplay-safe).'),
+  "videoFit": zod.union([zod.literal('cover'),zod.literal('contain'),zod.literal(null)]).nullish().describe('How a Video Player tile scales its video: \"cover\" (fill, crop) or \"contain\" (letterbox, whole frame). Null or absent uses cover.')
+}).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.')
 }).describe('A tile inside an export envelope. Mirrors Tile but omits every identity field (id, userId, pageId, createdAt) so it can be re-imported under any user\/page. Carries no credential data — integrations are referenced by type only.'))
+}).describe('One (device mode, variant) layout scope of a page inside a v2 export envelope.')).optional().describe('v2 only. The page\'s tiles grouped per (device mode, variant) layout scope, with modes referenced by name so they can be matched or recreated on import.')
 }).describe('A single page within an export envelope.'))
 }).describe('A versioned envelope holding one or more dashboard pages and their tiles. Used both as the export download and the import upload body. The format\/version fields let importers reject incompatible files. Never contains service connection credentials.')
 
@@ -1159,7 +1361,7 @@ export const ExportPageResponse = zod.object({
   "exportedAt": zod.string().optional().describe('ISO timestamp of when the file was produced.'),
   "pages": zod.array(zod.object({
   "name": zod.string(),
-  "layoutPreset": zod.enum(['auto', 'compact', 'fhd', 'qhd', 'uhd']).optional(),
+  "layoutPreset": zod.enum(['auto', 'adaptive', 'compact', 'fhd', 'qhd', 'uhd']).optional(),
   "layoutOrientation": zod.enum(['landscape', 'portrait']).optional(),
   "tiles": zod.array(zod.object({
   "type": zod.string(),
@@ -1291,7 +1493,142 @@ export const ExportPageResponse = zod.object({
   "videoMuted": zod.boolean().nullish().describe('Whether a Video Player tile starts muted. Null or absent defaults to true (autoplay-safe).'),
   "videoFit": zod.union([zod.literal('cover'),zod.literal('contain'),zod.literal(null)]).nullish().describe('How a Video Player tile scales its video: \"cover\" (fill, crop) or \"contain\" (letterbox, whole frame). Null or absent uses cover.')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.')
+}).describe('A tile inside an export envelope. Mirrors Tile but omits every identity field (id, userId, pageId, createdAt) so it can be re-imported under any user\/page. Carries no credential data — integrations are referenced by type only.')).describe('Flat list of every tile on the page across all device modes and variants. v1 importers read this; v2 importers prefer `layouts` when present.'),
+  "layouts": zod.array(zod.object({
+  "deviceMode": zod.string().describe('Device mode name (matched case-insensitively on import).'),
+  "variant": zod.string().nullish().describe('Adaptive variant key (e.g. \"fhd-landscape\"); null for the base layout.'),
+  "tiles": zod.array(zod.object({
+  "type": zod.string(),
+  "integration": zod.string().nullish(),
+  "gridX": zod.number(),
+  "gridY": zod.number(),
+  "gridW": zod.number(),
+  "gridH": zod.number(),
+  "name": zod.string().nullish(),
+  "url": zod.string().nullish(),
+  "bgColor": zod.string().nullish(),
+  "imageUrl": zod.string().nullish(),
+  "imageFit": zod.string().nullish(),
+  "imagePosition": zod.string().nullish(),
+  "imageScale": zod.number().nullish(),
+  "titleSize": zod.string().nullish(),
+  "titlePosition": zod.string().nullish(),
+  "titleColor": zod.string().nullish(),
+  "hideTitle": zod.boolean().optional(),
+  "metrics": zod.array(zod.string()).nullish(),
+  "tileSettings": zod.object({
+  "categoryFilter": zod.array(zod.string()).nullish().describe('Allow-list of qBittorrent categories to show on the tile. Null (or absent) means show all categories.'),
+  "groupByCategory": zod.boolean().nullish().describe('When true, the qBittorrent tile groups its torrents under category headers instead of showing a flat list. Absent or false means a flat list (the default).'),
+  "clockFormat": zod.union([zod.literal('12'),zod.literal('24'),zod.literal(null)]).nullish().describe('Time format for the Local Time tile: \"12\" for 12-hour with AM\/PM, \"24\" for 24-hour. Absent or null defaults to \"24\".'),
+  "clockShowSeconds": zod.boolean().nullish().describe('When true, the Local Time tile shows seconds. Absent or false hides them (the default).'),
+  "clockShowDate": zod.boolean().nullish().describe('When true, the Local Time tile shows the current date. Absent or false hides it (the default).'),
+  "weatherAutoLocate": zod.boolean().nullish().describe('When true, the Weather tile auto-detects the user\'s location via the browser. Absent or true defaults to auto-detect; false uses the typed weatherLocation instead.'),
+  "weatherLocation": zod.string().nullish().describe('City\/place name to geocode for the Weather tile when auto-detect is off (or as a fallback). Null or absent means none set.'),
+  "weatherUnits": zod.union([zod.literal('c'),zod.literal('f'),zod.literal(null)]).nullish().describe('Temperature units for the Weather tile: \"c\" for Celsius, \"f\" for Fahrenheit. Absent or null defaults to \"c\".'),
+  "sportsLeagues": zod.array(zod.string()).nullish().describe('League keys the Sports tile follows (e.g. \"nfl\", \"nba\", \"eng.1\"). Null or absent means none selected yet (the tile shows an empty state until at least one league is chosen).'),
+  "sportsTeams": zod.array(zod.string()).nullish().describe('Optional team allow-list for the Sports tile, scoped per league as \"<leagueKey>:<teamId>\" (e.g. \"nfl:12\"). When a league has no entries here, all of its teams are shown. Null or absent means no team filtering (all teams in every selected league).'),
+  "sportsShowScores": zod.boolean().nullish().describe('When true, the Sports tile shows live\/recent scores. Absent or null defaults to true. At least one of sportsShowScores \/ sportsShowNews must be on.'),
+  "sportsShowNews": zod.boolean().nullish().describe('When true, the Sports tile shows the latest headlines. Absent or null defaults to false. At least one of sportsShowScores \/ sportsShowNews must be on.'),
+  "newsFeedUrl": zod.string().nullish().describe('RSS or Atom feed URL the News tile pulls headlines from. Null or absent means none set, in which case the tile shows demo headlines.'),
+  "newsMaxItems": zod.number().nullish().describe('Maximum number of headlines the News tile requests\/shows. Null or absent defaults to a sensible value (clamped server-side).'),
+  "newsShowTimestamp": zod.boolean().nullish().describe('When true, the News tile shows each headline\'s published time (as room allows). Absent or false hides it (the default).'),
+  "stockWatchlist": zod.array(zod.object({
+  "symbol": zod.string().describe('Ticker symbol (e.g. \"AAPL\"), stored uppercased.'),
+  "shares": zod.number().nullish().describe('Optional number of shares held. When present (and > 0) the tile shows this row\'s position value and gain\/loss.'),
+  "costBasis": zod.number().nullish().describe('Optional average cost per share. Used with shares to compute gain\/loss. Null or absent when not tracking cost.')
+})).nullish().describe('Per-tile watchlist of stock symbols for the Stocks tile. Each entry carries an uppercased ticker symbol and optional share quantity and average cost basis per share, which turn the watchlist into a lightweight portfolio. Null or absent means none set (the tile shows demo\/sample quotes).'),
+  "sleeperUsername": zod.string().nullish().describe('Sleeper account username the Fantasy tile follows. Used to resolve the user\'s id and locate their roster in the league. Null or absent means none set (the tile shows an empty state until configured).'),
+  "sleeperLeagueId": zod.string().nullish().describe('Sleeper league id the Fantasy tile shows. Sleeper\'s read endpoints are public for any league id. Null or absent means none chosen yet.'),
+  "sleeperSport": zod.string().nullish().describe('Sport the Fantasy tile\'s league belongs to (e.g. \"nfl\", \"nba\"). Absent or null defaults to \"nfl\".'),
+  "sleeperSeason": zod.string().nullish().describe('Season year the Fantasy tile\'s league belongs to (e.g. \"2025\"). Absent or null defaults to the current NFL season.'),
+  "sleeperShowMatchup": zod.boolean().nullish().describe('When true, the Fantasy tile shows the user\'s current-week matchup. Absent or null defaults to true.'),
+  "sleeperShowStandings": zod.boolean().nullish().describe('When true, the Fantasy tile shows the league standings. Absent or null defaults to true.'),
+  "sleeperShowTransactions": zod.boolean().nullish().describe('When true, the Fantasy tile shows recent waiver\/trade transactions. Absent or null defaults to true.'),
+  "audioSource": zod.string().nullish().describe('Which music source backs an Audio Player tile (e.g. \"plex\"). Absent or null defaults to \"plex\". This is the seam additional sources (Spotify, Jellyfin, Navidrome) plug into later.'),
+  "audioFindMusic": zod.boolean().nullish().describe('When true, the Audio Player tile shows the \"Find music\" button that opens the music browser (Plex \/ Subsonic only). Absent or null defaults to true.'),
+  "audioSearch": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Search tab (Plex \/ Subsonic only). Absent or null defaults to true.'),
+  "audioBrowse": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Browse tab (recently added \/ albums \/ artists, Plex \/ Subsonic only). Absent or null defaults to true.'),
+  "audioPlaylists": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Playlists tab (Plex \/ Subsonic only). Absent or null defaults to true.'),
+  "emailAccounts": zod.array(zod.string()).nullish().describe('Allow-list of mail account keys the Email tile aggregates: \"gmail\" for the linked Google account, or the id of a saved IMAP account. Null or absent means all configured accounts.'),
+  "emailMaxMessages": zod.number().nullish().describe('Maximum number of messages the Email tile requests\/shows. Null or absent defaults to a sensible value (clamped server-side).'),
+  "emailUnreadOnly": zod.boolean().nullish().describe('When true, the Email tile shows only unread messages. Absent or false shows the most recent messages regardless of read state.'),
+  "calendarAccounts": zod.array(zod.string()).nullish().describe('Allow-list of calendar account keys the Calendar tile aggregates: \"google\" for the linked Google account, or the id of a saved CalDAV account. Null or absent means all configured accounts.'),
+  "calendarDaysAhead": zod.number().nullish().describe('How many days ahead the Calendar tile looks for upcoming events. Null or absent defaults to a sensible value (clamped server-side).'),
+  "calendarMaxEvents": zod.number().nullish().describe('Maximum number of events the Calendar tile requests\/shows. Null or absent defaults to a sensible value (clamped server-side).'),
+  "scrollable": zod.boolean().nullish().describe('When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).'),
+  "hideStatusDot": zod.boolean().nullish().describe('When true, the tile header hides the service-reachability status dot even when the backing connection is configured. Absent or false shows the dot (the default).'),
+  "truenasMetric": zod.union([zod.literal('cpuram'),zod.literal('network'),zod.literal('arc'),zod.literal('pools'),zod.literal('disks'),zod.literal('cputemp'),zod.literal(null)]).nullish().describe('Which single TrueNAS metric a dedicated TrueNAS tile renders with its bespoke visual: \"cpuram\", \"network\", \"arc\", \"pools\", \"disks\", or \"cputemp\". Null or absent means the tile shows the combined multi-section view (the default, backward-compatible behavior).'),
+  "truenasShowCpuCores": zod.boolean().nullish().describe('When true (or absent, the default), the dedicated CPU-temperature TrueNAS tile shows the per-core temperature readout beneath the gauge. Set false for a simpler tile with just the headline gauge.'),
+  "truenasPools": zod.array(zod.string()).nullish().describe('Allow-list of TrueNAS ZFS pool (volume) names to show on the tile. Applies to both the dedicated ZFS Pools view and the pools section of the combined view. Null, absent, or empty means show all pools (the default, backward-compatible behavior).'),
+  "truenasPoolOrder": zod.array(zod.string()).nullish().describe('Explicit display order of TrueNAS ZFS pool (volume) names. Pools whose name appears here are shown first, in this order; any remaining pools follow in their server-reported order. Applies to both the dedicated ZFS Pools view and the pools section of the combined view. Null, absent, or empty keeps the server-reported order (the default, backward-compatible behavior).'),
+  "pterodactylServers": zod.array(zod.string()).nullish().describe('Allow-list of Pterodactyl server identifiers to show on the tile. Null, absent, or empty means show all servers (the default, backward-compatible behavior).'),
+  "noteBody": zod.string().nullish().describe('Free-form note text for a Note (post-it) tile. Null or absent means an empty note.'),
+  "noteItems": zod.array(zod.object({
+  "text": zod.string().describe('The checklist item\'s label text.'),
+  "done": zod.boolean().describe('Whether the item is checked off. When true the tile renders it with a strike-through.')
+})).nullish().describe('Checklist \/ to-do items for a Note tile. Each item has text and a done flag (rendered with a strike-through when done). Null or absent means no checklist.'),
+  "noteColor": zod.string().nullish().describe('Background color of a Note (post-it) tile as a CSS color string (e.g. a preset note color or a custom hex). Null or absent uses the default post-it yellow.'),
+  "noteFontSize": zod.union([zod.literal('sm'),zod.literal('md'),zod.literal('lg'),zod.literal(null)]).nullish().describe('Font size for a Note tile\'s text: \"sm\", \"md\", or \"lg\". Absent or null defaults to \"md\".'),
+  "noteTextColor": zod.string().nullish().describe('CSS color for a Note tile\'s text (note body and checklist). Null or absent uses a sensible dark default that reads on light post-it colors.'),
+  "timerMode": zod.union([zod.literal('countup'),zod.literal('countdown'),zod.literal('pomodoro'),zod.literal(null)]).nullish().describe('Mode for a Timer tile: \"countup\" for a stopwatch counting elapsed time from zero, \"countdown\" for counting down from timerDuration to zero, \"pomodoro\" for an auto-cycling focus\/break timer. Absent or null defaults to \"countup\".'),
+  "timerDuration": zod.number().nullish().describe('Starting duration in seconds for a countdown Timer tile. Ignored in count-up mode. Null or absent defaults to a sensible value.'),
+  "timerRunning": zod.boolean().nullish().describe('Whether a Timer tile is currently running. When true the live display advances from timerStartedAt; when false it is paused at timerAccumulatedMs. Absent or false means paused (the default).'),
+  "timerStartedAt": zod.number().nullish().describe('Epoch milliseconds when the Timer tile\'s current run segment began. Combined with timerAccumulatedMs this lets the live display resume accurately after a refresh or page navigation. Null or absent when the timer is paused.'),
+  "timerAccumulatedMs": zod.number().nullish().describe('Elapsed milliseconds accumulated across previous run segments of a Timer tile (i.e. before timerStartedAt). Null or absent means zero.'),
+  "pomodoroFocusMinutes": zod.number().nullish().describe('Length in minutes of a focus interval for a Timer tile in pomodoro mode. Null or absent defaults to 25.'),
+  "pomodoroShortBreakMinutes": zod.number().nullish().describe('Length in minutes of a short break for a Timer tile in pomodoro mode. Null or absent defaults to 5.'),
+  "pomodoroLongBreakMinutes": zod.number().nullish().describe('Length in minutes of the long break for a Timer tile in pomodoro mode. Null or absent defaults to 15.'),
+  "pomodoroSessionsBeforeLongBreak": zod.number().nullish().describe('How many focus sessions complete before a Timer tile in pomodoro mode runs a long break. Null or absent defaults to 4.'),
+  "pomodoroPhase": zod.union([zod.literal('focus'),zod.literal('shortBreak'),zod.literal('longBreak'),zod.literal(null)]).nullish().describe('Current phase of a Timer tile in pomodoro mode: \"focus\", a \"shortBreak\", or the \"longBreak\". Combined with the anchor timestamp this lets the live display resume the correct phase after a refresh or page navigation. Null or absent defaults to \"focus\".'),
+  "pomodoroCompletedSessions": zod.number().nullish().describe('Number of focus sessions completed in the current pomodoro cycle for a Timer tile (resets to zero after a long break). Null or absent means zero.'),
+  "timerAlertEnabled": zod.boolean().nullish().describe('Whether a Timer tile alerts on completion (countdown) or phase change (pomodoro) by playing a sound and\/or firing a browser notification. Null or absent means disabled.'),
+  "timerAlertSound": zod.union([zod.literal('chime'),zod.literal('bell'),zod.literal('beep'),zod.literal('digital'),zod.literal('none'),zod.literal(null)]).nullish().describe('Which alert sound a Timer tile plays when it alerts: \"chime\", \"bell\", \"beep\", or \"digital\", or \"none\" for a browser notification only. Honored for both countdown completion and pomodoro phase transitions. Null or absent defaults to \"chime\".'),
+  "diceType": zod.union([zod.literal('d3'),zod.literal('d4'),zod.literal('d6'),zod.literal('d8'),zod.literal('d10'),zod.literal('d12'),zod.literal('d20'),zod.literal('d100'),zod.literal(null)]).nullish().describe('Die type for a Dice Roller tile, e.g. \"d4\", \"d6\", \"d20\". The number after the \"d\" is the number of sides each die has. Null or absent defaults to \"d6\".'),
+  "diceCount": zod.number().nullish().describe('How many dice a Dice Roller tile rolls at once (1-6). Null or absent defaults to 2.'),
+  "petHunger": zod.number().nullish().describe('A Tamagotchi pet tile\'s hunger satisfaction, 0 (starving) to 100 (full). Decays over real elapsed time and rises when the pet is fed. Null or absent starts at a healthy default.'),
+  "petHappiness": zod.number().nullish().describe('A Tamagotchi pet tile\'s happiness, 0 (sad) to 100 (delighted). Decays over real elapsed time and rises when the pet is played with. Null or absent starts at a healthy default.'),
+  "petEnergy": zod.number().nullish().describe('A Tamagotchi pet tile\'s energy, 0 (exhausted) to 100 (rested). Decays over real elapsed time and rises when the pet rests. Null or absent starts at a healthy default.'),
+  "petUpdatedAt": zod.number().nullish().describe('Epoch milliseconds when a Tamagotchi pet tile\'s stats were last computed. On mount the client recomputes decay from the elapsed wall-clock time since this anchor so the pet keeps living across reloads and sessions. Null or absent means \"just now\".'),
+  "petBodyColor": zod.string().nullish().describe('A Tamagotchi pet tile\'s body color: a preset key (e.g. \"green\", \"blue\", \"pink\") or a custom #hex value. Null or absent uses the default preset.'),
+  "petEyes": zod.string().nullish().describe('A Tamagotchi pet tile\'s eye style (e.g. \"round\", \"dot\", \"happy\", \"sleepy\", \"star\", \"wink\"). Null or absent uses the default.'),
+  "petNose": zod.string().nullish().describe('A Tamagotchi pet tile\'s nose style (e.g. \"none\", \"dot\", \"round\", \"triangle\", \"heart\"). Null or absent uses the default.'),
+  "petMouth": zod.string().nullish().describe('A Tamagotchi pet tile\'s mouth style (e.g. \"smile\", \"neutral\", \"open\", \"cat\", \"frown\"). Null or absent uses the default.'),
+  "bonsaiHydration": zod.number().nullish().describe('A Bonsai tile\'s soil hydration, 0 (bone dry) to 100 (well watered). Slowly drops over real elapsed time and rises when the tree is watered. Null or absent starts at a healthy default.'),
+  "bonsaiOvergrowth": zod.number().nullish().describe('A Bonsai tile\'s overgrowth, 0 (freshly pruned \/ tidy) to 100 (wild and untidy). Slowly rises over real elapsed time and is cut back when the tree is pruned. Null or absent starts at a tidy default.'),
+  "bonsaiGrowth": zod.number().nullish().describe('A Bonsai tile\'s accumulated growth progress, 0 to 100, which drives its visible growth stage (sapling -> young -> mature). Advances while the tree is kept healthy and stalls or slowly regresses when neglected. Null or absent starts at 0 (a fresh sapling).'),
+  "bonsaiUpdatedAt": zod.number().nullish().describe('Epoch milliseconds when a Bonsai tile\'s state was last computed. On mount the client recomputes hydration\/overgrowth\/growth from the elapsed wall-clock time since this anchor so the tree keeps living across reloads and sessions. Null or absent means \"just now\".'),
+  "bonsaiPotColor": zod.string().nullish().describe('A Bonsai tile\'s pot color: a preset key (e.g. \"terracotta\", \"slate\", \"glazed\") or a custom #hex value. Cosmetic only. Null or absent uses the default preset.'),
+  "bonsaiLeafColor": zod.string().nullish().describe('A Bonsai tile\'s foliage color: a preset key (e.g. \"green\", \"emerald\", \"maple\") or a custom #hex value. The chosen color is the healthy tone; the tree still fades toward dry tan when thirsty. Cosmetic only. Null or absent uses the default preset.'),
+  "bonsaiBlossom": zod.string().nullish().describe('A Bonsai tile\'s blossom color: \"none\" for a plain canopy or a preset key (e.g. \"pink\", \"white\", \"red\") that scatters flowers over the foliage. Cosmetic only. Null or absent means no blossoms.'),
+  "bonsaiStyle": zod.string().nullish().describe('A Bonsai tile\'s tree shape\/style (e.g. \"upright\", \"slanted\", \"windswept\", \"cascade\"). Cosmetic only. Null or absent uses the default upright style.'),
+  "aquariumFishTypes": zod.array(zod.string()).nullish().describe('An Aquarium tile\'s three fish species slots (e.g. \"clownfish\", \"bluetang\", \"angelfish\", \"pufferfish\", \"goldfish\", \"betta\"). Each slot may be \"none\" to leave it empty. Null or absent uses the defaults.'),
+  "aquariumSandColor": zod.string().nullish().describe('An Aquarium tile\'s sand floor color: a preset key (e.g. \"tan\", \"white\", \"dark\") or a custom #hex value. Null or absent uses the default tan sand.'),
+  "aquariumProps": zod.array(zod.string()).nullish().describe('An Aquarium tile\'s three decoration prop slots (e.g. \"seaweed\", \"coral\", \"chest\", \"anchor\", \"castle\", \"rock\"). Each slot may be \"none\" to leave it empty. Null or absent uses the defaults.'),
+  "visualizerStyle": zod.union([zod.literal('bars'),zod.literal('lava'),zod.literal('vu'),zod.literal('vinyl'),zod.literal('cd'),zod.literal(null)]).nullish().describe('An Audio Visualizer tile\'s render style: \"bars\" (frequency bar graph), \"lava\" (morphing lava-lamp blobs), \"vu\" (retro VU meter), \"vinyl\" (spinning record with album-art label), or \"cd\" (top-down CD player with album-art disc). Null or absent defaults to \"bars\".'),
+  "visualizerPrimary": zod.string().nullish().describe('An Audio Visualizer tile\'s primary accent color as a #hex value — the bars\/blobs\/needles\/lit LEDs. Null or absent uses the default.'),
+  "visualizerBackground": zod.string().nullish().describe('An Audio Visualizer tile\'s background \/ glow color as a #hex value — the canvas backdrop and halo glow. Null or absent uses the default.'),
+  "photoSource": zod.union([zod.literal('uploads'),zod.literal('urls'),zod.literal('google'),zod.literal('immich'),zod.literal(null)]).nullish().describe('Where a Picture Frame tile\'s photos come from: \"uploads\" (images from the upload library), \"urls\" (a pasted list of image URLs), \"google\" (a Google Photos album), or \"immich\" (an Immich album). Null or absent means unconfigured — the tile shows demo photos.'),
+  "photoUploadUrls": zod.array(zod.string()).nullish().describe('The uploaded images (their \/api\/uploads\/files\/... URLs) a Picture Frame tile cycles through when photoSource is \"uploads\".'),
+  "photoUrls": zod.array(zod.string()).nullish().describe('The image URLs a Picture Frame tile cycles through when photoSource is \"urls\".'),
+  "photoAlbumId": zod.string().nullish().describe('The selected album id for a server-backed photoSource (\"google\" or \"immich\"). Null or absent means no album chosen yet.'),
+  "photoInterval": zod.number().nullish().describe('Seconds between automatic slide advances on a Picture Frame tile. 0 disables auto-advance (manual only). Null or absent uses the default (30s).'),
+  "photoFit": zod.union([zod.literal('cover'),zod.literal('contain'),zod.literal(null)]).nullish().describe('How a Picture Frame tile scales its photos: \"cover\" (fill, crop) or \"contain\" (letterbox, whole image). Null or absent uses cover.'),
+  "frameStyle": zod.union([zod.literal('none'),zod.literal('wood'),zod.literal('thin'),zod.literal('gold'),zod.literal('polaroid'),zod.literal('custom'),zod.literal(null)]).nullish().describe('A Picture Frame tile\'s decorative frame: \"none\", \"wood\", \"thin\", \"gold\", \"polaroid\", or \"custom\" (uses frameColor\/frameWidth). Null or absent means no frame.'),
+  "frameColor": zod.string().nullish().describe('The frame color (#hex) when frameStyle is \"custom\". Null or absent uses a neutral default.'),
+  "frameWidth": zod.number().nullish().describe('The frame thickness in pixels when frameStyle is \"custom\". Null or absent uses the default.'),
+  "videoSource": zod.union([zod.literal('uploads'),zod.literal('urls'),zod.literal('youtube'),zod.literal('plex'),zod.literal('jellyfin'),zod.literal(null)]).nullish().describe('Where a Video Player tile\'s videos come from: \"uploads\" (video files from the upload library), \"urls\" (a pasted list of direct video file URLs), \"youtube\" (a YouTube video\/playlist embed), \"plex\" or \"jellyfin\" (a library on the connected media server). Null or absent means unconfigured — the tile plays the built-in yule log stream.'),
+  "videoUploadUrls": zod.array(zod.string()).nullish().describe('The uploaded videos (their \/api\/uploads\/files\/... URLs) a Video Player tile plays when videoSource is \"uploads\".'),
+  "videoUrls": zod.array(zod.string()).nullish().describe('The direct video file URLs a Video Player tile plays (in order) when videoSource is \"urls\".'),
+  "videoYoutubeUrl": zod.string().nullish().describe('The YouTube video or playlist URL a Video Player tile embeds when videoSource is \"youtube\".'),
+  "videoLibraryId": zod.string().nullish().describe('The selected library\/collection id for a media-server videoSource (\"plex\" or \"jellyfin\"). Null or absent means no library chosen.'),
+  "videoPlayMode": zod.union([zod.literal('single'),zod.literal('playlist'),zod.literal(null)]).nullish().describe('\"single\" loops the first (or only) video forever; \"playlist\" plays through the list, advancing on end. Null or absent uses playlist.'),
+  "videoPlaylistLoop": zod.boolean().nullish().describe('Whether a Video Player tile restarts the playlist after the last video ends (playlist mode). Null or absent defaults to true.'),
+  "videoShuffle": zod.boolean().nullish().describe('Whether a Video Player tile shuffles the playlist order (playlist mode). Null or absent defaults to false.'),
+  "videoMuted": zod.boolean().nullish().describe('Whether a Video Player tile starts muted. Null or absent defaults to true (autoplay-safe).'),
+  "videoFit": zod.union([zod.literal('cover'),zod.literal('contain'),zod.literal(null)]).nullish().describe('How a Video Player tile scales its video: \"cover\" (fill, crop) or \"contain\" (letterbox, whole frame). Null or absent uses cover.')
+}).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.')
 }).describe('A tile inside an export envelope. Mirrors Tile but omits every identity field (id, userId, pageId, createdAt) so it can be re-imported under any user\/page. Carries no credential data — integrations are referenced by type only.'))
+}).describe('One (device mode, variant) layout scope of a page inside a v2 export envelope.')).optional().describe('v2 only. The page\'s tiles grouped per (device mode, variant) layout scope, with modes referenced by name so they can be matched or recreated on import.')
 }).describe('A single page within an export envelope.'))
 }).describe('A versioned envelope holding one or more dashboard pages and their tiles. Used both as the export download and the import upload body. The format\/version fields let importers reject incompatible files. Never contains service connection credentials.')
 
@@ -1305,7 +1642,7 @@ export const ImportPagesBody = zod.object({
   "exportedAt": zod.string().optional().describe('ISO timestamp of when the file was produced.'),
   "pages": zod.array(zod.object({
   "name": zod.string(),
-  "layoutPreset": zod.enum(['auto', 'compact', 'fhd', 'qhd', 'uhd']).optional(),
+  "layoutPreset": zod.enum(['auto', 'adaptive', 'compact', 'fhd', 'qhd', 'uhd']).optional(),
   "layoutOrientation": zod.enum(['landscape', 'portrait']).optional(),
   "tiles": zod.array(zod.object({
   "type": zod.string(),
@@ -1437,9 +1774,174 @@ export const ImportPagesBody = zod.object({
   "videoMuted": zod.boolean().nullish().describe('Whether a Video Player tile starts muted. Null or absent defaults to true (autoplay-safe).'),
   "videoFit": zod.union([zod.literal('cover'),zod.literal('contain'),zod.literal(null)]).nullish().describe('How a Video Player tile scales its video: \"cover\" (fill, crop) or \"contain\" (letterbox, whole frame). Null or absent uses cover.')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.')
+}).describe('A tile inside an export envelope. Mirrors Tile but omits every identity field (id, userId, pageId, createdAt) so it can be re-imported under any user\/page. Carries no credential data — integrations are referenced by type only.')).describe('Flat list of every tile on the page across all device modes and variants. v1 importers read this; v2 importers prefer `layouts` when present.'),
+  "layouts": zod.array(zod.object({
+  "deviceMode": zod.string().describe('Device mode name (matched case-insensitively on import).'),
+  "variant": zod.string().nullish().describe('Adaptive variant key (e.g. \"fhd-landscape\"); null for the base layout.'),
+  "tiles": zod.array(zod.object({
+  "type": zod.string(),
+  "integration": zod.string().nullish(),
+  "gridX": zod.number(),
+  "gridY": zod.number(),
+  "gridW": zod.number(),
+  "gridH": zod.number(),
+  "name": zod.string().nullish(),
+  "url": zod.string().nullish(),
+  "bgColor": zod.string().nullish(),
+  "imageUrl": zod.string().nullish(),
+  "imageFit": zod.string().nullish(),
+  "imagePosition": zod.string().nullish(),
+  "imageScale": zod.number().nullish(),
+  "titleSize": zod.string().nullish(),
+  "titlePosition": zod.string().nullish(),
+  "titleColor": zod.string().nullish(),
+  "hideTitle": zod.boolean().optional(),
+  "metrics": zod.array(zod.string()).nullish(),
+  "tileSettings": zod.object({
+  "categoryFilter": zod.array(zod.string()).nullish().describe('Allow-list of qBittorrent categories to show on the tile. Null (or absent) means show all categories.'),
+  "groupByCategory": zod.boolean().nullish().describe('When true, the qBittorrent tile groups its torrents under category headers instead of showing a flat list. Absent or false means a flat list (the default).'),
+  "clockFormat": zod.union([zod.literal('12'),zod.literal('24'),zod.literal(null)]).nullish().describe('Time format for the Local Time tile: \"12\" for 12-hour with AM\/PM, \"24\" for 24-hour. Absent or null defaults to \"24\".'),
+  "clockShowSeconds": zod.boolean().nullish().describe('When true, the Local Time tile shows seconds. Absent or false hides them (the default).'),
+  "clockShowDate": zod.boolean().nullish().describe('When true, the Local Time tile shows the current date. Absent or false hides it (the default).'),
+  "weatherAutoLocate": zod.boolean().nullish().describe('When true, the Weather tile auto-detects the user\'s location via the browser. Absent or true defaults to auto-detect; false uses the typed weatherLocation instead.'),
+  "weatherLocation": zod.string().nullish().describe('City\/place name to geocode for the Weather tile when auto-detect is off (or as a fallback). Null or absent means none set.'),
+  "weatherUnits": zod.union([zod.literal('c'),zod.literal('f'),zod.literal(null)]).nullish().describe('Temperature units for the Weather tile: \"c\" for Celsius, \"f\" for Fahrenheit. Absent or null defaults to \"c\".'),
+  "sportsLeagues": zod.array(zod.string()).nullish().describe('League keys the Sports tile follows (e.g. \"nfl\", \"nba\", \"eng.1\"). Null or absent means none selected yet (the tile shows an empty state until at least one league is chosen).'),
+  "sportsTeams": zod.array(zod.string()).nullish().describe('Optional team allow-list for the Sports tile, scoped per league as \"<leagueKey>:<teamId>\" (e.g. \"nfl:12\"). When a league has no entries here, all of its teams are shown. Null or absent means no team filtering (all teams in every selected league).'),
+  "sportsShowScores": zod.boolean().nullish().describe('When true, the Sports tile shows live\/recent scores. Absent or null defaults to true. At least one of sportsShowScores \/ sportsShowNews must be on.'),
+  "sportsShowNews": zod.boolean().nullish().describe('When true, the Sports tile shows the latest headlines. Absent or null defaults to false. At least one of sportsShowScores \/ sportsShowNews must be on.'),
+  "newsFeedUrl": zod.string().nullish().describe('RSS or Atom feed URL the News tile pulls headlines from. Null or absent means none set, in which case the tile shows demo headlines.'),
+  "newsMaxItems": zod.number().nullish().describe('Maximum number of headlines the News tile requests\/shows. Null or absent defaults to a sensible value (clamped server-side).'),
+  "newsShowTimestamp": zod.boolean().nullish().describe('When true, the News tile shows each headline\'s published time (as room allows). Absent or false hides it (the default).'),
+  "stockWatchlist": zod.array(zod.object({
+  "symbol": zod.string().describe('Ticker symbol (e.g. \"AAPL\"), stored uppercased.'),
+  "shares": zod.number().nullish().describe('Optional number of shares held. When present (and > 0) the tile shows this row\'s position value and gain\/loss.'),
+  "costBasis": zod.number().nullish().describe('Optional average cost per share. Used with shares to compute gain\/loss. Null or absent when not tracking cost.')
+})).nullish().describe('Per-tile watchlist of stock symbols for the Stocks tile. Each entry carries an uppercased ticker symbol and optional share quantity and average cost basis per share, which turn the watchlist into a lightweight portfolio. Null or absent means none set (the tile shows demo\/sample quotes).'),
+  "sleeperUsername": zod.string().nullish().describe('Sleeper account username the Fantasy tile follows. Used to resolve the user\'s id and locate their roster in the league. Null or absent means none set (the tile shows an empty state until configured).'),
+  "sleeperLeagueId": zod.string().nullish().describe('Sleeper league id the Fantasy tile shows. Sleeper\'s read endpoints are public for any league id. Null or absent means none chosen yet.'),
+  "sleeperSport": zod.string().nullish().describe('Sport the Fantasy tile\'s league belongs to (e.g. \"nfl\", \"nba\"). Absent or null defaults to \"nfl\".'),
+  "sleeperSeason": zod.string().nullish().describe('Season year the Fantasy tile\'s league belongs to (e.g. \"2025\"). Absent or null defaults to the current NFL season.'),
+  "sleeperShowMatchup": zod.boolean().nullish().describe('When true, the Fantasy tile shows the user\'s current-week matchup. Absent or null defaults to true.'),
+  "sleeperShowStandings": zod.boolean().nullish().describe('When true, the Fantasy tile shows the league standings. Absent or null defaults to true.'),
+  "sleeperShowTransactions": zod.boolean().nullish().describe('When true, the Fantasy tile shows recent waiver\/trade transactions. Absent or null defaults to true.'),
+  "audioSource": zod.string().nullish().describe('Which music source backs an Audio Player tile (e.g. \"plex\"). Absent or null defaults to \"plex\". This is the seam additional sources (Spotify, Jellyfin, Navidrome) plug into later.'),
+  "audioFindMusic": zod.boolean().nullish().describe('When true, the Audio Player tile shows the \"Find music\" button that opens the music browser (Plex \/ Subsonic only). Absent or null defaults to true.'),
+  "audioSearch": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Search tab (Plex \/ Subsonic only). Absent or null defaults to true.'),
+  "audioBrowse": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Browse tab (recently added \/ albums \/ artists, Plex \/ Subsonic only). Absent or null defaults to true.'),
+  "audioPlaylists": zod.boolean().nullish().describe('When true, the Audio Player tile\'s music browser offers the Playlists tab (Plex \/ Subsonic only). Absent or null defaults to true.'),
+  "emailAccounts": zod.array(zod.string()).nullish().describe('Allow-list of mail account keys the Email tile aggregates: \"gmail\" for the linked Google account, or the id of a saved IMAP account. Null or absent means all configured accounts.'),
+  "emailMaxMessages": zod.number().nullish().describe('Maximum number of messages the Email tile requests\/shows. Null or absent defaults to a sensible value (clamped server-side).'),
+  "emailUnreadOnly": zod.boolean().nullish().describe('When true, the Email tile shows only unread messages. Absent or false shows the most recent messages regardless of read state.'),
+  "calendarAccounts": zod.array(zod.string()).nullish().describe('Allow-list of calendar account keys the Calendar tile aggregates: \"google\" for the linked Google account, or the id of a saved CalDAV account. Null or absent means all configured accounts.'),
+  "calendarDaysAhead": zod.number().nullish().describe('How many days ahead the Calendar tile looks for upcoming events. Null or absent defaults to a sensible value (clamped server-side).'),
+  "calendarMaxEvents": zod.number().nullish().describe('Maximum number of events the Calendar tile requests\/shows. Null or absent defaults to a sensible value (clamped server-side).'),
+  "scrollable": zod.boolean().nullish().describe('When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).'),
+  "hideStatusDot": zod.boolean().nullish().describe('When true, the tile header hides the service-reachability status dot even when the backing connection is configured. Absent or false shows the dot (the default).'),
+  "truenasMetric": zod.union([zod.literal('cpuram'),zod.literal('network'),zod.literal('arc'),zod.literal('pools'),zod.literal('disks'),zod.literal('cputemp'),zod.literal(null)]).nullish().describe('Which single TrueNAS metric a dedicated TrueNAS tile renders with its bespoke visual: \"cpuram\", \"network\", \"arc\", \"pools\", \"disks\", or \"cputemp\". Null or absent means the tile shows the combined multi-section view (the default, backward-compatible behavior).'),
+  "truenasShowCpuCores": zod.boolean().nullish().describe('When true (or absent, the default), the dedicated CPU-temperature TrueNAS tile shows the per-core temperature readout beneath the gauge. Set false for a simpler tile with just the headline gauge.'),
+  "truenasPools": zod.array(zod.string()).nullish().describe('Allow-list of TrueNAS ZFS pool (volume) names to show on the tile. Applies to both the dedicated ZFS Pools view and the pools section of the combined view. Null, absent, or empty means show all pools (the default, backward-compatible behavior).'),
+  "truenasPoolOrder": zod.array(zod.string()).nullish().describe('Explicit display order of TrueNAS ZFS pool (volume) names. Pools whose name appears here are shown first, in this order; any remaining pools follow in their server-reported order. Applies to both the dedicated ZFS Pools view and the pools section of the combined view. Null, absent, or empty keeps the server-reported order (the default, backward-compatible behavior).'),
+  "pterodactylServers": zod.array(zod.string()).nullish().describe('Allow-list of Pterodactyl server identifiers to show on the tile. Null, absent, or empty means show all servers (the default, backward-compatible behavior).'),
+  "noteBody": zod.string().nullish().describe('Free-form note text for a Note (post-it) tile. Null or absent means an empty note.'),
+  "noteItems": zod.array(zod.object({
+  "text": zod.string().describe('The checklist item\'s label text.'),
+  "done": zod.boolean().describe('Whether the item is checked off. When true the tile renders it with a strike-through.')
+})).nullish().describe('Checklist \/ to-do items for a Note tile. Each item has text and a done flag (rendered with a strike-through when done). Null or absent means no checklist.'),
+  "noteColor": zod.string().nullish().describe('Background color of a Note (post-it) tile as a CSS color string (e.g. a preset note color or a custom hex). Null or absent uses the default post-it yellow.'),
+  "noteFontSize": zod.union([zod.literal('sm'),zod.literal('md'),zod.literal('lg'),zod.literal(null)]).nullish().describe('Font size for a Note tile\'s text: \"sm\", \"md\", or \"lg\". Absent or null defaults to \"md\".'),
+  "noteTextColor": zod.string().nullish().describe('CSS color for a Note tile\'s text (note body and checklist). Null or absent uses a sensible dark default that reads on light post-it colors.'),
+  "timerMode": zod.union([zod.literal('countup'),zod.literal('countdown'),zod.literal('pomodoro'),zod.literal(null)]).nullish().describe('Mode for a Timer tile: \"countup\" for a stopwatch counting elapsed time from zero, \"countdown\" for counting down from timerDuration to zero, \"pomodoro\" for an auto-cycling focus\/break timer. Absent or null defaults to \"countup\".'),
+  "timerDuration": zod.number().nullish().describe('Starting duration in seconds for a countdown Timer tile. Ignored in count-up mode. Null or absent defaults to a sensible value.'),
+  "timerRunning": zod.boolean().nullish().describe('Whether a Timer tile is currently running. When true the live display advances from timerStartedAt; when false it is paused at timerAccumulatedMs. Absent or false means paused (the default).'),
+  "timerStartedAt": zod.number().nullish().describe('Epoch milliseconds when the Timer tile\'s current run segment began. Combined with timerAccumulatedMs this lets the live display resume accurately after a refresh or page navigation. Null or absent when the timer is paused.'),
+  "timerAccumulatedMs": zod.number().nullish().describe('Elapsed milliseconds accumulated across previous run segments of a Timer tile (i.e. before timerStartedAt). Null or absent means zero.'),
+  "pomodoroFocusMinutes": zod.number().nullish().describe('Length in minutes of a focus interval for a Timer tile in pomodoro mode. Null or absent defaults to 25.'),
+  "pomodoroShortBreakMinutes": zod.number().nullish().describe('Length in minutes of a short break for a Timer tile in pomodoro mode. Null or absent defaults to 5.'),
+  "pomodoroLongBreakMinutes": zod.number().nullish().describe('Length in minutes of the long break for a Timer tile in pomodoro mode. Null or absent defaults to 15.'),
+  "pomodoroSessionsBeforeLongBreak": zod.number().nullish().describe('How many focus sessions complete before a Timer tile in pomodoro mode runs a long break. Null or absent defaults to 4.'),
+  "pomodoroPhase": zod.union([zod.literal('focus'),zod.literal('shortBreak'),zod.literal('longBreak'),zod.literal(null)]).nullish().describe('Current phase of a Timer tile in pomodoro mode: \"focus\", a \"shortBreak\", or the \"longBreak\". Combined with the anchor timestamp this lets the live display resume the correct phase after a refresh or page navigation. Null or absent defaults to \"focus\".'),
+  "pomodoroCompletedSessions": zod.number().nullish().describe('Number of focus sessions completed in the current pomodoro cycle for a Timer tile (resets to zero after a long break). Null or absent means zero.'),
+  "timerAlertEnabled": zod.boolean().nullish().describe('Whether a Timer tile alerts on completion (countdown) or phase change (pomodoro) by playing a sound and\/or firing a browser notification. Null or absent means disabled.'),
+  "timerAlertSound": zod.union([zod.literal('chime'),zod.literal('bell'),zod.literal('beep'),zod.literal('digital'),zod.literal('none'),zod.literal(null)]).nullish().describe('Which alert sound a Timer tile plays when it alerts: \"chime\", \"bell\", \"beep\", or \"digital\", or \"none\" for a browser notification only. Honored for both countdown completion and pomodoro phase transitions. Null or absent defaults to \"chime\".'),
+  "diceType": zod.union([zod.literal('d3'),zod.literal('d4'),zod.literal('d6'),zod.literal('d8'),zod.literal('d10'),zod.literal('d12'),zod.literal('d20'),zod.literal('d100'),zod.literal(null)]).nullish().describe('Die type for a Dice Roller tile, e.g. \"d4\", \"d6\", \"d20\". The number after the \"d\" is the number of sides each die has. Null or absent defaults to \"d6\".'),
+  "diceCount": zod.number().nullish().describe('How many dice a Dice Roller tile rolls at once (1-6). Null or absent defaults to 2.'),
+  "petHunger": zod.number().nullish().describe('A Tamagotchi pet tile\'s hunger satisfaction, 0 (starving) to 100 (full). Decays over real elapsed time and rises when the pet is fed. Null or absent starts at a healthy default.'),
+  "petHappiness": zod.number().nullish().describe('A Tamagotchi pet tile\'s happiness, 0 (sad) to 100 (delighted). Decays over real elapsed time and rises when the pet is played with. Null or absent starts at a healthy default.'),
+  "petEnergy": zod.number().nullish().describe('A Tamagotchi pet tile\'s energy, 0 (exhausted) to 100 (rested). Decays over real elapsed time and rises when the pet rests. Null or absent starts at a healthy default.'),
+  "petUpdatedAt": zod.number().nullish().describe('Epoch milliseconds when a Tamagotchi pet tile\'s stats were last computed. On mount the client recomputes decay from the elapsed wall-clock time since this anchor so the pet keeps living across reloads and sessions. Null or absent means \"just now\".'),
+  "petBodyColor": zod.string().nullish().describe('A Tamagotchi pet tile\'s body color: a preset key (e.g. \"green\", \"blue\", \"pink\") or a custom #hex value. Null or absent uses the default preset.'),
+  "petEyes": zod.string().nullish().describe('A Tamagotchi pet tile\'s eye style (e.g. \"round\", \"dot\", \"happy\", \"sleepy\", \"star\", \"wink\"). Null or absent uses the default.'),
+  "petNose": zod.string().nullish().describe('A Tamagotchi pet tile\'s nose style (e.g. \"none\", \"dot\", \"round\", \"triangle\", \"heart\"). Null or absent uses the default.'),
+  "petMouth": zod.string().nullish().describe('A Tamagotchi pet tile\'s mouth style (e.g. \"smile\", \"neutral\", \"open\", \"cat\", \"frown\"). Null or absent uses the default.'),
+  "bonsaiHydration": zod.number().nullish().describe('A Bonsai tile\'s soil hydration, 0 (bone dry) to 100 (well watered). Slowly drops over real elapsed time and rises when the tree is watered. Null or absent starts at a healthy default.'),
+  "bonsaiOvergrowth": zod.number().nullish().describe('A Bonsai tile\'s overgrowth, 0 (freshly pruned \/ tidy) to 100 (wild and untidy). Slowly rises over real elapsed time and is cut back when the tree is pruned. Null or absent starts at a tidy default.'),
+  "bonsaiGrowth": zod.number().nullish().describe('A Bonsai tile\'s accumulated growth progress, 0 to 100, which drives its visible growth stage (sapling -> young -> mature). Advances while the tree is kept healthy and stalls or slowly regresses when neglected. Null or absent starts at 0 (a fresh sapling).'),
+  "bonsaiUpdatedAt": zod.number().nullish().describe('Epoch milliseconds when a Bonsai tile\'s state was last computed. On mount the client recomputes hydration\/overgrowth\/growth from the elapsed wall-clock time since this anchor so the tree keeps living across reloads and sessions. Null or absent means \"just now\".'),
+  "bonsaiPotColor": zod.string().nullish().describe('A Bonsai tile\'s pot color: a preset key (e.g. \"terracotta\", \"slate\", \"glazed\") or a custom #hex value. Cosmetic only. Null or absent uses the default preset.'),
+  "bonsaiLeafColor": zod.string().nullish().describe('A Bonsai tile\'s foliage color: a preset key (e.g. \"green\", \"emerald\", \"maple\") or a custom #hex value. The chosen color is the healthy tone; the tree still fades toward dry tan when thirsty. Cosmetic only. Null or absent uses the default preset.'),
+  "bonsaiBlossom": zod.string().nullish().describe('A Bonsai tile\'s blossom color: \"none\" for a plain canopy or a preset key (e.g. \"pink\", \"white\", \"red\") that scatters flowers over the foliage. Cosmetic only. Null or absent means no blossoms.'),
+  "bonsaiStyle": zod.string().nullish().describe('A Bonsai tile\'s tree shape\/style (e.g. \"upright\", \"slanted\", \"windswept\", \"cascade\"). Cosmetic only. Null or absent uses the default upright style.'),
+  "aquariumFishTypes": zod.array(zod.string()).nullish().describe('An Aquarium tile\'s three fish species slots (e.g. \"clownfish\", \"bluetang\", \"angelfish\", \"pufferfish\", \"goldfish\", \"betta\"). Each slot may be \"none\" to leave it empty. Null or absent uses the defaults.'),
+  "aquariumSandColor": zod.string().nullish().describe('An Aquarium tile\'s sand floor color: a preset key (e.g. \"tan\", \"white\", \"dark\") or a custom #hex value. Null or absent uses the default tan sand.'),
+  "aquariumProps": zod.array(zod.string()).nullish().describe('An Aquarium tile\'s three decoration prop slots (e.g. \"seaweed\", \"coral\", \"chest\", \"anchor\", \"castle\", \"rock\"). Each slot may be \"none\" to leave it empty. Null or absent uses the defaults.'),
+  "visualizerStyle": zod.union([zod.literal('bars'),zod.literal('lava'),zod.literal('vu'),zod.literal('vinyl'),zod.literal('cd'),zod.literal(null)]).nullish().describe('An Audio Visualizer tile\'s render style: \"bars\" (frequency bar graph), \"lava\" (morphing lava-lamp blobs), \"vu\" (retro VU meter), \"vinyl\" (spinning record with album-art label), or \"cd\" (top-down CD player with album-art disc). Null or absent defaults to \"bars\".'),
+  "visualizerPrimary": zod.string().nullish().describe('An Audio Visualizer tile\'s primary accent color as a #hex value — the bars\/blobs\/needles\/lit LEDs. Null or absent uses the default.'),
+  "visualizerBackground": zod.string().nullish().describe('An Audio Visualizer tile\'s background \/ glow color as a #hex value — the canvas backdrop and halo glow. Null or absent uses the default.'),
+  "photoSource": zod.union([zod.literal('uploads'),zod.literal('urls'),zod.literal('google'),zod.literal('immich'),zod.literal(null)]).nullish().describe('Where a Picture Frame tile\'s photos come from: \"uploads\" (images from the upload library), \"urls\" (a pasted list of image URLs), \"google\" (a Google Photos album), or \"immich\" (an Immich album). Null or absent means unconfigured — the tile shows demo photos.'),
+  "photoUploadUrls": zod.array(zod.string()).nullish().describe('The uploaded images (their \/api\/uploads\/files\/... URLs) a Picture Frame tile cycles through when photoSource is \"uploads\".'),
+  "photoUrls": zod.array(zod.string()).nullish().describe('The image URLs a Picture Frame tile cycles through when photoSource is \"urls\".'),
+  "photoAlbumId": zod.string().nullish().describe('The selected album id for a server-backed photoSource (\"google\" or \"immich\"). Null or absent means no album chosen yet.'),
+  "photoInterval": zod.number().nullish().describe('Seconds between automatic slide advances on a Picture Frame tile. 0 disables auto-advance (manual only). Null or absent uses the default (30s).'),
+  "photoFit": zod.union([zod.literal('cover'),zod.literal('contain'),zod.literal(null)]).nullish().describe('How a Picture Frame tile scales its photos: \"cover\" (fill, crop) or \"contain\" (letterbox, whole image). Null or absent uses cover.'),
+  "frameStyle": zod.union([zod.literal('none'),zod.literal('wood'),zod.literal('thin'),zod.literal('gold'),zod.literal('polaroid'),zod.literal('custom'),zod.literal(null)]).nullish().describe('A Picture Frame tile\'s decorative frame: \"none\", \"wood\", \"thin\", \"gold\", \"polaroid\", or \"custom\" (uses frameColor\/frameWidth). Null or absent means no frame.'),
+  "frameColor": zod.string().nullish().describe('The frame color (#hex) when frameStyle is \"custom\". Null or absent uses a neutral default.'),
+  "frameWidth": zod.number().nullish().describe('The frame thickness in pixels when frameStyle is \"custom\". Null or absent uses the default.'),
+  "videoSource": zod.union([zod.literal('uploads'),zod.literal('urls'),zod.literal('youtube'),zod.literal('plex'),zod.literal('jellyfin'),zod.literal(null)]).nullish().describe('Where a Video Player tile\'s videos come from: \"uploads\" (video files from the upload library), \"urls\" (a pasted list of direct video file URLs), \"youtube\" (a YouTube video\/playlist embed), \"plex\" or \"jellyfin\" (a library on the connected media server). Null or absent means unconfigured — the tile plays the built-in yule log stream.'),
+  "videoUploadUrls": zod.array(zod.string()).nullish().describe('The uploaded videos (their \/api\/uploads\/files\/... URLs) a Video Player tile plays when videoSource is \"uploads\".'),
+  "videoUrls": zod.array(zod.string()).nullish().describe('The direct video file URLs a Video Player tile plays (in order) when videoSource is \"urls\".'),
+  "videoYoutubeUrl": zod.string().nullish().describe('The YouTube video or playlist URL a Video Player tile embeds when videoSource is \"youtube\".'),
+  "videoLibraryId": zod.string().nullish().describe('The selected library\/collection id for a media-server videoSource (\"plex\" or \"jellyfin\"). Null or absent means no library chosen.'),
+  "videoPlayMode": zod.union([zod.literal('single'),zod.literal('playlist'),zod.literal(null)]).nullish().describe('\"single\" loops the first (or only) video forever; \"playlist\" plays through the list, advancing on end. Null or absent uses playlist.'),
+  "videoPlaylistLoop": zod.boolean().nullish().describe('Whether a Video Player tile restarts the playlist after the last video ends (playlist mode). Null or absent defaults to true.'),
+  "videoShuffle": zod.boolean().nullish().describe('Whether a Video Player tile shuffles the playlist order (playlist mode). Null or absent defaults to false.'),
+  "videoMuted": zod.boolean().nullish().describe('Whether a Video Player tile starts muted. Null or absent defaults to true (autoplay-safe).'),
+  "videoFit": zod.union([zod.literal('cover'),zod.literal('contain'),zod.literal(null)]).nullish().describe('How a Video Player tile scales its video: \"cover\" (fill, crop) or \"contain\" (letterbox, whole frame). Null or absent uses cover.')
+}).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.')
 }).describe('A tile inside an export envelope. Mirrors Tile but omits every identity field (id, userId, pageId, createdAt) so it can be re-imported under any user\/page. Carries no credential data — integrations are referenced by type only.'))
+}).describe('One (device mode, variant) layout scope of a page inside a v2 export envelope.')).optional().describe('v2 only. The page\'s tiles grouped per (device mode, variant) layout scope, with modes referenced by name so they can be matched or recreated on import.')
 }).describe('A single page within an export envelope.'))
 }).describe('A versioned envelope holding one or more dashboard pages and their tiles. Used both as the export download and the import upload body. The format\/version fields let importers reject incompatible files. Never contains service connection credentials.')
+
+
+/**
+ * @summary List the non-empty (device mode, variant) layouts on a page
+ */
+export const GetPageLayoutsParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetPageLayoutsResponseItem = zod.object({
+  "deviceModeId": zod.number().nullable(),
+  "variant": zod.string().nullable(),
+  "tileCount": zod.number()
+}).describe('One non-empty (device mode, variant) layout scope on a page, with its tile count. Feeds the \"copy layout from…\" picker.')
+export const GetPageLayoutsResponse = zod.array(GetPageLayoutsResponseItem)
+
+
+/**
+ * @summary Copy all tiles from one layout scope of a page into another
+ */
+export const CopyPageLayoutParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const CopyPageLayoutBody = zod.object({
+  "fromDeviceModeId": zod.number(),
+  "fromVariant": zod.string().nullish(),
+  "toDeviceModeId": zod.number(),
+  "toVariant": zod.string().nullish()
+}).describe('Source and target layout scopes for copying a page\'s tiles. The target scope must be empty.')
 
 
 /**

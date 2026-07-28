@@ -121,6 +121,24 @@ paths:
             Omitting it returns every tile the user owns.
           schema:
             type: integer
+        - name: deviceModeId
+          in: query
+          required: false
+          description: >-
+            When provided together with pageId, return only the tiles that
+            belong to this device mode's layout. Omitting it returns the page's
+            tiles across all modes (legacy behavior).
+          schema:
+            type: integer
+        - name: variant
+          in: query
+          required: false
+          description: >-
+            Adaptive layout variant key (e.g. "fhd-landscape") to scope the
+            result to, used with deviceModeId. Omitting it selects the base
+            layout (variant null) used by auto/fixed pages.
+          schema:
+            type: string
       responses:
         "200":
           description: Tile list
@@ -239,6 +257,112 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/Tile"
+
+  /device-modes:
+    get:
+      operationId: getDeviceModes
+      tags: [device-modes]
+      summary: List the authenticated user's device modes
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Device mode list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DeviceMode"
+    post:
+      operationId: createDeviceMode
+      tags: [device-modes]
+      summary: Create a new device mode
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DeviceModeInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeviceMode"
+        "400":
+          description: Missing or invalid name
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /device-modes/{id}:
+    put:
+      operationId: updateDeviceMode
+      tags: [device-modes]
+      summary: Rename a device mode
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DeviceModeInput"
+      responses:
+        "200":
+          description: Updated device mode
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeviceMode"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      operationId: deleteDeviceMode
+      tags: [device-modes]
+      summary: Delete a device mode and every tile in it
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "400":
+          description: Cannot delete the last remaining device mode
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
   /pages:
     get:
@@ -425,6 +549,74 @@ paths:
                   $ref: "#/components/schemas/Page"
         "400":
           description: Malformed or incompatible export file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /pages/{id}/layouts:
+    get:
+      operationId: getPageLayouts
+      tags: [pages]
+      summary: List the non-empty (device mode, variant) layouts on a page
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Layout scopes with tile counts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PageLayoutInfo"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /pages/{id}/copy-layout:
+    post:
+      operationId: copyPageLayout
+      tags: [pages]
+      summary: Copy all tiles from one layout scope of a page into another
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CopyLayoutBody"
+      responses:
+        "201":
+          description: Number of tiles copied into the target layout
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CopyLayoutResult"
+        "400":
+          description: Target layout not empty, or source equals target
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Page or device mode not found
           content:
             application/json:
               schema:
@@ -2231,6 +2423,17 @@ components:
             The page this tile belongs to. Null only for tiles that predate the
             multi-page migration and could not be assigned a page.
           type: ["integer", "null"]
+        deviceModeId:
+          description: >-
+            The device mode (layout profile) this tile belongs to. Null only
+            for rows that predate device modes and could not be assigned one.
+          type: ["integer", "null"]
+        variant:
+          description: >-
+            Adaptive layout variant key this tile belongs to (e.g.
+            "fhd-landscape"). Null means the base layout used by auto/fixed
+            pages.
+          type: ["string", "null"]
         type:
           type: string
           enum: [app, truenas, media, sonarr, radarr, lidarr, qbittorrent]
@@ -2315,6 +2518,16 @@ components:
             The page to create this tile on. Omit to fall back to the user's
             first page.
           type: ["integer", "null"]
+        deviceModeId:
+          description: >-
+            The device mode (layout profile) to create this tile in. Omit to
+            fall back to the user's default (first) mode.
+          type: ["integer", "null"]
+        variant:
+          description: >-
+            Adaptive layout variant key to create this tile in (e.g.
+            "fhd-landscape"). Omit or null for the base layout.
+          type: ["string", "null"]
         type:
           type: string
           enum: [app, truenas, media, sonarr, radarr, lidarr, qbittorrent]
@@ -3587,6 +3800,16 @@ components:
             The page whose layout is being saved. When provided, the response
             returns only that page's tiles; omit for all of the user's tiles.
           type: ["integer", "null"]
+        deviceModeId:
+          description: >-
+            When provided with pageId, the response is narrowed to that device
+            mode's layout (matching GET /tiles for the same scope).
+          type: ["integer", "null"]
+        variant:
+          description: >-
+            Adaptive layout variant key that further narrows the response
+            scope, used with deviceModeId. Omit or null for the base layout.
+          type: ["string", "null"]
         tiles:
           type: array
           items:
@@ -3608,10 +3831,13 @@ components:
           description: >-
             Fixed scale preset that maps to a locked column count. "auto" (the
             default) keeps today's responsive behavior (columns derived from
-            window width). Any other value locks the page to a fixed column count
-            that is CSS-scaled to fit the viewport so tiles never reflow.
+            window width). "adaptive" auto-resolves a fixed preset and
+            orientation from the viewport, with an independently saved layout
+            per scale+orientation variant. Any other value locks the page to a
+            fixed column count that is CSS-scaled to fit the viewport so tiles
+            never reflow.
           type: string
-          enum: [auto, compact, fhd, qhd, uhd]
+          enum: [auto, adaptive, compact, fhd, qhd, uhd]
         layoutOrientation:
           description: >-
             How a fixed-preset page is scaled to fit. "landscape" fits to width,
@@ -3628,7 +3854,7 @@ components:
           type: string
         layoutPreset:
           type: string
-          enum: [auto, compact, fhd, qhd, uhd]
+          enum: [auto, adaptive, compact, fhd, qhd, uhd]
         layoutOrientation:
           type: string
           enum: [landscape, portrait]
@@ -3702,14 +3928,118 @@ components:
           type: string
         layoutPreset:
           type: string
-          enum: [auto, compact, fhd, qhd, uhd]
+          enum: [auto, adaptive, compact, fhd, qhd, uhd]
         layoutOrientation:
           type: string
           enum: [landscape, portrait]
         tiles:
+          description: >-
+            Flat list of every tile on the page across all device modes and
+            variants. v1 importers read this; v2 importers prefer `layouts`
+            when present.
           type: array
           items:
             $ref: "#/components/schemas/ExportedTile"
+        layouts:
+          description: >-
+            v2 only. The page's tiles grouped per (device mode, variant)
+            layout scope, with modes referenced by name so they can be matched
+            or recreated on import.
+          type: array
+          items:
+            $ref: "#/components/schemas/ExportedLayout"
+
+    ExportedLayout:
+      description: >-
+        One (device mode, variant) layout scope of a page inside a v2 export
+        envelope.
+      type: object
+      required: [deviceMode, tiles]
+      properties:
+        deviceMode:
+          description: Device mode name (matched case-insensitively on import).
+          type: string
+        variant:
+          description: >-
+            Adaptive variant key (e.g. "fhd-landscape"); null for the base
+            layout.
+          type: ["string", "null"]
+        tiles:
+          type: array
+          items:
+            $ref: "#/components/schemas/ExportedTile"
+
+    SuccessResponse:
+      type: object
+      required: [success]
+      properties:
+        success:
+          type: boolean
+
+    DeviceMode:
+      description: >-
+        A named, user-created layout profile (e.g. "PC", "Phone"). Every tile
+        belongs to exactly one device mode; switching modes switches the whole
+        dashboard's tile set.
+      type: object
+      required: [id, userId, name, position]
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        name:
+          type: string
+        position:
+          type: integer
+        createdAt:
+          type: string
+
+    DeviceModeInput:
+      type: object
+      required: [name]
+      properties:
+        name:
+          description: Display name for the device mode (trimmed, max 40 chars).
+          type: string
+
+    PageLayoutInfo:
+      description: >-
+        One non-empty (device mode, variant) layout scope on a page, with its
+        tile count. Feeds the "copy layout from…" picker.
+      type: object
+      required: [deviceModeId, variant, tileCount]
+      properties:
+        deviceModeId:
+          type: ["integer", "null"]
+        variant:
+          type: ["string", "null"]
+        tileCount:
+          type: integer
+
+    CopyLayoutBody:
+      description: >-
+        Source and target layout scopes for copying a page's tiles. The target
+        scope must be empty.
+      type: object
+      required: [fromDeviceModeId, toDeviceModeId]
+      properties:
+        fromDeviceModeId:
+          type: integer
+        fromVariant:
+          type: ["string", "null"]
+        toDeviceModeId:
+          type: integer
+        toVariant:
+          type: ["string", "null"]
+
+    CopyLayoutResult:
+      type: object
+      required: [copied]
+      properties:
+        copied:
+          description: Number of tiles copied into the target layout.
+          type: integer
 
     PageExport:
       description: >-

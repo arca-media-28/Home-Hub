@@ -34,6 +34,10 @@ import type {
   ConnectionHealth,
   ConnectionTestResult,
   ContinueWatchingItem,
+  CopyLayoutBody,
+  CopyLayoutResult,
+  DeviceMode,
+  DeviceModeInput,
   EmailArchiveRequest,
   EmailArchiveResponse,
   EmailInboxData,
@@ -76,6 +80,7 @@ import type {
   Page,
   PageExport,
   PageInput,
+  PageLayoutInfo,
   PageReorder,
   PhotoAlbumsData,
   PhotosData,
@@ -104,6 +109,7 @@ import type {
   StockSearchData,
   SubsonicScrobbleInput,
   SubsonicScrobbleResult,
+  SuccessResponse,
   TailscaleData,
   Tile,
   TileInput,
@@ -871,6 +877,296 @@ export const useSaveLayout = <TError = ErrorType<unknown>,
       return useMutation(getSaveLayoutMutationOptions(options));
     }
 
+export const getGetDeviceModesUrl = () => {
+
+
+
+
+  return `/api/device-modes`
+}
+
+/**
+ * @summary List the authenticated user's device modes
+ */
+export const getDeviceModes = async ( options?: RequestInit): Promise<DeviceMode[]> => {
+
+  return customFetch<DeviceMode[]>(getGetDeviceModesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetDeviceModesQueryKey = () => {
+    return [
+    `/api/device-modes`
+    ] as const;
+    }
+
+
+export const getGetDeviceModesQueryOptions = <TData = Awaited<ReturnType<typeof getDeviceModes>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDeviceModes>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetDeviceModesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDeviceModes>>> = ({ signal }) => getDeviceModes({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getDeviceModes>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetDeviceModesQueryResult = NonNullable<Awaited<ReturnType<typeof getDeviceModes>>>
+export type GetDeviceModesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List the authenticated user's device modes
+ */
+
+export function useGetDeviceModes<TData = Awaited<ReturnType<typeof getDeviceModes>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDeviceModes>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetDeviceModesQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateDeviceModeUrl = () => {
+
+
+
+
+  return `/api/device-modes`
+}
+
+/**
+ * @summary Create a new device mode
+ */
+export const createDeviceMode = async (deviceModeInput: DeviceModeInput, options?: RequestInit): Promise<DeviceMode> => {
+
+  return customFetch<DeviceMode>(getCreateDeviceModeUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      deviceModeInput,)
+  }
+);}
+
+
+
+
+export const getCreateDeviceModeMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createDeviceMode>>, TError,{data: BodyType<DeviceModeInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createDeviceMode>>, TError,{data: BodyType<DeviceModeInput>}, TContext> => {
+
+const mutationKey = ['createDeviceMode'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createDeviceMode>>, {data: BodyType<DeviceModeInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createDeviceMode(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateDeviceModeMutationResult = NonNullable<Awaited<ReturnType<typeof createDeviceMode>>>
+    export type CreateDeviceModeMutationBody = BodyType<DeviceModeInput>
+    export type CreateDeviceModeMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Create a new device mode
+ */
+export const useCreateDeviceMode = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createDeviceMode>>, TError,{data: BodyType<DeviceModeInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createDeviceMode>>,
+        TError,
+        {data: BodyType<DeviceModeInput>},
+        TContext
+      > => {
+      return useMutation(getCreateDeviceModeMutationOptions(options));
+    }
+
+export const getUpdateDeviceModeUrl = (id: number,) => {
+
+
+
+
+  return `/api/device-modes/${id}`
+}
+
+/**
+ * @summary Rename a device mode
+ */
+export const updateDeviceMode = async (id: number,
+    deviceModeInput: DeviceModeInput, options?: RequestInit): Promise<DeviceMode> => {
+
+  return customFetch<DeviceMode>(getUpdateDeviceModeUrl(id),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      deviceModeInput,)
+  }
+);}
+
+
+
+
+export const getUpdateDeviceModeMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateDeviceMode>>, TError,{id: number;data: BodyType<DeviceModeInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateDeviceMode>>, TError,{id: number;data: BodyType<DeviceModeInput>}, TContext> => {
+
+const mutationKey = ['updateDeviceMode'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateDeviceMode>>, {id: number;data: BodyType<DeviceModeInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateDeviceMode(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateDeviceModeMutationResult = NonNullable<Awaited<ReturnType<typeof updateDeviceMode>>>
+    export type UpdateDeviceModeMutationBody = BodyType<DeviceModeInput>
+    export type UpdateDeviceModeMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Rename a device mode
+ */
+export const useUpdateDeviceMode = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateDeviceMode>>, TError,{id: number;data: BodyType<DeviceModeInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateDeviceMode>>,
+        TError,
+        {id: number;data: BodyType<DeviceModeInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateDeviceModeMutationOptions(options));
+    }
+
+export const getDeleteDeviceModeUrl = (id: number,) => {
+
+
+
+
+  return `/api/device-modes/${id}`
+}
+
+/**
+ * @summary Delete a device mode and every tile in it
+ */
+export const deleteDeviceMode = async (id: number, options?: RequestInit): Promise<SuccessResponse> => {
+
+  return customFetch<SuccessResponse>(getDeleteDeviceModeUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteDeviceModeMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteDeviceMode>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteDeviceMode>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['deleteDeviceMode'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteDeviceMode>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  deleteDeviceMode(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteDeviceModeMutationResult = NonNullable<Awaited<ReturnType<typeof deleteDeviceMode>>>
+
+    export type DeleteDeviceModeMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Delete a device mode and every tile in it
+ */
+export const useDeleteDeviceMode = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteDeviceMode>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteDeviceMode>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getDeleteDeviceModeMutationOptions(options));
+    }
+
 export const getGetPagesUrl = () => {
 
 
@@ -1455,6 +1751,155 @@ export const useImportPages = <TError = ErrorType<ErrorResponse>,
         TContext
       > => {
       return useMutation(getImportPagesMutationOptions(options));
+    }
+
+export const getGetPageLayoutsUrl = (id: number,) => {
+
+
+
+
+  return `/api/pages/${id}/layouts`
+}
+
+/**
+ * @summary List the non-empty (device mode, variant) layouts on a page
+ */
+export const getPageLayouts = async (id: number, options?: RequestInit): Promise<PageLayoutInfo[]> => {
+
+  return customFetch<PageLayoutInfo[]>(getGetPageLayoutsUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPageLayoutsQueryKey = (id: number,) => {
+    return [
+    `/api/pages/${id}/layouts`
+    ] as const;
+    }
+
+
+export const getGetPageLayoutsQueryOptions = <TData = Awaited<ReturnType<typeof getPageLayouts>>, TError = ErrorType<ErrorResponse>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPageLayouts>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPageLayoutsQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPageLayouts>>> = ({ signal }) => getPageLayouts(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPageLayouts>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPageLayoutsQueryResult = NonNullable<Awaited<ReturnType<typeof getPageLayouts>>>
+export type GetPageLayoutsQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary List the non-empty (device mode, variant) layouts on a page
+ */
+
+export function useGetPageLayouts<TData = Awaited<ReturnType<typeof getPageLayouts>>, TError = ErrorType<ErrorResponse>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPageLayouts>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPageLayoutsQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCopyPageLayoutUrl = (id: number,) => {
+
+
+
+
+  return `/api/pages/${id}/copy-layout`
+}
+
+/**
+ * @summary Copy all tiles from one layout scope of a page into another
+ */
+export const copyPageLayout = async (id: number,
+    copyLayoutBody: CopyLayoutBody, options?: RequestInit): Promise<CopyLayoutResult> => {
+
+  return customFetch<CopyLayoutResult>(getCopyPageLayoutUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      copyLayoutBody,)
+  }
+);}
+
+
+
+
+export const getCopyPageLayoutMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof copyPageLayout>>, TError,{id: number;data: BodyType<CopyLayoutBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof copyPageLayout>>, TError,{id: number;data: BodyType<CopyLayoutBody>}, TContext> => {
+
+const mutationKey = ['copyPageLayout'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof copyPageLayout>>, {id: number;data: BodyType<CopyLayoutBody>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  copyPageLayout(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CopyPageLayoutMutationResult = NonNullable<Awaited<ReturnType<typeof copyPageLayout>>>
+    export type CopyPageLayoutMutationBody = BodyType<CopyLayoutBody>
+    export type CopyPageLayoutMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Copy all tiles from one layout scope of a page into another
+ */
+export const useCopyPageLayout = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof copyPageLayout>>, TError,{id: number;data: BodyType<CopyLayoutBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof copyPageLayout>>,
+        TError,
+        {id: number;data: BodyType<CopyLayoutBody>},
+        TContext
+      > => {
+      return useMutation(getCopyPageLayoutMutationOptions(options));
     }
 
 export const getListUploadsUrl = () => {

@@ -11,6 +11,7 @@ export type ExportedPageLayoutPreset = typeof ExportedPageLayoutPreset[keyof typ
 
 export const ExportedPageLayoutPreset = {
   auto: 'auto',
+  adaptive: 'adaptive',
   compact: 'compact',
   fhd: 'fhd',
   qhd: 'qhd',
