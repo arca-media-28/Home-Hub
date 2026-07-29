@@ -347,6 +347,9 @@ export default function Dashboard() {
   // Available height below the grid container, used to fit-to-height vertical
   // (portrait) fixed-preset pages. null until measured.
   const [availHeight, setAvailHeight] = useState<number | null>(null);
+  // Pixel offset of the "fold" (viewport bottom) from the grid container's
+  // top. Used only for the edit-mode dotted safe-zone guide.
+  const [foldOffset, setFoldOffset] = useState<number | null>(null);
   // The unscaled (intrinsic) height of the fixed-preset grid, measured after
   // render. Transforms don't change offsetHeight, so this stays the true size
   // even while a scale transform is applied.
@@ -416,6 +419,14 @@ export default function Dashboard() {
       const top = el.getBoundingClientRect().top;
       const h = window.innerHeight - top - 24;
       if (h > 0) setAvailHeight(h);
+      // Fold offset within the container: how many pixels from the container's
+      // top fit in the viewport without scrolling. Computed against the
+      // container's absolute document position so it stays correct even if the
+      // user has scrolled when a resize fires. Drives the edit-mode safe-zone
+      // guide line.
+      const absTop = top + window.scrollY;
+      const fold = window.innerHeight - absTop;
+      setFoldOffset(fold > 0 ? fold : null);
     };
     measure();
     const ro = new ResizeObserver(measure);
@@ -1707,7 +1718,23 @@ export default function Dashboard() {
             )}
           </div>
         ) : (
-          <div>
+          <div className="relative">
+            {/* Edit-mode safe-zone guide: a dotted line marking the fold (what
+                fits in the viewport without scrolling). Purely visual —
+                pointer-events-none so it never interferes with drag/resize. */}
+            {editMode && foldOffset !== null && (
+              <div
+                data-testid="fold-guide"
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-x-0 z-30"
+                style={{ top: foldOffset }}
+              >
+                <div className="border-t-2 border-dashed border-primary/50" />
+                <span className="absolute right-0 -top-0.5 -translate-y-full bg-background/80 border border-primary/40 px-1.5 py-0.5 text-[10px] uppercase tracking-widest text-primary/80">
+                  Visible without scrolling
+                </span>
+              </div>
+            )}
             {gridWidth !== null && (() => {
             const gridEl = (
             <Grid
@@ -1790,7 +1817,30 @@ export default function Dashboard() {
             // A fixed page being edited renders at full intrinsic size (no
             // scaling) so react-grid-layout's drag/resize pointer math stays
             // correct; it scrolls horizontally if it's wider than the viewport.
-            if (editMode) return <div className="overflow-x-auto">{gridEl}</div>;
+            // A vertical dashed guide marks the page's placeable width limit —
+            // rendered inside the scroll wrapper (next to the grid, sized to
+            // the grid's intrinsic width) so it scrolls with the grid and is
+            // correct whether the fixed canvas is narrower or wider than the
+            // viewport. Purely visual: pointer-events-none.
+            if (editMode)
+              return (
+                <div className="overflow-x-auto">
+                  <div className="relative" style={{ width: renderWidth ?? undefined }}>
+                    <div
+                      data-testid="fold-guide-vertical"
+                      aria-hidden="true"
+                      className="pointer-events-none absolute inset-y-0 z-30"
+                      style={{ left: renderWidth ?? 0, marginLeft: -2 }}
+                    >
+                      <div className="h-full border-l-2 border-dashed border-primary/50" />
+                      <span className="absolute top-6 left-0 -translate-x-full bg-background/80 border border-primary/40 px-1.5 py-0.5 text-[10px] uppercase tracking-widest text-primary/80 whitespace-nowrap [writing-mode:vertical-rl]">
+                        Page width limit
+                      </span>
+                    </div>
+                    {gridEl}
+                  </div>
+                </div>
+              );
 
             // A locked fixed page is CSS-scaled to fit and centered. The outer
             // wrapper reserves the scaled height (and clips the unscaled layout
