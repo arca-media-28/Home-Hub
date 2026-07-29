@@ -352,10 +352,13 @@ export default function VideoPlayerTile({
     : null;
 
   // A slow clock so the "ends in" hint and progress bar advance while the
-  // channel plays; only ticks when a live channel with guide bounds is tuned.
+  // channel plays; ticks when a live channel with guide bounds is tuned OR
+  // any listed channel has guide bounds (the pop-out shows per-channel
+  // progress too).
   const [guideNow, setGuideNow] = useState(() => Date.now());
   const hasGuideWindow =
-    !!tunedErsatz?.nowPlayingStart && !!tunedErsatz?.nowPlayingStop;
+    (!!tunedErsatz?.nowPlayingStart && !!tunedErsatz?.nowPlayingStop) ||
+    ersatzChannels.some((c) => c.nowPlayingStart && c.nowPlayingStop);
   useEffect(() => {
     if (!hasGuideWindow) return;
     const timer = setInterval(() => setGuideNow(Date.now()), 30_000);
@@ -1039,6 +1042,11 @@ export default function VideoPlayerTile({
               {ersatzChannels.map((channel) => {
                 const isCurrent =
                   current?.id === `ersatztv-${channel.number}`;
+                const channelProgress = guideProgress(
+                  channel.nowPlayingStart,
+                  channel.nowPlayingStop,
+                  guideNow,
+                );
                 return (
                   <li key={channel.number}>
                     <button
@@ -1079,6 +1087,24 @@ export default function VideoPlayerTile({
                             </span>
                           )}
                         </span>
+                        {channelProgress && (
+                          <span
+                            className="mt-0.5 flex items-center gap-1.5"
+                            data-testid="videoplayer-channel-progress"
+                          >
+                            <span className="h-0.5 w-12 shrink-0 overflow-hidden rounded-full bg-white/15">
+                              <span
+                                className="block h-full rounded-full bg-white/60"
+                                style={{
+                                  width: `${Math.round(channelProgress.fraction * 100)}%`,
+                                }}
+                              />
+                            </span>
+                            <span className="truncate text-[9px] text-white/45">
+                              {channelProgress.endsIn}
+                            </span>
+                          </span>
+                        )}
                         {channel.upNextTitle && (
                           <span
                             className="block truncate text-[10px] text-white/40"
