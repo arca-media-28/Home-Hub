@@ -3120,6 +3120,13 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
                     Live channels play from your ErsatzTV server; you can also
                     switch channels right on the tile.
                   </p>
+                  <p className="text-xs text-muted-foreground">
+                    In ErsatzTV, set each channel's Streaming Mode to{" "}
+                    <span className="font-medium">HLS Segmenter</span> —
+                    browsers can't play MPEG-TS streams. For video to show,
+                    the channel's FFmpeg profile should output H.264 video
+                    (MPEG-2 will play audio only).
+                  </p>
                 </div>
               )}
 

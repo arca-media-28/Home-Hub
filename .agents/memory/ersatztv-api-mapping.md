@@ -18,3 +18,5 @@ Endpoints (both unauthenticated, fetched as text via `responseType: "text"`):
 **Widget convention:** unconfigured (no base URL) → sample data; configured-but-fetch-fails → 502. `reachable` is always `true` in a 200 (an unreachable configured server 502s instead); the field exists so the tile can render the "health" metric uniformly.
 
 Metrics (catalog priority): `health`, `activeStreams`, `nowPlaying`, `upNext` (the up-next line rides inside the nowPlaying channel list — it adds a third line per row and bumps the budgeted row height, it is not its own section).
+
+**Playback requirements (user-facing):** browsers cannot play raw MPEG-TS — channel Streaming Mode must be **HLS Segmenter**. Audio-but-no-video means the channel's FFmpeg profile outputs a codec the browser can't decode (MPEG-2, or HEVC w/o support) — fix is an H.264 video profile. Tile detects this (videoWidth===0 while playing >3s, via `resize` listener + 4s poll) and shows a `videoplayer-audioonly-badge` hint; TileEditModal's ErsatzTV section documents both requirements.

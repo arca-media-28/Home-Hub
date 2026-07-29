@@ -257,6 +257,60 @@ describe("VideoPlayerTile HLS stall recovery", () => {
   });
 });
 
+describe("VideoPlayerTile audio-only detection", () => {
+  function setMediaState(
+    el: HTMLVideoElement,
+    state: { videoWidth: number; paused: boolean; currentTime: number },
+  ) {
+    Object.defineProperty(el, "videoWidth", {
+      configurable: true,
+      get: () => state.videoWidth,
+    });
+    Object.defineProperty(el, "paused", {
+      configurable: true,
+      get: () => state.paused,
+    });
+    Object.defineProperty(el, "currentTime", {
+      configurable: true,
+      get: () => state.currentTime,
+      set: () => {},
+    });
+  }
+
+  it("shows the audio-only badge when playback runs with no video track, and clears it when video appears", async () => {
+    await renderTvTile();
+    const video = document.querySelector("video")!;
+    expect(video).toBeTruthy();
+
+    // Stream is playing (audio flowing) but the video track never decoded.
+    const state = { videoWidth: 0, paused: false, currentTime: 10 };
+    setMediaState(video, state);
+    act(() => {
+      video.dispatchEvent(new Event("resize"));
+    });
+    expect(screen.getByTestId("videoplayer-audioonly-badge")).toBeTruthy();
+    // It is a hint, not an error state.
+    expect(screen.queryByTestId("videoplayer-error")).toBeNull();
+
+    // The video track appears (element fires resize): badge clears.
+    state.videoWidth = 640;
+    act(() => {
+      video.dispatchEvent(new Event("resize"));
+    });
+    expect(screen.queryByTestId("videoplayer-audioonly-badge")).toBeNull();
+  });
+
+  it("does not flag audio-only before playback has really started", async () => {
+    await renderTvTile();
+    const video = document.querySelector("video")!;
+    setMediaState(video, { videoWidth: 0, paused: false, currentTime: 1 });
+    act(() => {
+      video.dispatchEvent(new Event("resize"));
+    });
+    expect(screen.queryByTestId("videoplayer-audioonly-badge")).toBeNull();
+  });
+});
+
 describe("VideoPlayerTile guide refresh at programme end", () => {
   afterEach(() => {
     vi.useRealTimers();

@@ -600,6 +600,12 @@ export default function VideoPlayerTile({
   // non-blocking "Reconnecting…" badge so a stalled live stream doesn't look
   // like a silently frozen frame.
   const [hlsReconnecting, setHlsReconnecting] = useState(false);
+  // True when a live HLS stream is playing sound but the video track never
+  // materialized (videoWidth stays 0). Almost always means the ErsatzTV
+  // channel's FFmpeg profile outputs a codec the browser can't decode
+  // (MPEG-2, or HEVC without hardware support) — surfaced as a hint badge
+  // rather than an error since audio is still playing.
+  const [audioOnly, setAudioOnly] = useState(false);
   const [muted, setMuted] = useState(savedRef.current?.muted ?? startMuted);
   // Playlist pop-out: a scrollable list of all entries (in play order) with
   // the current one highlighted; clicking an entry jumps straight to it.
@@ -782,6 +788,28 @@ export default function VideoPlayerTile({
       setHlsReconnecting(false);
     };
   }, [currentUrl, isHlsUrl, nativeHls, demo, hlsRetryNonce]);
+
+  // Audio-without-video detection for live HLS streams. If the stream has
+  // been playing for a few seconds and the element still reports
+  // videoWidth === 0, the audio track decoded but the video track didn't —
+  // in practice the channel's FFmpeg profile emits a codec the browser
+  // can't decode. The element fires `resize` when the video track appears,
+  // which clears the hint immediately.
+  useEffect(() => {
+    setAudioOnly(false);
+    if (!currentUrl || !isHlsUrl) return;
+    const el = videoRef.current;
+    if (!el) return;
+    const update = () => {
+      setAudioOnly(el.videoWidth === 0 && !el.paused && el.currentTime > 3);
+    };
+    const timer = window.setInterval(update, 4000);
+    el.addEventListener("resize", update);
+    return () => {
+      window.clearInterval(timer);
+      el.removeEventListener("resize", update);
+    };
+  }, [currentUrl, isHlsUrl, hlsRetryNonce]);
 
   const loopSingle = playMode === "single" || demo || count === 1;
 
@@ -1019,6 +1047,15 @@ export default function VideoPlayerTile({
           >
             <span className="h-2 w-2 animate-spin rounded-full border border-white/70 border-t-transparent" />
             Reconnecting…
+          </span>
+        )}
+        {audioOnly && !hlsReconnecting && (
+          <span
+            className="pointer-events-none absolute top-1.5 left-1.5 z-10 max-w-[85%] rounded bg-black/60 px-2 py-1 text-[10px] font-medium leading-snug text-white/90 backdrop-blur-sm"
+            data-testid="videoplayer-audioonly-badge"
+          >
+            Audio only — this browser can't decode the channel's video codec.
+            In ErsatzTV, use an FFmpeg profile with H.264 video.
           </span>
         )}
         {demo && (
