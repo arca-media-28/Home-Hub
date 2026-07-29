@@ -386,6 +386,26 @@ export default function VideoPlayerTile({
       },
     },
   });
+  // Refresh the guide right when the tuned programme ends: a single timeout
+  // keyed to nowPlayingStop invalidates the channel lineup so the new title,
+  // up-next, and progress land promptly instead of waiting for the next poll.
+  const tunedStop = tunedErsatz?.nowPlayingStop ?? null;
+  useEffect(() => {
+    if (!tunedStop) return;
+    const stopMs = new Date(tunedStop).getTime();
+    if (!Number.isFinite(stopMs)) return;
+    // Small grace so ErsatzTV has rolled over to the next programme by the
+    // time we refetch; fire immediately (clamped) if the stop already passed.
+    const delay = Math.max(0, stopMs - Date.now() + 2_000);
+    const timer = setTimeout(() => {
+      setGuideNow(Date.now());
+      void queryClient.invalidateQueries({
+        queryKey: getGetErsatzChannelsQueryKey(),
+      });
+    }, delay);
+    return () => clearTimeout(timer);
+  }, [tunedStop, queryClient]);
+
   function tuneChannel(number: string) {
     const settings: TileSettings = {
       ...(tile.tileSettings ?? {}),

@@ -73,6 +73,12 @@ const CHANNEL = {
   nowPlayingStop: null,
 };
 
+const { channelsRef, invalidateQueries } = vi.hoisted(() => ({
+  // Mutable ref so individual tests can swap in a channel with guide bounds.
+  channelsRef: { current: [] as unknown[] },
+  invalidateQueries: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock("@workspace/api-client-react", () => ({
   useGetVideoPlaylist: () => ({
     data: undefined,
@@ -81,7 +87,7 @@ vi.mock("@workspace/api-client-react", () => ({
   }),
   getGetVideoPlaylistQueryKey: (p: unknown) => ["video-playlist", p],
   useGetErsatzChannels: () => ({
-    data: { sample: false, channels: [CHANNEL] },
+    data: { sample: false, channels: channelsRef.current },
     isError: false,
     isLoading: false,
   }),
@@ -90,11 +96,14 @@ vi.mock("@workspace/api-client-react", () => ({
   getGetTilesQueryKey: () => ["tiles"],
 }));
 
+// A single stable client object (like the real QueryClientProvider) so
+// effects keyed on `queryClient` don't re-run every render.
+const mockQueryClient = {
+  setQueryData: vi.fn(),
+  invalidateQueries,
+};
 vi.mock("@tanstack/react-query", () => ({
-  useQueryClient: () => ({
-    setQueryData: vi.fn(),
-    invalidateQueries: vi.fn().mockResolvedValue(undefined),
-  }),
+  useQueryClient: () => mockQueryClient,
 }));
 
 import VideoPlayerTile from "./VideoPlayerTile";
@@ -126,6 +135,7 @@ function emitFatal(hls: InstanceType<typeof MockHls>, type: string) {
 beforeEach(() => {
   localStorage.clear();
   hlsInstances.length = 0;
+  channelsRef.current = [CHANNEL];
   // jsdom's media elements don't implement playback; the tile calls
   // el.play().catch(...) so it must return a promise.
   window.HTMLMediaElement.prototype.play = vi
@@ -244,5 +254,77 @@ describe("VideoPlayerTile HLS stall recovery", () => {
     emitFatal(next, MockHls.ErrorTypes.NETWORK_ERROR);
     expect(next.startLoad).toHaveBeenCalledTimes(1);
     expect(screen.queryByTestId("videoplayer-error")).toBeNull();
+  });
+});
+
+describe("VideoPlayerTile guide refresh at programme end", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("invalidates the channel lineup when the tuned programme's stop time passes", async () => {
+    // Fake timers must be on BEFORE render so the effect's setTimeout is
+    // captured; the lazy hls.js import is flushed via act (microtasks).
+    vi.useFakeTimers();
+    const start = new Date();
+    const stop = new Date(start.getTime() + 5 * 60_000);
+    channelsRef.current = [
+      {
+        ...CHANNEL,
+        nowPlaying: "Old Show",
+        nowPlayingStart: start.toISOString(),
+        nowPlayingStop: stop.toISOString(),
+      },
+    ];
+
+    render(<VideoPlayerTile tile={TILE} editMode={false} />);
+    await act(async () => {});
+    expect(hlsInstances.length).toBeGreaterThan(0);
+    invalidateQueries.mockClear();
+
+    // Just before stop (+2s grace): no refetch yet.
+    act(() => {
+      vi.advanceTimersByTime(5 * 60_000);
+    });
+    expect(invalidateQueries).not.toHaveBeenCalledWith({
+      queryKey: ["ersatz-channels"],
+    });
+
+    // Past the stop + grace: exactly one invalidation of the lineup query.
+    act(() => {
+      vi.advanceTimersByTime(3_000);
+    });
+    expect(invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ["ersatz-channels"],
+    });
+    const lineupCalls = invalidateQueries.mock.calls.filter(
+      (c) => c[0]?.queryKey?.[0] === "ersatz-channels",
+    ).length;
+    expect(lineupCalls).toBe(1);
+
+    // No tight loop: a long time passing with the same stale window does not
+    // fire again (the effect re-arms only when the stop time changes).
+    act(() => {
+      vi.advanceTimersByTime(10 * 60_000);
+    });
+    expect(
+      invalidateQueries.mock.calls.filter(
+        (c) => c[0]?.queryKey?.[0] === "ersatz-channels",
+      ).length,
+    ).toBe(1);
+  });
+
+  it("does not schedule a guide refresh when the channel has no guide window", async () => {
+    await renderTvTile();
+    invalidateQueries.mockClear();
+    vi.useFakeTimers();
+    act(() => {
+      vi.advanceTimersByTime(60 * 60_000);
+    });
+    expect(
+      invalidateQueries.mock.calls.filter(
+        (c) => c[0]?.queryKey?.[0] === "ersatz-channels",
+      ).length,
+    ).toBe(0);
   });
 });
