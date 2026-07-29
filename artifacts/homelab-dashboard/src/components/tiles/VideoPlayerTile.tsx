@@ -572,6 +572,11 @@ export default function VideoPlayerTile({
   // so a stalled/dead live stream gets a fresh hls.js instance re-tuned to
   // the same channel without the user having to reopen the channel picker.
   const [hlsRetryNonce, setHlsRetryNonce] = useState(0);
+  // True while the hls.js error handler is mid-recovery (between a fatal but
+  // recoverable error and the next buffered fragment). Drives a small
+  // non-blocking "Reconnecting…" badge so a stalled live stream doesn't look
+  // like a silently frozen frame.
+  const [hlsReconnecting, setHlsReconnecting] = useState(false);
   const [muted, setMuted] = useState(savedRef.current?.muted ?? startMuted);
   // Playlist pop-out: a scrollable list of all entries (in play order) with
   // the current one highlighted; clicking an entry jumps straight to it.
@@ -721,19 +726,24 @@ export default function VideoPlayerTile({
       hls.on(Hls.Events.FRAG_BUFFERED, () => {
         networkRecoveries = 0;
         mediaRecoveries = 0;
+        // Playback is flowing again — clear the "Reconnecting…" hint.
+        setHlsReconnecting(false);
       });
       hls.on(Hls.Events.ERROR, (_event, data) => {
         if (!data.fatal || !hls) return;
         if (data.type === Hls.ErrorTypes.NETWORK_ERROR && networkRecoveries < 3) {
           networkRecoveries += 1;
+          setHlsReconnecting(true);
           hls.startLoad();
           return;
         }
         if (data.type === Hls.ErrorTypes.MEDIA_ERROR && mediaRecoveries < 3) {
           mediaRecoveries += 1;
+          setHlsReconnecting(true);
           hls.recoverMediaError();
           return;
         }
+        setHlsReconnecting(false);
         if (!demo) setMediaFailed(true);
         hls.destroy();
         hls = null;
@@ -745,6 +755,8 @@ export default function VideoPlayerTile({
       cancelled = true;
       hls?.destroy();
       hls = null;
+      // A stale hint must not survive a channel change or a fresh attach.
+      setHlsReconnecting(false);
     };
   }, [currentUrl, isHlsUrl, nativeHls, demo, hlsRetryNonce]);
 
@@ -976,6 +988,15 @@ export default function VideoPlayerTile({
             onPlay={() => setPlaying(true)}
             onPause={() => setPlaying(false)}
           />
+        )}
+        {hlsReconnecting && (
+          <span
+            className="pointer-events-none absolute top-1.5 left-1.5 z-10 flex items-center gap-1.5 rounded bg-black/60 px-2 py-1 text-[10px] font-medium text-white/90 backdrop-blur-sm"
+            data-testid="videoplayer-reconnecting-badge"
+          >
+            <span className="h-2 w-2 animate-spin rounded-full border border-white/70 border-t-transparent" />
+            Reconnecting…
+          </span>
         )}
         {demo && (
           <span
