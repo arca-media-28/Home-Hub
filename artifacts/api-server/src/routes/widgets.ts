@@ -4865,6 +4865,8 @@ function parseXmltvTime(value: string): number {
 // now plus the next upcoming programme (title + ISO start time).
 interface ErsatzGuideEntry {
   nowPlaying?: string;
+  nowPlayingStart?: number;
+  nowPlayingStop?: number;
   upNextTitle?: string;
   upNextStart?: number;
 }
@@ -4893,7 +4895,11 @@ function parseXmltvGuide(xml: string, nowMs: number): Map<string, ErsatzGuideEnt
     if (!title) continue;
     const entry = guide.get(channel) ?? {};
     if (nowMs >= start && nowMs < stop) {
-      if (entry.nowPlaying === undefined) entry.nowPlaying = title;
+      if (entry.nowPlaying === undefined) {
+        entry.nowPlaying = title;
+        entry.nowPlayingStart = start;
+        entry.nowPlayingStop = stop;
+      }
     } else if (start > nowMs) {
       if (entry.upNextStart === undefined || start < entry.upNextStart) {
         entry.upNextTitle = title;
@@ -5070,9 +5076,9 @@ router.get("/ersatztv/channels", requireAuth, async (req: AuthRequest, res) => {
     res.json({
       sample: true,
       channels: [
-        { number: "1", name: "Movies 24/7", nowPlaying: "The Maltese Falcon", upNextTitle: "Casablanca", upNextStart: new Date(Date.now() + 45 * 60_000).toISOString(), streamUrl: null },
-        { number: "2", name: "Retro Cartoons", nowPlaying: "Looney Tunes", upNextTitle: "Tom and Jerry", upNextStart: new Date(Date.now() + 20 * 60_000).toISOString(), streamUrl: null },
-        { number: "3", name: "Nature Documentaries", nowPlaying: "Planet Earth: Jungles", upNextTitle: "Blue Planet: Coasts", upNextStart: new Date(Date.now() + 30 * 60_000).toISOString(), streamUrl: null },
+        { number: "1", name: "Movies 24/7", nowPlaying: "The Maltese Falcon", nowPlayingStart: new Date(Date.now() - 55 * 60_000).toISOString(), nowPlayingStop: new Date(Date.now() + 45 * 60_000).toISOString(), upNextTitle: "Casablanca", upNextStart: new Date(Date.now() + 45 * 60_000).toISOString(), streamUrl: null },
+        { number: "2", name: "Retro Cartoons", nowPlaying: "Looney Tunes", nowPlayingStart: new Date(Date.now() - 10 * 60_000).toISOString(), nowPlayingStop: new Date(Date.now() + 20 * 60_000).toISOString(), upNextTitle: "Tom and Jerry", upNextStart: new Date(Date.now() + 20 * 60_000).toISOString(), streamUrl: null },
+        { number: "3", name: "Nature Documentaries", nowPlaying: "Planet Earth: Jungles", nowPlayingStart: new Date(Date.now() - 30 * 60_000).toISOString(), nowPlayingStop: new Date(Date.now() + 30 * 60_000).toISOString(), upNextTitle: "Blue Planet: Coasts", upNextStart: new Date(Date.now() + 30 * 60_000).toISOString(), streamUrl: null },
       ],
     });
     return;
@@ -5090,6 +5096,14 @@ router.get("/ersatztv/channels", requireAuth, async (req: AuthRequest, res) => {
         number: c.number,
         name: c.name,
         nowPlaying: entry?.nowPlaying ?? null,
+        nowPlayingStart:
+          entry?.nowPlayingStart != null
+            ? new Date(entry.nowPlayingStart).toISOString()
+            : null,
+        nowPlayingStop:
+          entry?.nowPlayingStop != null
+            ? new Date(entry.nowPlayingStop).toISOString()
+            : null,
         upNextTitle: entry?.upNextTitle ?? null,
         upNextStart:
           entry?.upNextStart != null

@@ -124,6 +124,29 @@ export function formatGuideTime(iso: string | null | undefined): string | null {
   });
 }
 
+// Progress info for the current live-TV programme: how far through it we are
+// (0..1) plus a human "Ends in Xm" hint. Returns null when either bound is
+// missing/unparseable or the window is nonsensical (stop ≤ start, or now
+// outside the window — the guide data is stale in that case).
+export function guideProgress(
+  startIso: string | null | undefined,
+  stopIso: string | null | undefined,
+  nowMs: number,
+): { fraction: number; endsIn: string } | null {
+  if (!startIso || !stopIso) return null;
+  const start = Date.parse(startIso);
+  const stop = Date.parse(stopIso);
+  if (Number.isNaN(start) || Number.isNaN(stop) || stop <= start) return null;
+  if (nowMs < start || nowMs >= stop) return null;
+  const fraction = (nowMs - start) / (stop - start);
+  const minsLeft = Math.max(1, Math.ceil((stop - nowMs) / 60_000));
+  const endsIn =
+    minsLeft >= 60
+      ? `Ends in ${Math.floor(minsLeft / 60)}h ${minsLeft % 60}m`
+      : `Ends in ${minsLeft} min`;
+  return { fraction: Math.min(1, Math.max(0, fraction)), endsIn };
+}
+
 // mm:ss (or h:mm:ss) for the seek bar's time labels.
 export function formatClock(seconds: number): string {
   if (!Number.isFinite(seconds) || seconds < 0) return "0:00";
@@ -326,6 +349,24 @@ export default function VideoPlayerTile({
     ? (ersatzChannels.find((c) => c.number === tunedChannel) ??
       ersatzChannels[0] ??
       null)
+    : null;
+
+  // A slow clock so the "ends in" hint and progress bar advance while the
+  // channel plays; only ticks when a live channel with guide bounds is tuned.
+  const [guideNow, setGuideNow] = useState(() => Date.now());
+  const hasGuideWindow =
+    !!tunedErsatz?.nowPlayingStart && !!tunedErsatz?.nowPlayingStop;
+  useEffect(() => {
+    if (!hasGuideWindow) return;
+    const timer = setInterval(() => setGuideNow(Date.now()), 30_000);
+    return () => clearInterval(timer);
+  }, [hasGuideWindow]);
+  const tunedProgress = tunedErsatz
+    ? guideProgress(
+        tunedErsatz.nowPlayingStart,
+        tunedErsatz.nowPlayingStop,
+        guideNow,
+      )
     : null;
 
   // Persist a channel change through the normal tile-update flow so the
@@ -1261,6 +1302,22 @@ export default function VideoPlayerTile({
                   <span className="max-w-full truncate text-[10px] text-white/80">
                     {current.title}
                   </span>
+                  {isErsatz && tunedProgress && (
+                    <span
+                      className="flex w-full max-w-full items-center justify-end gap-1.5"
+                      data-testid="videoplayer-progress"
+                    >
+                      <span className="h-0.5 w-12 shrink-0 overflow-hidden rounded-full bg-white/20">
+                        <span
+                          className="block h-full rounded-full bg-white/70"
+                          style={{ width: `${Math.round(tunedProgress.fraction * 100)}%` }}
+                        />
+                      </span>
+                      <span className="truncate text-[9px] text-white/55">
+                        {tunedProgress.endsIn}
+                      </span>
+                    </span>
+                  )}
                   {isErsatz && tunedErsatz?.upNextTitle && (
                     <span
                       className="max-w-full truncate text-[9px] text-white/55"

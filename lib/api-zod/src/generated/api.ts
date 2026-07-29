@@ -2888,6 +2888,8 @@ export const GetErsatzChannelsResponse = zod.object({
   "number": zod.string().describe('The channel\'s number (ErsatzTV channel numbers can be fractional strings like \"5.1\").'),
   "name": zod.string().describe('The channel\'s display name.'),
   "nowPlaying": zod.string().nullish().describe('What\'s airing right now per the XMLTV guide. Null when unknown.'),
+  "nowPlayingStart": zod.string().nullish().describe('ISO 8601 start time of the current programme. Null when unknown.'),
+  "nowPlayingStop": zod.string().nullish().describe('ISO 8601 stop time of the current programme. Null when unknown.'),
   "upNextTitle": zod.string().nullish().describe('The next programme\'s title per the XMLTV guide. Null when unknown.'),
   "upNextStart": zod.string().nullish().describe('ISO 8601 start time of the next programme. Null when unknown.'),
   "streamUrl": zod.string().nullish().describe('Same-origin HLS playlist path (through the api-server\'s ErsatzTV stream proxy) the tile can play. The client appends its auth token as a query parameter. Null for sample channels.')

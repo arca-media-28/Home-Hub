@@ -5191,6 +5191,12 @@ components:
         nowPlaying:
           description: What's airing right now per the XMLTV guide. Null when unknown.
           type: ["string", "null"]
+        nowPlayingStart:
+          description: ISO 8601 start time of the current programme. Null when unknown.
+          type: ["string", "null"]
+        nowPlayingStop:
+          description: ISO 8601 stop time of the current programme. Null when unknown.
+          type: ["string", "null"]
         upNextTitle:
           description: The next programme's title per the XMLTV guide. Null when unknown.
           type: ["string", "null"]

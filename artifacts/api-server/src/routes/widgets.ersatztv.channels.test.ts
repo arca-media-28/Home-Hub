@@ -147,7 +147,16 @@ describe("GET /api/widgets/ersatztv/channels", () => {
     expect(Number.isNaN(upNextMs)).toBe(false);
     expect(upNextMs).toBeGreaterThan(Date.now());
     expect(upNextMs).toBeLessThan(Date.now() + 90_000);
+    // The current programme's window (ISO 8601) brackets "now".
+    const npStart = Date.parse(ch1.nowPlayingStart);
+    const npStop = Date.parse(ch1.nowPlayingStop);
+    expect(Number.isNaN(npStart)).toBe(false);
+    expect(Number.isNaN(npStop)).toBe(false);
+    expect(npStart).toBeLessThanOrEqual(Date.now());
+    expect(npStop).toBeGreaterThan(Date.now());
     expect(ch2.nowPlaying).toBeNull();
+    expect(ch2.nowPlayingStart).toBeNull();
+    expect(ch2.nowPlayingStop).toBeNull();
     expect(ch2.upNextTitle).toBeNull();
     expect(ch2.upNextStart).toBeNull();
     expect(ch2.streamUrl).toBe("/api/widgets/ersatztv/stream/iptv/channel/2.m3u8");

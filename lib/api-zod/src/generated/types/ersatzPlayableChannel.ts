@@ -17,6 +17,16 @@ export interface ErsatzPlayableChannel {
      */
   nowPlaying?: string | null;
   /**
+     * ISO 8601 start time of the current programme. Null when unknown.
+     * @nullable
+     */
+  nowPlayingStart?: string | null;
+  /**
+     * ISO 8601 stop time of the current programme. Null when unknown.
+     * @nullable
+     */
+  nowPlayingStop?: string | null;
+  /**
      * The next programme's title per the XMLTV guide. Null when unknown.
      * @nullable
      */
