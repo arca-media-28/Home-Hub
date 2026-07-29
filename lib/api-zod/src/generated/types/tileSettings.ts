@@ -474,10 +474,10 @@ export type TileSettings = {
      */
   frameWidth?: number | null;
   /**
-     * Where a Video Player tile's videos come from: "uploads" (video files from the upload library), "urls" (a pasted list of direct video file URLs), "youtube" (a YouTube video/playlist embed), "plex" or "jellyfin" (a library on the connected media server). Null or absent means unconfigured — the tile plays the built-in yule log stream.
+     * Where a Video Player tile's videos come from: "uploads" (video files from the upload library), "urls" (a pasted list of direct video file URLs), "youtube" (a YouTube video/playlist embed), "plex" or "jellyfin" (a library on the connected media server), or "ersatztv" (live TV channels from the connected ErsatzTV server). Null or absent means unconfigured — the tile plays the built-in yule log stream.
      * @nullable
      */
-  videoSource?: 'uploads' | 'urls' | 'youtube' | 'plex' | 'jellyfin' | null;
+  videoSource?: 'uploads' | 'urls' | 'youtube' | 'plex' | 'jellyfin' | 'ersatztv' | null;
   /**
      * The uploaded videos (their /api/uploads/files/... URLs) a Video Player tile plays when videoSource is "uploads".
      * @nullable
@@ -498,6 +498,11 @@ export type TileSettings = {
      * @nullable
      */
   videoLibraryId?: string | null;
+  /**
+     * The tuned ErsatzTV channel number when videoSource is "ersatztv". Null or absent means the first channel in the lineup.
+     * @nullable
+     */
+  videoErsatzChannel?: string | null;
   /**
      * "single" loops the first (or only) video forever; "playlist" plays through the list, advancing on end. Null or absent uses playlist.
      * @nullable

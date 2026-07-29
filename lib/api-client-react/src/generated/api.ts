@@ -45,6 +45,7 @@ import type {
   EmailMarkReadResponse,
   EmailMessageBodyData,
   ErrorResponse,
+  ErsatzChannelLineup,
   ErsatzTvData,
   ExportProfileParams,
   GetAudioPlayerNowPlayingParams,
@@ -1850,6 +1851,11 @@ export const getImportProfileUrl = () => {
 }
 
 /**
+ * Accepts only the plain "tachboard-profile" envelope. Passphrase-encrypted
+exports (format "tachboard-profile-encrypted") are decrypted client-side
+in the Settings page before being posted here; sending one directly
+returns a 400 explaining that.
+
  * @summary Recreate a full profile from a previously exported envelope
  */
 export const importProfile = async (profileImportBody: ProfileImportBody, options?: RequestInit): Promise<ProfileImportResult> => {
@@ -3513,6 +3519,83 @@ export function useGetErsatzTvWidget<TData = Awaited<ReturnType<typeof getErsatz
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetErsatzTvWidgetQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetErsatzChannelsUrl = () => {
+
+
+
+
+  return `/api/widgets/ersatztv/channels`
+}
+
+/**
+ * @summary List ErsatzTV's tunable channel lineup for the Video Player tile
+ */
+export const getErsatzChannels = async ( options?: RequestInit): Promise<ErsatzChannelLineup> => {
+
+  return customFetch<ErsatzChannelLineup>(getGetErsatzChannelsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetErsatzChannelsQueryKey = () => {
+    return [
+    `/api/widgets/ersatztv/channels`
+    ] as const;
+    }
+
+
+export const getGetErsatzChannelsQueryOptions = <TData = Awaited<ReturnType<typeof getErsatzChannels>>, TError = ErrorType<ErrorResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getErsatzChannels>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetErsatzChannelsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getErsatzChannels>>> = ({ signal }) => getErsatzChannels({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getErsatzChannels>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetErsatzChannelsQueryResult = NonNullable<Awaited<ReturnType<typeof getErsatzChannels>>>
+export type GetErsatzChannelsQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary List ErsatzTV's tunable channel lineup for the Video Player tile
+ */
+
+export function useGetErsatzChannels<TData = Awaited<ReturnType<typeof getErsatzChannels>>, TError = ErrorType<ErrorResponse>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getErsatzChannels>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetErsatzChannelsQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

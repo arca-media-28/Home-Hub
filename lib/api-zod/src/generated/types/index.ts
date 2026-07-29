@@ -44,6 +44,8 @@ export * from './emailMarkReadResponse';
 export * from './emailMessage';
 export * from './emailMessageBodyData';
 export * from './errorResponse';
+export * from './ersatzChannelLineup';
+export * from './ersatzPlayableChannel';
 export * from './ersatzTvChannel';
 export * from './ersatzTvData';
 export * from './exportedConnection';

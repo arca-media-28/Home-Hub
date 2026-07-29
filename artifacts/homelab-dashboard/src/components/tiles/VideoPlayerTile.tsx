@@ -1,9 +1,14 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
-import type { Tile } from "@workspace/api-client-react";
+import type { Tile, TileSettings } from "@workspace/api-client-react";
 import {
   useGetVideoPlaylist,
   getGetVideoPlaylistQueryKey,
+  useGetErsatzChannels,
+  getGetErsatzChannelsQueryKey,
+  useUpdateTile,
+  getGetTilesQueryKey,
 } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   ListVideo,
   Pause,
@@ -11,6 +16,7 @@ import {
   RotateCcw,
   SkipBack,
   SkipForward,
+  Tv,
   VideoOff,
   Volume2,
   VolumeX,
@@ -244,6 +250,14 @@ function sameUrls(a: string[], b: string[]): boolean {
   return a.length === b.length && a.every((url, i) => url === b[i]);
 }
 
+// ErsatzTV stream URLs point at the api-server's same-origin HLS proxy, which
+// authenticates via a ?token= query parameter — media element / hls.js
+// requests can't reliably carry an Authorization header.
+function withAuthToken(url: string): string {
+  const token = localStorage.getItem("token") ?? "";
+  return `${url}${url.includes("?") ? "&" : "?"}token=${encodeURIComponent(token)}`;
+}
+
 export default function VideoPlayerTile({
   tile,
   editMode,
@@ -272,6 +286,48 @@ export default function VideoPlayerTile({
       staleTime: 5 * 60_000,
     },
   });
+
+  // ErsatzTV: live channel lineup with now-airing info. Refetched every
+  // minute so the guide line stays current while the stream keeps playing.
+  const isErsatz = source === "ersatztv";
+  const ersatzQuery = useGetErsatzChannels({
+    query: {
+      queryKey: getGetErsatzChannelsQueryKey(),
+      enabled: isErsatz,
+      refetchInterval: 60_000,
+      staleTime: 30_000,
+    },
+  });
+  const ersatzChannels = useMemo(
+    () =>
+      (ersatzQuery.data?.channels ?? []).filter(
+        (c): c is typeof c & { streamUrl: string } => !!c.streamUrl,
+      ),
+    [ersatzQuery.data],
+  );
+  const tunedChannel = s.videoErsatzChannel ?? null;
+
+  // Persist a channel change through the normal tile-update flow so the
+  // tuned channel survives page switches and reloads (same reconcile
+  // pattern as the Note tile).
+  const queryClient = useQueryClient();
+  const updateTile = useUpdateTile({
+    mutation: {
+      onSuccess: (updated) => {
+        queryClient.setQueryData<Tile[]>(getGetTilesQueryKey(), (old) =>
+          old?.map((t) => (t.id === updated.id ? updated : t)),
+        );
+        void queryClient.invalidateQueries({ queryKey: getGetTilesQueryKey() });
+      },
+    },
+  });
+  function tuneChannel(number: string) {
+    const settings: TileSettings = {
+      ...(tile.tileSettings ?? {}),
+      videoErsatzChannel: number,
+    };
+    updateTile.mutate({ id: tile.id, data: { tileSettings: settings } });
+  }
 
   // Saved playback state from a previous mount of this tile (page switch or
   // re-render). Read once; consumed as the playlist resolves and the video
@@ -330,6 +386,32 @@ export default function VideoPlayerTile({
           }
         : { videos: yule, demo: true, failed: false };
     }
+    if (isErsatz) {
+      // Live TV: the tile plays exactly one channel at a time (the tuned
+      // one); switching channels goes through the channel pop-out.
+      if (ersatzQuery.isError) return { videos: [], demo: false, failed: true };
+      const data = ersatzQuery.data;
+      if (!data) return { videos: [], demo: false, failed: false };
+      if (data.sample || ersatzChannels.length === 0) {
+        return { videos: yule, demo: true, failed: false };
+      }
+      const tuned =
+        ersatzChannels.find((c) => c.number === tunedChannel) ??
+        ersatzChannels[0]!;
+      return {
+        videos: [
+          {
+            id: `ersatztv-${tuned.number}`,
+            title: `${tuned.number} · ${tuned.name}${
+              tuned.nowPlaying ? ` — ${tuned.nowPlaying}` : ""
+            }`,
+            url: withAuthToken(tuned.streamUrl),
+          },
+        ],
+        demo: false,
+        failed: false,
+      };
+    }
     if (isServerSource) {
       // A queue picked in the drill-down browser wins over the flat playlist.
       if (source === "plex" && overrideQueue && overrideQueue.length > 0) {
@@ -363,6 +445,11 @@ export default function VideoPlayerTile({
     overrideQueue,
     playlistQuery.data,
     playlistQuery.isError,
+    isErsatz,
+    ersatzQuery.data,
+    ersatzQuery.isError,
+    ersatzChannels,
+    tunedChannel,
   ]);
 
   // Keep the videos array reference stable across background refetches that
@@ -428,6 +515,8 @@ export default function VideoPlayerTile({
   const [playlistOpen, setPlaylistOpen] = useState(false);
   // Plex drill-down browser dialog (replaces the flat pop-out for Plex).
   const [browserOpen, setBrowserOpen] = useState(false);
+  // ErsatzTV channel pop-out (number, name, now airing; tap to tune).
+  const [channelsOpen, setChannelsOpen] = useState(false);
   const [volume, setVolume] = useState(savedRef.current?.volume ?? 0.7);
   const startMutedRef = useRef(startMuted);
   useEffect(() => {
@@ -529,6 +618,47 @@ export default function VideoPlayerTile({
     if (playing) void el.play().catch(() => {});
     else el.pause();
   }, [playing, current?.url]);
+
+  // ── HLS playback (ErsatzTV live channels) ─────────────────────────────────
+  // .m3u8 playlists don't play via a bare src attribute in most browsers.
+  // Where the browser supports HLS natively (Safari) the src attribute is
+  // kept; everywhere else hls.js is loaded lazily and attached to the
+  // element. Fatal HLS errors surface the same explicit error state as a
+  // broken direct-play video.
+  const currentUrl = current?.url ?? null;
+  const isHlsUrl = !!currentUrl && currentUrl.includes(".m3u8");
+  const nativeHls =
+    typeof document !== "undefined" &&
+    document.createElement("video").canPlayType("application/vnd.apple.mpegurl") !== "";
+  useEffect(() => {
+    if (!currentUrl || !isHlsUrl || nativeHls) return;
+    const el = videoRef.current;
+    if (!el) return;
+    let cancelled = false;
+    let hls: import("hls.js").default | null = null;
+    void import("hls.js").then(({ default: Hls }) => {
+      if (cancelled) return;
+      if (!Hls.isSupported()) {
+        if (!demo) setMediaFailed(true);
+        return;
+      }
+      hls = new Hls({ liveDurationInfinity: true });
+      hls.on(Hls.Events.ERROR, (_event, data) => {
+        if (data.fatal) {
+          if (!demo) setMediaFailed(true);
+          hls?.destroy();
+          hls = null;
+        }
+      });
+      hls.loadSource(currentUrl);
+      hls.attachMedia(el);
+    });
+    return () => {
+      cancelled = true;
+      hls?.destroy();
+      hls = null;
+    };
+  }, [currentUrl, isHlsUrl, nativeHls, demo]);
 
   const loopSingle = playMode === "single" || demo || count === 1;
 
@@ -659,10 +789,11 @@ export default function VideoPlayerTile({
       </div>
     );
   } else if (
-    isServerSource &&
-    libraryId &&
-    !playlistQuery.data &&
-    playlistQuery.isLoading
+    (isServerSource &&
+      libraryId &&
+      !playlistQuery.data &&
+      playlistQuery.isLoading) ||
+    (isErsatz && !ersatzQuery.data && ersatzQuery.isLoading)
   ) {
     body = (
       <div className="w-full h-full flex items-center justify-center text-muted-foreground text-sm bg-black/80">
@@ -676,7 +807,9 @@ export default function VideoPlayerTile({
           <video
             key={current.url}
             ref={videoRef}
-            src={current.url}
+            // hls.js (non-native HLS) attaches its own MediaSource; setting a
+            // src attribute alongside it would race the attach.
+            src={isHlsUrl && !nativeHls ? undefined : current.url}
             data-testid="videoplayer-video"
             data-video-id={current.id}
             className="absolute inset-0 w-full h-full"
@@ -758,6 +891,75 @@ export default function VideoPlayerTile({
               server={source === "jellyfin" ? "jellyfin" : "plex"}
             />
           </Suspense>
+        )}
+        {!editMode && isErsatz && channelsOpen && ersatzChannels.length > 0 && (
+          <div
+            className="absolute inset-x-2 bottom-[60px] top-2 z-10 flex flex-col overflow-hidden rounded-md bg-black/85 backdrop-blur-sm"
+            data-testid="videoplayer-channels"
+          >
+            <div className="flex items-center justify-between border-b border-white/10 px-2.5 py-1.5">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-white/70">
+                Channels ({ersatzChannels.length})
+              </span>
+              <button
+                type="button"
+                aria-label="Close channels"
+                data-testid="videoplayer-channels-close"
+                onClick={() => setChannelsOpen(false)}
+                className="rounded px-1.5 text-[13px] leading-none text-white/60 hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
+            <ul className="min-h-0 flex-1 overflow-y-auto py-1">
+              {ersatzChannels.map((channel) => {
+                const isCurrent =
+                  current?.id === `ersatztv-${channel.number}`;
+                return (
+                  <li key={channel.number}>
+                    <button
+                      type="button"
+                      data-testid="videoplayer-channel-entry"
+                      data-current={isCurrent ? "true" : undefined}
+                      aria-current={isCurrent ? "true" : undefined}
+                      onClick={() => {
+                        if (!isCurrent) tuneChannel(channel.number);
+                        setChannelsOpen(false);
+                      }}
+                      className={`flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-[11px] leading-tight transition-colors ${
+                        isCurrent
+                          ? "bg-white/15 text-white"
+                          : "text-white/70 hover:bg-white/10 hover:text-white"
+                      }`}
+                      ref={
+                        isCurrent
+                          ? (el) => el?.scrollIntoView({ block: "nearest" })
+                          : undefined
+                      }
+                    >
+                      <span className="w-7 shrink-0 text-right tabular-nums text-white/40">
+                        {channel.number}
+                      </span>
+                      {isCurrent ? (
+                        <Play className="h-3 w-3 shrink-0 fill-current" />
+                      ) : (
+                        <span className="w-3 shrink-0" />
+                      )}
+                      <span className="min-w-0 flex-1 truncate">
+                        {channel.name}
+                        {channel.nowPlaying && (
+                          <span className="text-white/45">
+                            {" "}
+                            — {channel.nowPlaying}
+                          </span>
+                        )}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
         )}
         {!editMode && !usesBrowser && playlistOpen && count > 1 && (
           <div
@@ -909,6 +1111,20 @@ export default function VideoPlayerTile({
                   <Volume2 className="w-3.5 h-3.5" />
                 )}
               </button>
+              {isErsatz && ersatzChannels.length > 1 && (
+                <button
+                  type="button"
+                  aria-label={channelsOpen ? "Hide channels" : "Show channels"}
+                  title={channelsOpen ? "Hide channels" : "Show channels"}
+                  data-testid="videoplayer-channels-toggle"
+                  onClick={() => setChannelsOpen((o) => !o)}
+                  className={`rounded-full p-1 text-white hover:bg-black/60 ${
+                    channelsOpen ? "bg-white/25" : "bg-black/40"
+                  }`}
+                >
+                  <Tv className="w-3.5 h-3.5" />
+                </button>
+              )}
               {usesBrowser ? (
                 <button
                   type="button"

@@ -121,6 +121,7 @@ interface TileSettings {
   videoUrls?: string[] | null;
   videoYoutubeUrl?: string | null;
   videoLibraryId?: string | null;
+  videoErsatzChannel?: string | null;
   videoPlayMode?: "single" | "playlist" | null;
   videoPlaylistLoop?: boolean | null;
   videoShuffle?: boolean | null;
@@ -712,7 +713,8 @@ function pickTileSettings(obj: Record<string, unknown>): TileSettings {
     obj["videoSource"] === "urls" ||
     obj["videoSource"] === "youtube" ||
     obj["videoSource"] === "plex" ||
-    obj["videoSource"] === "jellyfin"
+    obj["videoSource"] === "jellyfin" ||
+    obj["videoSource"] === "ersatztv"
   ) {
     result.videoSource = obj["videoSource"];
   } else if (obj["videoSource"] === null) {
@@ -741,6 +743,11 @@ function pickTileSettings(obj: Record<string, unknown>): TileSettings {
     result.videoLibraryId = obj["videoLibraryId"];
   } else if (obj["videoLibraryId"] === null) {
     result.videoLibraryId = null;
+  }
+  if (typeof obj["videoErsatzChannel"] === "string") {
+    result.videoErsatzChannel = obj["videoErsatzChannel"];
+  } else if (obj["videoErsatzChannel"] === null) {
+    result.videoErsatzChannel = null;
   }
   if (obj["videoPlayMode"] === "single" || obj["videoPlayMode"] === "playlist") {
     result.videoPlayMode = obj["videoPlayMode"];

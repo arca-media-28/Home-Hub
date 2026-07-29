@@ -590,10 +590,10 @@ export type TileSettings = {
      */
   frameWidth?: number | null;
   /**
-     * Where a Video Player tile's videos come from: "uploads" (video files from the upload library), "urls" (a pasted list of direct video file URLs), "youtube" (a YouTube video/playlist embed), "plex" or "jellyfin" (a library on the connected media server). Null or absent means unconfigured — the tile plays the built-in yule log stream.
+     * Where a Video Player tile's videos come from: "uploads" (video files from the upload library), "urls" (a pasted list of direct video file URLs), "youtube" (a YouTube video/playlist embed), "plex" or "jellyfin" (a library on the connected media server), or "ersatztv" (live TV channels from the connected ErsatzTV server). Null or absent means unconfigured — the tile plays the built-in yule log stream.
      * @nullable
      */
-  videoSource?: 'uploads' | 'urls' | 'youtube' | 'plex' | 'jellyfin' | null;
+  videoSource?: 'uploads' | 'urls' | 'youtube' | 'plex' | 'jellyfin' | 'ersatztv' | null;
   /**
      * The uploaded videos (their /api/uploads/files/... URLs) a Video Player tile plays when videoSource is "uploads".
      * @nullable
@@ -614,6 +614,11 @@ export type TileSettings = {
      * @nullable
      */
   videoLibraryId?: string | null;
+  /**
+     * The tuned ErsatzTV channel number when videoSource is "ersatztv". Null or absent means the first channel in the lineup.
+     * @nullable
+     */
+  videoErsatzChannel?: string | null;
   /**
      * "single" loops the first (or only) video forever; "playlist" plays through the list, advancing on end. Null or absent uses playlist.
      * @nullable
@@ -2185,6 +2190,32 @@ export interface PhotosData {
      */
   sample?: boolean | null;
   photos: PhotoItem[];
+}
+
+export interface ErsatzPlayableChannel {
+  /** The channel's number (ErsatzTV channel numbers can be fractional strings like "5.1"). */
+  number: string;
+  /** The channel's display name. */
+  name: string;
+  /**
+     * What's airing right now per the XMLTV guide. Null when unknown.
+     * @nullable
+     */
+  nowPlaying?: string | null;
+  /**
+     * Same-origin HLS playlist path (through the api-server's ErsatzTV stream proxy) the tile can play. The client appends its auth token as a query parameter. Null for sample channels.
+     * @nullable
+     */
+  streamUrl?: string | null;
+}
+
+export interface ErsatzChannelLineup {
+  /**
+     * True when ErsatzTV is not connected; channels is demo data and no stream URLs exist (the tile keeps its built-in demo video).
+     * @nullable
+     */
+  sample?: boolean | null;
+  channels: ErsatzPlayableChannel[];
 }
 
 export interface VideoLibrary {

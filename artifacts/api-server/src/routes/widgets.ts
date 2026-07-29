@@ -1,6 +1,6 @@
 import { Router } from "express";
 import Parser from "rss-parser";
-import { requireAuth, type AuthRequest } from "../lib/auth.js";
+import { requireAuth, verifyToken, type AuthRequest } from "../lib/auth.js";
 import { connectionStmts } from "../lib/db.js";
 import { httpClient, cloudHttpClient, normalizeBaseUrl, normalizeHttpError, describeHttpError } from "../lib/http.js";
 import { fetchPiholeData } from "../lib/pihole.js";
@@ -4958,6 +4958,187 @@ router.get("/ersatztv", requireAuth, async (req: AuthRequest, res) => {
   } catch (err) {
     logger.error({ reason: normalizeHttpError(err) }, "ErsatzTV widget error");
     res.status(502).json({ error: "Failed to fetch ErsatzTV data" });
+  }
+});
+
+// ── ErsatzTV live-TV playback (Video Player tile) ────────────────────────────
+// The Video Player tile can tune ErsatzTV channels. Two extra routes back it:
+//  - GET /ersatztv/channels: the channel lineup (number, name, now airing)
+//    plus a per-channel stream URL. The stream URL points at the proxy below
+//    rather than the ErsatzTV host directly, because the browser often can't
+//    reach the LAN address the api-server uses.
+//  - GET /ersatztv/stream/*: a transparent proxy for ErsatzTV's /iptv/ HLS
+//    tree. Playlists (.m3u8) are rewritten so every URI they reference flows
+//    back through this proxy; media segments stream through untouched.
+// Convention holds: unconfigured → sample lineup (tile keeps its demo
+// behavior); configured-but-failing → 502 (explicit error, no fallback).
+
+// Path prefix (mounted under /api/widgets) the stream proxy lives at; baked
+// into rewritten playlist URIs and the lineup's streamUrls.
+const ERSATZ_STREAM_PREFIX = "/api/widgets/ersatztv/stream";
+
+function resolveErsatzBase(userId: number): string | null {
+  const saved = getSavedConnection(userId, "ersatztv");
+  const baseUrl = saved.url || process.env["ERSATZTV_URL"];
+  return baseUrl ? trimSlash(baseUrl) : null;
+}
+
+// Auth for the stream proxy. <video>/hls.js media requests can't reliably
+// carry an Authorization header (native HLS playback sends plain GETs), so
+// this accepts the JWT either as a Bearer header or as a ?token= query
+// parameter. The token only ever travels to this server, never to ErsatzTV.
+function ersatzStreamAuth(req: AuthRequest, res: import("express").Response, next: import("express").NextFunction): void {
+  const header = req.headers.authorization;
+  const raw = header?.startsWith("Bearer ")
+    ? header.slice(7)
+    : typeof req.query["token"] === "string"
+      ? req.query["token"]
+      : "";
+  if (!raw) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  try {
+    req.user = verifyToken(raw);
+    next();
+  } catch {
+    res.status(401).json({ error: "Invalid or expired token" });
+  }
+}
+
+// Rewrite an HLS playlist so every URI it references is served through the
+// stream proxy (keeping the viewer's token on each rewritten URL). Handles
+// plain URI lines and URI="..." attributes (#EXT-X-MEDIA, #EXT-X-KEY, …).
+// URIs pointing at other hosts are left alone.
+export function rewriteErsatzPlaylist(
+  playlist: string,
+  upstreamUrl: string,
+  token: string,
+): string {
+  const upstreamOrigin = new URL(upstreamUrl).origin;
+  const rewriteUri = (uri: string): string => {
+    let resolved: URL;
+    try {
+      resolved = new URL(uri, upstreamUrl);
+    } catch {
+      return uri;
+    }
+    if (resolved.origin !== upstreamOrigin) return uri;
+    resolved.searchParams.set("token", token);
+    return `${ERSATZ_STREAM_PREFIX}${resolved.pathname}${resolved.search}`;
+  };
+  return playlist
+    .split(/\r?\n/)
+    .map((line) => {
+      const trimmed = line.trim();
+      if (!trimmed) return line;
+      if (trimmed.startsWith("#")) {
+        return line.replace(/URI="([^"]*)"/g, (_, uri) => `URI="${rewriteUri(uri)}"`);
+      }
+      return rewriteUri(trimmed);
+    })
+    .join("\n");
+}
+
+// GET /api/widgets/ersatztv/channels — the tunable channel lineup for the
+// Video Player tile, reusing the same M3U + XMLTV parsing as the monitoring
+// widget above.
+router.get("/ersatztv/channels", requireAuth, async (req: AuthRequest, res) => {
+  const base = resolveErsatzBase(req.user!.userId);
+  if (!base) {
+    // Sample lineup only when ErsatzTV is genuinely unconfigured; the tile
+    // keeps its demo (yule log) behavior and no stream URLs exist.
+    res.json({
+      sample: true,
+      channels: [
+        { number: "1", name: "Movies 24/7", nowPlaying: "The Maltese Falcon", streamUrl: null },
+        { number: "2", name: "Retro Cartoons", nowPlaying: "Looney Tunes", streamUrl: null },
+        { number: "3", name: "Nature Documentaries", nowPlaying: "Planet Earth: Jungles", streamUrl: null },
+      ],
+    });
+    return;
+  }
+  try {
+    const [channelsRes, guideRes] = await Promise.all([
+      httpClient.get(`${base}/iptv/channels.m3u`, { responseType: "text" }),
+      httpClient.get(`${base}/iptv/xmltv.xml`, { responseType: "text" }),
+    ]);
+    const channelList = parseM3uChannels(String(channelsRes.data ?? ""));
+    const nowPlaying = parseXmltvNowPlaying(String(guideRes.data ?? ""), Date.now());
+    const channels = channelList.map((c) => ({
+      number: c.number,
+      name: c.name,
+      nowPlaying: nowPlaying.get(c.tvgId) ?? nowPlaying.get(c.number) ?? null,
+      streamUrl: `${ERSATZ_STREAM_PREFIX}/iptv/channel/${encodeURIComponent(c.number)}.m3u8`,
+    }));
+    res.json({ sample: false, channels });
+  } catch (err) {
+    logger.error({ reason: normalizeHttpError(err) }, "ErsatzTV channel lineup error");
+    res.status(502).json({ error: "Failed to fetch ErsatzTV channels" });
+  }
+});
+
+// GET /api/widgets/ersatztv/stream/* — proxy one path of ErsatzTV's IPTV
+// tree (playlists and media segments). Only /iptv/ paths are allowed so the
+// proxy can't be used to reach arbitrary ErsatzTV endpoints.
+router.get("/ersatztv/stream/*splat", ersatzStreamAuth, async (req: AuthRequest, res) => {
+  const base = resolveErsatzBase(req.user!.userId);
+  if (!base) {
+    res.status(404).json({ error: "ErsatzTV is not configured" });
+    return;
+  }
+  const splat = req.params["splat"];
+  const path = (Array.isArray(splat) ? splat.join("/") : String(splat ?? "")).replace(/^\/+/, "");
+  if (!path.startsWith("iptv/") || path.includes("..")) {
+    res.status(400).json({ error: "Only ErsatzTV /iptv/ paths can be streamed" });
+    return;
+  }
+  // Forward the upstream query string (minus our own token param).
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(req.query)) {
+    if (key === "token") continue;
+    if (typeof value === "string") params.set(key, value);
+  }
+  const search = params.toString();
+  const upstreamUrl = `${base}/${path}${search ? `?${search}` : ""}`;
+  const token =
+    typeof req.query["token"] === "string"
+      ? req.query["token"]
+      : (req.headers.authorization ?? "").slice(7);
+  try {
+    const upstream = await httpClient.get(upstreamUrl, {
+      responseType: "arraybuffer",
+      // Live segment fetches can be chunky; give them a bit more headroom
+      // than the default widget timeout.
+      timeout: 15000,
+    });
+    const contentType = String(upstream.headers?.["content-type"] ?? "");
+    // The redirect-followed final URL (ErsatzTV redirects channel playlists
+    // into per-session paths); relative segment URIs must resolve against it.
+    const finalUrl: string =
+      (upstream.request?.res?.responseUrl as string | undefined) || upstreamUrl;
+    const isPlaylist =
+      contentType.includes("mpegurl") || new URL(finalUrl).pathname.endsWith(".m3u8");
+    if (isPlaylist) {
+      const body = Buffer.from(upstream.data as ArrayBuffer).toString("utf8");
+      res
+        .status(200)
+        .set("Content-Type", "application/vnd.apple.mpegurl")
+        .set("Cache-Control", "no-store")
+        .send(rewriteErsatzPlaylist(body, finalUrl, token));
+      return;
+    }
+    res
+      .status(200)
+      .set("Content-Type", contentType || "video/mp2t")
+      .set("Cache-Control", "no-store")
+      .send(Buffer.from(upstream.data as ArrayBuffer));
+  } catch (err) {
+    logger.error(
+      { reason: normalizeHttpError(err), path },
+      "ErsatzTV stream proxy error",
+    );
+    res.status(502).json({ error: "Failed to stream from ErsatzTV" });
   }
 });
 

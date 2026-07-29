@@ -189,7 +189,8 @@ export const INTEGRATION_META: Record<string, IntegrationMeta> = {
   },
   [TileIntegration.videoplayer]: {
     icon: MonitorPlay,
-    description: "Play videos from uploads, URLs, YouTube, or your library.",
+    description:
+      "Play videos from uploads, URLs, YouTube, your library, or ErsatzTV live TV.",
   },
   [TileIntegration.note]: {
     icon: StickyNote,

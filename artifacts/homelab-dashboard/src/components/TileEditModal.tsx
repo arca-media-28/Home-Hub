@@ -167,6 +167,8 @@ import {
   getGetPhotoAlbumsQueryKey,
   useGetVideoLibraries,
   getGetVideoLibrariesQueryKey,
+  useGetErsatzChannels,
+  getGetErsatzChannelsQueryKey,
   TileType,
   TileIntegration,
   type Tile,
@@ -653,6 +655,9 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
   const [videoLibraryId, setVideoLibraryId] = useState<string>(
     tile?.tileSettings?.videoLibraryId ?? "",
   );
+  const [videoErsatzChannel, setVideoErsatzChannel] = useState<string>(
+    tile?.tileSettings?.videoErsatzChannel ?? "",
+  );
   const [videoPlayMode, setVideoPlayMode] = useState<"single" | "playlist">(
     tile?.tileSettings?.videoPlayMode === "single" ? "single" : "playlist",
   );
@@ -810,6 +815,7 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
       setVideoUrlsText((tile?.tileSettings?.videoUrls ?? []).join("\n"));
       setVideoYoutubeUrl(tile?.tileSettings?.videoYoutubeUrl ?? "");
       setVideoLibraryId(tile?.tileSettings?.videoLibraryId ?? "");
+      setVideoErsatzChannel(tile?.tileSettings?.videoErsatzChannel ?? "");
       setVideoPlayMode(tile?.tileSettings?.videoPlayMode === "single" ? "single" : "playlist");
       setVideoPlaylistLoop(tile?.tileSettings?.videoPlaylistLoop ?? true);
       setVideoShuffle(tile?.tileSettings?.videoShuffle ?? false);
@@ -848,6 +854,16 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
     query: {
       queryKey: getGetVideoLibrariesQueryKey(videoServerParam),
       enabled: open && integration === TileIntegration.videoplayer && isVideoServerSource,
+    },
+  });
+
+  // Channel lineup for the Video Player's ErsatzTV live-TV source. Only
+  // fetched while the modal is open on a Video Player with that source.
+  const ersatzChannelsQuery = useGetErsatzChannels({
+    query: {
+      queryKey: getGetErsatzChannelsQueryKey(),
+      enabled:
+        open && integration === TileIntegration.videoplayer && videoSource === "ersatztv",
     },
   });
 
@@ -1803,7 +1819,8 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
                                         | "urls"
                                         | "youtube"
                                         | "plex"
-                                        | "jellyfin",
+                                        | "jellyfin"
+                                        | "ersatztv",
                                       videoUploadUrls:
                                         videoSource === "uploads" && videoUploadUrls.length > 0
                                           ? videoUploadUrls
@@ -1824,6 +1841,10 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
                                         (videoSource === "plex" || videoSource === "jellyfin") &&
                                         videoLibraryId
                                           ? videoLibraryId
+                                          : null,
+                                      videoErsatzChannel:
+                                        videoSource === "ersatztv" && videoErsatzChannel
+                                          ? videoErsatzChannel
                                           : null,
                                       videoPlayMode,
                                       videoPlaylistLoop,
@@ -2915,6 +2936,7 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
                     <SelectItem value="youtube">YouTube video or playlist</SelectItem>
                     <SelectItem value="plex">Plex library</SelectItem>
                     <SelectItem value="jellyfin">Jellyfin library</SelectItem>
+                    <SelectItem value="ersatztv">ErsatzTV live TV</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -3051,6 +3073,52 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
                   />
                   <p className="text-xs text-muted-foreground">
                     Plays via the YouTube embedded player (its own controls).
+                  </p>
+                </div>
+              )}
+
+              {videoSource === "ersatztv" && (
+                <div className="space-y-1.5">
+                  <Label>Channel</Label>
+                  {ersatzChannelsQuery.isLoading ? (
+                    <p className="text-xs text-muted-foreground">Loading channels…</p>
+                  ) : ersatzChannelsQuery.isError ? (
+                    <p className="text-xs text-destructive">
+                      Couldn't load ErsatzTV channels. Check the ErsatzTV
+                      connection in Settings, then try again.
+                    </p>
+                  ) : (
+                    <Select
+                      value={videoErsatzChannel || NONE}
+                      onValueChange={(v) => setVideoErsatzChannel(v === NONE ? "" : v)}
+                    >
+                      <SelectTrigger
+                        aria-label="Channel"
+                        data-testid="videoplayer-ersatz-channel"
+                      >
+                        <SelectValue placeholder="Choose a channel" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={NONE}>(first channel)</SelectItem>
+                        {(ersatzChannelsQuery.data?.channels ?? []).map((c) => (
+                          <SelectItem key={c.number} value={c.number}>
+                            {c.number} · {c.name}
+                            {c.nowPlaying ? ` — ${c.nowPlaying}` : ""}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                  {ersatzChannelsQuery.data?.sample && (
+                    <p className="text-xs text-muted-foreground">
+                      ErsatzTV isn't connected yet — the tile will play the
+                      yule log until it is. You can still tune a channel in
+                      the tile once it's connected.
+                    </p>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    Live channels play from your ErsatzTV server; you can also
+                    switch channels right on the tile.
                   </p>
                 </div>
               )}
