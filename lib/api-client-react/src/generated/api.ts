@@ -46,6 +46,7 @@ import type {
   EmailMessageBodyData,
   ErrorResponse,
   ErsatzTvData,
+  ExportProfileParams,
   GetAudioPlayerNowPlayingParams,
   GetCalendarEventsParams,
   GetEmailInboxParams,
@@ -85,6 +86,9 @@ import type {
   PhotoAlbumsData,
   PhotosData,
   PiholeData,
+  ProfileExport,
+  ProfileImportBody,
+  ProfileImportResult,
   ProwlarrData,
   PterodactylData,
   PterodactylPowerRequest,
@@ -1751,6 +1755,161 @@ export const useImportPages = <TError = ErrorType<ErrorResponse>,
         TContext
       > => {
       return useMutation(getImportPagesMutationOptions(options));
+    }
+
+export const getExportProfileUrl = (params?: ExportProfileParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/profile/export?${stringifiedParams}` : `/api/profile/export`
+}
+
+/**
+ * @summary Export the user's entire profile as a downloadable envelope
+ */
+export const exportProfile = async (params?: ExportProfileParams, options?: RequestInit): Promise<ProfileExport> => {
+
+  return customFetch<ProfileExport>(getExportProfileUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getExportProfileQueryKey = (params?: ExportProfileParams,) => {
+    return [
+    `/api/profile/export`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getExportProfileQueryOptions = <TData = Awaited<ReturnType<typeof exportProfile>>, TError = ErrorType<unknown>>(params?: ExportProfileParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportProfile>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getExportProfileQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof exportProfile>>> = ({ signal }) => exportProfile(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof exportProfile>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ExportProfileQueryResult = NonNullable<Awaited<ReturnType<typeof exportProfile>>>
+export type ExportProfileQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Export the user's entire profile as a downloadable envelope
+ */
+
+export function useExportProfile<TData = Awaited<ReturnType<typeof exportProfile>>, TError = ErrorType<unknown>>(
+ params?: ExportProfileParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportProfile>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getExportProfileQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getImportProfileUrl = () => {
+
+
+
+
+  return `/api/profile/import`
+}
+
+/**
+ * @summary Recreate a full profile from a previously exported envelope
+ */
+export const importProfile = async (profileImportBody: ProfileImportBody, options?: RequestInit): Promise<ProfileImportResult> => {
+
+  return customFetch<ProfileImportResult>(getImportProfileUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      profileImportBody,)
+  }
+);}
+
+
+
+
+export const getImportProfileMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof importProfile>>, TError,{data: BodyType<ProfileImportBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof importProfile>>, TError,{data: BodyType<ProfileImportBody>}, TContext> => {
+
+const mutationKey = ['importProfile'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof importProfile>>, {data: BodyType<ProfileImportBody>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  importProfile(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ImportProfileMutationResult = NonNullable<Awaited<ReturnType<typeof importProfile>>>
+    export type ImportProfileMutationBody = BodyType<ProfileImportBody>
+    export type ImportProfileMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Recreate a full profile from a previously exported envelope
+ */
+export const useImportProfile = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof importProfile>>, TError,{data: BodyType<ProfileImportBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof importProfile>>,
+        TError,
+        {data: BodyType<ProfileImportBody>},
+        TContext
+      > => {
+      return useMutation(getImportProfileMutationOptions(options));
     }
 
 export const getGetPageLayoutsUrl = (id: number,) => {

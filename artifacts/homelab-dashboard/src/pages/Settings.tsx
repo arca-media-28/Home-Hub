@@ -29,8 +29,12 @@ import {
   getListImapAccountsQueryKey,
   getListCalDavAccountsQueryKey,
   getGetMeQueryKey,
+  exportProfile,
+  useImportProfile,
   type ServiceConnection,
   type ServiceConnectionUpdate,
+  type ProfileExport,
+  type ProfileImportBody,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -76,7 +80,32 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import { groupByCategory } from "@/lib/integrationCategories";
+import {
+  THEME_KEY,
+  readSavedColors,
+  persistTheme,
+  persistColors,
+  applyThemeToDom,
+  isKnownTheme,
+  type ColorOverrides,
+} from "@/lib/theme";
+import {
+  readCustomThemes,
+  persistCustomThemes,
+  validateCustomTheme,
+  isCustomThemeId,
+  type CustomThemeMap,
+} from "@/lib/customThemes";
 
 // Copy text to the clipboard, returning whether it succeeded. The async
 // Clipboard API only exists in secure contexts (HTTPS or localhost); a
@@ -1876,6 +1905,385 @@ function CategorySection({
   );
 }
 
+// ---------------------------------------------------------------------------
+// Profile export/import
+// ---------------------------------------------------------------------------
+
+// The browser-side theme bundle merged into a downloaded profile file. Themes
+// live in localStorage (not the server), so the client is the only place that
+// can round-trip them between accounts/browsers.
+interface ProfileThemeBundle {
+  active?: string | null;
+  colors?: ColorOverrides;
+  customThemes?: CustomThemeMap;
+}
+
+type ProfileFile = ProfileExport & { theme?: ProfileThemeBundle };
+
+// Collect the current browser theme state for embedding into an export file.
+function collectThemeBundle(): ProfileThemeBundle {
+  let active: string | null = null;
+  try {
+    active = localStorage.getItem(THEME_KEY);
+  } catch {
+    /* privacy mode */
+  }
+  return {
+    active,
+    colors: readSavedColors(),
+    customThemes: readCustomThemes(),
+  };
+}
+
+// Apply an imported theme bundle to this browser. Every custom theme passes
+// through validateCustomTheme so a hand-edited file can never inject raw CSS.
+// Replace mode swaps the browser's theme state for the file's; merge mode adds
+// the file's custom themes/overrides without clobbering existing ones.
+// Returns the number of custom themes applied.
+function applyThemeBundle(theme: ProfileThemeBundle, replace: boolean): number {
+  const incoming: CustomThemeMap = {};
+  for (const [id, def] of Object.entries(theme.customThemes ?? {})) {
+    if (!isCustomThemeId(id)) continue;
+    const result = validateCustomTheme(def);
+    if (result.ok) incoming[id] = { ...result.value, id };
+  }
+
+  const existing = readCustomThemes();
+  const merged = replace ? incoming : { ...incoming, ...existing };
+  persistCustomThemes(merged);
+
+  const existingColors = readSavedColors();
+  const incomingColors =
+    theme.colors && typeof theme.colors === "object" ? theme.colors : {};
+  const colors = replace
+    ? incomingColors
+    : { ...incomingColors, ...existingColors };
+  persistColors(colors);
+
+  // Switch to the file's active theme when it resolves to something real.
+  const active = theme.active;
+  if (typeof active === "string" && (isKnownTheme(active) || merged[active])) {
+    persistTheme(active);
+    applyThemeToDom(
+      active,
+      isKnownTheme(active) ? (colors as ColorOverrides)[active] : undefined,
+      merged,
+    );
+  }
+  return Object.keys(incoming).length;
+}
+
+// Human summary counts for a parsed profile file.
+function summarizeProfileFile(file: ProfileFile) {
+  const pages = file.pages?.length ?? 0;
+  const tiles = (file.pages ?? []).reduce((n, p) => n + (p.tiles?.length ?? 0), 0);
+  return {
+    pages,
+    tiles,
+    deviceModes: file.deviceModes?.length ?? 0,
+    connections: file.connections?.length ?? 0,
+    customThemes: Object.keys(file.theme?.customThemes ?? {}).length,
+    hasTheme: Boolean(file.theme),
+  };
+}
+
+function ProfileSection() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [exportOpen, setExportOpen] = useState(false);
+  const [includeConnections, setIncludeConnections] = useState(false);
+  const [exporting, setExporting] = useState(false);
+
+  const [pendingFile, setPendingFile] = useState<ProfileFile | null>(null);
+  const [importMode, setImportMode] = useState<"merge" | "replace">("merge");
+
+  const importProfile = useImportProfile({
+    mutation: {
+      onSuccess: (result) => {
+        // The whole account may have changed shape — refetch everything.
+        queryClient.invalidateQueries();
+        let themes = 0;
+        if (pendingFile?.theme) {
+          themes = applyThemeBundle(pendingFile.theme, result.mode === "replace");
+        }
+        setPendingFile(null);
+        const bits = [
+          `${result.pages} page${result.pages === 1 ? "" : "s"}`,
+          `${result.tiles} tile${result.tiles === 1 ? "" : "s"}`,
+        ];
+        if (result.connections > 0) bits.push(`${result.connections} connections`);
+        if (themes > 0) bits.push(`${themes} custom theme${themes === 1 ? "" : "s"}`);
+        toast({
+          title: result.mode === "replace" ? "Profile replaced" : "Profile imported",
+          description: `Imported ${bits.join(", ")}.`,
+        });
+      },
+      onError: (err) => {
+        toast({
+          title: "Import failed",
+          description: err instanceof Error ? err.message : "Could not import profile",
+          variant: "destructive",
+        });
+      },
+    },
+  });
+
+  async function handleExport() {
+    setExporting(true);
+    try {
+      const data = await exportProfile(
+        includeConnections ? { includeConnections: true } : undefined,
+      );
+      const file: ProfileFile = { ...data, theme: collectThemeBundle() };
+      const blob = new Blob([JSON.stringify(file, null, 2)], {
+        type: "application/json",
+      });
+      const href = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = href;
+      a.download = "tachboard-profile.json";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(href);
+      setExportOpen(false);
+      toast({ title: "Profile exported" });
+    } catch (err) {
+      toast({
+        title: "Export failed",
+        description: err instanceof Error ? err.message : "Could not export profile",
+        variant: "destructive",
+      });
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  async function handleImportFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    // Reset the input so re-selecting the same file re-fires the change event.
+    e.target.value = "";
+    if (!file) return;
+    let parsed: ProfileFile;
+    try {
+      parsed = JSON.parse(await file.text()) as ProfileFile;
+    } catch {
+      toast({
+        title: "Import failed",
+        description: "That file isn't valid JSON.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (parsed?.format === "homelab-dashboard-pages") {
+      toast({
+        title: "That's a pages export",
+        description:
+          "This file holds pages only. Import it from the dashboard's page menu instead.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (parsed?.format !== "tachboard-profile") {
+      toast({
+        title: "Import failed",
+        description: "This file is not a Tachboard profile export.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setImportMode("merge");
+    setPendingFile(parsed);
+  }
+
+  function confirmImport() {
+    if (!pendingFile) return;
+    // The server ignores the client-only theme key, but strip it anyway so the
+    // request body matches the API contract exactly.
+    const { theme: _theme, ...serverEnvelope } = pendingFile;
+    importProfile.mutate({
+      data: { ...serverEnvelope, mode: importMode } as ProfileImportBody,
+    });
+  }
+
+  const summary = pendingFile ? summarizeProfileFile(pendingFile) : null;
+
+  return (
+    <div className="mb-8">
+      <div className="mb-4">
+        <h1 className="font-bold uppercase tracking-widest text-foreground">Profile</h1>
+        <p className="text-sm text-muted-foreground mt-1">
+          Move your whole setup — pages, tiles, layouts, device modes, and themes —
+          between accounts or installs as a single file.
+        </p>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        <Button
+          size="sm"
+          variant="outline"
+          className="gap-1.5"
+          onClick={() => setExportOpen(true)}
+          data-testid="button-export-profile"
+        >
+          <Download className="w-3.5 h-3.5" />
+          Export profile
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          className="gap-1.5"
+          onClick={() => fileInputRef.current?.click()}
+          data-testid="button-import-profile"
+        >
+          <Plug className="w-3.5 h-3.5" />
+          Import profile
+        </Button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="application/json,.json"
+          className="hidden"
+          onChange={handleImportFile}
+          data-testid="input-import-profile-file"
+        />
+      </div>
+
+      {/* Export dialog: credentials opt-in with an explicit warning. */}
+      <Dialog open={exportOpen} onOpenChange={setExportOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Export profile</DialogTitle>
+            <DialogDescription>
+              Downloads a JSON file with your pages, tiles, layouts, device modes,
+              and browser themes.
+            </DialogDescription>
+          </DialogHeader>
+          <label className="flex items-start gap-3 rounded-md border border-border p-3 cursor-pointer">
+            <Checkbox
+              checked={includeConnections}
+              onCheckedChange={(v) => setIncludeConnections(v === true)}
+              className="mt-0.5"
+              data-testid="checkbox-include-connections"
+            />
+            <span className="text-sm">
+              <span className="font-medium text-foreground">
+                Include service connections
+              </span>
+              <span className="block text-muted-foreground mt-1">
+                Adds your saved URLs, API keys, usernames, and passwords to the
+                file in readable form. Only share the file with people you trust.
+              </span>
+            </span>
+          </label>
+          {includeConnections && (
+            <div className="flex items-start gap-2 text-xs text-destructive">
+              <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+              The exported file will contain credentials in plain text.
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => setExportOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleExport}
+              disabled={exporting}
+              data-testid="button-confirm-export"
+            >
+              {exporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+              Download
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Import dialog: file summary + replace/add choice. */}
+      <Dialog
+        open={pendingFile !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingFile(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Import profile</DialogTitle>
+            <DialogDescription>
+              {summary && (
+                <>
+                  This file contains {summary.pages} page{summary.pages === 1 ? "" : "s"},{" "}
+                  {summary.tiles} tile{summary.tiles === 1 ? "" : "s"}, {summary.deviceModes}{" "}
+                  device mode{summary.deviceModes === 1 ? "" : "s"}
+                  {summary.connections > 0 &&
+                    `, ${summary.connections} service connection${summary.connections === 1 ? "" : "s"} (with credentials)`}
+                  {summary.hasTheme &&
+                    `, and theme settings${summary.customThemes > 0 ? ` (${summary.customThemes} custom)` : ""}`}
+                  .
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <button
+              type="button"
+              onClick={() => setImportMode("merge")}
+              className={`w-full text-left rounded-md border p-3 text-sm transition-colors ${
+                importMode === "merge"
+                  ? "border-primary bg-primary/5"
+                  : "border-border hover:border-muted-foreground/40"
+              }`}
+              data-testid="button-mode-merge"
+            >
+              <span className="font-medium text-foreground">Add to my profile</span>
+              <span className="block text-muted-foreground mt-0.5">
+                Appends the file's pages and device modes next to yours. Nothing is
+                deleted; duplicate names get a “(2)” suffix.
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setImportMode("replace")}
+              className={`w-full text-left rounded-md border p-3 text-sm transition-colors ${
+                importMode === "replace"
+                  ? "border-destructive bg-destructive/5"
+                  : "border-border hover:border-muted-foreground/40"
+              }`}
+              data-testid="button-mode-replace"
+            >
+              <span className="font-medium text-foreground">Replace my profile</span>
+              <span className="block text-muted-foreground mt-0.5">
+                Deletes all of your current pages, tiles, and device modes
+                {summary && summary.connections > 0 ? " (and service connections)" : ""}{" "}
+                and recreates everything from the file. This cannot be undone.
+              </span>
+            </button>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => setPendingFile(null)}>
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              variant={importMode === "replace" ? "destructive" : "default"}
+              onClick={confirmImport}
+              disabled={importProfile.isPending}
+              data-testid="button-confirm-import"
+            >
+              {importProfile.isPending ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : null}
+              {importMode === "replace" ? "Replace & import" : "Import"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
 export default function Settings() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -1992,6 +2400,8 @@ export default function Settings() {
 
       <main className="max-w-screen-md mx-auto px-4 py-6">
         <AppearanceSettings />
+
+        <ProfileSection />
 
         <div className="mb-6">
           <h1 className="font-bold uppercase tracking-widest text-foreground">

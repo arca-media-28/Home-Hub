@@ -554,6 +554,58 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /profile/export:
+    get:
+      operationId: exportProfile
+      tags: [profile]
+      summary: Export the user's entire profile as a downloadable envelope
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: includeConnections
+          in: query
+          required: false
+          description: >-
+            When true, include the user's saved service connection credentials
+            (URLs, API keys, usernames, passwords, tokens) in READABLE form.
+            Off by default.
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: Profile export envelope
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProfileExport"
+
+  /profile/import:
+    post:
+      operationId: importProfile
+      tags: [profile]
+      summary: Recreate a full profile from a previously exported envelope
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProfileImportBody"
+      responses:
+        "200":
+          description: Counts of what was imported
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProfileImportResult"
+        "400":
+          description: Malformed or incompatible export file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /pages/{id}/layouts:
     get:
       operationId: getPageLayouts
@@ -4069,6 +4121,114 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ExportedPage"
+
+    ProfileDeviceMode:
+      description: A device mode inside a profile export, referenced by name.
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+
+    ExportedConnection:
+      description: >-
+        A service connection inside a profile export. ONLY present when the
+        user explicitly opted in to including credentials — every field is
+        stored and exported in readable plain text.
+      type: object
+      required: [service]
+      properties:
+        service:
+          type: string
+        url:
+          type: ["string", "null"]
+        apiKey:
+          type: ["string", "null"]
+        username:
+          type: ["string", "null"]
+        password:
+          type: ["string", "null"]
+        extra:
+          description: >-
+            Opaque JSON blob carrying service-specific extras (tokens,
+            IMAP/CalDAV account lists).
+          type: ["string", "null"]
+
+    ProfileExport:
+      description: >-
+        A versioned envelope holding a user's entire profile — device modes,
+        pages with per-mode/variant tile layouts, and (only when explicitly
+        requested) service connection credentials. The client additionally
+        merges browser-side theme data into the downloaded file.
+      type: object
+      required: [format, version, deviceModes, pages]
+      properties:
+        format:
+          description: Constant identifier for this file type.
+          type: string
+        version:
+          description: Schema version, bumped on incompatible format changes.
+          type: integer
+        exportedAt:
+          description: ISO timestamp of when the file was produced.
+          type: string
+        deviceModes:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProfileDeviceMode"
+        pages:
+          type: array
+          items:
+            $ref: "#/components/schemas/ExportedPage"
+        connections:
+          type: ["array", "null"]
+          items:
+            $ref: "#/components/schemas/ExportedConnection"
+
+    ProfileImportBody:
+      description: >-
+        A profile export envelope plus the import mode. "replace" wipes the
+        account's pages/tiles/device modes (and connections, if the file
+        includes them) and recreates them from the file; "merge" appends pages
+        and device modes with de-duplicated names.
+      type: object
+      required: [format, version, deviceModes, pages, mode]
+      properties:
+        format:
+          type: string
+        version:
+          type: integer
+        mode:
+          type: string
+          enum: [replace, merge]
+        deviceModes:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProfileDeviceMode"
+        pages:
+          type: array
+          items:
+            $ref: "#/components/schemas/ExportedPage"
+        connections:
+          type: ["array", "null"]
+          items:
+            $ref: "#/components/schemas/ExportedConnection"
+
+    ProfileImportResult:
+      description: Counts of what an import created/applied.
+      type: object
+      required: [mode, pages, tiles, deviceModes, connections]
+      properties:
+        mode:
+          type: string
+        pages:
+          type: integer
+        tiles:
+          type: integer
+        deviceModes:
+          type: integer
+        connections:
+          type: integer
 
     UploadResult:
       type: object

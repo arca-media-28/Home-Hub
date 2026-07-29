@@ -29,13 +29,20 @@ const EXPORT_VERSION = 2;
 // accounts). `tiles` still carries the flat list so a v2 file remains readable
 // by eye; importers use `layouts` when present.
 function buildExport(userId: number, pages: DbPage[]) {
-  const modes = deviceModeStmts.findAllByUser.all(userId);
-  const modeName = new Map(modes.map((m) => [m.id, m.name]));
   return {
     format: EXPORT_FORMAT,
     version: EXPORT_VERSION,
     exportedAt: new Date().toISOString(),
-    pages: pages.map((p) => {
+    pages: buildExportedPages(userId, pages),
+  };
+}
+
+// Serialize pages (with their per-mode/variant layouts) into the shareable
+// export shape. Shared between the pages export and the full-profile export.
+export function buildExportedPages(userId: number, pages: DbPage[]) {
+  const modes = deviceModeStmts.findAllByUser.all(userId);
+  const modeName = new Map(modes.map((m) => [m.id, m.name]));
+  return pages.map((p) => {
       const tiles = tileStmts.findAllByPage.all(p.user_id, p.id);
       const groups = new Map<string, { deviceMode: string; variant: string | null; tiles: ReturnType<typeof exportTile>[] }>();
       for (const t of tiles) {
@@ -55,14 +62,13 @@ function buildExport(userId: number, pages: DbPage[]) {
         tiles: tiles.map(exportTile),
         layouts: Array.from(groups.values()),
       };
-    }),
-  };
+  });
 }
 
 // Pick a page name that doesn't collide with any name already taken. Appends
 // " (2)", " (3)", … until a free name is found, mirroring how a file manager
 // de-duplicates copies.
-function uniquePageName(base: string, taken: Set<string>): string {
+export function uniquePageName(base: string, taken: Set<string>): string {
   if (!taken.has(base)) return base;
   let n = 2;
   while (taken.has(`${base} (${n})`)) n++;
@@ -85,7 +91,7 @@ export function formatPage(p: DbPage) {
 
 // Clean an incoming page name: trim, fall back to a default, and cap length so
 // a stray paste can't blow up the tab bar.
-function cleanName(raw: unknown): string {
+export function cleanName(raw: unknown): string {
   if (typeof raw !== "string") return "Page";
   const trimmed = raw.trim();
   if (!trimmed) return "Page";
@@ -110,7 +116,7 @@ function cleanOrientation(raw: unknown): string | null {
 // valid value for at least one of them. Unspecified fields keep their current
 // stored value so a partial update (e.g. orientation only) never clobbers the
 // other. Reads the existing row to fill in the side that wasn't provided.
-function applyLayoutUpdate(
+export function applyLayoutUpdate(
   userId: number,
   pageId: number,
   body: { layoutPreset?: unknown; layoutOrientation?: unknown },

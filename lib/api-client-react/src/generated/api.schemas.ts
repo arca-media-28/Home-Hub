@@ -1485,6 +1485,81 @@ export interface PageExport {
   pages: ExportedPage[];
 }
 
+/**
+ * A device mode inside a profile export, referenced by name.
+ */
+export interface ProfileDeviceMode {
+  name: string;
+}
+
+/**
+ * A service connection inside a profile export. ONLY present when the user explicitly opted in to including credentials — every field is stored and exported in readable plain text.
+ */
+export interface ExportedConnection {
+  service: string;
+  /** @nullable */
+  url?: string | null;
+  /** @nullable */
+  apiKey?: string | null;
+  /** @nullable */
+  username?: string | null;
+  /** @nullable */
+  password?: string | null;
+  /**
+     * Opaque JSON blob carrying service-specific extras (tokens, IMAP/CalDAV account lists).
+     * @nullable
+     */
+  extra?: string | null;
+}
+
+/**
+ * A versioned envelope holding a user's entire profile — device modes, pages with per-mode/variant tile layouts, and (only when explicitly requested) service connection credentials. The client additionally merges browser-side theme data into the downloaded file.
+ */
+export interface ProfileExport {
+  /** Constant identifier for this file type. */
+  format: string;
+  /** Schema version, bumped on incompatible format changes. */
+  version: number;
+  /** ISO timestamp of when the file was produced. */
+  exportedAt?: string;
+  deviceModes: ProfileDeviceMode[];
+  pages: ExportedPage[];
+  /** @nullable */
+  connections?: ExportedConnection[] | null;
+}
+
+export type ProfileImportBodyMode = typeof ProfileImportBodyMode[keyof typeof ProfileImportBodyMode];
+
+
+export const ProfileImportBodyMode = {
+  replace: 'replace',
+  merge: 'merge',
+} as const;
+
+/**
+ * A profile export envelope plus the import mode. "replace" wipes the account's pages/tiles/device modes (and connections, if the file includes them) and recreates them from the file; "merge" appends pages and device modes with de-duplicated names.
+ */
+export interface ProfileImportBody {
+  format: string;
+  version: number;
+  mode: ProfileImportBodyMode;
+  deviceModes: ProfileDeviceMode[];
+  pages: ExportedPage[];
+  /** @nullable */
+  connections?: ExportedConnection[] | null;
+}
+
+/**
+ * Counts of what an import created/applied.
+ */
+export interface ProfileImportResult {
+  mode: string;
+  pages: number;
+  tiles: number;
+  deviceModes: number;
+  connections: number;
+}
+
 export interface UploadResult {
   url: string;
 }
@@ -2398,6 +2473,13 @@ deviceModeId?: number;
  * Adaptive layout variant key (e.g. "fhd-landscape") to scope the result to, used with deviceModeId. Omitting it selects the base layout (variant null) used by auto/fixed pages.
  */
 variant?: string;
+};
+
+export type ExportProfileParams = {
+/**
+ * When true, include the user's saved service connection credentials (URLs, API keys, usernames, passwords, tokens) in READABLE form. Off by default.
+ */
+includeConnections?: boolean;
 };
 
 export type GetTruenasDiagnostics200 = { [key: string]: unknown };

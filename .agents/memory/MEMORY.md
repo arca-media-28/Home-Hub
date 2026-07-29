@@ -54,4 +54,5 @@
 - [Visualizer theme defaults](visualizer-theme-defaults.md) — unset colors mean "follow the theme" (resolve CSS vars→hex, darken light surfaces); Reset/save must persist null, never a theme snapshot.
 - [Video Player tile](videoplayer-tile.md) — yule log ONLY when unconfigured (configured failure = explicit error); Plex show libs need type=4 re-query; new video* keys go in whitelist + local TileSettings.
 - [Device modes + adaptive variants](device-modes-adaptive.md) — tiles scoped by (page, deviceModeId, variant "fhd-landscape"); pass all three everywhere; Playwright needs E2E_BASE_URL on Replit.
+- [Profile export/import](profile-export-import.md) — "tachboard-profile" v1 envelope; replace vs merge semantics; connections presence = key presence (empty [] still wipes on replace); client bundles theme in localStorage.
 - [Picture Frame tile](pictureframe-tile.md) — album photos come as authed /api/widgets/photos proxy paths (blob-fetch w/ token); Google baseUrls re-resolved per request; sample- albumIds = demo mode; frames drawn as padding+background.
