@@ -172,6 +172,53 @@ describe("GET /api/widgets/ersatztv/channels", () => {
   });
 });
 
+describe("GET /api/widgets/ersatztv (monitoring)", () => {
+  it("includes up-next title/start per channel in the sample data", async () => {
+    const res = await request(makeApp()).get("/api/widgets/ersatztv");
+    expect(res.status).toBe(200);
+    const withUpNext = res.body.channels.filter(
+      (c: { upNextTitle: string | null }) => c.upNextTitle != null,
+    );
+    expect(withUpNext.length).toBeGreaterThan(0);
+    for (const c of res.body.channels) {
+      expect(c).toHaveProperty("upNextTitle");
+      expect(c).toHaveProperty("upNextStart");
+      if (c.upNextTitle != null) {
+        expect(Number.isNaN(Date.parse(c.upNextStart))).toBe(false);
+      } else {
+        expect(c.upNextStart).toBeNull();
+      }
+    }
+  });
+
+  it("includes up-next title/start per channel from the real guide", async () => {
+    findByService.mockImplementation((_userId: number, service: string) =>
+      service === "ersatztv" ? ersatzRow : undefined,
+    );
+    httpGet.mockImplementation((url: string) => {
+      if (url.endsWith("/iptv/channels.m3u")) return Promise.resolve({ data: M3U });
+      if (url.endsWith("/iptv/xmltv.xml"))
+        return Promise.resolve({ data: xmltvAround(Date.now()) });
+      if (url.endsWith("/api/sessions")) return Promise.resolve({ data: [] });
+      return Promise.reject(new Error(`unexpected ${url}`));
+    });
+    const res = await request(makeApp()).get("/api/widgets/ersatztv");
+    expect(res.status).toBe(200);
+    const [ch1, ch2] = res.body.channels;
+    expect(ch1).toMatchObject({
+      number: "1",
+      nowPlaying: "The Maltese Falcon",
+      upNextTitle: "Casablanca",
+    });
+    const upNextMs = Date.parse(ch1.upNextStart);
+    expect(Number.isNaN(upNextMs)).toBe(false);
+    expect(upNextMs).toBeGreaterThan(Date.now());
+    expect(upNextMs).toBeLessThan(Date.now() + 90_000);
+    expect(ch2.upNextTitle).toBeNull();
+    expect(ch2.upNextStart).toBeNull();
+  });
+});
+
 describe("GET /api/widgets/ersatztv/stream/*", () => {
   const streamPath = "/api/widgets/ersatztv/stream/iptv/channel/1.m3u8";
 

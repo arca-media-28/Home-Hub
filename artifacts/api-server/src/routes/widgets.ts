@@ -4941,11 +4941,11 @@ router.get("/ersatztv", requireAuth, async (req: AuthRequest, res) => {
       reachable: true,
       activeStreams: 2,
       channels: [
-        { number: "1", name: "Movies 24/7", nowPlaying: "The Maltese Falcon" },
-        { number: "2", name: "Retro Cartoons", nowPlaying: "Looney Tunes" },
-        { number: "3", name: "Nature Documentaries", nowPlaying: "Planet Earth: Jungles" },
-        { number: "4", name: "Sci-Fi Marathon", nowPlaying: "Blade Runner" },
-        { number: "5", name: "News Loop", nowPlaying: null },
+        { number: "1", name: "Movies 24/7", nowPlaying: "The Maltese Falcon", upNextTitle: "Casablanca", upNextStart: new Date(Date.now() + 45 * 60_000).toISOString() },
+        { number: "2", name: "Retro Cartoons", nowPlaying: "Looney Tunes", upNextTitle: "Tom and Jerry", upNextStart: new Date(Date.now() + 20 * 60_000).toISOString() },
+        { number: "3", name: "Nature Documentaries", nowPlaying: "Planet Earth: Jungles", upNextTitle: "Blue Planet: Coasts", upNextStart: new Date(Date.now() + 30 * 60_000).toISOString() },
+        { number: "4", name: "Sci-Fi Marathon", nowPlaying: "Blade Runner", upNextTitle: "The Matrix", upNextStart: new Date(Date.now() + 70 * 60_000).toISOString() },
+        { number: "5", name: "News Loop", nowPlaying: null, upNextTitle: null, upNextStart: null },
       ],
     });
     return;
@@ -4976,6 +4976,11 @@ router.get("/ersatztv", requireAuth, async (req: AuthRequest, res) => {
         number: c.number,
         name: c.name,
         nowPlaying: entry?.nowPlaying ?? null,
+        upNextTitle: entry?.upNextTitle ?? null,
+        upNextStart:
+          entry?.upNextStart != null
+            ? new Date(entry.upNextStart).toISOString()
+            : null,
       };
     });
 

@@ -11,10 +11,10 @@ Endpoints (both unauthenticated, fetched as text via `responseType: "text"`):
 
 **Now playing rule:** a programme is current when `start ≤ now < stop` (stop is exclusive, so a show ending exactly now yields the next one). XMLTV time has an optional `±HHMM` offset; absent offset → treat as UTC. Titles may be CDATA or carry XML entities — decode both.
 
-**Up next rule:** the future programme with the *earliest* `start > now` — programmes are NOT guaranteed ordered in the feed, so track the min per channel rather than taking the first future entry. Only the `/ersatztv/channels` (playable lineup) route exposes `upNextTitle`/`upNextStart` (ISO 8601); the monitoring widget route stays now-playing-only.
+**Up next rule:** the future programme with the *earliest* `start > now` — programmes are NOT guaranteed ordered in the feed, so track the min per channel rather than taking the first future entry. BOTH `/ersatztv/channels` (playable lineup) and the `/ersatztv` monitoring widget expose `upNextTitle`/`upNextStart` (ISO 8601, null when nothing further is scheduled).
 
 **Active streams metric:** comes from `GET /api/sessions` (no-auth) — a JSON array, one entry per active transcode session (MPEG-TS + HLS Segmenter); `activeStreams = array.length`. Fetched with its **own** try/catch so an older instance / missing endpoint / network error returns `null` (tile omits the metric) and **never 502s the whole tile**. Older note that "no endpoint exists" is wrong — `/api/sessions` is the source.
 
 **Widget convention:** unconfigured (no base URL) → sample data; configured-but-fetch-fails → 502. `reachable` is always `true` in a 200 (an unreachable configured server 502s instead); the field exists so the tile can render the "health" metric uniformly.
 
-Metrics (catalog priority): `health`, `activeStreams`, `nowPlaying`.
+Metrics (catalog priority): `health`, `activeStreams`, `nowPlaying`, `upNext` (the up-next line rides inside the nowPlaying channel list — it adds a third line per row and bumps the budgeted row height, it is not its own section).

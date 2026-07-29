@@ -4,6 +4,13 @@ import type { WidgetProps } from "./IntegrationTile";
 import { tileBudget, STAT_ROW_PX, ROW_PX, SECTION_PX, TWO_LINE_ROW_PX, listColumnClass, listColumnStyle } from "./metrics";
 import { CenteredTileBody } from "./TileBody";
 
+// Format an up-next ISO start time as a short local clock time (e.g. "8:45 PM").
+function formatStartTime(iso: string): string {
+  const ms = Date.parse(iso);
+  if (Number.isNaN(ms)) return "";
+  return new Date(ms).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+}
+
 export default function ErsatztvTile({ enabled, density }: WidgetProps) {
   const { data, isLoading, isError } = useGetErsatzTvWidget({
     query: { queryKey: getGetErsatzTvWidgetQueryKey(), refetchInterval: 30_000 },
@@ -32,8 +39,12 @@ export default function ErsatztvTile({ enabled, density }: WidgetProps) {
   const showHealth = enabled.has("health") && budget.block(STAT_ROW_PX);
   const showStreams =
     enabled.has("activeStreams") && data.activeStreams != null && budget.block(ROW_PX);
+  // With the up-next metric on, each channel row gains a third line, so the
+  // budget charges a taller row and reveals fewer channels in the same space.
+  const showUpNext = enabled.has("upNext");
+  const channelRowPx = showUpNext ? TWO_LINE_ROW_PX + 14 : TWO_LINE_ROW_PX;
   const channelRows = enabled.has("nowPlaying")
-    ? budget.list(SECTION_PX, TWO_LINE_ROW_PX, data.channels.length)
+    ? budget.list(SECTION_PX, channelRowPx, data.channels.length)
     : 0;
 
   // Channels currently airing something float to the top so the most useful
@@ -104,6 +115,12 @@ export default function ErsatztvTile({ enabled, density }: WidgetProps) {
                 >
                   {c.nowPlaying ?? "Off air"}
                 </div>
+                {showUpNext && c.upNextTitle && (
+                  <div className="text-[10px] truncate text-muted-foreground/70">
+                    Next: {c.upNextTitle}
+                    {c.upNextStart ? ` · ${formatStartTime(c.upNextStart)}` : ""}
+                  </div>
+                )}
               </div>
             </div>
           ))}

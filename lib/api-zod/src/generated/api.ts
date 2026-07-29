@@ -2874,7 +2874,9 @@ export const GetErsatzTvWidgetResponse = zod.object({
   "channels": zod.array(zod.object({
   "number": zod.string().describe('The channel number (e.g. \"1\", \"2.1\").'),
   "name": zod.string().describe('The channel\'s display name.'),
-  "nowPlaying": zod.string().nullable().describe('Title of the programme currently airing on the channel (start ≤ now < stop in the EPG). Null when nothing is currently scheduled.')
+  "nowPlaying": zod.string().nullable().describe('Title of the programme currently airing on the channel (start ≤ now < stop in the EPG). Null when nothing is currently scheduled.'),
+  "upNextTitle": zod.string().nullish().describe('Title of the next upcoming programme on the channel (the future programme with the earliest start time in the EPG). Null when nothing further is scheduled.'),
+  "upNextStart": zod.coerce.date().nullish().describe('ISO-8601 start time of the up-next programme. Null when upNextTitle is null.')
 })).describe('Channels and what each is currently airing (from the EPG).')
 })
 

@@ -2141,6 +2141,16 @@ export interface ErsatzTvChannel {
      * @nullable
      */
   nowPlaying: string | null;
+  /**
+     * Title of the next upcoming programme on the channel (the future programme with the earliest start time in the EPG). Null when nothing further is scheduled.
+     * @nullable
+     */
+  upNextTitle?: string | null;
+  /**
+     * ISO-8601 start time of the up-next programme. Null when upNextTitle is null.
+     * @nullable
+     */
+  upNextStart?: string | null;
 }
 
 export interface ErsatzTvData {

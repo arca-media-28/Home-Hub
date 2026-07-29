@@ -76,6 +76,7 @@ export const METRIC_CATALOG: Record<string, MetricDef[]> = {
     { key: "health", label: "Health status" },
     { key: "activeStreams", label: "Active streams" },
     { key: "nowPlaying", label: "Now playing" },
+    { key: "upNext", label: "Up next" },
   ],
   [TileIntegration.stocks]: [
     { key: "dailyChange", label: "Daily change" },

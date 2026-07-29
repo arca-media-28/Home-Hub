@@ -5121,6 +5121,18 @@ components:
             Title of the programme currently airing on the channel (start ≤ now
             < stop in the EPG). Null when nothing is currently scheduled.
           type: ["string", "null"]
+        upNextTitle:
+          description: >-
+            Title of the next upcoming programme on the channel (the future
+            programme with the earliest start time in the EPG). Null when
+            nothing further is scheduled.
+          type: ["string", "null"]
+        upNextStart:
+          description: >-
+            ISO-8601 start time of the up-next programme. Null when
+            upNextTitle is null.
+          type: ["string", "null"]
+          format: date-time
 
     PhotoAlbum:
       type: object
