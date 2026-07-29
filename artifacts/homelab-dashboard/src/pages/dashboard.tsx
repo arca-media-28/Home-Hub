@@ -150,7 +150,47 @@ const PRESET_ORDER = ["auto", "adaptive", "compact", "fhd", "qhd", "uhd"] as con
 // (preset, orientation) pair — the "variant". Variant keys look like
 // "fhd-landscape". Auto/fixed pages always use the base layout (variant null).
 
-const ORIENTATIONS = ["landscape", "portrait"] as const;
+// ---- Portrait (vertical) tiers --------------------------------------------
+// A vertical screen's grid must be shaped by its WIDTH (the short side), not by
+// the landscape column count — otherwise a 1080×1920 portrait page renders a
+// 24-column landscape-wide grid that just gets shrunk to fit the height.
+// Portrait widths cluster tightly (1080p and 2K portrait are ~1080–1440px
+// wide), so vertical mode offers a simplified two-tier set instead of
+// mirroring all four landscape presets:
+//   - "fhd"  → Standard vertical (~1080–1440px wide screens), 14 columns
+//   - "uhd"  → 4K vertical (~2160px wide), 27 columns
+// Column counts keep the landscape px-per-column density: fhd landscape is
+// 24 cols per 1920px (~80px/col), so 1080px wide ≈ 14 cols and 2160px ≈ 27.
+const PORTRAIT_COLS: Record<string, number> = {
+  fhd: 14,
+  uhd: 27,
+};
+
+// Labels shown for the vertical tiers wherever a portrait preset/variant is
+// displayed. Landscape labels stay in PRESET_LABEL, unchanged.
+const PORTRAIT_PRESET_LABEL: Record<string, string> = {
+  fhd: "Standard",
+  uhd: "4K",
+};
+const PORTRAIT_PRESET_ORDER = ["fhd", "uhd"] as const;
+
+// Collapse any legacy preset onto its simplified vertical tier. compact/fhd/qhd
+// portrait all had near-identical real widths, so they map to the "fhd"
+// (Standard) tier; uhd keeps its own denser tier. This is also the back-compat
+// seam: previously saved "compact-portrait"/"qhd-portrait" variant keys resolve
+// to "fhd-portrait" (the server migrates stored tile rows the same way).
+function canonicalPortraitPreset(preset: string): string {
+  return preset === "uhd" ? "uhd" : "fhd";
+}
+
+// The column count for a preset in a given orientation. Landscape uses the
+// original PRESET_COLS (unchanged); portrait uses the simplified vertical tiers.
+function colsForPreset(preset: string, orientation: string): number {
+  if (orientation === "portrait") {
+    return PORTRAIT_COLS[canonicalPortraitPreset(preset)] ?? PORTRAIT_COLS["fhd"]!;
+  }
+  return PRESET_COLS[preset] ?? MIN_COLS;
+}
 
 // Width breakpoints (CSS px) that pick the fixed preset an adaptive page
 // resolves to. Chosen to sit between the widths the presets echo (compact
@@ -160,25 +200,36 @@ function resolveAdaptive(width: number, height: number): {
   orientation: string;
 } {
   const orientation = height > width ? "portrait" : "landscape";
-  // In portrait the long side still describes the screen class, so classify by
-  // the larger dimension rather than raw width.
-  const major = Math.max(width, height);
+  if (orientation === "portrait") {
+    // Vertical screens resolve to the simplified portrait tiers by their WIDTH
+    // (the short side): a ~2160px-wide 4K portrait panel gets the dense tier,
+    // everything narrower (1080p/2K portrait, both ~1080–1440px wide) gets the
+    // Standard tier.
+    const preset = width >= 1800 ? "uhd" : "fhd";
+    return { preset, orientation };
+  }
   const preset =
-    major >= 3200 ? "uhd" : major >= 2240 ? "qhd" : major >= 1600 ? "fhd" : "compact";
+    width >= 3200 ? "uhd" : width >= 2240 ? "qhd" : width >= 1600 ? "fhd" : "compact";
   return { preset, orientation };
 }
 
 function variantKey(preset: string, orientation: string): string {
-  return `${preset}-${orientation}`;
+  // Portrait variant keys are always canonical simplified tiers, so legacy
+  // presets never create (or read) a non-canonical portrait scope.
+  const p = orientation === "portrait" ? canonicalPortraitPreset(preset) : preset;
+  return `${p}-${orientation}`;
 }
 
-// Human label for a variant key, e.g. "fhd-landscape" → "1080p · Landscape".
+// Human label for a variant key, e.g. "fhd-landscape" → "1080p · Landscape",
+// "fhd-portrait" → "Standard · Vertical".
 function variantLabel(variant: string | null | undefined): string {
   if (!variant) return "Base layout";
   const [p, o] = variant.split("-");
-  const preset = PRESET_LABEL[p ?? ""] ?? p ?? "?";
-  const orient = o === "portrait" ? "Vertical" : "Landscape";
-  return `${preset} · ${orient}`;
+  const portrait = o === "portrait";
+  const preset = portrait
+    ? (PORTRAIT_PRESET_LABEL[canonicalPortraitPreset(p ?? "")] ?? p ?? "?")
+    : (PRESET_LABEL[p ?? ""] ?? p ?? "?");
+  return `${preset} · ${portrait ? "Vertical" : "Landscape"}`;
 }
 
 // A page is locked to a fixed layout when its preset is a known non-auto preset.
@@ -724,8 +775,10 @@ export default function Dashboard() {
     : orientation;
   const fixedLayout = isFixedPreset(effPreset);
 
+  // Portrait fixed pages use the simplified vertical column tiers (shaped by
+  // the screen's short side); landscape keeps the original preset columns.
   const cols = fixedLayout
-    ? PRESET_COLS[effPreset]!
+    ? colsForPreset(effPreset, effOrientation)
     : gridWidth !== null
       ? colsForWidth(gridWidth)
       : MIN_COLS;
@@ -1473,7 +1526,9 @@ export default function Dashboard() {
                           title="Lock this page to a fixed scale so tiles don't reflow on resize"
                         >
                           <MonitorSmartphone className="w-3.5 h-3.5" />
-                          {PRESET_LABEL[preset] ?? "Auto / responsive"}
+                          {!isAdaptive && fixedLayout && orientation === "portrait"
+                            ? (PORTRAIT_PRESET_LABEL[canonicalPortraitPreset(preset)] ?? "Standard")
+                            : (PRESET_LABEL[preset] ?? "Auto / responsive")}
                           {!isAdaptive && fixedLayout && (
                             <span className="text-muted-foreground">
                               · {orientation === "portrait" ? "Vertical" : "Landscape"}
@@ -1483,21 +1538,52 @@ export default function Dashboard() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="start" className="w-48">
                         <DropdownMenuLabel>Page scale</DropdownMenuLabel>
-                        <DropdownMenuRadioGroup
-                          value={preset}
-                          onValueChange={(v) => setPageLayout({ layoutPreset: v })}
-                        >
-                          {PRESET_ORDER.map((p) => (
-                            <DropdownMenuRadioItem key={p} value={p}>
-                              {PRESET_LABEL[p]}
-                            </DropdownMenuRadioItem>
-                          ))}
-                        </DropdownMenuRadioGroup>
+                        {/* Vertical pages offer the simplified portrait tiers
+                            only; landscape (and auto/adaptive) keep the full
+                            preset list. The radio value is canonicalized so a
+                            legacy compact/qhd portrait page highlights the
+                            tier it actually renders as. */}
+                        {!isAdaptive && fixedLayout && orientation === "portrait" ? (
+                          <DropdownMenuRadioGroup
+                            value={canonicalPortraitPreset(preset)}
+                            onValueChange={(v) => setPageLayout({ layoutPreset: v })}
+                          >
+                            {PORTRAIT_PRESET_ORDER.map((p) => (
+                              <DropdownMenuRadioItem key={p} value={p}>
+                                {PORTRAIT_PRESET_LABEL[p]}
+                              </DropdownMenuRadioItem>
+                            ))}
+                          </DropdownMenuRadioGroup>
+                        ) : (
+                          <DropdownMenuRadioGroup
+                            value={preset}
+                            onValueChange={(v) => setPageLayout({ layoutPreset: v })}
+                          >
+                            {PRESET_ORDER.map((p) => (
+                              <DropdownMenuRadioItem key={p} value={p}>
+                                {PRESET_LABEL[p]}
+                              </DropdownMenuRadioItem>
+                            ))}
+                          </DropdownMenuRadioGroup>
+                        )}
                         <DropdownMenuSeparator />
                         <DropdownMenuLabel>Orientation</DropdownMenuLabel>
                         <DropdownMenuRadioGroup
                           value={orientation}
-                          onValueChange={(v) => setPageLayout({ layoutOrientation: v })}
+                          onValueChange={(v) =>
+                            // Switching to vertical also snaps the stored
+                            // preset onto its simplified portrait tier so the
+                            // saved page always names a canonical vertical
+                            // option.
+                            setPageLayout(
+                              v === "portrait" && fixedLayout && !isAdaptive
+                                ? {
+                                    layoutOrientation: v,
+                                    layoutPreset: canonicalPortraitPreset(preset),
+                                  }
+                                : { layoutOrientation: v },
+                            )
+                          }
                         >
                           <DropdownMenuRadioItem
                             value="landscape"
@@ -1550,21 +1636,23 @@ export default function Dashboard() {
                             setEditVariantOverride(v === screenVariant ? null : v)
                           }
                         >
-                          {PRESET_ORDER.filter((p) => p in PRESET_COLS).flatMap((p) =>
-                            ORIENTATIONS.map((o) => {
-                              const key = variantKey(p, o);
-                              return (
-                                <DropdownMenuRadioItem key={key} value={key}>
-                                  {variantLabel(key)}
-                                  {key === screenVariant && (
-                                    <span className="ml-1 text-muted-foreground text-xs">
-                                      (this screen)
-                                    </span>
-                                  )}
-                                </DropdownMenuRadioItem>
-                              );
-                            }),
-                          )}
+                          {/* Landscape lists all four presets; vertical lists
+                              only the simplified portrait tiers. */}
+                          {[
+                            ...PRESET_ORDER.filter((p) => p in PRESET_COLS).map(
+                              (p) => variantKey(p, "landscape"),
+                            ),
+                            ...PORTRAIT_PRESET_ORDER.map((p) => variantKey(p, "portrait")),
+                          ].map((key) => (
+                            <DropdownMenuRadioItem key={key} value={key}>
+                              {variantLabel(key)}
+                              {key === screenVariant && (
+                                <span className="ml-1 text-muted-foreground text-xs">
+                                  (this screen)
+                                </span>
+                              )}
+                            </DropdownMenuRadioItem>
+                          ))}
                         </DropdownMenuRadioGroup>
                       </DropdownMenuContent>
                     </DropdownMenu>

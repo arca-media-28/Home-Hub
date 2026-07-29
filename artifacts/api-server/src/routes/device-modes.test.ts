@@ -207,7 +207,40 @@ describe("tile scoping by device mode and variant", () => {
     expect(saved.body[0].id).toBe(t1.id);
     expect(saved.body[0].gridX).toBe(3);
     expect(saved.body[0].integration).toBe("clock");
-    expect(saved.body[0].variant).toBe("qhd-portrait");
+    // Legacy portrait variants are aliased onto the simplified vertical tiers:
+    // "qhd-portrait" (and "compact-portrait") canonicalize to "fhd-portrait".
+    expect(saved.body[0].variant).toBe("fhd-portrait");
+  });
+
+  it("aliases legacy portrait variants to the simplified tiers on read and write", async () => {
+    const created = await request(app)
+      .post("/device-modes")
+      .set("x-user-id", "1")
+      .send({ name: "PortraitAlias" });
+    const modeId = created.body.id as number;
+
+    // Writing a tile under a legacy portrait key stores the canonical tier.
+    const legacy = await createTile({
+      deviceModeId: modeId,
+      variant: "compact-portrait",
+      name: "legacy",
+    });
+    expect(legacy.variant).toBe("fhd-portrait");
+
+    // Reading via either the legacy or the canonical key finds the same scope.
+    for (const v of ["compact-portrait", "qhd-portrait", "fhd-portrait"]) {
+      const list = await request(app)
+        .get(`/tiles?pageId=${pageId}&deviceModeId=${modeId}&variant=${v}`)
+        .set("x-user-id", "1");
+      expect(list.status).toBe(200);
+      expect(list.body.map((t: { id: number }) => t.id)).toEqual([legacy.id]);
+    }
+
+    // The 4K vertical tier is its own scope, untouched by the aliasing.
+    const uhd = await request(app)
+      .get(`/tiles?pageId=${pageId}&deviceModeId=${modeId}&variant=uhd-portrait`)
+      .set("x-user-id", "1");
+    expect(uhd.body).toHaveLength(0);
   });
 });
 

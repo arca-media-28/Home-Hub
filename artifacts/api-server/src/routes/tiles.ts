@@ -896,12 +896,25 @@ export function createImportedTile(
   );
 }
 
+// Portrait variants were simplified from four tiers to two: compact/fhd/qhd
+// portrait (near-identical real screen widths) collapsed into "fhd-portrait"
+// (the Standard vertical tier); "uhd-portrait" stays the dense 4K tier. Legacy
+// keys are aliased here so any read or write naming an old portrait scope
+// lands on its canonical tier (stored rows were migrated the same way in db.ts).
+const LEGACY_PORTRAIT_VARIANTS: Record<string, string> = {
+  "compact-portrait": "fhd-portrait",
+  "qhd-portrait": "fhd-portrait",
+};
+
 // Normalize an incoming variant value: a non-empty string is kept (trimmed,
-// capped), anything else means "the base layout" (NULL).
+// capped, legacy portrait keys canonicalized), anything else means "the base
+// layout" (NULL).
 export function cleanVariant(raw: unknown): string | null {
   if (typeof raw !== "string") return null;
   const trimmed = raw.trim();
-  return trimmed ? trimmed.slice(0, 40) : null;
+  if (!trimmed) return null;
+  const capped = trimmed.slice(0, 40);
+  return LEGACY_PORTRAIT_VARIANTS[capped] ?? capped;
 }
 
 // GET /api/tiles?pageId=&deviceModeId=&variant= — when a pageId is supplied,

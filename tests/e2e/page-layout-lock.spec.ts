@@ -136,10 +136,32 @@ test("a page can be locked to a fixed scale preset that survives reload and resi
     // The visible (scaled) width of the grid must fit within the wrapper's
     // clipping container — otherwise the sides are clipped.
     const containerWidth = (wrap.parentElement as HTMLElement).clientWidth;
-    return { visibleWidth: grid.offsetWidth * scaleX, containerWidth };
+    return {
+      visibleWidth: grid.offsetWidth * scaleX,
+      containerWidth,
+      gridIntrinsicWidth: grid.offsetWidth,
+    };
   });
   // Allow 1px of sub-pixel rounding slack.
   expect(portrait.visibleWidth).toBeLessThanOrEqual(portrait.containerWidth + 1);
+  // Vertical mode uses its own simplified column tiers shaped by the screen's
+  // SHORT side, so the portrait grid's intrinsic width must be substantially
+  // narrower than the landscape one (a tall narrow grid, not a squeezed-down
+  // wide layout). Standard vertical is 14 cols vs 24 for 1080p landscape.
+  expect(portrait.gridIntrinsicWidth).toBeLessThan(wide.gridIntrinsicWidth * 0.75);
+
+  // The layout trigger shows the simplified vertical tier label.
+  await page.getByRole("button", { name: /^Edit$/ }).click();
+  await expect(
+    page.getByRole("button", { name: /Standard.*Vertical/ }),
+  ).toBeVisible();
+  // The vertical page-scale menu offers only the simplified tiers.
+  await page.getByRole("button", { name: /Standard.*Vertical/ }).click();
+  await expect(page.getByRole("menuitemradio", { name: /^Standard$/ })).toBeVisible();
+  await expect(page.getByRole("menuitemradio", { name: /^4K$/ })).toBeVisible();
+  await expect(page.getByRole("menuitemradio", { name: /^2K$/ })).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: /^Done$/ }).click();
 
   // --- A dense preset wider than the viewport must NOT collapse --------------
   // Switch to the 4K (densest) preset on a narrow viewport so the fixed canvas

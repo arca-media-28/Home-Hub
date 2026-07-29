@@ -7,6 +7,9 @@ description: How fixed-column pages are rendered via CSS transform scaling, and 
 
 A dashboard page carries a `layoutPreset` (auto/compact/fhd/qhd/uhd → fixed column count) and `layoutOrientation` (landscape/portrait). Fixed presets render the grid at a locked intrinsic pixel width (`COL_WIDTH*cols + GRID_MARGIN*(cols-1)`) and CSS-scale it to fit; auto keeps the responsive `colsForWidth` behavior.
 
+## Portrait uses simplified column tiers (NOT the landscape cols)
+Portrait grids are shaped by the screen's SHORT side: only two vertical tiers exist — `fhd`=14 cols ("Standard", ~1080–1440px wide) and `uhd`=27 cols ("4K"), via `PORTRAIT_COLS`/`colsForPreset(preset, orientation)`. `canonicalPortraitPreset` collapses compact/qhd→fhd; `variantKey` canonicalizes portrait keys so non-canonical portrait scopes are never created. Adaptive portrait resolves by width (≥1800→uhd). Back-compat: server `cleanVariant` aliases `compact-portrait`/`qhd-portrait`→`fhd-portrait` on read+write, and a one-time db.ts migration (PRAGMA user_version 2) renamed legacy portrait tile rows per scope (qhd preferred, never overwriting an existing canonical scope). **Why:** portrait previously reused landscape cols, so a vertical screen just showed a shrunk landscape grid.
+
 ## Three render branches (do not collapse them)
 - **auto**: render the grid directly (responsive, today's behavior).
 - **fixed + edit mode**: render at full intrinsic size, NO scale, `overflow-x-auto`. Scaling is disabled in edit mode so react-grid-layout's drag/resize pointer math stays in document coordinates.

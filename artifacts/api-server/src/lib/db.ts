@@ -335,6 +335,57 @@ const backfillModes = db.transaction(() => {
 });
 backfillModes();
 
+// 1l. Simplified portrait variants. Vertical layouts used to mirror all four
+//     landscape tiers ("compact-portrait" … "uhd-portrait") even though most
+//     portrait screens are ~1080–1440px wide; the client now uses only two
+//     canonical vertical tiers: "fhd-portrait" (Standard) and "uhd-portrait"
+//     (4K). Migrate stored tile rows so no saved vertical layout is silently
+//     lost: within each (user, page, device mode) scope, legacy
+//     "qhd-portrait" (preferred, denser/likelier hand-tuned) then
+//     "compact-portrait" rows are renamed to "fhd-portrait" — but only when
+//     that scope has no "fhd-portrait" tiles yet, so an existing canonical
+//     layout is never merged into or overwritten. Any legacy rows left behind
+//     (because a canonical layout already existed) are kept in the DB
+//     untouched. Guarded by PRAGMA user_version so it runs exactly once.
+const portraitVariantVersion = db.pragma("user_version", { simple: true }) as number;
+if (portraitVariantVersion < 2) {
+  // Precompute the promotion plan first (a correlated NOT EXISTS inside the
+  // UPDATE could observe rows renamed earlier by the same statement and stop
+  // promoting a scope halfway through, splitting one saved layout in two).
+  const legacyScopes = db
+    .prepare(
+      `SELECT DISTINCT user_id, page_id, device_mode_id, variant FROM tiles
+       WHERE variant IN ('qhd-portrait', 'compact-portrait')`
+    )
+    .all() as {
+    user_id: number;
+    page_id: number | null;
+    device_mode_id: number | null;
+    variant: string;
+  }[];
+  const hasCanonical = db.prepare(
+    `SELECT 1 FROM tiles
+     WHERE user_id = ? AND page_id IS ? AND device_mode_id IS ?
+       AND variant = 'fhd-portrait' LIMIT 1`
+  );
+  const renameScope = db.prepare(
+    `UPDATE tiles SET variant = 'fhd-portrait'
+     WHERE user_id = ? AND page_id IS ? AND device_mode_id IS ? AND variant = ?`
+  );
+  const promoteLegacyPortrait = db.transaction(() => {
+    // qhd before compact so the denser legacy layout wins when both exist.
+    const ordered = [...legacyScopes].sort((a, b) =>
+      a.variant === b.variant ? 0 : a.variant === "qhd-portrait" ? -1 : 1
+    );
+    for (const s of ordered) {
+      if (hasCanonical.get(s.user_id, s.page_id, s.device_mode_id)) continue;
+      renameScope.run(s.user_id, s.page_id, s.device_mode_id, s.variant);
+    }
+  });
+  promoteLegacyPortrait();
+  db.pragma("user_version = 2");
+}
+
 // 2. One-time data migration: existing integration-typed tiles become app/link
 //    tiles whose `integration` carries the old type. Styling fields are left
 //    untouched. After this runs `type` is 'app' so it never matches again.
