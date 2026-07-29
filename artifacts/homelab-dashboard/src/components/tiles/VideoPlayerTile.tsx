@@ -15,6 +15,7 @@ import {
   Play,
   RotateCcw,
   SkipBack,
+  RotateCw,
   SkipForward,
   Tv,
   VideoOff,
@@ -526,6 +527,10 @@ export default function VideoPlayerTile({
   // explicit error state as a failed playlist fetch (never the yule log).
   const [mediaFailed, setMediaFailed] = useState(false);
   useEffect(() => setMediaFailed(false), [videos]);
+  // Bumped by the error-state "Retry" button; re-runs the HLS attach effect
+  // so a stalled/dead live stream gets a fresh hls.js instance re-tuned to
+  // the same channel without the user having to reopen the channel picker.
+  const [hlsRetryNonce, setHlsRetryNonce] = useState(0);
   const [muted, setMuted] = useState(savedRef.current?.muted ?? startMuted);
   // Playlist pop-out: a scrollable list of all entries (in play order) with
   // the current one highlighted; clicking an entry jumps straight to it.
@@ -663,12 +668,34 @@ export default function VideoPlayerTile({
         return;
       }
       hls = new Hls({ liveDurationInfinity: true });
+      // Recoverable-error handling: hls.js flags errors as fatal when it has
+      // given up retrying internally, but many of those are still salvageable
+      // — a network blip or server restart can be resumed with startLoad(),
+      // and a decode hiccup with recoverMediaError(). Attempt a bounded
+      // number of recoveries per error type before surfacing the explicit
+      // error state; a healthy buffered fragment resets the budget so a
+      // long-running live stream can survive repeated (spaced-out) stalls.
+      let networkRecoveries = 0;
+      let mediaRecoveries = 0;
+      hls.on(Hls.Events.FRAG_BUFFERED, () => {
+        networkRecoveries = 0;
+        mediaRecoveries = 0;
+      });
       hls.on(Hls.Events.ERROR, (_event, data) => {
-        if (data.fatal) {
-          if (!demo) setMediaFailed(true);
-          hls?.destroy();
-          hls = null;
+        if (!data.fatal || !hls) return;
+        if (data.type === Hls.ErrorTypes.NETWORK_ERROR && networkRecoveries < 3) {
+          networkRecoveries += 1;
+          hls.startLoad();
+          return;
         }
+        if (data.type === Hls.ErrorTypes.MEDIA_ERROR && mediaRecoveries < 3) {
+          mediaRecoveries += 1;
+          hls.recoverMediaError();
+          return;
+        }
+        if (!demo) setMediaFailed(true);
+        hls.destroy();
+        hls = null;
       });
       hls.loadSource(currentUrl);
       hls.attachMedia(el);
@@ -678,7 +705,7 @@ export default function VideoPlayerTile({
       hls?.destroy();
       hls = null;
     };
-  }, [currentUrl, isHlsUrl, nativeHls, demo]);
+  }, [currentUrl, isHlsUrl, nativeHls, demo, hlsRetryNonce]);
 
   const loopSingle = playMode === "single" || demo || count === 1;
 
@@ -786,6 +813,21 @@ export default function VideoPlayerTile({
         <span>
           {mediaFailed ? "Video failed to load" : "Videos unavailable"}
         </span>
+        {mediaFailed && (
+          <button
+            type="button"
+            data-testid="videoplayer-retry"
+            onClick={() => {
+              setMediaFailed(false);
+              setHlsRetryNonce((n) => n + 1);
+              setPlaying(true);
+            }}
+            className="mt-1 flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs text-foreground hover:bg-accent"
+          >
+            <RotateCw className="w-3 h-3" />
+            Retry
+          </button>
+        )}
       </div>
     );
   } else if (source === "youtube") {
