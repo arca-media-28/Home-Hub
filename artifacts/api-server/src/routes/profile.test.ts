@@ -209,6 +209,21 @@ describe("profile import", () => {
     expect(res.body.error).toMatch(/pages export/i);
   });
 
+  it("rejects an encrypted export with a message pointing at the Settings page", async () => {
+    const res = await request(app)
+      .post("/profile/import")
+      .set("x-user-id", "2")
+      .send({
+        format: "tachboard-profile-encrypted",
+        version: 1,
+        kdf: { name: "PBKDF2", hash: "SHA-256", iterations: 310000, salt: "AAAA" },
+        cipher: { name: "AES-GCM", iv: "AAAA" },
+        ciphertext: "AAAA",
+      });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/passphrase/i);
+  });
+
   it("rejects malformed files and wrong versions without creating anything", async () => {
     const before = pageStmts.findAllByUser.all(2).length;
     for (const payload of [

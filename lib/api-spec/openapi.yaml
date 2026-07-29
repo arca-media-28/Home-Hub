@@ -584,6 +584,11 @@ paths:
       operationId: importProfile
       tags: [profile]
       summary: Recreate a full profile from a previously exported envelope
+      description: |
+        Accepts only the plain "tachboard-profile" envelope. Passphrase-encrypted
+        exports (format "tachboard-profile-encrypted") are decrypted client-side
+        in the Settings page before being posted here; sending one directly
+        returns a 400 explaining that.
       security:
         - bearerAuth: []
       requestBody:

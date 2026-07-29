@@ -91,6 +91,13 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { groupByCategory } from "@/lib/integrationCategories";
 import {
+  encryptProfileFile,
+  decryptProfileFile,
+  isEncryptedProfileFile,
+  ProfileDecryptError,
+  type EncryptedProfileFile,
+} from "@/lib/profileCrypto";
+import {
   THEME_KEY,
   readSavedColors,
   persistTheme,
@@ -1994,10 +2001,17 @@ function ProfileSection() {
 
   const [exportOpen, setExportOpen] = useState(false);
   const [includeConnections, setIncludeConnections] = useState(false);
+  const [exportPassphrase, setExportPassphrase] = useState("");
   const [exporting, setExporting] = useState(false);
 
   const [pendingFile, setPendingFile] = useState<ProfileFile | null>(null);
   const [importMode, setImportMode] = useState<"merge" | "replace">("merge");
+
+  // Set when the selected file is an encrypted export awaiting a passphrase.
+  const [lockedFile, setLockedFile] = useState<EncryptedProfileFile | null>(null);
+  const [importPassphrase, setImportPassphrase] = useState("");
+  const [decrypting, setDecrypting] = useState(false);
+  const [decryptError, setDecryptError] = useState<string | null>(null);
 
   const importProfile = useImportProfile({
     mutation: {
@@ -2037,7 +2051,11 @@ function ProfileSection() {
         includeConnections ? { includeConnections: true } : undefined,
       );
       const file: ProfileFile = { ...data, theme: collectThemeBundle() };
-      const blob = new Blob([JSON.stringify(file, null, 2)], {
+      const passphrase = includeConnections ? exportPassphrase.trim() : "";
+      const payload = passphrase
+        ? await encryptProfileFile(JSON.stringify(file), passphrase)
+        : file;
+      const blob = new Blob([JSON.stringify(payload, null, 2)], {
         type: "application/json",
       });
       const href = URL.createObjectURL(blob);
@@ -2049,7 +2067,10 @@ function ProfileSection() {
       a.remove();
       URL.revokeObjectURL(href);
       setExportOpen(false);
-      toast({ title: "Profile exported" });
+      setExportPassphrase("");
+      toast({
+        title: passphrase ? "Encrypted profile exported" : "Profile exported",
+      });
     } catch (err) {
       toast({
         title: "Export failed",
@@ -2061,22 +2082,8 @@ function ProfileSection() {
     }
   }
 
-  async function handleImportFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    // Reset the input so re-selecting the same file re-fires the change event.
-    e.target.value = "";
-    if (!file) return;
-    let parsed: ProfileFile;
-    try {
-      parsed = JSON.parse(await file.text()) as ProfileFile;
-    } catch {
-      toast({
-        title: "Import failed",
-        description: "That file isn't valid JSON.",
-        variant: "destructive",
-      });
-      return;
-    }
+  // Validate a decrypted/plain parsed file and open the import dialog.
+  function acceptPlainFile(parsed: ProfileFile) {
     if (parsed?.format === "homelab-dashboard-pages") {
       toast({
         title: "That's a pages export",
@@ -2096,6 +2103,59 @@ function ProfileSection() {
     }
     setImportMode("merge");
     setPendingFile(parsed);
+  }
+
+  async function handleImportFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    // Reset the input so re-selecting the same file re-fires the change event.
+    e.target.value = "";
+    if (!file) return;
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(await file.text());
+    } catch {
+      toast({
+        title: "Import failed",
+        description: "That file isn't valid JSON.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (isEncryptedProfileFile(parsed)) {
+      // Encrypted export: ask for the passphrase before anything else.
+      setImportPassphrase("");
+      setDecryptError(null);
+      setLockedFile(parsed);
+      return;
+    }
+    acceptPlainFile(parsed as ProfileFile);
+  }
+
+  async function handleDecrypt() {
+    if (!lockedFile) return;
+    setDecrypting(true);
+    setDecryptError(null);
+    try {
+      const plainJson = await decryptProfileFile(lockedFile, importPassphrase);
+      let parsed: ProfileFile;
+      try {
+        parsed = JSON.parse(plainJson) as ProfileFile;
+      } catch {
+        setDecryptError("The decrypted file isn't valid JSON.");
+        return;
+      }
+      setLockedFile(null);
+      setImportPassphrase("");
+      acceptPlainFile(parsed);
+    } catch (err) {
+      setDecryptError(
+        err instanceof ProfileDecryptError
+          ? err.message
+          : "Could not decrypt this file.",
+      );
+    } finally {
+      setDecrypting(false);
+    }
   }
 
   function confirmImport() {
@@ -2179,9 +2239,31 @@ function ProfileSection() {
             </span>
           </label>
           {includeConnections && (
-            <div className="flex items-start gap-2 text-xs text-destructive">
-              <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-              The exported file will contain credentials in plain text.
+            <div className="space-y-2">
+              <Label htmlFor="export-passphrase" className="text-sm">
+                Passphrase <span className="text-muted-foreground">(recommended)</span>
+              </Label>
+              <Input
+                id="export-passphrase"
+                type="password"
+                autoComplete="new-password"
+                placeholder="Encrypt the file with a passphrase"
+                value={exportPassphrase}
+                onChange={(e) => setExportPassphrase(e.target.value)}
+                data-testid="input-export-passphrase"
+              />
+              {exportPassphrase.trim() ? (
+                <p className="text-xs text-muted-foreground">
+                  The file will be encrypted. You'll need this passphrase to import
+                  it — it can't be recovered if lost.
+                </p>
+              ) : (
+                <div className="flex items-start gap-2 text-xs text-destructive">
+                  <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                  Without a passphrase, the exported file will contain credentials
+                  in plain text.
+                </div>
+              )}
             </div>
           )}
           <DialogFooter>
@@ -2196,6 +2278,75 @@ function ProfileSection() {
             >
               {exporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
               Download
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Passphrase prompt for encrypted export files. */}
+      <Dialog
+        open={lockedFile !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setLockedFile(null);
+            setImportPassphrase("");
+            setDecryptError(null);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Encrypted profile file</DialogTitle>
+            <DialogDescription>
+              This export is protected. Enter the passphrase it was exported with
+              to unlock it.
+            </DialogDescription>
+          </DialogHeader>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              void handleDecrypt();
+            }}
+            className="space-y-2"
+          >
+            <Label htmlFor="import-passphrase" className="text-sm">
+              Passphrase
+            </Label>
+            <Input
+              id="import-passphrase"
+              type="password"
+              autoComplete="off"
+              autoFocus
+              value={importPassphrase}
+              onChange={(e) => setImportPassphrase(e.target.value)}
+              data-testid="input-import-passphrase"
+            />
+            {decryptError && (
+              <p className="text-xs text-destructive" data-testid="text-decrypt-error">
+                {decryptError}
+              </p>
+            )}
+          </form>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setLockedFile(null);
+                setImportPassphrase("");
+                setDecryptError(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => void handleDecrypt()}
+              disabled={decrypting || !importPassphrase}
+              data-testid="button-confirm-decrypt"
+            >
+              {decrypting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+              Unlock
             </Button>
           </DialogFooter>
         </DialogContent>

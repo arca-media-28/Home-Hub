@@ -25,6 +25,10 @@ const router = Router();
 // receives the other kind of file.
 const PROFILE_FORMAT = "tachboard-profile";
 const PAGES_FORMAT = "homelab-dashboard-pages";
+// Passphrase-encrypted exports are decrypted in the browser before import;
+// the server only knows the format name so it can give a clear error if one
+// is posted directly (e.g. via curl).
+const ENCRYPTED_FORMAT = "tachboard-profile-encrypted";
 const PROFILE_VERSION = 1;
 
 // Service keys are free-form strings ("plex", "gmail", "imap", …) but must be
@@ -80,6 +84,13 @@ router.post("/import", requireAuth, (req: AuthRequest, res) => {
   // A pages-only export is a valid file, just for the other flow — say so
   // clearly instead of a generic "invalid file" error.
   const rawFormat = (req.body as { format?: unknown } | null)?.format;
+  if (rawFormat === ENCRYPTED_FORMAT) {
+    res.status(400).json({
+      error:
+        "This profile export is passphrase-protected. Import it through the Settings page, which will ask for the passphrase and decrypt it.",
+    });
+    return;
+  }
   if (rawFormat === PAGES_FORMAT) {
     res.status(400).json({
       error:
