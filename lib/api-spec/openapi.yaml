@@ -5191,6 +5191,12 @@ components:
         nowPlaying:
           description: What's airing right now per the XMLTV guide. Null when unknown.
           type: ["string", "null"]
+        upNextTitle:
+          description: The next programme's title per the XMLTV guide. Null when unknown.
+          type: ["string", "null"]
+        upNextStart:
+          description: ISO 8601 start time of the next programme. Null when unknown.
+          type: ["string", "null"]
         streamUrl:
           description: >-
             Same-origin HLS playlist path (through the api-server's ErsatzTV

@@ -2203,6 +2203,16 @@ export interface ErsatzPlayableChannel {
      */
   nowPlaying?: string | null;
   /**
+     * The next programme's title per the XMLTV guide. Null when unknown.
+     * @nullable
+     */
+  upNextTitle?: string | null;
+  /**
+     * ISO 8601 start time of the next programme. Null when unknown.
+     * @nullable
+     */
+  upNextStart?: string | null;
+  /**
      * Same-origin HLS playlist path (through the api-server's ErsatzTV stream proxy) the tile can play. The client appends its auth token as a query parameter. Null for sample channels.
      * @nullable
      */

@@ -88,10 +88,18 @@ function xmltvAround(now: number): string {
     const p = (n: number, w = 2) => String(n).padStart(w, "0");
     return `${d.getUTCFullYear()}${p(d.getUTCMonth() + 1)}${p(d.getUTCDate())}${p(d.getUTCHours())}${p(d.getUTCMinutes())}${p(d.getUTCSeconds())} +0000`;
   };
+  // Includes two future programmes on channel 1 listed out of order to prove
+  // "up next" picks the earliest upcoming start, not the first in the feed.
   return `<?xml version="1.0"?>
 <tv>
   <programme start="${fmt(now - 60_000)}" stop="${fmt(now + 60_000)}" channel="1">
     <title>The Maltese Falcon</title>
+  </programme>
+  <programme start="${fmt(now + 120_000)}" stop="${fmt(now + 180_000)}" channel="1">
+    <title>Later Feature</title>
+  </programme>
+  <programme start="${fmt(now + 60_000)}" stop="${fmt(now + 120_000)}" channel="1">
+    <title>Casablanca</title>
   </programme>
 </tv>`;
 }
@@ -131,9 +139,17 @@ describe("GET /api/widgets/ersatztv/channels", () => {
       number: "1",
       name: "Movies",
       nowPlaying: "The Maltese Falcon",
+      upNextTitle: "Casablanca",
       streamUrl: "/api/widgets/ersatztv/stream/iptv/channel/1.m3u8",
     });
+    // Up-next start is the earliest future programme, serialized as ISO 8601.
+    const upNextMs = Date.parse(ch1.upNextStart);
+    expect(Number.isNaN(upNextMs)).toBe(false);
+    expect(upNextMs).toBeGreaterThan(Date.now());
+    expect(upNextMs).toBeLessThan(Date.now() + 90_000);
     expect(ch2.nowPlaying).toBeNull();
+    expect(ch2.upNextTitle).toBeNull();
+    expect(ch2.upNextStart).toBeNull();
     expect(ch2.streamUrl).toBe("/api/widgets/ersatztv/stream/iptv/channel/2.m3u8");
   });
 

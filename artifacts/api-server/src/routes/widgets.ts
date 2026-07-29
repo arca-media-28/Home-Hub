@@ -4861,11 +4861,19 @@ function parseXmltvTime(value: string): number {
   return new Date(iso).getTime();
 }
 
-// Build a map of channelId → currently-airing programme title from an XMLTV
-// document. A programme is "now playing" when start ≤ now < stop. Earlier
-// matches win, but normally only one programme covers a given instant.
-function parseXmltvNowPlaying(xml: string, nowMs: number): Map<string, string> {
-  const nowPlaying = new Map<string, string>();
+// Per-channel guide info parsed from an XMLTV document: what's airing right
+// now plus the next upcoming programme (title + ISO start time).
+interface ErsatzGuideEntry {
+  nowPlaying?: string;
+  upNextTitle?: string;
+  upNextStart?: number;
+}
+
+// Build a map of channelId → guide entry from an XMLTV document. A programme
+// is "now playing" when start ≤ now < stop; "up next" is the future programme
+// with the earliest start time (programmes need not be ordered in the feed).
+function parseXmltvGuide(xml: string, nowMs: number): Map<string, ErsatzGuideEntry> {
+  const guide = new Map<string, ErsatzGuideEntry>();
   const programmeRe = /<programme\b([^>]*)>([\s\S]*?)<\/programme>/g;
   let match: RegExpExecArray | null;
   while ((match = programmeRe.exec(xml)) !== null) {
@@ -4875,18 +4883,26 @@ function parseXmltvNowPlaying(xml: string, nowMs: number): Map<string, string> {
     const startRaw = attrs.match(/start="([^"]*)"/)?.[1];
     const stopRaw = attrs.match(/stop="([^"]*)"/)?.[1];
     if (!channel || !startRaw || !stopRaw) continue;
-    if (nowPlaying.has(channel)) continue;
     const start = parseXmltvTime(startRaw);
     const stop = parseXmltvTime(stopRaw);
     if (Number.isNaN(start) || Number.isNaN(stop)) continue;
-    if (nowMs < start || nowMs >= stop) continue;
     const rawTitle = body
       .match(/<title\b[^>]*>([\s\S]*?)<\/title>/)?.[1]
       ?.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/, "$1");
     const title = rawTitle ? decodeXmlEntities(rawTitle).trim() : undefined;
-    if (title) nowPlaying.set(channel, title);
+    if (!title) continue;
+    const entry = guide.get(channel) ?? {};
+    if (nowMs >= start && nowMs < stop) {
+      if (entry.nowPlaying === undefined) entry.nowPlaying = title;
+    } else if (start > nowMs) {
+      if (entry.upNextStart === undefined || start < entry.upNextStart) {
+        entry.upNextTitle = title;
+        entry.upNextStart = start;
+      }
+    }
+    guide.set(channel, entry);
   }
-  return nowPlaying;
+  return guide;
 }
 
 // Fetch the live active-stream count from ErsatzTV's /api/sessions endpoint,
@@ -4944,15 +4960,18 @@ router.get("/ersatztv", requireAuth, async (req: AuthRequest, res) => {
     ]);
 
     const channelList = parseM3uChannels(String(channelsRes.data ?? ""));
-    const nowPlaying = parseXmltvNowPlaying(String(guideRes.data ?? ""), Date.now());
+    const guide = parseXmltvGuide(String(guideRes.data ?? ""), Date.now());
 
-    const channels = channelList.map((c) => ({
-      number: c.number,
-      name: c.name,
+    const channels = channelList.map((c) => {
       // Match the guide by tvg-id, falling back to channel number (ErsatzTV
       // keys XMLTV channels by their number when no explicit id is set).
-      nowPlaying: nowPlaying.get(c.tvgId) ?? nowPlaying.get(c.number) ?? null,
-    }));
+      const entry = guide.get(c.tvgId) ?? guide.get(c.number);
+      return {
+        number: c.number,
+        name: c.name,
+        nowPlaying: entry?.nowPlaying ?? null,
+      };
+    });
 
     res.json({ reachable: true, activeStreams, channels });
   } catch (err) {
@@ -5051,9 +5070,9 @@ router.get("/ersatztv/channels", requireAuth, async (req: AuthRequest, res) => {
     res.json({
       sample: true,
       channels: [
-        { number: "1", name: "Movies 24/7", nowPlaying: "The Maltese Falcon", streamUrl: null },
-        { number: "2", name: "Retro Cartoons", nowPlaying: "Looney Tunes", streamUrl: null },
-        { number: "3", name: "Nature Documentaries", nowPlaying: "Planet Earth: Jungles", streamUrl: null },
+        { number: "1", name: "Movies 24/7", nowPlaying: "The Maltese Falcon", upNextTitle: "Casablanca", upNextStart: new Date(Date.now() + 45 * 60_000).toISOString(), streamUrl: null },
+        { number: "2", name: "Retro Cartoons", nowPlaying: "Looney Tunes", upNextTitle: "Tom and Jerry", upNextStart: new Date(Date.now() + 20 * 60_000).toISOString(), streamUrl: null },
+        { number: "3", name: "Nature Documentaries", nowPlaying: "Planet Earth: Jungles", upNextTitle: "Blue Planet: Coasts", upNextStart: new Date(Date.now() + 30 * 60_000).toISOString(), streamUrl: null },
       ],
     });
     return;
@@ -5064,13 +5083,21 @@ router.get("/ersatztv/channels", requireAuth, async (req: AuthRequest, res) => {
       httpClient.get(`${base}/iptv/xmltv.xml`, { responseType: "text" }),
     ]);
     const channelList = parseM3uChannels(String(channelsRes.data ?? ""));
-    const nowPlaying = parseXmltvNowPlaying(String(guideRes.data ?? ""), Date.now());
-    const channels = channelList.map((c) => ({
-      number: c.number,
-      name: c.name,
-      nowPlaying: nowPlaying.get(c.tvgId) ?? nowPlaying.get(c.number) ?? null,
-      streamUrl: `${ERSATZ_STREAM_PREFIX}/iptv/channel/${encodeURIComponent(c.number)}.m3u8`,
-    }));
+    const guide = parseXmltvGuide(String(guideRes.data ?? ""), Date.now());
+    const channels = channelList.map((c) => {
+      const entry = guide.get(c.tvgId) ?? guide.get(c.number);
+      return {
+        number: c.number,
+        name: c.name,
+        nowPlaying: entry?.nowPlaying ?? null,
+        upNextTitle: entry?.upNextTitle ?? null,
+        upNextStart:
+          entry?.upNextStart != null
+            ? new Date(entry.upNextStart).toISOString()
+            : null,
+        streamUrl: `${ERSATZ_STREAM_PREFIX}/iptv/channel/${encodeURIComponent(c.number)}.m3u8`,
+      };
+    });
     res.json({ sample: false, channels });
   } catch (err) {
     logger.error({ reason: normalizeHttpError(err) }, "ErsatzTV channel lineup error");

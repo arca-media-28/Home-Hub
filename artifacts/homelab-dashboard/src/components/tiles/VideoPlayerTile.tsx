@@ -111,6 +111,18 @@ function shuffled<T>(list: T[]): T[] {
   return out;
 }
 
+// Format an ISO timestamp as a short local wall-clock time (e.g. "8:30 PM")
+// for the "Up next" line. Returns null when the value is missing/unparseable.
+export function formatGuideTime(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const ms = Date.parse(iso);
+  if (Number.isNaN(ms)) return null;
+  return new Date(ms).toLocaleTimeString(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
 // mm:ss (or h:mm:ss) for the seek bar's time labels.
 export function formatClock(seconds: number): string {
   if (!Number.isFinite(seconds) || seconds < 0) return "0:00";
@@ -306,6 +318,14 @@ export default function VideoPlayerTile({
     [ersatzQuery.data],
   );
   const tunedChannel = s.videoErsatzChannel ?? null;
+  // The full channel record for whatever is currently tuned (falling back to
+  // the first channel, mirroring the playlist resolution below) so the
+  // overlay can show its up-next info.
+  const tunedErsatz = isErsatz
+    ? (ersatzChannels.find((c) => c.number === tunedChannel) ??
+      ersatzChannels[0] ??
+      null)
+    : null;
 
   // Persist a channel change through the normal tile-update flow so the
   // tuned channel survives page switches and reloads (same reconcile
@@ -945,12 +965,24 @@ export default function VideoPlayerTile({
                       ) : (
                         <span className="w-3 shrink-0" />
                       )}
-                      <span className="min-w-0 flex-1 truncate">
-                        {channel.name}
-                        {channel.nowPlaying && (
-                          <span className="text-white/45">
-                            {" "}
-                            — {channel.nowPlaying}
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate">
+                          {channel.name}
+                          {channel.nowPlaying && (
+                            <span className="text-white/45">
+                              {" "}
+                              — {channel.nowPlaying}
+                            </span>
+                          )}
+                        </span>
+                        {channel.upNextTitle && (
+                          <span
+                            className="block truncate text-[10px] text-white/40"
+                            data-testid="videoplayer-channel-upnext"
+                          >
+                            Up next: {channel.upNextTitle}
+                            {formatGuideTime(channel.upNextStart) &&
+                              ` · ${formatGuideTime(channel.upNextStart)}`}
                           </span>
                         )}
                       </span>
@@ -1183,8 +1215,20 @@ export default function VideoPlayerTile({
                 className="h-1 w-16 accent-white/90"
               />
               {current && !demo && (
-                <span className="ml-auto max-w-[45%] truncate text-[10px] text-white/80">
-                  {current.title}
+                <span className="ml-auto flex max-w-[45%] min-w-0 flex-col items-end">
+                  <span className="max-w-full truncate text-[10px] text-white/80">
+                    {current.title}
+                  </span>
+                  {isErsatz && tunedErsatz?.upNextTitle && (
+                    <span
+                      className="max-w-full truncate text-[9px] text-white/55"
+                      data-testid="videoplayer-upnext"
+                    >
+                      Up next: {tunedErsatz.upNextTitle}
+                      {formatGuideTime(tunedErsatz.upNextStart) &&
+                        ` · ${formatGuideTime(tunedErsatz.upNextStart)}`}
+                    </span>
+                  )}
                 </span>
               )}
             </div>
