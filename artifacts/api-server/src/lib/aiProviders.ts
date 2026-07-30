@@ -59,6 +59,7 @@ interface ProviderAdapter {
     model: string,
     messages: ChatMessage[],
     onDelta: StreamDelta,
+    signal?: AbortSignal,
   ): Promise<string>;
   listModels(creds: Creds): Promise<string[]>;
   // Cheap key/connectivity check; throws on failure.
@@ -139,7 +140,7 @@ const openai: ProviderAdapter = {
     if (typeof text !== "string") throw new Error("OpenAI returned no reply text");
     return text;
   },
-  async chatStream({ apiKey }, model, messages, onDelta) {
+  async chatStream({ apiKey }, model, messages, onDelta, signal) {
     const r = await cloudHttpClient.post(
       "https://api.openai.com/v1/chat/completions",
       { model, messages, stream: true },
@@ -147,6 +148,7 @@ const openai: ProviderAdapter = {
         headers: { Authorization: `Bearer ${apiKey}`, Accept: "text/event-stream" },
         timeout: CHAT_TIMEOUT,
         responseType: "stream",
+        ...(signal ? { signal } : {}),
       },
     );
     const text = await consumeJsonStream(r.data, extractOpenAiDelta, onDelta);
@@ -190,7 +192,7 @@ const gemini: ProviderAdapter = {
     if (!text) throw new Error("Gemini returned no reply text");
     return text;
   },
-  async chatStream({ apiKey }, model, messages, onDelta) {
+  async chatStream({ apiKey }, model, messages, onDelta, signal) {
     const contents = messages.map((m) => ({
       role: m.role === "assistant" ? "model" : "user",
       parts: [{ text: m.content }],
@@ -202,6 +204,7 @@ const gemini: ProviderAdapter = {
         headers: { "x-goog-api-key": apiKey, Accept: "text/event-stream" },
         timeout: CHAT_TIMEOUT,
         responseType: "stream",
+        ...(signal ? { signal } : {}),
       },
     );
     const text = await consumeJsonStream(
@@ -261,7 +264,7 @@ const anthropic: ProviderAdapter = {
     if (!text) throw new Error("Claude returned no reply text");
     return text;
   },
-  async chatStream({ apiKey }, model, messages, onDelta) {
+  async chatStream({ apiKey }, model, messages, onDelta, signal) {
     const r = await cloudHttpClient.post(
       "https://api.anthropic.com/v1/messages",
       { model, max_tokens: 1024, messages, stream: true },
@@ -273,6 +276,7 @@ const anthropic: ProviderAdapter = {
         },
         timeout: CHAT_TIMEOUT,
         responseType: "stream",
+        ...(signal ? { signal } : {}),
       },
     );
     const text = await consumeJsonStream(
@@ -337,12 +341,12 @@ const ollama: ProviderAdapter = {
     if (typeof text !== "string" || !text) throw new Error("Ollama returned no reply text");
     return text;
   },
-  async chatStream(creds, model, messages, onDelta) {
+  async chatStream(creds, model, messages, onDelta, signal) {
     const base = requireBaseUrl(creds);
     const r = await httpClient.post(
       `${base}/api/chat`,
       { model, messages, stream: true },
-      { timeout: CHAT_TIMEOUT, responseType: "stream" },
+      { timeout: CHAT_TIMEOUT, responseType: "stream", ...(signal ? { signal } : {}) },
     );
     // Ollama streams NDJSON: {"message":{"content":"…"},"done":false} per line.
     const text = await consumeJsonStream(
@@ -390,7 +394,7 @@ const openaiCompatible: ProviderAdapter = {
       throw new Error("The local AI server returned no reply text");
     return text;
   },
-  async chatStream(creds, model, messages, onDelta) {
+  async chatStream(creds, model, messages, onDelta, signal) {
     const base = requireBaseUrl(creds);
     const r = await httpClient.post(
       `${base}/v1/chat/completions`,
@@ -402,6 +406,7 @@ const openaiCompatible: ProviderAdapter = {
         },
         timeout: CHAT_TIMEOUT,
         responseType: "stream",
+        ...(signal ? { signal } : {}),
       },
     );
     const text = await consumeJsonStream(r.data, extractOpenAiDelta, onDelta);
@@ -458,8 +463,9 @@ export async function aiChatStream(
   model: string,
   messages: ChatMessage[],
   onDelta: StreamDelta,
+  signal?: AbortSignal,
 ): Promise<string> {
-  return ADAPTERS[account.provider].chatStream(account, model, messages, onDelta);
+  return ADAPTERS[account.provider].chatStream(account, model, messages, onDelta, signal);
 }
 
 // Live model list for an account, falling back to the static list when the

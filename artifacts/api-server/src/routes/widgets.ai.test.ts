@@ -365,6 +365,47 @@ describe("POST /api/widgets/ai/chat (stream mode)", () => {
     expect(String(lines.at(-1)?.error)).toContain("AI request failed");
   });
 
+  it("passes an abort signal to the provider request", async () => {
+    findByService.mockReturnValue(aiRow([openaiAccount]));
+    cloudPost.mockResolvedValueOnce({
+      data: Readable.from(['data: {"choices":[{"delta":{"content":"ok"}}]}\n']),
+    });
+    await request(app)
+      .post("/api/widgets/ai/chat")
+      .send({ stream: true, accountId: "acc1", messages: [{ role: "user", content: "hi" }] });
+    const [, , opts] = cloudPost.mock.calls[0] as [string, unknown, { signal?: AbortSignal }];
+    expect(opts.signal).toBeInstanceOf(AbortSignal);
+    // Normal completion must NOT abort the upstream request.
+    expect(opts.signal?.aborted).toBe(false);
+  });
+
+  it("aborts the upstream provider stream when the client disconnects mid-reply", async () => {
+    findByService.mockReturnValue(aiRow([openaiAccount]));
+    // A provider stream that emits one delta then stays open forever.
+    const upstream = new Readable({ read() {} });
+    upstream.push('data: {"choices":[{"delta":{"content":"par"}}]}\n');
+    cloudPost.mockResolvedValueOnce({ data: upstream });
+
+    const req = request(app)
+      .post("/api/widgets/ai/chat")
+      .send({ stream: true, accountId: "acc1", messages: [{ role: "user", content: "hi" }] });
+    // Fire the request, then drop the connection once the first delta arrived.
+    const done = req.then(
+      () => undefined,
+      () => undefined, // aborting rejects the superagent promise — expected
+    );
+    await vi.waitFor(() => {
+      const [, , opts] = (cloudPost.mock.calls[0] ?? []) as [string, unknown, { signal?: AbortSignal }];
+      expect(opts?.signal).toBeInstanceOf(AbortSignal);
+    });
+    req.abort();
+    await done;
+    const [, , opts] = cloudPost.mock.calls[0] as [string, unknown, { signal: AbortSignal }];
+    await vi.waitFor(() => expect(opts.signal.aborted).toBe(true));
+    // End the mock stream so nothing leaks past the test.
+    upstream.push(null);
+  });
+
   it("still answers plain JSON when stream is not requested", async () => {
     findByService.mockReturnValue(aiRow([openaiAccount]));
     cloudPost.mockResolvedValueOnce({

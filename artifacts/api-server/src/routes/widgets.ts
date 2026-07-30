@@ -6691,18 +6691,42 @@ router.post("/ai/chat", requireAuth, async (req: AuthRequest, res) => {
       // so provider failures after that point are reported in-band as a
       // final {"error"} line instead of a 502.
       let started = false;
+      // If the browser disconnects (user hit Stop or navigated away), tear
+      // down the upstream provider request so tokens stop being generated.
+      // (Watch res "close", not req "close" — req fires once the request
+      // body is consumed. res "close" fires when the connection goes away;
+      // the writableEnded guard skips the normal end-of-response case.)
+      const upstream = new AbortController();
+      res.on("close", () => {
+        if (!res.writableEnded) upstream.abort();
+      });
       try {
-        await aiChatStream(account, model, messages, (delta) => {
-          if (!started) {
-            beginNdjsonStream(res);
-            started = true;
-          }
-          writeNdjson(res, { delta });
-        });
+        await aiChatStream(
+          account,
+          model,
+          messages,
+          (delta) => {
+            if (!started) {
+              beginNdjsonStream(res);
+              started = true;
+            }
+            writeNdjson(res, { delta });
+          },
+          upstream.signal,
+        );
         if (!started) beginNdjsonStream(res);
         writeNdjson(res, { done: true, sample: false, model });
         res.end();
       } catch (err) {
+        // Client-initiated abort: nobody is listening, just clean up quietly.
+        if (upstream.signal.aborted) {
+          logger.debug(
+            { provider: account.provider, model },
+            "AI chat stream aborted by client disconnect",
+          );
+          res.end();
+          return;
+        }
         if (!started) throw err; // headers not sent yet → normal 502 below
         const detail = describeHttpError(err);
         logger.error(

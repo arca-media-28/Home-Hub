@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { Tile } from "@workspace/api-client-react";
-import { Bot, Send, Eraser, Loader2 } from "lucide-react";
+import { Bot, Send, Square, Eraser, Loader2 } from "lucide-react";
 import { MarkdownContent } from "../../lib/markdown";
 
 // Per-tile conversation history lives in localStorage under the app's legacy
@@ -73,6 +73,7 @@ async function streamAiChat(
     messages: Array<{ role: "user" | "assistant"; content: string }>;
   },
   onDelta: (text: string) => void,
+  signal?: AbortSignal,
 ): Promise<{ sample: boolean }> {
   const token = localStorage.getItem("token");
   const res = await fetch("/api/widgets/ai/chat", {
@@ -82,6 +83,7 @@ async function streamAiChat(
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     body: JSON.stringify({ ...body, stream: true }),
+    signal,
   });
   if (!res.ok) {
     let message = "The AI request failed.";
@@ -170,6 +172,13 @@ export default function AiChatTile({ tile, editMode }: AiChatTileProps) {
   const [busy, setBusy] = useState(false);
   const [streamingText, setStreamingText] = useState<string | null>(null);
   const thinking = busy && streamingText === null;
+  // Lets the Stop button abort the in-flight streaming fetch mid-reply.
+  const abortRef = useRef<AbortController | null>(null);
+
+  // Abandon any in-flight stream if the tile unmounts mid-reply.
+  useEffect(() => {
+    return () => abortRef.current?.abort();
+  }, []);
 
   // Keep the newest message in view as the conversation grows.
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -194,6 +203,8 @@ export default function AiChatTile({ tile, editMode }: AiChatTileProps) {
     setInput("");
     setBusy(true);
     setStreamingText(null);
+    const controller = new AbortController();
+    abortRef.current = controller;
 
     // Accumulate deltas locally; render them via the streamingText bubble and
     // commit the finished reply to history in one go.
@@ -212,6 +223,7 @@ export default function AiChatTile({ tile, editMode }: AiChatTileProps) {
           acc += delta;
           setStreamingText(acc);
         },
+        controller.signal,
       );
       setMessages((cur) =>
         [
@@ -224,20 +236,39 @@ export default function AiChatTile({ tile, editMode }: AiChatTileProps) {
         ].slice(-HISTORY_CAP),
       );
     } catch (err: unknown) {
-      const detail =
-        (err instanceof Error && err.message) || "The AI request failed.";
-      setMessages((cur) =>
-        [
-          ...cur,
-          // Keep whatever partial reply already streamed in, then the error.
-          ...(acc ? [{ role: "assistant" as const, content: acc }] : []),
-          { role: "assistant" as const, content: detail, error: true },
-        ].slice(-HISTORY_CAP),
-      );
+      if (controller.signal.aborted) {
+        // User hit Stop — keep whatever streamed in as a normal message,
+        // no error bubble.
+        if (acc) {
+          setMessages((cur) =>
+            [...cur, { role: "assistant" as const, content: acc }].slice(
+              -HISTORY_CAP,
+            ),
+          );
+        }
+      } else {
+        const detail =
+          (err instanceof Error && err.message) || "The AI request failed.";
+        setMessages((cur) =>
+          [
+            ...cur,
+            // Keep whatever partial reply already streamed in, then the error.
+            ...(acc ? [{ role: "assistant" as const, content: acc }] : []),
+            { role: "assistant" as const, content: detail, error: true },
+          ].slice(-HISTORY_CAP),
+        );
+      }
     } finally {
+      abortRef.current = null;
       setBusy(false);
       setStreamingText(null);
     }
+  }
+
+  // Stops the in-flight reply: aborts the fetch (which also disconnects the
+  // server from the provider); the catch above commits the partial text.
+  function stop() {
+    abortRef.current?.abort();
   }
 
   const shown = messages.length > 0 || configured ? messages : DEMO_CONVERSATION;
@@ -345,14 +376,28 @@ export default function AiChatTile({ tile, editMode }: AiChatTileProps) {
           onPointerDown={(e) => e.stopPropagation()}
           onMouseDown={(e) => e.stopPropagation()}
         />
-        <button
-          type="submit"
-          aria-label="Send message"
-          disabled={editMode || busy || input.trim().length === 0}
-          className="text-primary disabled:text-muted-foreground transition-colors p-1"
-        >
-          <Send className="w-3.5 h-3.5" />
-        </button>
+        {busy ? (
+          <button
+            type="button"
+            aria-label="Stop generating"
+            title="Stop generating"
+            onClick={stop}
+            className="text-foreground hover:text-destructive transition-colors p-1"
+            onPointerDown={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <Square className="w-3.5 h-3.5 fill-current" />
+          </button>
+        ) : (
+          <button
+            type="submit"
+            aria-label="Send message"
+            disabled={editMode || input.trim().length === 0}
+            className="text-primary disabled:text-muted-foreground transition-colors p-1"
+          >
+            <Send className="w-3.5 h-3.5" />
+          </button>
+        )}
       </form>
     </div>
   );
