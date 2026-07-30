@@ -58,6 +58,7 @@ export const INTEGRATION_LABELS: Record<string, string> = {
   [TileIntegration.news]: "News",
   [TileIntegration.email]: "Email",
   [TileIntegration.calendar]: "Calendar",
+  [TileIntegration.aichat]: "AI Chat",
   [TileIntegration.stocks]: "Stocks",
   [TileIntegration.sleeper]: "Fantasy",
   [TileIntegration.audioplayer]: "Audio Player",

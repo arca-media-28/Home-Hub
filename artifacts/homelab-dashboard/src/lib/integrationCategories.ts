@@ -34,6 +34,8 @@ const CATEGORY_BY_KEY: Record<string, Category> = {
   google_calendar: "Communication",
   imap: "Communication",
   caldav: "Communication",
+  aichat: "Communication",
+  ai: "Communication",
   // Media
   media: "Media",
   plex: "Media",

@@ -49,4 +49,5 @@ export const TileIntegration = {
   visualizer: 'visualizer',
   pictureframe: 'pictureframe',
   videoplayer: 'videoplayer',
+  aichat: 'aichat',
 } as const;

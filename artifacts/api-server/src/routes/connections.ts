@@ -12,6 +12,18 @@ import {
   type CalDavAccount,
 } from "../lib/mailAccounts.js";
 import {
+  listAiAccounts,
+  addAiAccount,
+  updateAiAccount,
+  removeAiAccount,
+  maskApiKey,
+  isAiProvider,
+  isLocalAiProvider,
+  type AiAccount,
+} from "../lib/aiAccounts.js";
+import { aiTestKey } from "../lib/aiProviders.js";
+import { normalizeHttpError } from "../lib/http.js";
+import {
   runPing,
   connectionToValues,
   isConfigured,
@@ -186,6 +198,129 @@ router.delete("/caldav/accounts/:id", requireAuth, (req: AuthRequest, res) => {
     return;
   }
   res.json(next.map(sanitizeCalDav));
+});
+
+// ── AI chat multi-account management ─────────────────────────────────────────
+// Users can save several AI provider accounts (OpenAI, Gemini, Claude), each
+// with its own API key and default model. The list lives in the `extra` JSON
+// of the caller's "ai" row. API keys never leave the server — every response
+// carries only a masked hint (last 4 characters).
+
+function sanitizeAi(a: AiAccount) {
+  return {
+    id: a.id,
+    label: a.label,
+    provider: a.provider,
+    // Local keyless accounts show an empty hint rather than a fake mask.
+    maskedKey: a.apiKey ? maskApiKey(a.apiKey) : "",
+    baseUrl: a.baseUrl ?? null,
+    model: a.model ?? null,
+  };
+}
+
+// GET /api/connections/ai/accounts
+router.get("/ai/accounts", requireAuth, (req: AuthRequest, res) => {
+  res.json(listAiAccounts(req.user!.userId).map(sanitizeAi));
+});
+
+// POST /api/connections/ai/accounts
+router.post("/ai/accounts", requireAuth, (req: AuthRequest, res) => {
+  const body = (req.body ?? {}) as {
+    label?: string | null;
+    provider?: string;
+    apiKey?: string;
+    baseUrl?: string | null;
+    model?: string | null;
+  };
+  if (!isAiProvider(body.provider)) {
+    res
+      .status(400)
+      .json({ error: "provider must be one of: openai, gemini, anthropic, ollama, openai_compatible" });
+    return;
+  }
+  // Local providers need a server URL instead of a key; cloud providers need
+  // a key.
+  if (isLocalAiProvider(body.provider)) {
+    if (!body.baseUrl?.trim()) {
+      res.status(400).json({ error: "baseUrl (the local server URL) is required for this provider" });
+      return;
+    }
+  } else if (!body.apiKey?.trim()) {
+    res.status(400).json({ error: "apiKey is required" });
+    return;
+  }
+  const accounts = addAiAccount(req.user!.userId, {
+    label: body.label ?? null,
+    provider: body.provider,
+    apiKey: body.apiKey?.trim() ?? "",
+    baseUrl: typeof body.baseUrl === "string" ? body.baseUrl : null,
+    model: typeof body.model === "string" ? body.model : null,
+  });
+  res.json(accounts.map(sanitizeAi));
+});
+
+// PUT /api/connections/ai/accounts/:id — edit label / provider / model, and
+// optionally rotate the API key (omitting apiKey keeps the stored key).
+router.put("/ai/accounts/:id", requireAuth, (req: AuthRequest, res) => {
+  const body = (req.body ?? {}) as {
+    label?: string | null;
+    provider?: string | null;
+    apiKey?: string | null;
+    baseUrl?: string | null;
+    model?: string | null;
+  };
+  if (body.provider != null && !isAiProvider(body.provider)) {
+    res
+      .status(400)
+      .json({ error: "provider must be one of: openai, gemini, anthropic, ollama, openai_compatible" });
+    return;
+  }
+  const next = updateAiAccount(req.user!.userId, String(req.params["id"]), {
+    label: body.label,
+    provider: body.provider != null && isAiProvider(body.provider) ? body.provider : null,
+    apiKey: typeof body.apiKey === "string" && body.apiKey.trim() ? body.apiKey.trim() : null,
+    baseUrl: typeof body.baseUrl === "string" && body.baseUrl.trim() ? body.baseUrl.trim() : null,
+    model: body.model,
+  });
+  if (next === null) {
+    res.status(404).json({ error: "No AI account with that id" });
+    return;
+  }
+  res.json(next.map(sanitizeAi));
+});
+
+// DELETE /api/connections/ai/accounts/:id
+router.delete("/ai/accounts/:id", requireAuth, (req: AuthRequest, res) => {
+  const next = removeAiAccount(req.user!.userId, String(req.params["id"]));
+  if (next === null) {
+    res.status(404).json({ error: "No AI account with that id" });
+    return;
+  }
+  res.json(next.map(sanitizeAi));
+});
+
+// POST /api/connections/ai/accounts/:id/test — verify the saved key against
+// the provider. Always answers 200 with { ok, message } so the card can show
+// the outcome inline (matching the service connection test convention).
+router.post("/ai/accounts/:id/test", requireAuth, async (req: AuthRequest, res) => {
+  const account = listAiAccounts(req.user!.userId).find(
+    (a) => a.id === String(req.params["id"]),
+  );
+  if (!account) {
+    res.status(404).json({ error: "No AI account with that id" });
+    return;
+  }
+  try {
+    await aiTestKey(account.provider, account);
+    res.json({
+      ok: true,
+      message: isLocalAiProvider(account.provider)
+        ? "Local AI server reachable"
+        : "API key verified",
+    });
+  } catch (err) {
+    res.json({ ok: false, message: normalizeHttpError(err) });
+  }
 });
 
 // PUT /api/connections/:service — upsert the caller's own connection for a

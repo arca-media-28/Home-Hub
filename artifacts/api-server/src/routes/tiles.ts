@@ -58,6 +58,8 @@ interface TileSettings {
   calendarAccounts?: string[] | null;
   calendarDaysAhead?: number | null;
   calendarMaxEvents?: number | null;
+  aiAccountId?: string | null;
+  aiModel?: string | null;
   audioSource?: string | null;
   audioFindMusic?: boolean | null;
   audioSearch?: boolean | null;
@@ -342,6 +344,16 @@ function pickTileSettings(obj: Record<string, unknown>): TileSettings {
     result.calendarMaxEvents = obj["calendarMaxEvents"];
   } else if (obj["calendarMaxEvents"] === null) {
     result.calendarMaxEvents = null;
+  }
+  if (typeof obj["aiAccountId"] === "string") {
+    result.aiAccountId = obj["aiAccountId"];
+  } else if (obj["aiAccountId"] === null) {
+    result.aiAccountId = null;
+  }
+  if (typeof obj["aiModel"] === "string") {
+    result.aiModel = obj["aiModel"];
+  } else if (obj["aiModel"] === null) {
+    result.aiModel = null;
   }
   if (typeof obj["audioSource"] === "string") {
     result.audioSource = obj["audioSource"];

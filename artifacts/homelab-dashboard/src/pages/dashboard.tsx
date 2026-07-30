@@ -50,6 +50,7 @@ import AquariumTile from "@/components/tiles/AquariumTile";
 import VisualizerTile from "@/components/tiles/VisualizerTile";
 import PictureFrameTile from "@/components/tiles/PictureFrameTile";
 import VideoPlayerTile from "@/components/tiles/VideoPlayerTile";
+import AiChatTile from "@/components/tiles/AiChatTile";
 import TileEditModal, { type EditMode } from "@/components/TileEditModal";
 import { INTEGRATION_SERVICE, CONNECTION_BACKED_INTEGRATIONS } from "@/lib/integrationMeta";
 import { ToastAction } from "@/components/ui/toast";
@@ -365,6 +366,11 @@ function renderTileContent(tile: Tile, status: ServiceStatus | undefined, editMo
   // standard integration header like the picture frame.
   if (tile.integration === "videoplayer") {
     return <VideoPlayerTile tile={tile} editMode={editMode} />;
+  }
+  // The AI Chat tile owns its whole surface (conversation + input) and keeps
+  // its history per tile, bypassing the standard integration header.
+  if (tile.integration === "aichat") {
+    return <AiChatTile tile={tile} editMode={editMode} />;
   }
   // Every tile renders as a styled app/link card. When an integration is
   // attached it also shows a compact live-status section from that service.

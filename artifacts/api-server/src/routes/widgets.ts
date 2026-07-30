@@ -50,6 +50,8 @@ import {
   type CalendarEvent,
 } from "../lib/calendar.js";
 import { guessGameType, queryGamePlayersDetailed, type PlayerCount } from "../lib/gameQuery.js";
+import { getAiAccount, listAiAccounts } from "../lib/aiAccounts.js";
+import { aiChat, aiListModels, resolveModel, type ChatMessage } from "../lib/aiProviders.js";
 
 const router = Router();
 
@@ -6583,6 +6585,112 @@ router.get("/calendar/google", requireAuth, async (req: AuthRequest, res) => {
 });
 router.get("/calendar/caldav", requireAuth, async (req: AuthRequest, res) => {
   await handleCalendarRequest(req.user!.userId, req, res, "caldav");
+});
+
+// ── AI Chat widget ───────────────────────────────────────────────────────────
+// Proxies chat requests from an AI Chat tile to the provider that backs the
+// tile's selected account. All provider calls happen server-side (the API key
+// never reaches the browser) over the TLS-verifying cloud client. Following
+// the widget convention: demo/sample data only when nothing is configured; a
+// configured account that fails answers 502 with an explicit error.
+
+const AI_MAX_MESSAGES = 40;
+const AI_MAX_CONTENT = 8000;
+
+// POST /api/widgets/ai/chat — { accountId, model?, messages: [{role, content}] }
+router.post("/ai/chat", requireAuth, async (req: AuthRequest, res) => {
+  const userId = req.user!.userId;
+  const body = (req.body ?? {}) as {
+    accountId?: unknown;
+    model?: unknown;
+    messages?: unknown;
+  };
+
+  const rawMessages = Array.isArray(body.messages) ? body.messages : [];
+  const messages: ChatMessage[] = rawMessages
+    .filter(
+      (m): m is { role: string; content: string } =>
+        !!m &&
+        typeof m === "object" &&
+        ((m as { role?: unknown }).role === "user" ||
+          (m as { role?: unknown }).role === "assistant") &&
+        typeof (m as { content?: unknown }).content === "string" &&
+        ((m as { content: string }).content.trim().length > 0),
+    )
+    .slice(-AI_MAX_MESSAGES)
+    .map((m) => ({
+      role: m.role as "user" | "assistant",
+      content: m.content.slice(0, AI_MAX_CONTENT),
+    }));
+  if (messages.length === 0) {
+    res.status(400).json({ error: "messages must contain at least one user message" });
+    return;
+  }
+
+  // No accounts configured at all → demo reply so the tile can show its
+  // sample conversation without a key (sample:true tells the tile).
+  if (listAiAccounts(userId).length === 0) {
+    res.json({
+      sample: true,
+      reply:
+        "This is a demo reply — add an AI account (OpenAI, Gemini, Claude, or a local server like Ollama) in Settings, then pick it in this tile's settings to chat for real.",
+      model: "demo",
+    });
+    return;
+  }
+
+  const accountId = typeof body.accountId === "string" ? body.accountId : "";
+  const account = accountId ? getAiAccount(userId, accountId) : null;
+  if (!account) {
+    res.status(404).json({ error: "Unknown AI account — pick one in the tile settings" });
+    return;
+  }
+
+  const model = resolveModel(account, typeof body.model === "string" ? body.model : null);
+  // Local servers (Ollama, LM Studio…) have no universal default model — the
+  // user must pick one in the account or tile settings.
+  if (!model) {
+    res.status(400).json({
+      error:
+        "No model selected — set a default model on this AI account in Settings or pick one in the tile options.",
+    });
+    return;
+  }
+  try {
+    const reply = await aiChat(account, model, messages);
+    res.json({ sample: false, reply, model });
+  } catch (err) {
+    const detail = describeHttpError(err);
+    logger.error(
+      { reason: detail, provider: account.provider, model },
+      "AI chat widget error",
+    );
+    const status = detail.status;
+    const hint =
+      status === 401 || status === 403
+        ? "The API key was rejected — check it in Settings."
+        : status === 429
+          ? "Rate limit or quota exceeded for this account."
+          : status === 404 || status === 400
+            ? `The model "${model}" was rejected by ${account.provider}.`
+            : "The provider did not respond.";
+    res.status(502).json({ error: `AI request failed: ${hint}` });
+  }
+});
+
+// GET /api/widgets/ai/models?accountId=… — model options for the tile editor's
+// override picker. Falls back to a static per-provider list when the live
+// endpoint fails, so this never 502s.
+router.get("/ai/models", requireAuth, async (req: AuthRequest, res) => {
+  const userId = req.user!.userId;
+  const accountId = typeof req.query["accountId"] === "string" ? req.query["accountId"] : "";
+  const account = accountId ? getAiAccount(userId, accountId) : null;
+  if (!account) {
+    res.status(404).json({ error: "Unknown AI account" });
+    return;
+  }
+  const { models, live } = await aiListModels(account);
+  res.json({ provider: account.provider, models, live, default: account.model ?? null });
 });
 
 export default router;

@@ -86,6 +86,7 @@ export const TileIntegration = {
   visualizer: 'visualizer',
   pictureframe: 'pictureframe',
   videoplayer: 'videoplayer',
+  aichat: 'aichat',
 } as const;
 
 /**
@@ -299,6 +300,16 @@ export type TileSettings = {
      * @nullable
      */
   calendarMaxEvents?: number | null;
+  /**
+     * The saved AI account (from Settings) that backs an AI Chat tile. Null or absent means none chosen yet (the tile shows a demo conversation until one is selected).
+     * @nullable
+     */
+  aiAccountId?: string | null;
+  /**
+     * Optional per-tile model override for the AI Chat tile. Null or absent uses the account's default model.
+     * @nullable
+     */
+  aiModel?: string | null;
   /**
      * When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).
      * @nullable
@@ -778,6 +789,7 @@ export const TileInputIntegration = {
   visualizer: 'visualizer',
   pictureframe: 'pictureframe',
   videoplayer: 'videoplayer',
+  aichat: 'aichat',
 } as const;
 
 export interface TileInput {
@@ -866,6 +878,7 @@ export const TileUpdateIntegration = {
   visualizer: 'visualizer',
   pictureframe: 'pictureframe',
   videoplayer: 'videoplayer',
+  aichat: 'aichat',
 } as const;
 
 export interface TileUpdate {
@@ -1090,6 +1103,131 @@ export interface GoogleCredentialsInput {
 export interface GoogleAuthIntent {
   /** Short-lived single-use token; append as ?intent= to the /widgets/gmail/auth popup URL to authorize one OAuth flow run. */
   intent: string;
+}
+
+/**
+ * Supported AI chat providers. "ollama" and "openai_compatible" are local/self-hosted servers reached via a base URL (no API key needed).
+ */
+export type AiProvider = typeof AiProvider[keyof typeof AiProvider];
+
+
+export const AiProvider = {
+  openai: 'openai',
+  gemini: 'gemini',
+  anthropic: 'anthropic',
+  ollama: 'ollama',
+  openai_compatible: 'openai_compatible',
+} as const;
+
+export interface AiAccountInput {
+  /**
+     * Display label; defaults to the provider name when empty.
+     * @nullable
+     */
+  label?: string | null;
+  provider: AiProvider;
+  /**
+     * The provider API key. Stored server-side, never echoed back. Required for cloud providers; optional for local ones.
+     * @nullable
+     */
+  apiKey?: string | null;
+  /**
+     * Base URL of a local/self-hosted AI server (e.g. "http://192.168.1.10:11434" for Ollama or "http://192.168.1.10:1234" for LM Studio). Required for local providers, ignored for cloud providers.
+     * @nullable
+     */
+  baseUrl?: string | null;
+  /**
+     * Default model for this account (e.g. "gpt-4o-mini"). Null or absent uses a sensible provider default.
+     * @nullable
+     */
+  model?: string | null;
+}
+
+/**
+ * Partial update for a saved AI account. Absent fields keep their stored values; in particular, omitting apiKey keeps the stored key.
+ */
+export interface AiAccountUpdate {
+  /** @nullable */
+  label?: string | null;
+  provider?: AiProvider | null;
+  /** @nullable */
+  apiKey?: string | null;
+  /** @nullable */
+  baseUrl?: string | null;
+  /** @nullable */
+  model?: string | null;
+}
+
+/**
+ * A saved AI account as returned to the browser (key masked).
+ */
+export interface AiAccount {
+  id: string;
+  label: string;
+  provider: AiProvider;
+  /** Masked API key hint (last 4 characters at most). Empty for local keyless accounts. */
+  maskedKey: string;
+  /**
+     * Base URL of a local/self-hosted server, if any.
+     * @nullable
+     */
+  baseUrl?: string | null;
+  /** @nullable */
+  model?: string | null;
+}
+
+export interface AiTestResult {
+  ok: boolean;
+  /** @nullable */
+  message?: string | null;
+}
+
+export type AiChatMessageRole = typeof AiChatMessageRole[keyof typeof AiChatMessageRole];
+
+
+export const AiChatMessageRole = {
+  user: 'user',
+  assistant: 'assistant',
+} as const;
+
+export interface AiChatMessage {
+  role: AiChatMessageRole;
+  content: string;
+}
+
+export interface AiChatRequest {
+  /**
+     * The saved AI account to chat through. May be omitted only when no accounts are configured at all (demo mode).
+     * @nullable
+     */
+  accountId?: string | null;
+  /**
+     * Optional per-tile model override.
+     * @nullable
+     */
+  model?: string | null;
+  /** The conversation so far, oldest first. */
+  messages: AiChatMessage[];
+}
+
+export interface AiChatReply {
+  /** True when this is a demo reply (no accounts configured). */
+  sample: boolean;
+  reply: string;
+  /** The model that produced the reply. */
+  model: string;
+}
+
+export interface AiModelList {
+  provider: AiProvider;
+  models: string[];
+  /** True when the list came live from the provider; false when it is the static fallback list. */
+  live: boolean;
+  /**
+     * The account's saved default model, if any.
+     * @nullable
+     */
+  default?: string | null;
 }
 
 export interface ImapAccountInput {
@@ -2869,4 +3007,8 @@ export const GetWeatherWidgetUnits = {
   c: 'c',
   f: 'f',
 } as const;
+
+export type AiModelsParams = {
+accountId: string;
+};
 

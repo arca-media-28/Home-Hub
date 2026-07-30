@@ -37,6 +37,7 @@ import {
   Fish,
   AudioLines,
   StickyNote,
+  Bot,
   Images,
   MonitorPlay,
   SquareDashed,
@@ -191,6 +192,10 @@ export const INTEGRATION_META: Record<string, IntegrationMeta> = {
     icon: MonitorPlay,
     description:
       "Play videos from uploads, URLs, YouTube, your library, or ErsatzTV live TV.",
+  },
+  [TileIntegration.aichat]: {
+    icon: Bot,
+    description: "Chat with OpenAI, Gemini, or Claude from your dashboard.",
   },
   [TileIntegration.note]: {
     icon: StickyNote,

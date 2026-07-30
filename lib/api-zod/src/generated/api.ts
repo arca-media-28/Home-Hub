@@ -79,7 +79,7 @@ export const GetTilesResponseItem = zod.object({
   "deviceModeId": zod.number().nullish().describe('The device mode (layout profile) this tile belongs to. Null only for rows that predate device modes and could not be assigned one.'),
   "variant": zod.string().nullish().describe('Adaptive layout variant key this tile belongs to (e.g. \"fhd-landscape\"). Null means the base layout used by auto\/fixed pages.'),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'lidarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('pterodactyl'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('email'),zod.literal('calendar'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal('bonsai'),zod.literal('aquarium'),zod.literal('visualizer'),zod.literal('pictureframe'),zod.literal('videoplayer'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('pterodactyl'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('email'),zod.literal('calendar'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal('bonsai'),zod.literal('aquarium'),zod.literal('visualizer'),zod.literal('pictureframe'),zod.literal('videoplayer'),zod.literal('aichat'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -135,6 +135,8 @@ export const GetTilesResponseItem = zod.object({
   "calendarAccounts": zod.array(zod.string()).nullish().describe('Allow-list of calendar account keys the Calendar tile aggregates: \"google\" for the linked Google account, or the id of a saved CalDAV account. Null or absent means all configured accounts.'),
   "calendarDaysAhead": zod.number().nullish().describe('How many days ahead the Calendar tile looks for upcoming events. Null or absent defaults to a sensible value (clamped server-side).'),
   "calendarMaxEvents": zod.number().nullish().describe('Maximum number of events the Calendar tile requests\/shows. Null or absent defaults to a sensible value (clamped server-side).'),
+  "aiAccountId": zod.string().nullish().describe('The saved AI account (from Settings) that backs an AI Chat tile. Null or absent means none chosen yet (the tile shows a demo conversation until one is selected).'),
+  "aiModel": zod.string().nullish().describe('Optional per-tile model override for the AI Chat tile. Null or absent uses the account\'s default model.'),
   "scrollable": zod.boolean().nullish().describe('When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).'),
   "hideStatusDot": zod.boolean().nullish().describe('When true, the tile header hides the service-reachability status dot even when the backing connection is configured. Absent or false shows the dot (the default).'),
   "truenasMetric": zod.union([zod.literal('cpuram'),zod.literal('network'),zod.literal('arc'),zod.literal('pools'),zod.literal('disks'),zod.literal('cputemp'),zod.literal(null)]).nullish().describe('Which single TrueNAS metric a dedicated TrueNAS tile renders with its bespoke visual: \"cpuram\", \"network\", \"arc\", \"pools\", \"disks\", or \"cputemp\". Null or absent means the tile shows the combined multi-section view (the default, backward-compatible behavior).'),
@@ -222,7 +224,7 @@ export const CreateTileBody = zod.object({
   "deviceModeId": zod.number().nullish().describe('The device mode (layout profile) to create this tile in. Omit to fall back to the user\'s default (first) mode.'),
   "variant": zod.string().nullish().describe('Adaptive layout variant key to create this tile in (e.g. \"fhd-landscape\"). Omit or null for the base layout.'),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'lidarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('pterodactyl'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('email'),zod.literal('calendar'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal('bonsai'),zod.literal('aquarium'),zod.literal('visualizer'),zod.literal('pictureframe'),zod.literal('videoplayer'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('pterodactyl'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('email'),zod.literal('calendar'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal('bonsai'),zod.literal('aquarium'),zod.literal('visualizer'),zod.literal('pictureframe'),zod.literal('videoplayer'),zod.literal('aichat'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -278,6 +280,8 @@ export const CreateTileBody = zod.object({
   "calendarAccounts": zod.array(zod.string()).nullish().describe('Allow-list of calendar account keys the Calendar tile aggregates: \"google\" for the linked Google account, or the id of a saved CalDAV account. Null or absent means all configured accounts.'),
   "calendarDaysAhead": zod.number().nullish().describe('How many days ahead the Calendar tile looks for upcoming events. Null or absent defaults to a sensible value (clamped server-side).'),
   "calendarMaxEvents": zod.number().nullish().describe('Maximum number of events the Calendar tile requests\/shows. Null or absent defaults to a sensible value (clamped server-side).'),
+  "aiAccountId": zod.string().nullish().describe('The saved AI account (from Settings) that backs an AI Chat tile. Null or absent means none chosen yet (the tile shows a demo conversation until one is selected).'),
+  "aiModel": zod.string().nullish().describe('Optional per-tile model override for the AI Chat tile. Null or absent uses the account\'s default model.'),
   "scrollable": zod.boolean().nullish().describe('When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).'),
   "hideStatusDot": zod.boolean().nullish().describe('When true, the tile header hides the service-reachability status dot even when the backing connection is configured. Absent or false shows the dot (the default).'),
   "truenasMetric": zod.union([zod.literal('cpuram'),zod.literal('network'),zod.literal('arc'),zod.literal('pools'),zod.literal('disks'),zod.literal('cputemp'),zod.literal(null)]).nullish().describe('Which single TrueNAS metric a dedicated TrueNAS tile renders with its bespoke visual: \"cpuram\", \"network\", \"arc\", \"pools\", \"disks\", or \"cputemp\". Null or absent means the tile shows the combined multi-section view (the default, backward-compatible behavior).'),
@@ -369,7 +373,7 @@ export const GetTileResponse = zod.object({
   "deviceModeId": zod.number().nullish().describe('The device mode (layout profile) this tile belongs to. Null only for rows that predate device modes and could not be assigned one.'),
   "variant": zod.string().nullish().describe('Adaptive layout variant key this tile belongs to (e.g. \"fhd-landscape\"). Null means the base layout used by auto\/fixed pages.'),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'lidarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('pterodactyl'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('email'),zod.literal('calendar'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal('bonsai'),zod.literal('aquarium'),zod.literal('visualizer'),zod.literal('pictureframe'),zod.literal('videoplayer'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('pterodactyl'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('email'),zod.literal('calendar'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal('bonsai'),zod.literal('aquarium'),zod.literal('visualizer'),zod.literal('pictureframe'),zod.literal('videoplayer'),zod.literal('aichat'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -425,6 +429,8 @@ export const GetTileResponse = zod.object({
   "calendarAccounts": zod.array(zod.string()).nullish().describe('Allow-list of calendar account keys the Calendar tile aggregates: \"google\" for the linked Google account, or the id of a saved CalDAV account. Null or absent means all configured accounts.'),
   "calendarDaysAhead": zod.number().nullish().describe('How many days ahead the Calendar tile looks for upcoming events. Null or absent defaults to a sensible value (clamped server-side).'),
   "calendarMaxEvents": zod.number().nullish().describe('Maximum number of events the Calendar tile requests\/shows. Null or absent defaults to a sensible value (clamped server-side).'),
+  "aiAccountId": zod.string().nullish().describe('The saved AI account (from Settings) that backs an AI Chat tile. Null or absent means none chosen yet (the tile shows a demo conversation until one is selected).'),
+  "aiModel": zod.string().nullish().describe('Optional per-tile model override for the AI Chat tile. Null or absent uses the account\'s default model.'),
   "scrollable": zod.boolean().nullish().describe('When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).'),
   "hideStatusDot": zod.boolean().nullish().describe('When true, the tile header hides the service-reachability status dot even when the backing connection is configured. Absent or false shows the dot (the default).'),
   "truenasMetric": zod.union([zod.literal('cpuram'),zod.literal('network'),zod.literal('arc'),zod.literal('pools'),zod.literal('disks'),zod.literal('cputemp'),zod.literal(null)]).nullish().describe('Which single TrueNAS metric a dedicated TrueNAS tile renders with its bespoke visual: \"cpuram\", \"network\", \"arc\", \"pools\", \"disks\", or \"cputemp\". Null or absent means the tile shows the combined multi-section view (the default, backward-compatible behavior).'),
@@ -511,7 +517,7 @@ export const UpdateTileParams = zod.object({
 })
 
 export const UpdateTileBody = zod.object({
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('pterodactyl'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('email'),zod.literal('calendar'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal('bonsai'),zod.literal('aquarium'),zod.literal('visualizer'),zod.literal('pictureframe'),zod.literal('videoplayer'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('pterodactyl'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('email'),zod.literal('calendar'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal('bonsai'),zod.literal('aquarium'),zod.literal('visualizer'),zod.literal('pictureframe'),zod.literal('videoplayer'),zod.literal('aichat'),zod.literal(null)]).nullish(),
   "gridX": zod.number().optional(),
   "gridY": zod.number().optional(),
   "gridW": zod.number().optional(),
@@ -567,6 +573,8 @@ export const UpdateTileBody = zod.object({
   "calendarAccounts": zod.array(zod.string()).nullish().describe('Allow-list of calendar account keys the Calendar tile aggregates: \"google\" for the linked Google account, or the id of a saved CalDAV account. Null or absent means all configured accounts.'),
   "calendarDaysAhead": zod.number().nullish().describe('How many days ahead the Calendar tile looks for upcoming events. Null or absent defaults to a sensible value (clamped server-side).'),
   "calendarMaxEvents": zod.number().nullish().describe('Maximum number of events the Calendar tile requests\/shows. Null or absent defaults to a sensible value (clamped server-side).'),
+  "aiAccountId": zod.string().nullish().describe('The saved AI account (from Settings) that backs an AI Chat tile. Null or absent means none chosen yet (the tile shows a demo conversation until one is selected).'),
+  "aiModel": zod.string().nullish().describe('Optional per-tile model override for the AI Chat tile. Null or absent uses the account\'s default model.'),
   "scrollable": zod.boolean().nullish().describe('When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).'),
   "hideStatusDot": zod.boolean().nullish().describe('When true, the tile header hides the service-reachability status dot even when the backing connection is configured. Absent or false shows the dot (the default).'),
   "truenasMetric": zod.union([zod.literal('cpuram'),zod.literal('network'),zod.literal('arc'),zod.literal('pools'),zod.literal('disks'),zod.literal('cputemp'),zod.literal(null)]).nullish().describe('Which single TrueNAS metric a dedicated TrueNAS tile renders with its bespoke visual: \"cpuram\", \"network\", \"arc\", \"pools\", \"disks\", or \"cputemp\". Null or absent means the tile shows the combined multi-section view (the default, backward-compatible behavior).'),
@@ -650,7 +658,7 @@ export const UpdateTileResponse = zod.object({
   "deviceModeId": zod.number().nullish().describe('The device mode (layout profile) this tile belongs to. Null only for rows that predate device modes and could not be assigned one.'),
   "variant": zod.string().nullish().describe('Adaptive layout variant key this tile belongs to (e.g. \"fhd-landscape\"). Null means the base layout used by auto\/fixed pages.'),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'lidarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('pterodactyl'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('email'),zod.literal('calendar'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal('bonsai'),zod.literal('aquarium'),zod.literal('visualizer'),zod.literal('pictureframe'),zod.literal('videoplayer'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('pterodactyl'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('email'),zod.literal('calendar'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal('bonsai'),zod.literal('aquarium'),zod.literal('visualizer'),zod.literal('pictureframe'),zod.literal('videoplayer'),zod.literal('aichat'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -706,6 +714,8 @@ export const UpdateTileResponse = zod.object({
   "calendarAccounts": zod.array(zod.string()).nullish().describe('Allow-list of calendar account keys the Calendar tile aggregates: \"google\" for the linked Google account, or the id of a saved CalDAV account. Null or absent means all configured accounts.'),
   "calendarDaysAhead": zod.number().nullish().describe('How many days ahead the Calendar tile looks for upcoming events. Null or absent defaults to a sensible value (clamped server-side).'),
   "calendarMaxEvents": zod.number().nullish().describe('Maximum number of events the Calendar tile requests\/shows. Null or absent defaults to a sensible value (clamped server-side).'),
+  "aiAccountId": zod.string().nullish().describe('The saved AI account (from Settings) that backs an AI Chat tile. Null or absent means none chosen yet (the tile shows a demo conversation until one is selected).'),
+  "aiModel": zod.string().nullish().describe('Optional per-tile model override for the AI Chat tile. Null or absent uses the account\'s default model.'),
   "scrollable": zod.boolean().nullish().describe('When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).'),
   "hideStatusDot": zod.boolean().nullish().describe('When true, the tile header hides the service-reachability status dot even when the backing connection is configured. Absent or false shows the dot (the default).'),
   "truenasMetric": zod.union([zod.literal('cpuram'),zod.literal('network'),zod.literal('arc'),zod.literal('pools'),zod.literal('disks'),zod.literal('cputemp'),zod.literal(null)]).nullish().describe('Which single TrueNAS metric a dedicated TrueNAS tile renders with its bespoke visual: \"cpuram\", \"network\", \"arc\", \"pools\", \"disks\", or \"cputemp\". Null or absent means the tile shows the combined multi-section view (the default, backward-compatible behavior).'),
@@ -815,7 +825,7 @@ export const SaveLayoutResponseItem = zod.object({
   "deviceModeId": zod.number().nullish().describe('The device mode (layout profile) this tile belongs to. Null only for rows that predate device modes and could not be assigned one.'),
   "variant": zod.string().nullish().describe('Adaptive layout variant key this tile belongs to (e.g. \"fhd-landscape\"). Null means the base layout used by auto\/fixed pages.'),
   "type": zod.enum(['app', 'truenas', 'media', 'sonarr', 'radarr', 'lidarr', 'qbittorrent']),
-  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('pterodactyl'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('email'),zod.literal('calendar'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal('bonsai'),zod.literal('aquarium'),zod.literal('visualizer'),zod.literal('pictureframe'),zod.literal('videoplayer'),zod.literal(null)]).nullish(),
+  "integration": zod.union([zod.literal('truenas'),zod.literal('media'),zod.literal('jellyfin'),zod.literal('sonarr'),zod.literal('radarr'),zod.literal('lidarr'),zod.literal('qbittorrent'),zod.literal('pihole'),zod.literal('nginx-proxy-manager'),zod.literal('prowlarr'),zod.literal('pterodactyl'),zod.literal('tailscale'),zod.literal('ersatztv'),zod.literal('audioplayer'),zod.literal('clock'),zod.literal('timer'),zod.literal('weather'),zod.literal('sports'),zod.literal('news'),zod.literal('stocks'),zod.literal('sleeper'),zod.literal('email'),zod.literal('calendar'),zod.literal('note'),zod.literal('spacer'),zod.literal('divider'),zod.literal('eightball'),zod.literal('dice'),zod.literal('coinflip'),zod.literal('fortune'),zod.literal('tamagotchi'),zod.literal('bonsai'),zod.literal('aquarium'),zod.literal('visualizer'),zod.literal('pictureframe'),zod.literal('videoplayer'),zod.literal('aichat'),zod.literal(null)]).nullish(),
   "gridX": zod.number(),
   "gridY": zod.number(),
   "gridW": zod.number(),
@@ -871,6 +881,8 @@ export const SaveLayoutResponseItem = zod.object({
   "calendarAccounts": zod.array(zod.string()).nullish().describe('Allow-list of calendar account keys the Calendar tile aggregates: \"google\" for the linked Google account, or the id of a saved CalDAV account. Null or absent means all configured accounts.'),
   "calendarDaysAhead": zod.number().nullish().describe('How many days ahead the Calendar tile looks for upcoming events. Null or absent defaults to a sensible value (clamped server-side).'),
   "calendarMaxEvents": zod.number().nullish().describe('Maximum number of events the Calendar tile requests\/shows. Null or absent defaults to a sensible value (clamped server-side).'),
+  "aiAccountId": zod.string().nullish().describe('The saved AI account (from Settings) that backs an AI Chat tile. Null or absent means none chosen yet (the tile shows a demo conversation until one is selected).'),
+  "aiModel": zod.string().nullish().describe('Optional per-tile model override for the AI Chat tile. Null or absent uses the account\'s default model.'),
   "scrollable": zod.boolean().nullish().describe('When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).'),
   "hideStatusDot": zod.boolean().nullish().describe('When true, the tile header hides the service-reachability status dot even when the backing connection is configured. Absent or false shows the dot (the default).'),
   "truenasMetric": zod.union([zod.literal('cpuram'),zod.literal('network'),zod.literal('arc'),zod.literal('pools'),zod.literal('disks'),zod.literal('cputemp'),zod.literal(null)]).nullish().describe('Which single TrueNAS metric a dedicated TrueNAS tile renders with its bespoke visual: \"cpuram\", \"network\", \"arc\", \"pools\", \"disks\", or \"cputemp\". Null or absent means the tile shows the combined multi-section view (the default, backward-compatible behavior).'),
@@ -1148,6 +1160,8 @@ export const ExportAllPagesResponse = zod.object({
   "calendarAccounts": zod.array(zod.string()).nullish().describe('Allow-list of calendar account keys the Calendar tile aggregates: \"google\" for the linked Google account, or the id of a saved CalDAV account. Null or absent means all configured accounts.'),
   "calendarDaysAhead": zod.number().nullish().describe('How many days ahead the Calendar tile looks for upcoming events. Null or absent defaults to a sensible value (clamped server-side).'),
   "calendarMaxEvents": zod.number().nullish().describe('Maximum number of events the Calendar tile requests\/shows. Null or absent defaults to a sensible value (clamped server-side).'),
+  "aiAccountId": zod.string().nullish().describe('The saved AI account (from Settings) that backs an AI Chat tile. Null or absent means none chosen yet (the tile shows a demo conversation until one is selected).'),
+  "aiModel": zod.string().nullish().describe('Optional per-tile model override for the AI Chat tile. Null or absent uses the account\'s default model.'),
   "scrollable": zod.boolean().nullish().describe('When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).'),
   "hideStatusDot": zod.boolean().nullish().describe('When true, the tile header hides the service-reachability status dot even when the backing connection is configured. Absent or false shows the dot (the default).'),
   "truenasMetric": zod.union([zod.literal('cpuram'),zod.literal('network'),zod.literal('arc'),zod.literal('pools'),zod.literal('disks'),zod.literal('cputemp'),zod.literal(null)]).nullish().describe('Which single TrueNAS metric a dedicated TrueNAS tile renders with its bespoke visual: \"cpuram\", \"network\", \"arc\", \"pools\", \"disks\", or \"cputemp\". Null or absent means the tile shows the combined multi-section view (the default, backward-compatible behavior).'),
@@ -1284,6 +1298,8 @@ export const ExportAllPagesResponse = zod.object({
   "calendarAccounts": zod.array(zod.string()).nullish().describe('Allow-list of calendar account keys the Calendar tile aggregates: \"google\" for the linked Google account, or the id of a saved CalDAV account. Null or absent means all configured accounts.'),
   "calendarDaysAhead": zod.number().nullish().describe('How many days ahead the Calendar tile looks for upcoming events. Null or absent defaults to a sensible value (clamped server-side).'),
   "calendarMaxEvents": zod.number().nullish().describe('Maximum number of events the Calendar tile requests\/shows. Null or absent defaults to a sensible value (clamped server-side).'),
+  "aiAccountId": zod.string().nullish().describe('The saved AI account (from Settings) that backs an AI Chat tile. Null or absent means none chosen yet (the tile shows a demo conversation until one is selected).'),
+  "aiModel": zod.string().nullish().describe('Optional per-tile model override for the AI Chat tile. Null or absent uses the account\'s default model.'),
   "scrollable": zod.boolean().nullish().describe('When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).'),
   "hideStatusDot": zod.boolean().nullish().describe('When true, the tile header hides the service-reachability status dot even when the backing connection is configured. Absent or false shows the dot (the default).'),
   "truenasMetric": zod.union([zod.literal('cpuram'),zod.literal('network'),zod.literal('arc'),zod.literal('pools'),zod.literal('disks'),zod.literal('cputemp'),zod.literal(null)]).nullish().describe('Which single TrueNAS metric a dedicated TrueNAS tile renders with its bespoke visual: \"cpuram\", \"network\", \"arc\", \"pools\", \"disks\", or \"cputemp\". Null or absent means the tile shows the combined multi-section view (the default, backward-compatible behavior).'),
@@ -1437,6 +1453,8 @@ export const ExportPageResponse = zod.object({
   "calendarAccounts": zod.array(zod.string()).nullish().describe('Allow-list of calendar account keys the Calendar tile aggregates: \"google\" for the linked Google account, or the id of a saved CalDAV account. Null or absent means all configured accounts.'),
   "calendarDaysAhead": zod.number().nullish().describe('How many days ahead the Calendar tile looks for upcoming events. Null or absent defaults to a sensible value (clamped server-side).'),
   "calendarMaxEvents": zod.number().nullish().describe('Maximum number of events the Calendar tile requests\/shows. Null or absent defaults to a sensible value (clamped server-side).'),
+  "aiAccountId": zod.string().nullish().describe('The saved AI account (from Settings) that backs an AI Chat tile. Null or absent means none chosen yet (the tile shows a demo conversation until one is selected).'),
+  "aiModel": zod.string().nullish().describe('Optional per-tile model override for the AI Chat tile. Null or absent uses the account\'s default model.'),
   "scrollable": zod.boolean().nullish().describe('When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).'),
   "hideStatusDot": zod.boolean().nullish().describe('When true, the tile header hides the service-reachability status dot even when the backing connection is configured. Absent or false shows the dot (the default).'),
   "truenasMetric": zod.union([zod.literal('cpuram'),zod.literal('network'),zod.literal('arc'),zod.literal('pools'),zod.literal('disks'),zod.literal('cputemp'),zod.literal(null)]).nullish().describe('Which single TrueNAS metric a dedicated TrueNAS tile renders with its bespoke visual: \"cpuram\", \"network\", \"arc\", \"pools\", \"disks\", or \"cputemp\". Null or absent means the tile shows the combined multi-section view (the default, backward-compatible behavior).'),
@@ -1573,6 +1591,8 @@ export const ExportPageResponse = zod.object({
   "calendarAccounts": zod.array(zod.string()).nullish().describe('Allow-list of calendar account keys the Calendar tile aggregates: \"google\" for the linked Google account, or the id of a saved CalDAV account. Null or absent means all configured accounts.'),
   "calendarDaysAhead": zod.number().nullish().describe('How many days ahead the Calendar tile looks for upcoming events. Null or absent defaults to a sensible value (clamped server-side).'),
   "calendarMaxEvents": zod.number().nullish().describe('Maximum number of events the Calendar tile requests\/shows. Null or absent defaults to a sensible value (clamped server-side).'),
+  "aiAccountId": zod.string().nullish().describe('The saved AI account (from Settings) that backs an AI Chat tile. Null or absent means none chosen yet (the tile shows a demo conversation until one is selected).'),
+  "aiModel": zod.string().nullish().describe('Optional per-tile model override for the AI Chat tile. Null or absent uses the account\'s default model.'),
   "scrollable": zod.boolean().nullish().describe('When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).'),
   "hideStatusDot": zod.boolean().nullish().describe('When true, the tile header hides the service-reachability status dot even when the backing connection is configured. Absent or false shows the dot (the default).'),
   "truenasMetric": zod.union([zod.literal('cpuram'),zod.literal('network'),zod.literal('arc'),zod.literal('pools'),zod.literal('disks'),zod.literal('cputemp'),zod.literal(null)]).nullish().describe('Which single TrueNAS metric a dedicated TrueNAS tile renders with its bespoke visual: \"cpuram\", \"network\", \"arc\", \"pools\", \"disks\", or \"cputemp\". Null or absent means the tile shows the combined multi-section view (the default, backward-compatible behavior).'),
@@ -1722,6 +1742,8 @@ export const ImportPagesBody = zod.object({
   "calendarAccounts": zod.array(zod.string()).nullish().describe('Allow-list of calendar account keys the Calendar tile aggregates: \"google\" for the linked Google account, or the id of a saved CalDAV account. Null or absent means all configured accounts.'),
   "calendarDaysAhead": zod.number().nullish().describe('How many days ahead the Calendar tile looks for upcoming events. Null or absent defaults to a sensible value (clamped server-side).'),
   "calendarMaxEvents": zod.number().nullish().describe('Maximum number of events the Calendar tile requests\/shows. Null or absent defaults to a sensible value (clamped server-side).'),
+  "aiAccountId": zod.string().nullish().describe('The saved AI account (from Settings) that backs an AI Chat tile. Null or absent means none chosen yet (the tile shows a demo conversation until one is selected).'),
+  "aiModel": zod.string().nullish().describe('Optional per-tile model override for the AI Chat tile. Null or absent uses the account\'s default model.'),
   "scrollable": zod.boolean().nullish().describe('When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).'),
   "hideStatusDot": zod.boolean().nullish().describe('When true, the tile header hides the service-reachability status dot even when the backing connection is configured. Absent or false shows the dot (the default).'),
   "truenasMetric": zod.union([zod.literal('cpuram'),zod.literal('network'),zod.literal('arc'),zod.literal('pools'),zod.literal('disks'),zod.literal('cputemp'),zod.literal(null)]).nullish().describe('Which single TrueNAS metric a dedicated TrueNAS tile renders with its bespoke visual: \"cpuram\", \"network\", \"arc\", \"pools\", \"disks\", or \"cputemp\". Null or absent means the tile shows the combined multi-section view (the default, backward-compatible behavior).'),
@@ -1858,6 +1880,8 @@ export const ImportPagesBody = zod.object({
   "calendarAccounts": zod.array(zod.string()).nullish().describe('Allow-list of calendar account keys the Calendar tile aggregates: \"google\" for the linked Google account, or the id of a saved CalDAV account. Null or absent means all configured accounts.'),
   "calendarDaysAhead": zod.number().nullish().describe('How many days ahead the Calendar tile looks for upcoming events. Null or absent defaults to a sensible value (clamped server-side).'),
   "calendarMaxEvents": zod.number().nullish().describe('Maximum number of events the Calendar tile requests\/shows. Null or absent defaults to a sensible value (clamped server-side).'),
+  "aiAccountId": zod.string().nullish().describe('The saved AI account (from Settings) that backs an AI Chat tile. Null or absent means none chosen yet (the tile shows a demo conversation until one is selected).'),
+  "aiModel": zod.string().nullish().describe('Optional per-tile model override for the AI Chat tile. Null or absent uses the account\'s default model.'),
   "scrollable": zod.boolean().nullish().describe('When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).'),
   "hideStatusDot": zod.boolean().nullish().describe('When true, the tile header hides the service-reachability status dot even when the backing connection is configured. Absent or false shows the dot (the default).'),
   "truenasMetric": zod.union([zod.literal('cpuram'),zod.literal('network'),zod.literal('arc'),zod.literal('pools'),zod.literal('disks'),zod.literal('cputemp'),zod.literal(null)]).nullish().describe('Which single TrueNAS metric a dedicated TrueNAS tile renders with its bespoke visual: \"cpuram\", \"network\", \"arc\", \"pools\", \"disks\", or \"cputemp\". Null or absent means the tile shows the combined multi-section view (the default, backward-compatible behavior).'),
@@ -2014,6 +2038,8 @@ export const ExportProfileResponse = zod.object({
   "calendarAccounts": zod.array(zod.string()).nullish().describe('Allow-list of calendar account keys the Calendar tile aggregates: \"google\" for the linked Google account, or the id of a saved CalDAV account. Null or absent means all configured accounts.'),
   "calendarDaysAhead": zod.number().nullish().describe('How many days ahead the Calendar tile looks for upcoming events. Null or absent defaults to a sensible value (clamped server-side).'),
   "calendarMaxEvents": zod.number().nullish().describe('Maximum number of events the Calendar tile requests\/shows. Null or absent defaults to a sensible value (clamped server-side).'),
+  "aiAccountId": zod.string().nullish().describe('The saved AI account (from Settings) that backs an AI Chat tile. Null or absent means none chosen yet (the tile shows a demo conversation until one is selected).'),
+  "aiModel": zod.string().nullish().describe('Optional per-tile model override for the AI Chat tile. Null or absent uses the account\'s default model.'),
   "scrollable": zod.boolean().nullish().describe('When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).'),
   "hideStatusDot": zod.boolean().nullish().describe('When true, the tile header hides the service-reachability status dot even when the backing connection is configured. Absent or false shows the dot (the default).'),
   "truenasMetric": zod.union([zod.literal('cpuram'),zod.literal('network'),zod.literal('arc'),zod.literal('pools'),zod.literal('disks'),zod.literal('cputemp'),zod.literal(null)]).nullish().describe('Which single TrueNAS metric a dedicated TrueNAS tile renders with its bespoke visual: \"cpuram\", \"network\", \"arc\", \"pools\", \"disks\", or \"cputemp\". Null or absent means the tile shows the combined multi-section view (the default, backward-compatible behavior).'),
@@ -2150,6 +2176,8 @@ export const ExportProfileResponse = zod.object({
   "calendarAccounts": zod.array(zod.string()).nullish().describe('Allow-list of calendar account keys the Calendar tile aggregates: \"google\" for the linked Google account, or the id of a saved CalDAV account. Null or absent means all configured accounts.'),
   "calendarDaysAhead": zod.number().nullish().describe('How many days ahead the Calendar tile looks for upcoming events. Null or absent defaults to a sensible value (clamped server-side).'),
   "calendarMaxEvents": zod.number().nullish().describe('Maximum number of events the Calendar tile requests\/shows. Null or absent defaults to a sensible value (clamped server-side).'),
+  "aiAccountId": zod.string().nullish().describe('The saved AI account (from Settings) that backs an AI Chat tile. Null or absent means none chosen yet (the tile shows a demo conversation until one is selected).'),
+  "aiModel": zod.string().nullish().describe('Optional per-tile model override for the AI Chat tile. Null or absent uses the account\'s default model.'),
   "scrollable": zod.boolean().nullish().describe('When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).'),
   "hideStatusDot": zod.boolean().nullish().describe('When true, the tile header hides the service-reachability status dot even when the backing connection is configured. Absent or false shows the dot (the default).'),
   "truenasMetric": zod.union([zod.literal('cpuram'),zod.literal('network'),zod.literal('arc'),zod.literal('pools'),zod.literal('disks'),zod.literal('cputemp'),zod.literal(null)]).nullish().describe('Which single TrueNAS metric a dedicated TrueNAS tile renders with its bespoke visual: \"cpuram\", \"network\", \"arc\", \"pools\", \"disks\", or \"cputemp\". Null or absent means the tile shows the combined multi-section view (the default, backward-compatible behavior).'),
@@ -2315,6 +2343,8 @@ export const ImportProfileBody = zod.object({
   "calendarAccounts": zod.array(zod.string()).nullish().describe('Allow-list of calendar account keys the Calendar tile aggregates: \"google\" for the linked Google account, or the id of a saved CalDAV account. Null or absent means all configured accounts.'),
   "calendarDaysAhead": zod.number().nullish().describe('How many days ahead the Calendar tile looks for upcoming events. Null or absent defaults to a sensible value (clamped server-side).'),
   "calendarMaxEvents": zod.number().nullish().describe('Maximum number of events the Calendar tile requests\/shows. Null or absent defaults to a sensible value (clamped server-side).'),
+  "aiAccountId": zod.string().nullish().describe('The saved AI account (from Settings) that backs an AI Chat tile. Null or absent means none chosen yet (the tile shows a demo conversation until one is selected).'),
+  "aiModel": zod.string().nullish().describe('Optional per-tile model override for the AI Chat tile. Null or absent uses the account\'s default model.'),
   "scrollable": zod.boolean().nullish().describe('When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).'),
   "hideStatusDot": zod.boolean().nullish().describe('When true, the tile header hides the service-reachability status dot even when the backing connection is configured. Absent or false shows the dot (the default).'),
   "truenasMetric": zod.union([zod.literal('cpuram'),zod.literal('network'),zod.literal('arc'),zod.literal('pools'),zod.literal('disks'),zod.literal('cputemp'),zod.literal(null)]).nullish().describe('Which single TrueNAS metric a dedicated TrueNAS tile renders with its bespoke visual: \"cpuram\", \"network\", \"arc\", \"pools\", \"disks\", or \"cputemp\". Null or absent means the tile shows the combined multi-section view (the default, backward-compatible behavior).'),
@@ -2451,6 +2481,8 @@ export const ImportProfileBody = zod.object({
   "calendarAccounts": zod.array(zod.string()).nullish().describe('Allow-list of calendar account keys the Calendar tile aggregates: \"google\" for the linked Google account, or the id of a saved CalDAV account. Null or absent means all configured accounts.'),
   "calendarDaysAhead": zod.number().nullish().describe('How many days ahead the Calendar tile looks for upcoming events. Null or absent defaults to a sensible value (clamped server-side).'),
   "calendarMaxEvents": zod.number().nullish().describe('Maximum number of events the Calendar tile requests\/shows. Null or absent defaults to a sensible value (clamped server-side).'),
+  "aiAccountId": zod.string().nullish().describe('The saved AI account (from Settings) that backs an AI Chat tile. Null or absent means none chosen yet (the tile shows a demo conversation until one is selected).'),
+  "aiModel": zod.string().nullish().describe('Optional per-tile model override for the AI Chat tile. Null or absent uses the account\'s default model.'),
   "scrollable": zod.boolean().nullish().describe('When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).'),
   "hideStatusDot": zod.boolean().nullish().describe('When true, the tile header hides the service-reachability status dot even when the backing connection is configured. Absent or false shows the dot (the default).'),
   "truenasMetric": zod.union([zod.literal('cpuram'),zod.literal('network'),zod.literal('arc'),zod.literal('pools'),zod.literal('disks'),zod.literal('cputemp'),zod.literal(null)]).nullish().describe('Which single TrueNAS metric a dedicated TrueNAS tile renders with its bespoke visual: \"cpuram\", \"network\", \"arc\", \"pools\", \"disks\", or \"cputemp\". Null or absent means the tile shows the combined multi-section view (the default, backward-compatible behavior).'),
@@ -3566,6 +3598,133 @@ export const DisconnectGoogleResponse = zod.object({
   "redirectUri": zod.string().nullish().describe('The exact OAuth redirect URI the Google Cloud project must allow-list.'),
   "credentialSource": zod.union([zod.literal('env'),zod.literal('stored'),zod.literal(null)]).nullish().describe('Where the active OAuth client credentials come from: \"env\" (server environment variables, read-only in the UI) or \"stored\" (saved via Settings). Null when not configured.'),
   "clientId": zod.string().nullish().describe('The active OAuth client ID (the secret is never returned). Null when not configured.')
+})
+
+
+/**
+ * @summary List the saved AI provider accounts (API keys masked)
+ */
+export const ListAiAccountsResponseItem = zod.object({
+  "id": zod.string(),
+  "label": zod.string(),
+  "provider": zod.enum(['openai', 'gemini', 'anthropic', 'ollama', 'openai_compatible']).describe('Supported AI chat providers. \"ollama\" and \"openai_compatible\" are local\/self-hosted servers reached via a base URL (no API key needed).'),
+  "maskedKey": zod.string().describe('Masked API key hint (last 4 characters at most). Empty for local keyless accounts.'),
+  "baseUrl": zod.string().nullish().describe('Base URL of a local\/self-hosted server, if any.'),
+  "model": zod.string().nullish()
+}).describe('A saved AI account as returned to the browser (key masked).')
+export const ListAiAccountsResponse = zod.array(ListAiAccountsResponseItem)
+
+
+/**
+ * @summary Add an AI provider account
+ */
+export const AddAiAccountBody = zod.object({
+  "label": zod.string().nullish().describe('Display label; defaults to the provider name when empty.'),
+  "provider": zod.enum(['openai', 'gemini', 'anthropic', 'ollama', 'openai_compatible']).describe('Supported AI chat providers. \"ollama\" and \"openai_compatible\" are local\/self-hosted servers reached via a base URL (no API key needed).'),
+  "apiKey": zod.string().nullish().describe('The provider API key. Stored server-side, never echoed back. Required for cloud providers; optional for local ones.'),
+  "baseUrl": zod.string().nullish().describe('Base URL of a local\/self-hosted AI server (e.g. \"http:\/\/192.168.1.10:11434\" for Ollama or \"http:\/\/192.168.1.10:1234\" for LM Studio). Required for local providers, ignored for cloud providers.'),
+  "model": zod.string().nullish().describe('Default model for this account (e.g. \"gpt-4o-mini\"). Null or absent uses a sensible provider default.')
+})
+
+export const AddAiAccountResponseItem = zod.object({
+  "id": zod.string(),
+  "label": zod.string(),
+  "provider": zod.enum(['openai', 'gemini', 'anthropic', 'ollama', 'openai_compatible']).describe('Supported AI chat providers. \"ollama\" and \"openai_compatible\" are local\/self-hosted servers reached via a base URL (no API key needed).'),
+  "maskedKey": zod.string().describe('Masked API key hint (last 4 characters at most). Empty for local keyless accounts.'),
+  "baseUrl": zod.string().nullish().describe('Base URL of a local\/self-hosted server, if any.'),
+  "model": zod.string().nullish()
+}).describe('A saved AI account as returned to the browser (key masked).')
+export const AddAiAccountResponse = zod.array(AddAiAccountResponseItem)
+
+
+/**
+ * @summary Update a saved AI account (omit apiKey to keep the stored key)
+ */
+export const UpdateAiAccountParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const UpdateAiAccountBody = zod.object({
+  "label": zod.string().nullish(),
+  "provider": zod.union([zod.enum(['openai', 'gemini', 'anthropic', 'ollama', 'openai_compatible']).describe('Supported AI chat providers. \"ollama\" and \"openai_compatible\" are local\/self-hosted servers reached via a base URL (no API key needed).'),zod.null()]).optional(),
+  "apiKey": zod.string().nullish(),
+  "baseUrl": zod.string().nullish(),
+  "model": zod.string().nullish()
+}).describe('Partial update for a saved AI account. Absent fields keep their stored values; in particular, omitting apiKey keeps the stored key.')
+
+export const UpdateAiAccountResponseItem = zod.object({
+  "id": zod.string(),
+  "label": zod.string(),
+  "provider": zod.enum(['openai', 'gemini', 'anthropic', 'ollama', 'openai_compatible']).describe('Supported AI chat providers. \"ollama\" and \"openai_compatible\" are local\/self-hosted servers reached via a base URL (no API key needed).'),
+  "maskedKey": zod.string().describe('Masked API key hint (last 4 characters at most). Empty for local keyless accounts.'),
+  "baseUrl": zod.string().nullish().describe('Base URL of a local\/self-hosted server, if any.'),
+  "model": zod.string().nullish()
+}).describe('A saved AI account as returned to the browser (key masked).')
+export const UpdateAiAccountResponse = zod.array(UpdateAiAccountResponseItem)
+
+
+/**
+ * @summary Remove a saved AI account
+ */
+export const RemoveAiAccountParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const RemoveAiAccountResponseItem = zod.object({
+  "id": zod.string(),
+  "label": zod.string(),
+  "provider": zod.enum(['openai', 'gemini', 'anthropic', 'ollama', 'openai_compatible']).describe('Supported AI chat providers. \"ollama\" and \"openai_compatible\" are local\/self-hosted servers reached via a base URL (no API key needed).'),
+  "maskedKey": zod.string().describe('Masked API key hint (last 4 characters at most). Empty for local keyless accounts.'),
+  "baseUrl": zod.string().nullish().describe('Base URL of a local\/self-hosted server, if any.'),
+  "model": zod.string().nullish()
+}).describe('A saved AI account as returned to the browser (key masked).')
+export const RemoveAiAccountResponse = zod.array(RemoveAiAccountResponseItem)
+
+
+/**
+ * @summary Verify a saved AI account's API key against its provider
+ */
+export const TestAiAccountParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const TestAiAccountResponse = zod.object({
+  "ok": zod.boolean(),
+  "message": zod.string().nullish()
+})
+
+
+/**
+ * @summary Send a chat conversation to the AI provider backing the selected account and return the assistant's reply. Returns a sample reply (sample:true) only when no AI accounts are configured at all.
+ */
+export const AiChatBody = zod.object({
+  "accountId": zod.string().nullish().describe('The saved AI account to chat through. May be omitted only when no accounts are configured at all (demo mode).'),
+  "model": zod.string().nullish().describe('Optional per-tile model override.'),
+  "messages": zod.array(zod.object({
+  "role": zod.enum(['user', 'assistant']),
+  "content": zod.string()
+})).describe('The conversation so far, oldest first.')
+})
+
+export const AiChatResponse = zod.object({
+  "sample": zod.boolean().describe('True when this is a demo reply (no accounts configured).'),
+  "reply": zod.string(),
+  "model": zod.string().describe('The model that produced the reply.')
+})
+
+
+/**
+ * @summary List the model options for one saved AI account (live from the provider when possible, otherwise a static fallback list).
+ */
+export const AiModelsQueryParams = zod.object({
+  "accountId": zod.coerce.string()
+})
+
+export const AiModelsResponse = zod.object({
+  "provider": zod.enum(['openai', 'gemini', 'anthropic', 'ollama', 'openai_compatible']).describe('Supported AI chat providers. \"ollama\" and \"openai_compatible\" are local\/self-hosted servers reached via a base URL (no API key needed).'),
+  "models": zod.array(zod.string()),
+  "live": zod.boolean().describe('True when the list came live from the provider; false when it is the static fallback list.'),
+  "default": zod.string().nullish().describe('The account\'s saved default model, if any.')
 })
 
 

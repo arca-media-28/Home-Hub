@@ -20,6 +20,14 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  AiAccount,
+  AiAccountInput,
+  AiAccountUpdate,
+  AiChatReply,
+  AiChatRequest,
+  AiModelList,
+  AiModelsParams,
+  AiTestResult,
   AudioBrowseResult,
   AudioFavoriteInput,
   AudioFavoriteResult,
@@ -5973,6 +5981,521 @@ export const useDisconnectGoogle = <TError = ErrorType<unknown>,
       > => {
       return useMutation(getDisconnectGoogleMutationOptions(options));
     }
+
+export const getListAiAccountsUrl = () => {
+
+
+
+
+  return `/api/connections/ai/accounts`
+}
+
+/**
+ * @summary List the saved AI provider accounts (API keys masked)
+ */
+export const listAiAccounts = async ( options?: RequestInit): Promise<AiAccount[]> => {
+
+  return customFetch<AiAccount[]>(getListAiAccountsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListAiAccountsQueryKey = () => {
+    return [
+    `/api/connections/ai/accounts`
+    ] as const;
+    }
+
+
+export const getListAiAccountsQueryOptions = <TData = Awaited<ReturnType<typeof listAiAccounts>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAiAccounts>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListAiAccountsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listAiAccounts>>> = ({ signal }) => listAiAccounts({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listAiAccounts>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListAiAccountsQueryResult = NonNullable<Awaited<ReturnType<typeof listAiAccounts>>>
+export type ListAiAccountsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List the saved AI provider accounts (API keys masked)
+ */
+
+export function useListAiAccounts<TData = Awaited<ReturnType<typeof listAiAccounts>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAiAccounts>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListAiAccountsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getAddAiAccountUrl = () => {
+
+
+
+
+  return `/api/connections/ai/accounts`
+}
+
+/**
+ * @summary Add an AI provider account
+ */
+export const addAiAccount = async (aiAccountInput: AiAccountInput, options?: RequestInit): Promise<AiAccount[]> => {
+
+  return customFetch<AiAccount[]>(getAddAiAccountUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      aiAccountInput,)
+  }
+);}
+
+
+
+
+export const getAddAiAccountMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof addAiAccount>>, TError,{data: BodyType<AiAccountInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof addAiAccount>>, TError,{data: BodyType<AiAccountInput>}, TContext> => {
+
+const mutationKey = ['addAiAccount'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof addAiAccount>>, {data: BodyType<AiAccountInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  addAiAccount(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AddAiAccountMutationResult = NonNullable<Awaited<ReturnType<typeof addAiAccount>>>
+    export type AddAiAccountMutationBody = BodyType<AiAccountInput>
+    export type AddAiAccountMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Add an AI provider account
+ */
+export const useAddAiAccount = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof addAiAccount>>, TError,{data: BodyType<AiAccountInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof addAiAccount>>,
+        TError,
+        {data: BodyType<AiAccountInput>},
+        TContext
+      > => {
+      return useMutation(getAddAiAccountMutationOptions(options));
+    }
+
+export const getUpdateAiAccountUrl = (id: string,) => {
+
+
+
+
+  return `/api/connections/ai/accounts/${id}`
+}
+
+/**
+ * @summary Update a saved AI account (omit apiKey to keep the stored key)
+ */
+export const updateAiAccount = async (id: string,
+    aiAccountUpdate: AiAccountUpdate, options?: RequestInit): Promise<AiAccount[]> => {
+
+  return customFetch<AiAccount[]>(getUpdateAiAccountUrl(id),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      aiAccountUpdate,)
+  }
+);}
+
+
+
+
+export const getUpdateAiAccountMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAiAccount>>, TError,{id: string;data: BodyType<AiAccountUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateAiAccount>>, TError,{id: string;data: BodyType<AiAccountUpdate>}, TContext> => {
+
+const mutationKey = ['updateAiAccount'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateAiAccount>>, {id: string;data: BodyType<AiAccountUpdate>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateAiAccount(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateAiAccountMutationResult = NonNullable<Awaited<ReturnType<typeof updateAiAccount>>>
+    export type UpdateAiAccountMutationBody = BodyType<AiAccountUpdate>
+    export type UpdateAiAccountMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Update a saved AI account (omit apiKey to keep the stored key)
+ */
+export const useUpdateAiAccount = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAiAccount>>, TError,{id: string;data: BodyType<AiAccountUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateAiAccount>>,
+        TError,
+        {id: string;data: BodyType<AiAccountUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateAiAccountMutationOptions(options));
+    }
+
+export const getRemoveAiAccountUrl = (id: string,) => {
+
+
+
+
+  return `/api/connections/ai/accounts/${id}`
+}
+
+/**
+ * @summary Remove a saved AI account
+ */
+export const removeAiAccount = async (id: string, options?: RequestInit): Promise<AiAccount[]> => {
+
+  return customFetch<AiAccount[]>(getRemoveAiAccountUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getRemoveAiAccountMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof removeAiAccount>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof removeAiAccount>>, TError,{id: string}, TContext> => {
+
+const mutationKey = ['removeAiAccount'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof removeAiAccount>>, {id: string}> = (props) => {
+          const {id} = props ?? {};
+
+          return  removeAiAccount(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RemoveAiAccountMutationResult = NonNullable<Awaited<ReturnType<typeof removeAiAccount>>>
+
+    export type RemoveAiAccountMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Remove a saved AI account
+ */
+export const useRemoveAiAccount = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof removeAiAccount>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof removeAiAccount>>,
+        TError,
+        {id: string},
+        TContext
+      > => {
+      return useMutation(getRemoveAiAccountMutationOptions(options));
+    }
+
+export const getTestAiAccountUrl = (id: string,) => {
+
+
+
+
+  return `/api/connections/ai/accounts/${id}/test`
+}
+
+/**
+ * @summary Verify a saved AI account's API key against its provider
+ */
+export const testAiAccount = async (id: string, options?: RequestInit): Promise<AiTestResult> => {
+
+  return customFetch<AiTestResult>(getTestAiAccountUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getTestAiAccountMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof testAiAccount>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof testAiAccount>>, TError,{id: string}, TContext> => {
+
+const mutationKey = ['testAiAccount'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof testAiAccount>>, {id: string}> = (props) => {
+          const {id} = props ?? {};
+
+          return  testAiAccount(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type TestAiAccountMutationResult = NonNullable<Awaited<ReturnType<typeof testAiAccount>>>
+
+    export type TestAiAccountMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Verify a saved AI account's API key against its provider
+ */
+export const useTestAiAccount = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof testAiAccount>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof testAiAccount>>,
+        TError,
+        {id: string},
+        TContext
+      > => {
+      return useMutation(getTestAiAccountMutationOptions(options));
+    }
+
+export const getAiChatUrl = () => {
+
+
+
+
+  return `/api/widgets/ai/chat`
+}
+
+/**
+ * @summary Send a chat conversation to the AI provider backing the selected account and return the assistant's reply. Returns a sample reply (sample:true) only when no AI accounts are configured at all.
+ */
+export const aiChat = async (aiChatRequest: AiChatRequest, options?: RequestInit): Promise<AiChatReply> => {
+
+  return customFetch<AiChatReply>(getAiChatUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      aiChatRequest,)
+  }
+);}
+
+
+
+
+export const getAiChatMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof aiChat>>, TError,{data: BodyType<AiChatRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof aiChat>>, TError,{data: BodyType<AiChatRequest>}, TContext> => {
+
+const mutationKey = ['aiChat'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof aiChat>>, {data: BodyType<AiChatRequest>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  aiChat(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AiChatMutationResult = NonNullable<Awaited<ReturnType<typeof aiChat>>>
+    export type AiChatMutationBody = BodyType<AiChatRequest>
+    export type AiChatMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Send a chat conversation to the AI provider backing the selected account and return the assistant's reply. Returns a sample reply (sample:true) only when no AI accounts are configured at all.
+ */
+export const useAiChat = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof aiChat>>, TError,{data: BodyType<AiChatRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof aiChat>>,
+        TError,
+        {data: BodyType<AiChatRequest>},
+        TContext
+      > => {
+      return useMutation(getAiChatMutationOptions(options));
+    }
+
+export const getAiModelsUrl = (params: AiModelsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/widgets/ai/models?${stringifiedParams}` : `/api/widgets/ai/models`
+}
+
+/**
+ * @summary List the model options for one saved AI account (live from the provider when possible, otherwise a static fallback list).
+ */
+export const aiModels = async (params: AiModelsParams, options?: RequestInit): Promise<AiModelList> => {
+
+  return customFetch<AiModelList>(getAiModelsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getAiModelsQueryKey = (params?: AiModelsParams,) => {
+    return [
+    `/api/widgets/ai/models`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getAiModelsQueryOptions = <TData = Awaited<ReturnType<typeof aiModels>>, TError = ErrorType<ErrorResponse>>(params: AiModelsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof aiModels>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getAiModelsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof aiModels>>> = ({ signal }) => aiModels(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof aiModels>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type AiModelsQueryResult = NonNullable<Awaited<ReturnType<typeof aiModels>>>
+export type AiModelsQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary List the model options for one saved AI account (live from the provider when possible, otherwise a static fallback list).
+ */
+
+export function useAiModels<TData = Awaited<ReturnType<typeof aiModels>>, TError = ErrorType<ErrorResponse>>(
+ params: AiModelsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof aiModels>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getAiModelsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 
 export const getListImapAccountsUrl = () => {
 

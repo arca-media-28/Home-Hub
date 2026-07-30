@@ -6,6 +6,17 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './aiAccount';
+export * from './aiAccountInput';
+export * from './aiAccountUpdate';
+export * from './aiChatMessage';
+export * from './aiChatMessageRole';
+export * from './aiChatReply';
+export * from './aiChatRequest';
+export * from './aiModelList';
+export * from './aiModelsParams';
+export * from './aiProvider';
+export * from './aiTestResult';
 export * from './audioBrowseResult';
 export * from './audioContainer';
 export * from './audioContainerKind';

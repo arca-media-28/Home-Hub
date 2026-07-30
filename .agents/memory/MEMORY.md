@@ -56,4 +56,5 @@
 - [Device modes + adaptive variants](device-modes-adaptive.md) — tiles scoped by (page, deviceModeId, variant "fhd-landscape"); pass all three everywhere; Playwright needs E2E_BASE_URL on Replit.
 - [Profile export/import](profile-export-import.md) — "tachboard-profile" v1 envelope; replace vs merge semantics; connections presence = key presence (empty [] still wipes on replace); client bundles theme in localStorage.
 - [ErsatzTV live TV playback](ersatztv-live-tv.md) — HLS proxy with ?token= JWT auth, playlist rewrite vs axios final redirect URL, no video src when hls.js attaches, channel in videoErsatzChannel.
+- [AI Chat tile](ai-chat-tile.md) — multi-account AI providers in "ai" row extra JSON; sample only at zero accounts, 502-with-hint on failure; history client-side homehub:aichat:<tileId>.
 - [Picture Frame tile](pictureframe-tile.md) — album photos come as authed /api/widgets/photos proxy paths (blob-fetch w/ token); Google baseUrls re-resolved per request; sample- albumIds = demo mode; frames drawn as padding+background.

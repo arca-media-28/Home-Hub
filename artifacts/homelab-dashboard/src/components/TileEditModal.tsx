@@ -161,6 +161,10 @@ import {
   getGetGoogleStatusQueryKey,
   useListImapAccounts,
   getListImapAccountsQueryKey,
+  useListAiAccounts,
+  getListAiAccountsQueryKey,
+  useAiModels,
+  getAiModelsQueryKey,
   useListCalDavAccounts,
   getListCalDavAccountsQueryKey,
   useGetPhotoAlbums,
@@ -247,6 +251,7 @@ const INTEGRATIONS = [
   { value: TileIntegration.news, label: "News" },
   { value: TileIntegration.email, label: "Email" },
   { value: TileIntegration.calendar, label: "Calendar" },
+  { value: TileIntegration.aichat, label: "AI Chat" },
   { value: TileIntegration.stocks, label: "Stocks" },
   { value: TileIntegration.eightball, label: "Magic Eight Ball" },
   { value: TileIntegration.dice, label: "Dice Roller" },
@@ -461,6 +466,14 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
   );
   const [calendarMaxEvents, setCalendarMaxEvents] = useState<number>(
     tile?.tileSettings?.calendarMaxEvents ?? 20,
+  );
+  // AI Chat widget options: which saved AI account backs the tile and an
+  // optional per-tile model override (empty = the account's default model).
+  const [aiAccountId, setAiAccountId] = useState<string>(
+    tile?.tileSettings?.aiAccountId ?? "",
+  );
+  const [aiModel, setAiModel] = useState<string>(
+    tile?.tileSettings?.aiModel ?? "",
   );
   // Stocks (watchlist) widget options. Each entry holds a symbol plus optional
   // share quantity and cost basis (turning the watchlist into a portfolio).
@@ -760,6 +773,8 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
       setCalendarAccounts(tile?.tileSettings?.calendarAccounts ?? []);
       setCalendarDaysAhead(tile?.tileSettings?.calendarDaysAhead ?? 14);
       setCalendarMaxEvents(tile?.tileSettings?.calendarMaxEvents ?? 20);
+      setAiAccountId(tile?.tileSettings?.aiAccountId ?? "");
+      setAiModel(tile?.tileSettings?.aiModel ?? "");
       setStockWatchlist(tile?.tileSettings?.stockWatchlist ?? []);
       setStockSearch("");
       setSleeperUsername(tile?.tileSettings?.sleeperUsername ?? "");
@@ -922,6 +937,7 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
   const isNews = integration === TileIntegration.news;
   const isEmail = integration === TileIntegration.email;
   const isCalendar = integration === TileIntegration.calendar;
+  const isAiChat = integration === TileIntegration.aichat;
   const isStocks = integration === TileIntegration.stocks;
   const isSleeper = integration === TileIntegration.sleeper;
   const isAudioPlayer = integration === TileIntegration.audioplayer;
@@ -1121,6 +1137,24 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
       enabled: open && isCalendar,
     },
   });
+  // AI Chat: saved AI accounts (for the account picker) and the selected
+  // account's model options (for the optional per-tile model override).
+  const aiAccountsQuery = useListAiAccounts({
+    query: {
+      queryKey: getListAiAccountsQueryKey(),
+      enabled: open && isAiChat,
+    },
+  });
+  const aiAccounts = aiAccountsQuery.data ?? [];
+  const aiModelsQuery = useAiModels(
+    { accountId: aiAccountId },
+    {
+      query: {
+        queryKey: getAiModelsQueryKey({ accountId: aiAccountId }),
+        enabled: open && isAiChat && aiAccountId.length > 0,
+      },
+    },
+  );
   // Every linked Google account is individually selectable (keyed by its
   // stable account id). Legacy tiles saved with the old "gmail"/"google" keys
   // still work — the backend treats those as "all Google accounts".
@@ -1711,6 +1745,11 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
                           calendarAccounts.length > 0 ? calendarAccounts : null,
                         calendarDaysAhead,
                         calendarMaxEvents,
+                      }
+                  : isAiChat
+                    ? {
+                        aiAccountId: aiAccountId || null,
+                        aiModel: aiModel || null,
                       }
                   : isStocks
                     ? { stockWatchlist }
@@ -4449,6 +4488,73 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
                   </Select>
                 </div>
               </div>
+            </div>
+          )}
+
+          {isAiChat && (
+            <div className="space-y-3 border-t border-border pt-4">
+              <div className="space-y-1.5">
+                <Label>AI account</Label>
+                {aiAccounts.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">
+                    No AI accounts saved yet — add one (OpenAI, Gemini, or
+                    Anthropic) in Settings. Until then the tile shows a sample
+                    conversation.
+                  </p>
+                ) : (
+                  <Select
+                    value={aiAccountId || "__none"}
+                    onValueChange={(v) => {
+                      setAiAccountId(v === "__none" ? "" : v);
+                      // The model list belongs to the previous account.
+                      setAiModel("");
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Choose an account" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none">Not configured</SelectItem>
+                      {aiAccounts.map((a) => (
+                        <SelectItem key={a.id} value={a.id}>
+                          {a.label} ({a.provider})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
+
+              {aiAccountId && (
+                <div className="space-y-1.5">
+                  <Label>Model</Label>
+                  <Select
+                    value={aiModel || "__default"}
+                    onValueChange={(v) => setAiModel(v === "__default" ? "" : v)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__default">
+                        Account default
+                        {(() => {
+                          const acct = aiAccounts.find((a) => a.id === aiAccountId);
+                          return acct?.model ? ` (${acct.model})` : "";
+                        })()}
+                      </SelectItem>
+                      {(aiModelsQuery.data?.models ?? []).map((m) => (
+                        <SelectItem key={m} value={m}>
+                          {m}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Override the account's default model for this tile only.
+                  </p>
+                </div>
+              )}
             </div>
           )}
 

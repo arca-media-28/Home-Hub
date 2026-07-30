@@ -22,6 +22,14 @@ import {
   useListCalDavAccounts,
   useAddCalDavAccount,
   useRemoveCalDavAccount,
+  useListAiAccounts,
+  useAddAiAccount,
+  useUpdateAiAccount,
+  useRemoveAiAccount,
+  useTestAiAccount,
+  getListAiAccountsQueryKey,
+  AiProvider,
+  type AiAccount,
   getGetConnectionsQueryKey,
   getGetConnectionsStatusQueryKey,
   getGetSpotifyStatusQueryKey,
@@ -43,6 +51,13 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import AppearanceSettings from "@/components/AppearanceSettings";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Boxes,
   ArrowLeft,
@@ -74,6 +89,8 @@ import {
   CalendarDays,
   Trash2,
   Image as ImageIcon,
+  Bot,
+  Pencil,
 } from "lucide-react";
 import {
   Collapsible,
@@ -1854,6 +1871,372 @@ function CalDavAccountsCard() {
   );
 }
 
+const AI_PROVIDER_LABELS: Record<string, string> = {
+  [AiProvider.openai]: "OpenAI (ChatGPT)",
+  [AiProvider.gemini]: "Google Gemini",
+  [AiProvider.anthropic]: "Anthropic (Claude)",
+  [AiProvider.ollama]: "Ollama (local)",
+  [AiProvider.openai_compatible]: "Local server (LM Studio, vLLM…)",
+};
+
+// Local providers connect to a server on your network via a base URL instead
+// of a cloud API key.
+const LOCAL_AI_PROVIDERS: string[] = [AiProvider.ollama, AiProvider.openai_compatible];
+
+function AiAccountsCard() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const { data: accounts, isLoading } = useListAiAccounts({
+    query: { queryKey: getListAiAccountsQueryKey() },
+  });
+
+  // Shared add/edit form. `editing` holds the account being edited (null when
+  // adding). While editing, an empty key field means "keep the saved key".
+  const [editing, setEditing] = useState<AiAccount | null>(null);
+  const [label, setLabel] = useState("");
+  const [provider, setProvider] = useState<string>(AiProvider.openai);
+  const [apiKey, setApiKey] = useState("");
+  const [baseUrl, setBaseUrl] = useState("");
+  const [model, setModel] = useState("");
+  const isLocal = LOCAL_AI_PROVIDERS.includes(provider);
+  // Per-account test feedback keyed by account id.
+  const [testResults, setTestResults] = useState<
+    Record<string, { ok: boolean; message: string }>
+  >({});
+
+  function resetForm() {
+    setEditing(null);
+    setLabel("");
+    setProvider(AiProvider.openai);
+    setApiKey("");
+    setBaseUrl("");
+    setModel("");
+  }
+
+  const addMutation = useAddAiAccount({
+    mutation: {
+      onSuccess: (next) => {
+        queryClient.setQueryData(getListAiAccountsQueryKey(), next);
+        resetForm();
+        toast({ title: "AI account added" });
+      },
+      onError: (err) =>
+        toast({
+          title: "Couldn’t add AI account",
+          description:
+            err instanceof ApiError ? err.message : "Check the details and try again.",
+          variant: "destructive",
+        }),
+    },
+  });
+
+  const updateMutation = useUpdateAiAccount({
+    mutation: {
+      onSuccess: (next) => {
+        queryClient.setQueryData(getListAiAccountsQueryKey(), next);
+        resetForm();
+        toast({ title: "AI account updated" });
+      },
+      onError: (err) =>
+        toast({
+          title: "Couldn’t update AI account",
+          description:
+            err instanceof ApiError ? err.message : "Check the details and try again.",
+          variant: "destructive",
+        }),
+    },
+  });
+
+  const removeMutation = useRemoveAiAccount({
+    mutation: {
+      onSuccess: (next, vars) => {
+        queryClient.setQueryData(getListAiAccountsQueryKey(), next);
+        if (editing?.id === vars.id) resetForm();
+        toast({ title: "AI account removed" });
+      },
+      onError: () =>
+        queryClient.invalidateQueries({ queryKey: getListAiAccountsQueryKey() }),
+    },
+  });
+
+  const testMutation = useTestAiAccount({
+    mutation: {
+      onSuccess: (result, vars) => {
+        setTestResults((cur) => ({
+          ...cur,
+          [vars.id]: {
+            ok: result.ok,
+            message:
+              result.message || (result.ok ? "Key works" : "Key check failed"),
+          },
+        }));
+      },
+      onError: (err, vars) => {
+        setTestResults((cur) => ({
+          ...cur,
+          [vars.id]: {
+            ok: false,
+            message: err instanceof ApiError ? err.message : "Test failed",
+          },
+        }));
+      },
+    },
+  });
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (editing) {
+      updateMutation.mutate({
+        id: editing.id,
+        data: {
+          label: label.trim() || null,
+          provider: provider as AiAccount["provider"],
+          apiKey: apiKey.trim() || null,
+          baseUrl: isLocal ? baseUrl.trim() || null : null,
+          model: model.trim() || null,
+        },
+      });
+    } else {
+      if (isLocal ? !baseUrl.trim() : !apiKey.trim()) return;
+      addMutation.mutate({
+        data: {
+          label: label.trim() || null,
+          provider: provider as AiAccount["provider"],
+          apiKey: apiKey.trim() || null,
+          baseUrl: isLocal ? baseUrl.trim() : null,
+          model: model.trim() || null,
+        },
+      });
+    }
+  }
+
+  function startEdit(a: AiAccount) {
+    setEditing(a);
+    setLabel(a.label);
+    setProvider(a.provider);
+    setApiKey("");
+    setBaseUrl(a.baseUrl ?? "");
+    setModel(a.model ?? "");
+  }
+
+  const saving = addMutation.isPending || updateMutation.isPending;
+
+  return (
+    <div className="border border-border bg-card relative">
+      <div className="absolute top-0 left-0 h-full w-0.5 bg-primary/60" />
+      <div className="flex items-center justify-between gap-2.5 px-5 py-4 border-b border-border">
+        <div className="flex items-center gap-2.5">
+          <Bot className="w-4 h-4 text-primary" />
+          <h2 className="font-bold text-sm uppercase tracking-widest text-foreground">
+            AI Accounts
+          </h2>
+        </div>
+        {!isLoading && (
+          <span className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground">
+            {(accounts ?? []).length > 0
+              ? `${(accounts ?? []).length} account${(accounts ?? []).length === 1 ? "" : "s"}`
+              : "None"}
+          </span>
+        )}
+      </div>
+
+      <div className="p-5 space-y-4">
+        <p className="text-xs text-muted-foreground">
+          Bring your own API keys for OpenAI, Google Gemini, or Anthropic
+          Claude — or point at a local model server like Ollama or LM Studio on
+          your network — to power AI Chat tiles. Keys are stored on the host and
+          never sent back to the browser — only a masked hint is shown here.
+        </p>
+
+        {(accounts ?? []).length > 0 && (
+          <ul className="space-y-2">
+            {(accounts ?? []).map((a) => {
+              const test = testResults[a.id];
+              return (
+                <li
+                  key={a.id}
+                  className="border border-border bg-muted/30 px-3 py-2 space-y-1"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-sm text-foreground truncate">
+                        {a.label}
+                      </div>
+                      <div className="text-xs text-muted-foreground truncate">
+                        {AI_PROVIDER_LABELS[a.provider] ?? a.provider}
+                        {a.baseUrl ? ` · ${a.baseUrl}` : ""}
+                        {a.maskedKey ? ` · ${a.maskedKey}` : ""}
+                        {a.model ? ` · ${a.model}` : ""}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => testMutation.mutate({ id: a.id })}
+                        disabled={testMutation.isPending}
+                        className="h-7 px-2 text-xs"
+                      >
+                        {testMutation.isPending && testMutation.variables?.id === a.id ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          "Test"
+                        )}
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => startEdit(a)}
+                        className="h-7 px-2 text-muted-foreground hover:text-foreground"
+                        aria-label={`Edit ${a.label}`}
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => removeMutation.mutate({ id: a.id })}
+                        disabled={removeMutation.isPending}
+                        className="h-7 px-2 text-muted-foreground hover:text-destructive"
+                        aria-label={`Remove ${a.label}`}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                  {test && (
+                    <p
+                      className={`text-xs flex items-center gap-1 ${test.ok ? "text-green-500" : "text-destructive"}`}
+                    >
+                      {test.ok ? (
+                        <Check className="w-3 h-3" />
+                      ) : (
+                        <AlertTriangle className="w-3 h-3" />
+                      )}
+                      {test.message}
+                    </p>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+
+        <form onSubmit={handleSubmit} className="grid gap-3 sm:grid-cols-2">
+          {editing && (
+            <div className="sm:col-span-2 flex items-center justify-between text-xs text-muted-foreground">
+              <span>
+                Editing <span className="text-foreground">{editing.label}</span> —
+                leave the key blank to keep the saved one.
+              </span>
+              <Button type="button" size="sm" variant="ghost" onClick={resetForm}>
+                Cancel
+              </Button>
+            </div>
+          )}
+          <div className="space-y-1.5">
+            <Label className="text-xs uppercase tracking-wider text-muted-foreground">
+              Label (optional)
+            </Label>
+            <Input
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
+              placeholder="Work OpenAI"
+              autoComplete="off"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs uppercase tracking-wider text-muted-foreground">
+              Provider
+            </Label>
+            <Select value={provider} onValueChange={setProvider}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.values(AiProvider).map((p) => (
+                  <SelectItem key={p} value={p}>
+                    {AI_PROVIDER_LABELS[p] ?? p}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          {isLocal && (
+            <div className="space-y-1.5">
+              <Label className="text-xs uppercase tracking-wider text-muted-foreground">
+                Server URL
+              </Label>
+              <Input
+                value={baseUrl}
+                onChange={(e) => setBaseUrl(e.target.value)}
+                placeholder={
+                  provider === AiProvider.ollama
+                    ? "http://192.168.1.10:11434"
+                    : "http://192.168.1.10:1234"
+                }
+                autoComplete="off"
+              />
+            </div>
+          )}
+          <div className="space-y-1.5">
+            <Label className="text-xs uppercase tracking-wider text-muted-foreground">
+              {isLocal ? "API key (optional)" : "API key"}
+            </Label>
+            <Input
+              type="password"
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+              placeholder={
+                editing
+                  ? "Leave blank to keep saved key"
+                  : isLocal
+                    ? "Usually not needed"
+                    : "sk-…"
+              }
+              autoComplete="off"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs uppercase tracking-wider text-muted-foreground">
+              {isLocal ? "Default model" : "Default model (optional)"}
+            </Label>
+            <Input
+              value={model}
+              onChange={(e) => setModel(e.target.value)}
+              placeholder={
+                provider === AiProvider.ollama ? "e.g. llama3.2" : "e.g. gpt-4o-mini"
+              }
+              autoComplete="off"
+            />
+          </div>
+          {isLocal && !model.trim() && (
+            <p className="sm:col-span-2 text-xs text-muted-foreground">
+              Local servers need a model name — set a default here or pick one
+              per tile after saving (the list loads from your server).
+            </p>
+          )}
+          <div className="sm:col-span-2">
+            <Button
+              type="submit"
+              size="sm"
+              disabled={saving || (!editing && (isLocal ? !baseUrl.trim() : !apiKey.trim()))}
+              className="gap-1.5"
+            >
+              {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+              {editing ? "Save changes" : "Add AI account"}
+            </Button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 // Persist each category's collapsed/expanded state in localStorage, keyed per
 // category, so a user's choice survives reloads and sessions. Defaults to
 // expanded the first time (matching the original behaviour).
@@ -2590,6 +2973,7 @@ export default function Settings() {
               <GoogleCard />
               <ImapAccountsCard />
               <CalDavAccountsCard />
+              <AiAccountsCard />
             </CategorySection>
           </div>
         )}

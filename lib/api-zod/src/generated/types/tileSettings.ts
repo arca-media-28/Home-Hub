@@ -184,6 +184,16 @@ export type TileSettings = {
      */
   calendarMaxEvents?: number | null;
   /**
+     * The saved AI account (from Settings) that backs an AI Chat tile. Null or absent means none chosen yet (the tile shows a demo conversation until one is selected).
+     * @nullable
+     */
+  aiAccountId?: string | null;
+  /**
+     * Optional per-tile model override for the AI Chat tile. Null or absent uses the account's default model.
+     * @nullable
+     */
+  aiModel?: string | null;
+  /**
      * When true, the tile body shows a scrollbar when its content overflows instead of clipping it at the tile edge. Absent or false clips overflowing content (the default).
      * @nullable
      */

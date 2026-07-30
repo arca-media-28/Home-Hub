@@ -2168,6 +2168,210 @@ paths:
               schema:
                 $ref: "#/components/schemas/GoogleStatus"
 
+  /connections/ai/accounts:
+    get:
+      operationId: listAiAccounts
+      tags: [connections]
+      summary: List the saved AI provider accounts (API keys masked)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Saved AI accounts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AiAccount"
+    post:
+      operationId: addAiAccount
+      tags: [connections]
+      summary: Add an AI provider account
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AiAccountInput"
+      responses:
+        "200":
+          description: Updated list of saved AI accounts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AiAccount"
+        "400":
+          description: Missing or invalid account fields
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /connections/ai/accounts/{id}:
+    put:
+      operationId: updateAiAccount
+      tags: [connections]
+      summary: Update a saved AI account (omit apiKey to keep the stored key)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AiAccountUpdate"
+      responses:
+        "200":
+          description: Updated list of saved AI accounts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AiAccount"
+        "404":
+          description: No account with that id
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      operationId: removeAiAccount
+      tags: [connections]
+      summary: Remove a saved AI account
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Updated list of saved AI accounts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AiAccount"
+        "404":
+          description: No account with that id
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /connections/ai/accounts/{id}/test:
+    post:
+      operationId: testAiAccount
+      tags: [connections]
+      summary: Verify a saved AI account's API key against its provider
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Test outcome (ok=false carries the failure reason)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiTestResult"
+        "404":
+          description: No account with that id
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /widgets/ai/chat:
+    post:
+      operationId: aiChat
+      tags: [widgets]
+      summary: >-
+        Send a chat conversation to the AI provider backing the selected
+        account and return the assistant's reply. Returns a sample reply
+        (sample:true) only when no AI accounts are configured at all.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AiChatRequest"
+      responses:
+        "200":
+          description: Assistant reply
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiChatReply"
+        "400":
+          description: Missing or invalid messages
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Unknown AI account
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "502":
+          description: The configured provider rejected or failed the request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /widgets/ai/models:
+    get:
+      operationId: aiModels
+      tags: [widgets]
+      summary: >-
+        List the model options for one saved AI account (live from the
+        provider when possible, otherwise a static fallback list).
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: accountId
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Model options
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiModelList"
+        "404":
+          description: Unknown AI account
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /connections/imap/accounts:
     get:
       operationId: listImapAccounts
@@ -2520,7 +2724,7 @@ components:
           enum: [app, truenas, media, sonarr, radarr, lidarr, qbittorrent]
         integration:
           type: ["string", "null"]
-          enum: [truenas, media, jellyfin, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, pterodactyl, tailscale, ersatztv, audioplayer, clock, timer, weather, sports, news, stocks, sleeper, email, calendar, note, spacer, divider, eightball, dice, coinflip, fortune, tamagotchi, bonsai, aquarium, visualizer, pictureframe, videoplayer, null]
+          enum: [truenas, media, jellyfin, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, pterodactyl, tailscale, ersatztv, audioplayer, clock, timer, weather, sports, news, stocks, sleeper, email, calendar, note, spacer, divider, eightball, dice, coinflip, fortune, tamagotchi, bonsai, aquarium, visualizer, pictureframe, videoplayer, aichat, null]
         gridX:
           type: integer
         gridY:
@@ -2614,7 +2818,7 @@ components:
           enum: [app, truenas, media, sonarr, radarr, lidarr, qbittorrent]
         integration:
           type: ["string", "null"]
-          enum: [truenas, media, jellyfin, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, pterodactyl, tailscale, ersatztv, audioplayer, clock, timer, weather, sports, news, stocks, sleeper, email, calendar, note, spacer, divider, eightball, dice, coinflip, fortune, tamagotchi, bonsai, aquarium, visualizer, pictureframe, videoplayer, null]
+          enum: [truenas, media, jellyfin, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, pterodactyl, tailscale, ersatztv, audioplayer, clock, timer, weather, sports, news, stocks, sleeper, email, calendar, note, spacer, divider, eightball, dice, coinflip, fortune, tamagotchi, bonsai, aquarium, visualizer, pictureframe, videoplayer, aichat, null]
         gridX:
           type: integer
         gridY:
@@ -2657,7 +2861,7 @@ components:
       properties:
         integration:
           type: ["string", "null"]
-          enum: [truenas, media, jellyfin, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, pterodactyl, tailscale, ersatztv, audioplayer, clock, timer, weather, sports, news, stocks, sleeper, email, calendar, note, spacer, divider, eightball, dice, coinflip, fortune, tamagotchi, bonsai, aquarium, visualizer, pictureframe, videoplayer, null]
+          enum: [truenas, media, jellyfin, sonarr, radarr, lidarr, qbittorrent, pihole, nginx-proxy-manager, prowlarr, pterodactyl, tailscale, ersatztv, audioplayer, clock, timer, weather, sports, news, stocks, sleeper, email, calendar, note, spacer, divider, eightball, dice, coinflip, fortune, tamagotchi, bonsai, aquarium, visualizer, pictureframe, videoplayer, aichat, null]
         gridX:
           type: integer
         gridY:
@@ -2904,6 +3108,17 @@ components:
             Maximum number of events the Calendar tile requests/shows. Null or
             absent defaults to a sensible value (clamped server-side).
           type: ["integer", "null"]
+        aiAccountId:
+          description: >-
+            The saved AI account (from Settings) that backs an AI Chat tile.
+            Null or absent means none chosen yet (the tile shows a demo
+            conversation until one is selected).
+          type: ["string", "null"]
+        aiModel:
+          description: >-
+            Optional per-tile model override for the AI Chat tile. Null or
+            absent uses the account's default model.
+          type: ["string", "null"]
         scrollable:
           description: >-
             When true, the tile body shows a scrollbar when its content
@@ -3639,6 +3854,150 @@ components:
             Short-lived single-use token; append as ?intent= to the
             /widgets/gmail/auth popup URL to authorize one OAuth flow run.
           type: string
+
+    AiProvider:
+      description: >-
+        Supported AI chat providers. "ollama" and "openai_compatible" are
+        local/self-hosted servers reached via a base URL (no API key needed).
+      type: string
+      enum: [openai, gemini, anthropic, ollama, openai_compatible]
+
+    AiAccountInput:
+      type: object
+      required: [provider]
+      properties:
+        label:
+          description: Display label; defaults to the provider name when empty.
+          type: ["string", "null"]
+        provider:
+          $ref: "#/components/schemas/AiProvider"
+        apiKey:
+          description: >-
+            The provider API key. Stored server-side, never echoed back.
+            Required for cloud providers; optional for local ones.
+          type: ["string", "null"]
+        baseUrl:
+          description: >-
+            Base URL of a local/self-hosted AI server (e.g.
+            "http://192.168.1.10:11434" for Ollama or
+            "http://192.168.1.10:1234" for LM Studio). Required for local
+            providers, ignored for cloud providers.
+          type: ["string", "null"]
+        model:
+          description: >-
+            Default model for this account (e.g. "gpt-4o-mini"). Null or absent
+            uses a sensible provider default.
+          type: ["string", "null"]
+
+    AiAccountUpdate:
+      description: >-
+        Partial update for a saved AI account. Absent fields keep their stored
+        values; in particular, omitting apiKey keeps the stored key.
+      type: object
+      properties:
+        label:
+          type: ["string", "null"]
+        provider:
+          oneOf:
+            - $ref: "#/components/schemas/AiProvider"
+            - type: "null"
+        apiKey:
+          type: ["string", "null"]
+        baseUrl:
+          type: ["string", "null"]
+        model:
+          type: ["string", "null"]
+
+    AiAccount:
+      description: A saved AI account as returned to the browser (key masked).
+      type: object
+      required: [id, label, provider, maskedKey]
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+        provider:
+          $ref: "#/components/schemas/AiProvider"
+        maskedKey:
+          description: >-
+            Masked API key hint (last 4 characters at most). Empty for local
+            keyless accounts.
+          type: string
+        baseUrl:
+          description: Base URL of a local/self-hosted server, if any.
+          type: ["string", "null"]
+        model:
+          type: ["string", "null"]
+
+    AiTestResult:
+      type: object
+      required: [ok]
+      properties:
+        ok:
+          type: boolean
+        message:
+          type: ["string", "null"]
+
+    AiChatMessage:
+      type: object
+      required: [role, content]
+      properties:
+        role:
+          type: string
+          enum: [user, assistant]
+        content:
+          type: string
+
+    AiChatRequest:
+      type: object
+      required: [messages]
+      properties:
+        accountId:
+          description: >-
+            The saved AI account to chat through. May be omitted only when no
+            accounts are configured at all (demo mode).
+          type: ["string", "null"]
+        model:
+          description: Optional per-tile model override.
+          type: ["string", "null"]
+        messages:
+          description: The conversation so far, oldest first.
+          type: array
+          items:
+            $ref: "#/components/schemas/AiChatMessage"
+
+    AiChatReply:
+      type: object
+      required: [sample, reply, model]
+      properties:
+        sample:
+          description: True when this is a demo reply (no accounts configured).
+          type: boolean
+        reply:
+          type: string
+        model:
+          description: The model that produced the reply.
+          type: string
+
+    AiModelList:
+      type: object
+      required: [provider, models, live]
+      properties:
+        provider:
+          $ref: "#/components/schemas/AiProvider"
+        models:
+          type: array
+          items:
+            type: string
+        live:
+          description: >-
+            True when the list came live from the provider; false when it is
+            the static fallback list.
+          type: boolean
+        default:
+          description: The account's saved default model, if any.
+          type: ["string", "null"]
 
     ImapAccountInput:
       type: object
