@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { Tile } from "@workspace/api-client-react";
 import { Bot, Send, Eraser, Loader2 } from "lucide-react";
+import { MarkdownContent } from "../../lib/markdown";
 
 // Per-tile conversation history lives in localStorage under the app's legacy
 // key prefix (kept for back-compat) so it survives refreshes without touching
@@ -283,15 +284,21 @@ export default function AiChatTile({ tile, editMode }: AiChatTileProps) {
             className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
           >
             <div
-              className={`max-w-[85%] rounded-lg px-2.5 py-1.5 text-xs whitespace-pre-wrap break-words ${
+              className={`max-w-[85%] rounded-lg px-2.5 py-1.5 text-xs break-words ${
                 m.error
-                  ? "bg-destructive/10 text-destructive border border-destructive/30"
+                  ? "bg-destructive/10 text-destructive border border-destructive/30 whitespace-pre-wrap"
                   : m.role === "user"
-                    ? "bg-primary text-primary-foreground"
+                    ? "bg-primary text-primary-foreground whitespace-pre-wrap"
                     : "bg-muted text-foreground"
               }`}
             >
-              {m.content}
+              {/* Assistant replies often contain Markdown (lists, code) —
+                  render it sanitized. User messages and errors stay plain. */}
+              {m.role === "assistant" && !m.error ? (
+                <MarkdownContent text={m.content} />
+              ) : (
+                m.content
+              )}
               {m.sample && configured === false && messages.length > 0 && (
                 <span className="block mt-1 text-[10px] opacity-70">
                   Sample reply — pick an AI account in this tile's options.
@@ -311,8 +318,8 @@ export default function AiChatTile({ tile, editMode }: AiChatTileProps) {
         {/* The in-flight reply, growing token by token as the stream arrives. */}
         {streamingText !== null && (
           <div className="flex justify-start">
-            <div className="max-w-[85%] rounded-lg px-2.5 py-1.5 text-xs whitespace-pre-wrap break-words bg-muted text-foreground">
-              {streamingText}
+            <div className="max-w-[85%] rounded-lg px-2.5 py-1.5 text-xs break-words bg-muted text-foreground">
+              <MarkdownContent text={streamingText} />
               <span className="inline-block w-1.5 h-3 ml-0.5 align-middle bg-muted-foreground/60 animate-pulse" />
             </div>
           </div>
