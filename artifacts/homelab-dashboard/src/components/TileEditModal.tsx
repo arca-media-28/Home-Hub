@@ -670,6 +670,9 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
   const [videoMuted, setVideoMuted] = useState<boolean>(
     tile?.tileSettings?.videoMuted ?? true,
   );
+  const [videoPageSwitchMute, setVideoPageSwitchMute] = useState<boolean>(
+    tile?.tileSettings?.videoPageSwitchMute ?? true,
+  );
   const [videoFit, setVideoFit] = useState<"cover" | "contain">(
     tile?.tileSettings?.videoFit === "contain" ? "contain" : "cover",
   );
@@ -820,6 +823,7 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
       setVideoPlaylistLoop(tile?.tileSettings?.videoPlaylistLoop ?? true);
       setVideoShuffle(tile?.tileSettings?.videoShuffle ?? false);
       setVideoMuted(tile?.tileSettings?.videoMuted ?? true);
+      setVideoPageSwitchMute(tile?.tileSettings?.videoPageSwitchMute ?? true);
       setVideoFit(tile?.tileSettings?.videoFit === "contain" ? "contain" : "cover");
       setShowPetColorPicker(false);
       setShowNoteColorPicker(false);
@@ -1850,6 +1854,7 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
                                       videoPlaylistLoop,
                                       videoShuffle,
                                       videoMuted,
+                                      videoPageSwitchMute,
                                       videoFit,
                                     }
                                   : null;
@@ -3242,6 +3247,14 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
                   onCheckedChange={(v) => setVideoMuted(v === true)}
                 />
                 Start muted (recommended — browsers block unmuted autoplay)
+              </label>
+
+              <label className="flex items-center gap-2 text-sm">
+                <Checkbox
+                  checked={videoPageSwitchMute}
+                  onCheckedChange={(v) => setVideoPageSwitchMute(v === true)}
+                />
+                Mute when switching pages or tabs
               </label>
             </div>
           )}

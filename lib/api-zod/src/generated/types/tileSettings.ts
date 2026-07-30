@@ -524,6 +524,11 @@ export type TileSettings = {
      */
   videoMuted?: boolean | null;
   /**
+     * Whether a Video Player tile automatically mutes when the user switches dashboard pages or browser tabs. Null or absent defaults to true.
+     * @nullable
+     */
+  videoPageSwitchMute?: boolean | null;
+  /**
      * How a Video Player tile scales its video: "cover" (fill, crop) or "contain" (letterbox, whole frame). Null or absent uses cover.
      * @nullable
      */

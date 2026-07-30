@@ -19,4 +19,6 @@ Endpoints (both unauthenticated, fetched as text via `responseType: "text"`):
 
 Metrics (catalog priority): `health`, `activeStreams`, `nowPlaying`, `upNext` (the up-next line rides inside the nowPlaying channel list — it adds a third line per row and bumps the budgeted row height, it is not its own section).
 
+**Video Player live-stream resilience:** hls.js in-instance budgets (3 startLoad + 3 recoverMediaError) are only the first layer — exhaustion triggers destroy + delayed full re-attach (4s, up to 3 auto retries via a ref surviving effect re-runs) before the error/Retry state; FRAG_BUFFERED resets everything. Stop button (Ersatz-only) unmounts the `<video>` and gates the attach effect so segment fetches cease and the ErsatzTV transcoder session winds down. `videoPageSwitchMute` (default true) forces `muted:true` into playback memory on save and mutes live on tab-hide.
+
 **Playback requirements (user-facing):** browsers cannot play raw MPEG-TS — channel Streaming Mode must be **HLS Segmenter**. Audio-but-no-video means the channel's FFmpeg profile outputs a codec the browser can't decode (MPEG-2, or HEVC w/o support) — fix is an H.264 video profile. The Video Player tile shows an audio-only hint badge for this case, and the tile settings modal documents both requirements.

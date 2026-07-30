@@ -206,6 +206,7 @@ export const GetTilesResponseItem = zod.object({
   "videoPlaylistLoop": zod.boolean().nullish().describe('Whether a Video Player tile restarts the playlist after the last video ends (playlist mode). Null or absent defaults to true.'),
   "videoShuffle": zod.boolean().nullish().describe('Whether a Video Player tile shuffles the playlist order (playlist mode). Null or absent defaults to false.'),
   "videoMuted": zod.boolean().nullish().describe('Whether a Video Player tile starts muted. Null or absent defaults to true (autoplay-safe).'),
+  "videoPageSwitchMute": zod.boolean().nullish().describe('Whether a Video Player tile automatically mutes when the user switches dashboard pages or browser tabs. Null or absent defaults to true.'),
   "videoFit": zod.union([zod.literal('cover'),zod.literal('contain'),zod.literal(null)]).nullish().describe('How a Video Player tile scales its video: \"cover\" (fill, crop) or \"contain\" (letterbox, whole frame). Null or absent uses cover.')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.'),
   "createdAt": zod.string().optional()
@@ -348,6 +349,7 @@ export const CreateTileBody = zod.object({
   "videoPlaylistLoop": zod.boolean().nullish().describe('Whether a Video Player tile restarts the playlist after the last video ends (playlist mode). Null or absent defaults to true.'),
   "videoShuffle": zod.boolean().nullish().describe('Whether a Video Player tile shuffles the playlist order (playlist mode). Null or absent defaults to false.'),
   "videoMuted": zod.boolean().nullish().describe('Whether a Video Player tile starts muted. Null or absent defaults to true (autoplay-safe).'),
+  "videoPageSwitchMute": zod.boolean().nullish().describe('Whether a Video Player tile automatically mutes when the user switches dashboard pages or browser tabs. Null or absent defaults to true.'),
   "videoFit": zod.union([zod.literal('cover'),zod.literal('contain'),zod.literal(null)]).nullish().describe('How a Video Player tile scales its video: \"cover\" (fill, crop) or \"contain\" (letterbox, whole frame). Null or absent uses cover.')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.')
 })
@@ -494,6 +496,7 @@ export const GetTileResponse = zod.object({
   "videoPlaylistLoop": zod.boolean().nullish().describe('Whether a Video Player tile restarts the playlist after the last video ends (playlist mode). Null or absent defaults to true.'),
   "videoShuffle": zod.boolean().nullish().describe('Whether a Video Player tile shuffles the playlist order (playlist mode). Null or absent defaults to false.'),
   "videoMuted": zod.boolean().nullish().describe('Whether a Video Player tile starts muted. Null or absent defaults to true (autoplay-safe).'),
+  "videoPageSwitchMute": zod.boolean().nullish().describe('Whether a Video Player tile automatically mutes when the user switches dashboard pages or browser tabs. Null or absent defaults to true.'),
   "videoFit": zod.union([zod.literal('cover'),zod.literal('contain'),zod.literal(null)]).nullish().describe('How a Video Player tile scales its video: \"cover\" (fill, crop) or \"contain\" (letterbox, whole frame). Null or absent uses cover.')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.'),
   "createdAt": zod.string().optional()
@@ -635,6 +638,7 @@ export const UpdateTileBody = zod.object({
   "videoPlaylistLoop": zod.boolean().nullish().describe('Whether a Video Player tile restarts the playlist after the last video ends (playlist mode). Null or absent defaults to true.'),
   "videoShuffle": zod.boolean().nullish().describe('Whether a Video Player tile shuffles the playlist order (playlist mode). Null or absent defaults to false.'),
   "videoMuted": zod.boolean().nullish().describe('Whether a Video Player tile starts muted. Null or absent defaults to true (autoplay-safe).'),
+  "videoPageSwitchMute": zod.boolean().nullish().describe('Whether a Video Player tile automatically mutes when the user switches dashboard pages or browser tabs. Null or absent defaults to true.'),
   "videoFit": zod.union([zod.literal('cover'),zod.literal('contain'),zod.literal(null)]).nullish().describe('How a Video Player tile scales its video: \"cover\" (fill, crop) or \"contain\" (letterbox, whole frame). Null or absent uses cover.')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.')
 })
@@ -773,6 +777,7 @@ export const UpdateTileResponse = zod.object({
   "videoPlaylistLoop": zod.boolean().nullish().describe('Whether a Video Player tile restarts the playlist after the last video ends (playlist mode). Null or absent defaults to true.'),
   "videoShuffle": zod.boolean().nullish().describe('Whether a Video Player tile shuffles the playlist order (playlist mode). Null or absent defaults to false.'),
   "videoMuted": zod.boolean().nullish().describe('Whether a Video Player tile starts muted. Null or absent defaults to true (autoplay-safe).'),
+  "videoPageSwitchMute": zod.boolean().nullish().describe('Whether a Video Player tile automatically mutes when the user switches dashboard pages or browser tabs. Null or absent defaults to true.'),
   "videoFit": zod.union([zod.literal('cover'),zod.literal('contain'),zod.literal(null)]).nullish().describe('How a Video Player tile scales its video: \"cover\" (fill, crop) or \"contain\" (letterbox, whole frame). Null or absent uses cover.')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.'),
   "createdAt": zod.string().optional()
@@ -937,6 +942,7 @@ export const SaveLayoutResponseItem = zod.object({
   "videoPlaylistLoop": zod.boolean().nullish().describe('Whether a Video Player tile restarts the playlist after the last video ends (playlist mode). Null or absent defaults to true.'),
   "videoShuffle": zod.boolean().nullish().describe('Whether a Video Player tile shuffles the playlist order (playlist mode). Null or absent defaults to false.'),
   "videoMuted": zod.boolean().nullish().describe('Whether a Video Player tile starts muted. Null or absent defaults to true (autoplay-safe).'),
+  "videoPageSwitchMute": zod.boolean().nullish().describe('Whether a Video Player tile automatically mutes when the user switches dashboard pages or browser tabs. Null or absent defaults to true.'),
   "videoFit": zod.union([zod.literal('cover'),zod.literal('contain'),zod.literal(null)]).nullish().describe('How a Video Player tile scales its video: \"cover\" (fill, crop) or \"contain\" (letterbox, whole frame). Null or absent uses cover.')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.'),
   "createdAt": zod.string().optional()
@@ -1213,6 +1219,7 @@ export const ExportAllPagesResponse = zod.object({
   "videoPlaylistLoop": zod.boolean().nullish().describe('Whether a Video Player tile restarts the playlist after the last video ends (playlist mode). Null or absent defaults to true.'),
   "videoShuffle": zod.boolean().nullish().describe('Whether a Video Player tile shuffles the playlist order (playlist mode). Null or absent defaults to false.'),
   "videoMuted": zod.boolean().nullish().describe('Whether a Video Player tile starts muted. Null or absent defaults to true (autoplay-safe).'),
+  "videoPageSwitchMute": zod.boolean().nullish().describe('Whether a Video Player tile automatically mutes when the user switches dashboard pages or browser tabs. Null or absent defaults to true.'),
   "videoFit": zod.union([zod.literal('cover'),zod.literal('contain'),zod.literal(null)]).nullish().describe('How a Video Player tile scales its video: \"cover\" (fill, crop) or \"contain\" (letterbox, whole frame). Null or absent uses cover.')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.')
 }).describe('A tile inside an export envelope. Mirrors Tile but omits every identity field (id, userId, pageId, createdAt) so it can be re-imported under any user\/page. Carries no credential data — integrations are referenced by type only.')).describe('Flat list of every tile on the page across all device modes and variants. v1 importers read this; v2 importers prefer `layouts` when present.'),
@@ -1348,6 +1355,7 @@ export const ExportAllPagesResponse = zod.object({
   "videoPlaylistLoop": zod.boolean().nullish().describe('Whether a Video Player tile restarts the playlist after the last video ends (playlist mode). Null or absent defaults to true.'),
   "videoShuffle": zod.boolean().nullish().describe('Whether a Video Player tile shuffles the playlist order (playlist mode). Null or absent defaults to false.'),
   "videoMuted": zod.boolean().nullish().describe('Whether a Video Player tile starts muted. Null or absent defaults to true (autoplay-safe).'),
+  "videoPageSwitchMute": zod.boolean().nullish().describe('Whether a Video Player tile automatically mutes when the user switches dashboard pages or browser tabs. Null or absent defaults to true.'),
   "videoFit": zod.union([zod.literal('cover'),zod.literal('contain'),zod.literal(null)]).nullish().describe('How a Video Player tile scales its video: \"cover\" (fill, crop) or \"contain\" (letterbox, whole frame). Null or absent uses cover.')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.')
 }).describe('A tile inside an export envelope. Mirrors Tile but omits every identity field (id, userId, pageId, createdAt) so it can be re-imported under any user\/page. Carries no credential data — integrations are referenced by type only.'))
@@ -1500,6 +1508,7 @@ export const ExportPageResponse = zod.object({
   "videoPlaylistLoop": zod.boolean().nullish().describe('Whether a Video Player tile restarts the playlist after the last video ends (playlist mode). Null or absent defaults to true.'),
   "videoShuffle": zod.boolean().nullish().describe('Whether a Video Player tile shuffles the playlist order (playlist mode). Null or absent defaults to false.'),
   "videoMuted": zod.boolean().nullish().describe('Whether a Video Player tile starts muted. Null or absent defaults to true (autoplay-safe).'),
+  "videoPageSwitchMute": zod.boolean().nullish().describe('Whether a Video Player tile automatically mutes when the user switches dashboard pages or browser tabs. Null or absent defaults to true.'),
   "videoFit": zod.union([zod.literal('cover'),zod.literal('contain'),zod.literal(null)]).nullish().describe('How a Video Player tile scales its video: \"cover\" (fill, crop) or \"contain\" (letterbox, whole frame). Null or absent uses cover.')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.')
 }).describe('A tile inside an export envelope. Mirrors Tile but omits every identity field (id, userId, pageId, createdAt) so it can be re-imported under any user\/page. Carries no credential data — integrations are referenced by type only.')).describe('Flat list of every tile on the page across all device modes and variants. v1 importers read this; v2 importers prefer `layouts` when present.'),
@@ -1635,6 +1644,7 @@ export const ExportPageResponse = zod.object({
   "videoPlaylistLoop": zod.boolean().nullish().describe('Whether a Video Player tile restarts the playlist after the last video ends (playlist mode). Null or absent defaults to true.'),
   "videoShuffle": zod.boolean().nullish().describe('Whether a Video Player tile shuffles the playlist order (playlist mode). Null or absent defaults to false.'),
   "videoMuted": zod.boolean().nullish().describe('Whether a Video Player tile starts muted. Null or absent defaults to true (autoplay-safe).'),
+  "videoPageSwitchMute": zod.boolean().nullish().describe('Whether a Video Player tile automatically mutes when the user switches dashboard pages or browser tabs. Null or absent defaults to true.'),
   "videoFit": zod.union([zod.literal('cover'),zod.literal('contain'),zod.literal(null)]).nullish().describe('How a Video Player tile scales its video: \"cover\" (fill, crop) or \"contain\" (letterbox, whole frame). Null or absent uses cover.')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.')
 }).describe('A tile inside an export envelope. Mirrors Tile but omits every identity field (id, userId, pageId, createdAt) so it can be re-imported under any user\/page. Carries no credential data — integrations are referenced by type only.'))
@@ -1783,6 +1793,7 @@ export const ImportPagesBody = zod.object({
   "videoPlaylistLoop": zod.boolean().nullish().describe('Whether a Video Player tile restarts the playlist after the last video ends (playlist mode). Null or absent defaults to true.'),
   "videoShuffle": zod.boolean().nullish().describe('Whether a Video Player tile shuffles the playlist order (playlist mode). Null or absent defaults to false.'),
   "videoMuted": zod.boolean().nullish().describe('Whether a Video Player tile starts muted. Null or absent defaults to true (autoplay-safe).'),
+  "videoPageSwitchMute": zod.boolean().nullish().describe('Whether a Video Player tile automatically mutes when the user switches dashboard pages or browser tabs. Null or absent defaults to true.'),
   "videoFit": zod.union([zod.literal('cover'),zod.literal('contain'),zod.literal(null)]).nullish().describe('How a Video Player tile scales its video: \"cover\" (fill, crop) or \"contain\" (letterbox, whole frame). Null or absent uses cover.')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.')
 }).describe('A tile inside an export envelope. Mirrors Tile but omits every identity field (id, userId, pageId, createdAt) so it can be re-imported under any user\/page. Carries no credential data — integrations are referenced by type only.')).describe('Flat list of every tile on the page across all device modes and variants. v1 importers read this; v2 importers prefer `layouts` when present.'),
@@ -1918,6 +1929,7 @@ export const ImportPagesBody = zod.object({
   "videoPlaylistLoop": zod.boolean().nullish().describe('Whether a Video Player tile restarts the playlist after the last video ends (playlist mode). Null or absent defaults to true.'),
   "videoShuffle": zod.boolean().nullish().describe('Whether a Video Player tile shuffles the playlist order (playlist mode). Null or absent defaults to false.'),
   "videoMuted": zod.boolean().nullish().describe('Whether a Video Player tile starts muted. Null or absent defaults to true (autoplay-safe).'),
+  "videoPageSwitchMute": zod.boolean().nullish().describe('Whether a Video Player tile automatically mutes when the user switches dashboard pages or browser tabs. Null or absent defaults to true.'),
   "videoFit": zod.union([zod.literal('cover'),zod.literal('contain'),zod.literal(null)]).nullish().describe('How a Video Player tile scales its video: \"cover\" (fill, crop) or \"contain\" (letterbox, whole frame). Null or absent uses cover.')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.')
 }).describe('A tile inside an export envelope. Mirrors Tile but omits every identity field (id, userId, pageId, createdAt) so it can be re-imported under any user\/page. Carries no credential data — integrations are referenced by type only.'))
@@ -2073,6 +2085,7 @@ export const ExportProfileResponse = zod.object({
   "videoPlaylistLoop": zod.boolean().nullish().describe('Whether a Video Player tile restarts the playlist after the last video ends (playlist mode). Null or absent defaults to true.'),
   "videoShuffle": zod.boolean().nullish().describe('Whether a Video Player tile shuffles the playlist order (playlist mode). Null or absent defaults to false.'),
   "videoMuted": zod.boolean().nullish().describe('Whether a Video Player tile starts muted. Null or absent defaults to true (autoplay-safe).'),
+  "videoPageSwitchMute": zod.boolean().nullish().describe('Whether a Video Player tile automatically mutes when the user switches dashboard pages or browser tabs. Null or absent defaults to true.'),
   "videoFit": zod.union([zod.literal('cover'),zod.literal('contain'),zod.literal(null)]).nullish().describe('How a Video Player tile scales its video: \"cover\" (fill, crop) or \"contain\" (letterbox, whole frame). Null or absent uses cover.')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.')
 }).describe('A tile inside an export envelope. Mirrors Tile but omits every identity field (id, userId, pageId, createdAt) so it can be re-imported under any user\/page. Carries no credential data — integrations are referenced by type only.')).describe('Flat list of every tile on the page across all device modes and variants. v1 importers read this; v2 importers prefer `layouts` when present.'),
@@ -2208,6 +2221,7 @@ export const ExportProfileResponse = zod.object({
   "videoPlaylistLoop": zod.boolean().nullish().describe('Whether a Video Player tile restarts the playlist after the last video ends (playlist mode). Null or absent defaults to true.'),
   "videoShuffle": zod.boolean().nullish().describe('Whether a Video Player tile shuffles the playlist order (playlist mode). Null or absent defaults to false.'),
   "videoMuted": zod.boolean().nullish().describe('Whether a Video Player tile starts muted. Null or absent defaults to true (autoplay-safe).'),
+  "videoPageSwitchMute": zod.boolean().nullish().describe('Whether a Video Player tile automatically mutes when the user switches dashboard pages or browser tabs. Null or absent defaults to true.'),
   "videoFit": zod.union([zod.literal('cover'),zod.literal('contain'),zod.literal(null)]).nullish().describe('How a Video Player tile scales its video: \"cover\" (fill, crop) or \"contain\" (letterbox, whole frame). Null or absent uses cover.')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.')
 }).describe('A tile inside an export envelope. Mirrors Tile but omits every identity field (id, userId, pageId, createdAt) so it can be re-imported under any user\/page. Carries no credential data — integrations are referenced by type only.'))
@@ -2372,6 +2386,7 @@ export const ImportProfileBody = zod.object({
   "videoPlaylistLoop": zod.boolean().nullish().describe('Whether a Video Player tile restarts the playlist after the last video ends (playlist mode). Null or absent defaults to true.'),
   "videoShuffle": zod.boolean().nullish().describe('Whether a Video Player tile shuffles the playlist order (playlist mode). Null or absent defaults to false.'),
   "videoMuted": zod.boolean().nullish().describe('Whether a Video Player tile starts muted. Null or absent defaults to true (autoplay-safe).'),
+  "videoPageSwitchMute": zod.boolean().nullish().describe('Whether a Video Player tile automatically mutes when the user switches dashboard pages or browser tabs. Null or absent defaults to true.'),
   "videoFit": zod.union([zod.literal('cover'),zod.literal('contain'),zod.literal(null)]).nullish().describe('How a Video Player tile scales its video: \"cover\" (fill, crop) or \"contain\" (letterbox, whole frame). Null or absent uses cover.')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.')
 }).describe('A tile inside an export envelope. Mirrors Tile but omits every identity field (id, userId, pageId, createdAt) so it can be re-imported under any user\/page. Carries no credential data — integrations are referenced by type only.')).describe('Flat list of every tile on the page across all device modes and variants. v1 importers read this; v2 importers prefer `layouts` when present.'),
@@ -2507,6 +2522,7 @@ export const ImportProfileBody = zod.object({
   "videoPlaylistLoop": zod.boolean().nullish().describe('Whether a Video Player tile restarts the playlist after the last video ends (playlist mode). Null or absent defaults to true.'),
   "videoShuffle": zod.boolean().nullish().describe('Whether a Video Player tile shuffles the playlist order (playlist mode). Null or absent defaults to false.'),
   "videoMuted": zod.boolean().nullish().describe('Whether a Video Player tile starts muted. Null or absent defaults to true (autoplay-safe).'),
+  "videoPageSwitchMute": zod.boolean().nullish().describe('Whether a Video Player tile automatically mutes when the user switches dashboard pages or browser tabs. Null or absent defaults to true.'),
   "videoFit": zod.union([zod.literal('cover'),zod.literal('contain'),zod.literal(null)]).nullish().describe('How a Video Player tile scales its video: \"cover\" (fill, crop) or \"contain\" (letterbox, whole frame). Null or absent uses cover.')
 }).nullish().describe('Per-tile extra configuration for integration widgets. Null means no extra settings (the default). Carries the qBittorrent category filter, the Local Time clock options, the Weather tile options, and the Sports tile options.')
 }).describe('A tile inside an export envelope. Mirrors Tile but omits every identity field (id, userId, pageId, createdAt) so it can be re-imported under any user\/page. Carries no credential data — integrations are referenced by type only.'))

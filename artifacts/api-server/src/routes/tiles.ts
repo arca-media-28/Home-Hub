@@ -126,6 +126,7 @@ interface TileSettings {
   videoPlaylistLoop?: boolean | null;
   videoShuffle?: boolean | null;
   videoMuted?: boolean | null;
+  videoPageSwitchMute?: boolean | null;
   videoFit?: "cover" | "contain" | null;
   truenasMetric?: "cpuram" | "network" | "arc" | "pools" | "disks" | "cputemp" | null;
   truenasShowCpuCores?: boolean | null;
@@ -768,6 +769,11 @@ function pickTileSettings(obj: Record<string, unknown>): TileSettings {
     result.videoMuted = obj["videoMuted"];
   } else if (obj["videoMuted"] === null) {
     result.videoMuted = null;
+  }
+  if (typeof obj["videoPageSwitchMute"] === "boolean") {
+    result.videoPageSwitchMute = obj["videoPageSwitchMute"];
+  } else if (obj["videoPageSwitchMute"] === null) {
+    result.videoPageSwitchMute = null;
   }
   if (obj["videoFit"] === "cover" || obj["videoFit"] === "contain") {
     result.videoFit = obj["videoFit"];

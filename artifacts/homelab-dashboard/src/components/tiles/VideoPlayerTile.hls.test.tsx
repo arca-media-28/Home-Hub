@@ -11,10 +11,14 @@ import {
 
 // ---------------------------------------------------------------------------
 // Locks in the TV tile's HLS stall recovery and the error-state Retry button:
-// - fatal network errors call hls.startLoad() up to 3 times, then error state
-// - fatal media errors call hls.recoverMediaError() up to 3 times, then error
-// - a buffered fragment (FRAG_BUFFERED) resets both recovery budgets
+// - fatal network errors call hls.startLoad() up to 3 times per instance
+// - fatal media errors call hls.recoverMediaError() up to 3 times
+// - exhausting an instance's budget destroys it and auto-reattaches a fresh
+//   instance after a pause (up to 3 times) before showing the error state
+// - a buffered fragment (FRAG_BUFFERED) resets every budget
 // - clicking Retry re-creates the hls.js instance tuned to the same channel
+// - Stop tears the stream down completely; Resume re-attaches
+// - hiding the tab mutes the player (videoPageSwitchMute default)
 // hls.js is loaded dynamically by the component, so the module mock below
 // intercepts the `import("hls.js")` inside the attach effect.
 // ---------------------------------------------------------------------------
@@ -169,13 +173,14 @@ describe("VideoPlayerTile HLS stall recovery", () => {
       expect(screen.queryByTestId("videoplayer-error")).toBeNull();
     }
 
-    // 4th fatal network error exhausts the budget: explicit error state,
-    // no further startLoad, instance destroyed.
+    // 4th fatal network error exhausts this instance's budget: the instance
+    // is destroyed, but instead of an error state the tile keeps showing the
+    // reconnecting badge while it waits to auto-reattach a fresh instance.
     emitFatal(hls, MockHls.ErrorTypes.NETWORK_ERROR);
     expect(hls.startLoad).toHaveBeenCalledTimes(3);
     expect(hls.destroy).toHaveBeenCalled();
-    expect(screen.getByTestId("videoplayer-error")).toBeTruthy();
-    expect(screen.queryByTestId("videoplayer-reconnecting-badge")).toBeNull();
+    expect(screen.queryByTestId("videoplayer-error")).toBeNull();
+    expect(screen.getByTestId("videoplayer-reconnecting-badge")).toBeTruthy();
   });
 
   it("retries fatal media errors with recoverMediaError up to 3 times, then errors", async () => {
@@ -190,7 +195,88 @@ describe("VideoPlayerTile HLS stall recovery", () => {
     emitFatal(hls, MockHls.ErrorTypes.MEDIA_ERROR);
     expect(hls.recoverMediaError).toHaveBeenCalledTimes(3);
     expect(hls.destroy).toHaveBeenCalled();
-    expect(screen.getByTestId("videoplayer-error")).toBeTruthy();
+    // Budget exhaustion no longer errors immediately — auto-reattach kicks in.
+    expect(screen.queryByTestId("videoplayer-error")).toBeNull();
+    expect(screen.getByTestId("videoplayer-reconnecting-badge")).toBeTruthy();
+  });
+
+  it("auto-reattaches a fresh instance after budget exhaustion, erroring only after 3 auto retries", async () => {
+    vi.useFakeTimers();
+    try {
+      render(<VideoPlayerTile tile={TILE} editMode={false} />);
+      await act(async () => {});
+      expect(hlsInstances.length).toBe(1);
+
+      // Exhaust instance budgets back-to-back. After each exhaustion the
+      // tile waits ~4s then attaches a brand-new instance — 3 times.
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const hls = hlsInstances[hlsInstances.length - 1]!;
+        for (let i = 0; i < 4; i++) {
+          emitFatal(hls, MockHls.ErrorTypes.NETWORK_ERROR);
+        }
+        expect(screen.queryByTestId("videoplayer-error")).toBeNull();
+        expect(
+          screen.getByTestId("videoplayer-reconnecting-badge"),
+        ).toBeTruthy();
+        await act(async () => {
+          vi.advanceTimersByTime(4_000);
+        });
+        await act(async () => {});
+        expect(hlsInstances.length).toBe(attempt + 2);
+      }
+
+      // The 4th instance exhausting its budget finally surfaces the error.
+      const last = hlsInstances[hlsInstances.length - 1]!;
+      for (let i = 0; i < 4; i++) {
+        emitFatal(last, MockHls.ErrorTypes.NETWORK_ERROR);
+      }
+      expect(screen.getByTestId("videoplayer-error")).toBeTruthy();
+      await act(async () => {
+        vi.advanceTimersByTime(10_000);
+      });
+      expect(hlsInstances.length).toBe(4);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("a buffered fragment resets the auto-reattach budget too", async () => {
+    vi.useFakeTimers();
+    try {
+      render(<VideoPlayerTile tile={TILE} editMode={false} />);
+      await act(async () => {});
+
+      // Burn one auto-reattach…
+      const first = hlsInstances[0]!;
+      for (let i = 0; i < 4; i++) {
+        emitFatal(first, MockHls.ErrorTypes.NETWORK_ERROR);
+      }
+      await act(async () => {
+        vi.advanceTimersByTime(4_000);
+      });
+      await act(async () => {});
+      const second = hlsInstances[1]!;
+
+      // …then healthy playback resets the counter, so a later meltdown gets
+      // the full 3 auto retries again instead of erroring early.
+      act(() => {
+        second.emit(MockHls.Events.FRAG_BUFFERED);
+      });
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const hls = hlsInstances[hlsInstances.length - 1]!;
+        for (let i = 0; i < 4; i++) {
+          emitFatal(hls, MockHls.ErrorTypes.NETWORK_ERROR);
+        }
+        expect(screen.queryByTestId("videoplayer-error")).toBeNull();
+        await act(async () => {
+          vi.advanceTimersByTime(4_000);
+        });
+        await act(async () => {});
+      }
+      expect(hlsInstances.length).toBe(5);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("ignores non-fatal errors entirely", async () => {
@@ -229,31 +315,117 @@ describe("VideoPlayerTile HLS stall recovery", () => {
   });
 
   it("Retry button re-creates the hls instance for the same channel URL", async () => {
-    const hls = await renderTvTile();
+    vi.useFakeTimers();
+    try {
+      render(<VideoPlayerTile tile={TILE} editMode={false} />);
+      await act(async () => {});
 
-    // Exhaust the media-error budget to reach the error state.
-    for (let i = 0; i < 4; i++) {
-      emitFatal(hls, MockHls.ErrorTypes.MEDIA_ERROR);
+      // Exhaust the initial instance plus all 3 auto-reattaches to reach the
+      // real error state.
+      for (let attempt = 0; attempt < 4; attempt++) {
+        const hls = hlsInstances[hlsInstances.length - 1]!;
+        for (let i = 0; i < 4; i++) {
+          emitFatal(hls, MockHls.ErrorTypes.MEDIA_ERROR);
+        }
+        await act(async () => {
+          vi.advanceTimersByTime(4_000);
+        });
+        await act(async () => {});
+      }
+      expect(screen.getByTestId("videoplayer-error")).toBeTruthy();
+      const firstUrl = hlsInstances[0]!.loadedUrl;
+      expect(firstUrl).toContain(".m3u8");
+      expect(hlsInstances.length).toBe(4);
+
+      // Clicking Retry clears the error state and re-runs the attach effect,
+      // creating a brand-new hls.js instance tuned to the same stream.
+      fireEvent.click(screen.getByTestId("videoplayer-retry"));
+      await act(async () => {});
+      expect(hlsInstances.length).toBe(5);
+      const next = hlsInstances[4]!;
+      expect(next.loadedUrl).toBe(firstUrl);
+      expect(next.attachMedia).toHaveBeenCalledTimes(1);
+      expect(screen.queryByTestId("videoplayer-error")).toBeNull();
+
+      // The revived instance's recovery budget is fresh.
+      emitFatal(next, MockHls.ErrorTypes.NETWORK_ERROR);
+      expect(next.startLoad).toHaveBeenCalledTimes(1);
+      expect(screen.queryByTestId("videoplayer-error")).toBeNull();
+    } finally {
+      vi.useRealTimers();
     }
-    expect(screen.getByTestId("videoplayer-error")).toBeTruthy();
-    const firstUrl = hls.loadedUrl;
-    expect(firstUrl).toContain(".m3u8");
-    expect(hlsInstances.length).toBe(1);
+  });
+});
 
-    // Clicking Retry clears the error state and re-runs the attach effect,
-    // creating a brand-new hls.js instance tuned to the same stream.
-    fireEvent.click(screen.getByTestId("videoplayer-retry"));
+describe("VideoPlayerTile stop / resume", () => {
+  it("Stop tears the stream down and Resume re-attaches it", async () => {
+    const hls = await renderTvTile();
+    expect(document.querySelector("video")).toBeTruthy();
+
+    // Stop: hls destroyed, video element removed, stopped overlay shown.
+    fireEvent.click(screen.getByTestId("videoplayer-stop"));
+    expect(hls.destroy).toHaveBeenCalled();
+    expect(document.querySelector("video")).toBeNull();
+    expect(screen.getByTestId("videoplayer-stopped")).toBeTruthy();
+    expect(screen.queryByTestId("videoplayer-error")).toBeNull();
+
+    // Resume: a fresh hls instance attaches to the same channel.
+    fireEvent.click(screen.getByTestId("videoplayer-resume"));
     await waitFor(() => expect(hlsInstances.length).toBe(2));
-    const next = hlsInstances[1]!;
-    expect(next).not.toBe(hls);
-    expect(next.loadedUrl).toBe(firstUrl);
-    expect(next.attachMedia).toHaveBeenCalledTimes(1);
-    expect(screen.queryByTestId("videoplayer-error")).toBeNull();
+    expect(hlsInstances[1]!.loadedUrl).toBe(hls.loadedUrl);
+    expect(screen.queryByTestId("videoplayer-stopped")).toBeNull();
+  });
+});
 
-    // The revived instance's recovery budget is fresh.
-    emitFatal(next, MockHls.ErrorTypes.NETWORK_ERROR);
-    expect(next.startLoad).toHaveBeenCalledTimes(1);
-    expect(screen.queryByTestId("videoplayer-error")).toBeNull();
+describe("VideoPlayerTile page-switch mute", () => {
+  function setHidden(hidden: boolean) {
+    Object.defineProperty(document, "hidden", {
+      configurable: true,
+      get: () => hidden,
+    });
+    act(() => {
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+  }
+
+  afterEach(() => {
+    Object.defineProperty(document, "hidden", {
+      configurable: true,
+      get: () => false,
+    });
+  });
+
+  it("mutes when the tab hides (default on)", async () => {
+    await renderTvTile();
+    // Unmute via the control-bar button first.
+    fireEvent.click(screen.getByTestId("videoplayer-mute"));
+    expect(document.querySelector("video")!.muted).toBe(false);
+
+    setHidden(true);
+    expect(document.querySelector("video")!.muted).toBe(true);
+  });
+
+  it("does not mute on tab hide when videoPageSwitchMute is false", async () => {
+    render(
+      <VideoPlayerTile
+        tile={
+          {
+            ...TILE,
+            tileSettings: {
+              ...(TILE.tileSettings as object),
+              videoPageSwitchMute: false,
+            },
+          } as unknown as Tile
+        }
+        editMode={false}
+      />,
+    );
+    await waitFor(() => expect(hlsInstances.length).toBeGreaterThan(0));
+    fireEvent.click(screen.getByTestId("videoplayer-mute"));
+    expect(document.querySelector("video")!.muted).toBe(false);
+
+    setHidden(true);
+    expect(document.querySelector("video")!.muted).toBe(false);
   });
 });
 

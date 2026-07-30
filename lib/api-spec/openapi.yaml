@@ -3335,6 +3335,12 @@ components:
             Whether a Video Player tile starts muted. Null or absent defaults
             to true (autoplay-safe).
           type: ["boolean", "null"]
+        videoPageSwitchMute:
+          description: >-
+            Whether a Video Player tile automatically mutes when the user
+            switches dashboard pages or browser tabs. Null or absent defaults
+            to true.
+          type: ["boolean", "null"]
         videoFit:
           description: >-
             How a Video Player tile scales its video: "cover" (fill, crop) or

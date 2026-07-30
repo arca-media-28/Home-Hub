@@ -16,6 +16,7 @@ import {
   RotateCcw,
   SkipBack,
   RotateCw,
+  Square,
   SkipForward,
   Tv,
   VideoOff,
@@ -304,6 +305,10 @@ export default function VideoPlayerTile({
   const playlistLoop = s.videoPlaylistLoop ?? true;
   const shuffle = s.videoShuffle ?? false;
   const startMuted = s.videoMuted ?? true;
+  // Auto-mute when the user navigates away (dashboard page switch unmounts
+  // the tile; browser tab switch hides the document). Default on; the tile
+  // settings modal exposes a toggle.
+  const pageSwitchMute = s.videoPageSwitchMute ?? true;
   const fit = s.videoFit === "contain" ? "contain" : "cover";
 
   const isServerSource = source === "plex" || source === "jellyfin";
@@ -606,6 +611,14 @@ export default function VideoPlayerTile({
   // (MPEG-2, or HEVC without hardware support) — surfaced as a hint badge
   // rather than an error since audio is still playing.
   const [audioOnly, setAudioOnly] = useState(false);
+  // Buffering hint for live HLS streams: the video element fired `waiting`
+  // (playback stalled to buffer) and hasn't resumed yet. A spinner overlay
+  // lets the stream catch up without alarming the user.
+  const [buffering, setBuffering] = useState(false);
+  // Live-TV "Stop" state: the stream is fully torn down (hls.js destroyed,
+  // no segment fetches) so the ErsatzTV transcoder session can wind down.
+  // Resuming re-attaches a fresh instance to the same channel.
+  const [stopped, setStopped] = useState(false);
   const [muted, setMuted] = useState(savedRef.current?.muted ?? startMuted);
   // Playlist pop-out: a scrollable list of all entries (in play order) with
   // the current one highlighted; clicking an entry jumps straight to it.
@@ -683,6 +696,11 @@ export default function VideoPlayerTile({
   // the unmount cleanup runs, React has already detached videoRef.
   const lastTimeRef = useRef(0);
 
+  // Kept in a ref so the save/visibility handlers below never go stale
+  // without having to re-register listeners when the setting changes.
+  const pageSwitchMuteRef = useRef(pageSwitchMute);
+  pageSwitchMuteRef.current = pageSwitchMute;
+
   useEffect(() => {
     const tileId = tile.id;
     const save = () => {
@@ -690,6 +708,9 @@ export default function VideoPlayerTile({
       if (!snap.currentUrl) return;
       savePlaybackMemory(tileId, {
         ...snap,
+        // Auto-mute on page switch: the memory written when leaving forces
+        // muted so the player resumes silently when the user comes back.
+        muted: pageSwitchMuteRef.current ? true : snap.muted,
         time: videoRef.current?.currentTime ?? lastTimeRef.current,
       });
     };
@@ -704,6 +725,17 @@ export default function VideoPlayerTile({
       save();
     };
   }, [tile.id]);
+
+  // Live half of auto-mute: switching browser tabs doesn't unmount the tile,
+  // so audio would keep playing — mute as soon as the document hides.
+  useEffect(() => {
+    const onVisibility = () => {
+      if (document.hidden && pageSwitchMuteRef.current) setMuted(true);
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () =>
+      document.removeEventListener("visibilitychange", onVisibility);
+  }, []);
 
   useEffect(() => {
     const el = videoRef.current;
@@ -730,11 +762,16 @@ export default function VideoPlayerTile({
   const nativeHls =
     typeof document !== "undefined" &&
     document.createElement("video").canPlayType("application/vnd.apple.mpegurl") !== "";
+  // Full re-attach retries that happen automatically (no user click) after
+  // one hls.js instance exhausts its in-instance recovery budget. Persisted
+  // across attach-effect runs; reset by healthy playback or a manual Retry.
+  const autoReattachRef = useRef(0);
   useEffect(() => {
-    if (!currentUrl || !isHlsUrl || nativeHls) return;
+    if (!currentUrl || !isHlsUrl || nativeHls || stopped) return;
     const el = videoRef.current;
     if (!el) return;
     let cancelled = false;
+    let reattachTimer: number | null = null;
     let hls: import("hls.js").default | null = null;
     void import("hls.js").then(({ default: Hls }) => {
       if (cancelled) return;
@@ -747,14 +784,18 @@ export default function VideoPlayerTile({
       // given up retrying internally, but many of those are still salvageable
       // — a network blip or server restart can be resumed with startLoad(),
       // and a decode hiccup with recoverMediaError(). Attempt a bounded
-      // number of recoveries per error type before surfacing the explicit
-      // error state; a healthy buffered fragment resets the budget so a
-      // long-running live stream can survive repeated (spaced-out) stalls.
+      // number of recoveries per error type; when that budget is exhausted,
+      // tear the instance down and automatically re-attach a fresh one after
+      // a short pause (up to 3 times) before ever surfacing the explicit
+      // error state — a lagging live stream should self-heal, not demand a
+      // manual Retry click. Healthy buffered fragments reset every budget so
+      // a long-running stream survives repeated (spaced-out) stalls.
       let networkRecoveries = 0;
       let mediaRecoveries = 0;
       hls.on(Hls.Events.FRAG_BUFFERED, () => {
         networkRecoveries = 0;
         mediaRecoveries = 0;
+        autoReattachRef.current = 0;
         // Playback is flowing again — clear the "Reconnecting…" hint.
         setHlsReconnecting(false);
       });
@@ -772,22 +813,42 @@ export default function VideoPlayerTile({
           hls.recoverMediaError();
           return;
         }
-        setHlsReconnecting(false);
-        if (!demo) setMediaFailed(true);
+        // In-instance budget exhausted: destroy and re-attach fresh, with a
+        // short pause so a struggling server isn't hammered.
         hls.destroy();
         hls = null;
+        if (autoReattachRef.current < 3) {
+          autoReattachRef.current += 1;
+          setHlsReconnecting(true);
+          reattachTimer = window.setTimeout(() => {
+            reattachTimer = null;
+            setHlsRetryNonce((n) => n + 1);
+          }, 4000);
+          return;
+        }
+        setHlsReconnecting(false);
+        if (!demo) setMediaFailed(true);
       });
       hls.loadSource(currentUrl);
       hls.attachMedia(el);
     });
     return () => {
       cancelled = true;
+      if (reattachTimer != null) window.clearTimeout(reattachTimer);
       hls?.destroy();
       hls = null;
       // A stale hint must not survive a channel change or a fresh attach.
       setHlsReconnecting(false);
     };
-  }, [currentUrl, isHlsUrl, nativeHls, demo, hlsRetryNonce]);
+  }, [currentUrl, isHlsUrl, nativeHls, demo, hlsRetryNonce, stopped]);
+
+  // A channel change starts over with a clean slate for auto-reattaches and
+  // any leftover Stop state from the previous channel.
+  useEffect(() => {
+    autoReattachRef.current = 0;
+    setStopped(false);
+    setBuffering(false);
+  }, [currentUrl]);
 
   // Audio-without-video detection for live HLS streams. If the stream has
   // been playing for a few seconds and the element still reports
@@ -923,6 +984,8 @@ export default function VideoPlayerTile({
             data-testid="videoplayer-retry"
             onClick={() => {
               setMediaFailed(false);
+              setBuffering(false);
+              autoReattachRef.current = 0;
               setHlsRetryNonce((n) => n + 1);
               setPlaying(true);
             }}
@@ -969,7 +1032,7 @@ export default function VideoPlayerTile({
   } else {
     body = (
       <div className="relative w-full h-full overflow-hidden bg-black group">
-        {current && (
+        {current && !(stopped && isHlsUrl) && (
           <video
             key={current.url}
             ref={videoRef}
@@ -1038,7 +1101,41 @@ export default function VideoPlayerTile({
             }}
             onPlay={() => setPlaying(true)}
             onPause={() => setPlaying(false)}
+            onWaiting={() => {
+              if (isHlsUrl) setBuffering(true);
+            }}
+            onPlaying={() => setBuffering(false)}
           />
+        )}
+        {stopped && (
+          <div
+            className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-black/80 text-white/80"
+            data-testid="videoplayer-stopped"
+          >
+            <VideoOff className="w-5 h-5 opacity-60" />
+            <span className="text-xs">Stream stopped</span>
+            <button
+              type="button"
+              data-testid="videoplayer-resume"
+              onClick={() => {
+                autoReattachRef.current = 0;
+                setStopped(false);
+                setPlaying(true);
+              }}
+              className="mt-1 flex items-center gap-1.5 rounded-md border border-white/25 px-2.5 py-1 text-xs text-white hover:bg-white/10"
+            >
+              <Play className="w-3 h-3" />
+              Resume
+            </button>
+          </div>
+        )}
+        {buffering && !stopped && !hlsReconnecting && !mediaFailed && (
+          <div
+            className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center"
+            data-testid="videoplayer-buffering"
+          >
+            <span className="h-8 w-8 animate-spin rounded-full border-2 border-white/70 border-t-transparent" />
+          </div>
         )}
         {hlsReconnecting && (
           <span
@@ -1330,6 +1427,34 @@ export default function VideoPlayerTile({
                   <Volume2 className="w-3.5 h-3.5" />
                 )}
               </button>
+              {isErsatz && !demo && (
+                <button
+                  type="button"
+                  aria-label={stopped ? "Resume stream" : "Stop stream"}
+                  title={
+                    stopped
+                      ? "Resume the live stream"
+                      : "Stop the stream (frees the ErsatzTV transcoder)"
+                  }
+                  data-testid="videoplayer-stop"
+                  onClick={() => {
+                    if (stopped) {
+                      autoReattachRef.current = 0;
+                      setStopped(false);
+                      setPlaying(true);
+                    } else {
+                      setStopped(true);
+                      setPlaying(false);
+                      setBuffering(false);
+                    }
+                  }}
+                  className={`rounded-full p-1 text-white hover:bg-black/60 ${
+                    stopped ? "bg-white/25" : "bg-black/40"
+                  }`}
+                >
+                  <Square className="w-3.5 h-3.5" />
+                </button>
+              )}
               {isErsatz && ersatzChannels.length > 1 && (
                 <button
                   type="button"
