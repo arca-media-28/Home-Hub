@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import type { Tile } from "@workspace/api-client-react";
-import { useAiChat } from "@workspace/api-client-react";
 import { Bot, Send, Eraser, Loader2 } from "lucide-react";
 
 // Per-tile conversation history lives in localStorage under the app's legacy
@@ -61,6 +60,92 @@ function saveHistory(tileId: string | number, messages: ChatMessage[]): void {
   }
 }
 
+// Streams a chat reply from the API's NDJSON streaming mode. Calls onDelta
+// with each incremental piece of reply text; resolves with the final metadata
+// line. Non-2xx responses (400/404/502 before streaming starts) throw with
+// the server's error message; mid-stream provider failures surface as an
+// {"error"} line and also throw.
+async function streamAiChat(
+  body: {
+    accountId: string | null;
+    model: string | null;
+    messages: Array<{ role: "user" | "assistant"; content: string }>;
+  },
+  onDelta: (text: string) => void,
+): Promise<{ sample: boolean }> {
+  const token = localStorage.getItem("token");
+  const res = await fetch("/api/widgets/ai/chat", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ ...body, stream: true }),
+  });
+  if (!res.ok) {
+    let message = "The AI request failed.";
+    try {
+      const data = (await res.json()) as { error?: string };
+      if (data?.error) message = data.error;
+    } catch {
+      // non-JSON error body — keep the generic message
+    }
+    throw new Error(message);
+  }
+  if (!res.body) {
+    // Extremely old browser without stream support — read it all at once.
+    const text = await res.text();
+    return finishFromLines(text.split("\n"), onDelta);
+  }
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let done: { sample: boolean } | null = null;
+  for (;;) {
+    const { value, done: eof } = await reader.read();
+    if (eof) break;
+    buffer += decoder.decode(value, { stream: true });
+    let idx: number;
+    while ((idx = buffer.indexOf("\n")) !== -1) {
+      const line = buffer.slice(0, idx);
+      buffer = buffer.slice(idx + 1);
+      done = handleStreamLine(line, onDelta) ?? done;
+    }
+  }
+  if (buffer.trim()) done = handleStreamLine(buffer, onDelta) ?? done;
+  if (!done) throw new Error("The AI reply stream ended unexpectedly.");
+  return done;
+}
+
+function finishFromLines(
+  lines: string[],
+  onDelta: (text: string) => void,
+): { sample: boolean } {
+  let done: { sample: boolean } | null = null;
+  for (const line of lines) done = handleStreamLine(line, onDelta) ?? done;
+  if (!done) throw new Error("The AI reply stream ended unexpectedly.");
+  return done;
+}
+
+// Parses one NDJSON line; returns final metadata when it's the done line.
+function handleStreamLine(
+  line: string,
+  onDelta: (text: string) => void,
+): { sample: boolean } | null {
+  const trimmed = line.trim();
+  if (!trimmed) return null;
+  let payload: { delta?: string; done?: boolean; sample?: boolean; error?: string };
+  try {
+    payload = JSON.parse(trimmed);
+  } catch {
+    return null;
+  }
+  if (payload.error) throw new Error(payload.error);
+  if (typeof payload.delta === "string" && payload.delta) onDelta(payload.delta);
+  if (payload.done) return { sample: payload.sample === true };
+  return null;
+}
+
 interface AiChatTileProps {
   tile: Tile;
   // In edit (layout) mode the tile is a drag/resize target, so the input is
@@ -79,33 +164,42 @@ export default function AiChatTile({ tile, editMode }: AiChatTileProps) {
     loadHistory(tile.id),
   );
   const [input, setInput] = useState("");
-  const chat = useAiChat();
-  const thinking = chat.isPending;
+  // True from send until the stream finishes; "Thinking…" shows only until
+  // the first token arrives, then the reply grows in place.
+  const [busy, setBusy] = useState(false);
+  const [streamingText, setStreamingText] = useState<string | null>(null);
+  const thinking = busy && streamingText === null;
 
   // Keep the newest message in view as the conversation grows.
   const scrollRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const el = scrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [messages, thinking]);
+  }, [messages, thinking, streamingText]);
 
   // Persist every change (also covers the clear action writing []).
   useEffect(() => {
     saveHistory(tile.id, messages);
   }, [tile.id, messages]);
 
-  function send() {
+  async function send() {
     const text = input.trim();
-    if (!text || thinking) return;
+    if (!text || busy) return;
     const next: ChatMessage[] = [
       ...messages.filter((m) => !m.error),
       { role: "user", content: text },
     ];
     setMessages(next.slice(-HISTORY_CAP));
     setInput("");
-    chat.mutate(
-      {
-        data: {
+    setBusy(true);
+    setStreamingText(null);
+
+    // Accumulate deltas locally; render them via the streamingText bubble and
+    // commit the finished reply to history in one go.
+    let acc = "";
+    try {
+      const meta = await streamAiChat(
+        {
           accountId: accountId || null,
           model: model || null,
           messages: next
@@ -113,33 +207,36 @@ export default function AiChatTile({ tile, editMode }: AiChatTileProps) {
             .slice(-CONTEXT_TURNS)
             .map((m) => ({ role: m.role, content: m.content })),
         },
-      },
-      {
-        onSuccess: (reply) => {
-          setMessages((cur) =>
-            [
-              ...cur,
-              {
-                role: "assistant" as const,
-                content: reply.reply,
-                sample: reply.sample || undefined,
-              },
-            ].slice(-HISTORY_CAP),
-          );
+        (delta) => {
+          acc += delta;
+          setStreamingText(acc);
         },
-        onError: (err: unknown) => {
-          const e = err as { error?: string; message?: string } | undefined;
-          const detail =
-            (e && (e.error || e.message)) || "The AI request failed.";
-          setMessages((cur) =>
-            [
-              ...cur,
-              { role: "assistant" as const, content: detail, error: true },
-            ].slice(-HISTORY_CAP),
-          );
-        },
-      },
-    );
+      );
+      setMessages((cur) =>
+        [
+          ...cur,
+          {
+            role: "assistant" as const,
+            content: acc,
+            sample: meta.sample || undefined,
+          },
+        ].slice(-HISTORY_CAP),
+      );
+    } catch (err: unknown) {
+      const detail =
+        (err instanceof Error && err.message) || "The AI request failed.";
+      setMessages((cur) =>
+        [
+          ...cur,
+          // Keep whatever partial reply already streamed in, then the error.
+          ...(acc ? [{ role: "assistant" as const, content: acc }] : []),
+          { role: "assistant" as const, content: detail, error: true },
+        ].slice(-HISTORY_CAP),
+      );
+    } finally {
+      setBusy(false);
+      setStreamingText(null);
+    }
   }
 
   const shown = messages.length > 0 || configured ? messages : DEMO_CONVERSATION;
@@ -211,6 +308,15 @@ export default function AiChatTile({ tile, editMode }: AiChatTileProps) {
             </div>
           </div>
         )}
+        {/* The in-flight reply, growing token by token as the stream arrives. */}
+        {streamingText !== null && (
+          <div className="flex justify-start">
+            <div className="max-w-[85%] rounded-lg px-2.5 py-1.5 text-xs whitespace-pre-wrap break-words bg-muted text-foreground">
+              {streamingText}
+              <span className="inline-block w-1.5 h-3 ml-0.5 align-middle bg-muted-foreground/60 animate-pulse" />
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Input row. Disabled while arranging the layout. */}
@@ -226,7 +332,7 @@ export default function AiChatTile({ tile, editMode }: AiChatTileProps) {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder={configured ? "Message…" : "Try it — replies are samples"}
-          disabled={editMode || thinking}
+          disabled={editMode || busy}
           aria-label="Chat message"
           className="flex-1 min-w-0 bg-transparent text-xs outline-none placeholder:text-muted-foreground disabled:opacity-50"
           onPointerDown={(e) => e.stopPropagation()}
@@ -235,7 +341,7 @@ export default function AiChatTile({ tile, editMode }: AiChatTileProps) {
         <button
           type="submit"
           aria-label="Send message"
-          disabled={editMode || thinking || input.trim().length === 0}
+          disabled={editMode || busy || input.trim().length === 0}
           className="text-primary disabled:text-muted-foreground transition-colors p-1"
         >
           <Send className="w-3.5 h-3.5" />

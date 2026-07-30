@@ -1208,6 +1208,11 @@ export interface AiChatRequest {
   model?: string | null;
   /** The conversation so far, oldest first. */
   messages: AiChatMessage[];
+  /**
+     * When true the response is a chunked NDJSON stream (application/x-ndjson): one {"delta": "…"} line per piece of reply text, ending with {"done": true, "sample": bool, "model": "…"} — or {"error": "…"} if the provider fails mid-stream.
+     * @nullable
+     */
+  stream?: boolean | null;
 }
 
 export interface AiChatReply {

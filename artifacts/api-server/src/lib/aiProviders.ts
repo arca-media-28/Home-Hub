@@ -48,11 +48,84 @@ export const DEFAULT_MODELS: Record<AiProvider, string> = {
 // base URL of the self-hosted server.
 type Creds = Pick<AiAccount, "apiKey" | "baseUrl">;
 
+// Called with each incremental piece of reply text as the provider streams it.
+export type StreamDelta = (text: string) => void;
+
 interface ProviderAdapter {
   chat(creds: Creds, model: string, messages: ChatMessage[]): Promise<string>;
+  // Streams the reply incrementally via onDelta; resolves with the full text.
+  chatStream(
+    creds: Creds,
+    model: string,
+    messages: ChatMessage[],
+    onDelta: StreamDelta,
+  ): Promise<string>;
   listModels(creds: Creds): Promise<string[]>;
   // Cheap key/connectivity check; throws on failure.
   test(creds: Creds): Promise<void>;
+}
+
+// ── Streaming plumbing ───────────────────────────────────────────────────────
+// Providers stream over HTTP as either SSE ("data: {...}" lines) or NDJSON
+// (one JSON object per line). Both reduce to: split the byte stream on
+// newlines, hand each non-empty line to a parser that extracts the text delta.
+
+// Iterates the lines of a Node readable stream (axios responseType:"stream").
+async function* streamLines(stream: NodeJS.ReadableStream): AsyncGenerator<string> {
+  let buffer = "";
+  for await (const chunk of stream) {
+    buffer += typeof chunk === "string" ? chunk : chunk.toString("utf8");
+    let idx: number;
+    while ((idx = buffer.indexOf("\n")) !== -1) {
+      yield buffer.slice(0, idx).replace(/\r$/, "");
+      buffer = buffer.slice(idx + 1);
+    }
+  }
+  if (buffer.trim()) yield buffer;
+}
+
+// Consumes an SSE or NDJSON body, calling extract on each JSON payload and
+// forwarding any extracted text to onDelta. Returns the accumulated reply.
+async function consumeJsonStream(
+  stream: NodeJS.ReadableStream,
+  extract: (payload: unknown) => string | null | undefined,
+  onDelta: StreamDelta,
+): Promise<string> {
+  let full = "";
+  for await (const line of streamLines(stream)) {
+    let data = line;
+    if (data.startsWith("data:")) data = data.slice(5).trim();
+    else data = data.trim();
+    if (!data || data === "[DONE]" || data.startsWith("event:") || data.startsWith(":"))
+      continue;
+    let payload: unknown;
+    try {
+      payload = JSON.parse(data);
+    } catch {
+      continue; // ignore non-JSON keep-alives / partial noise
+    }
+    const text = extract(payload);
+    if (text) {
+      full += text;
+      onDelta(text);
+    }
+  }
+  return full;
+}
+
+// Providers put SSE error payloads inside the stream too; surface them.
+function streamedError(payload: unknown): string | null {
+  const err = (payload as { error?: { message?: string } | string })?.error;
+  if (!err) return null;
+  return typeof err === "string" ? err : (err.message ?? "provider stream error");
+}
+
+function extractOpenAiDelta(payload: unknown): string | null {
+  const msg = streamedError(payload);
+  if (msg) throw new Error(msg);
+  const p = payload as { choices?: Array<{ delta?: { content?: unknown } }> };
+  const c = p?.choices?.[0]?.delta?.content;
+  return typeof c === "string" ? c : null;
 }
 
 const openai: ProviderAdapter = {
@@ -64,6 +137,20 @@ const openai: ProviderAdapter = {
     );
     const text = r.data?.choices?.[0]?.message?.content;
     if (typeof text !== "string") throw new Error("OpenAI returned no reply text");
+    return text;
+  },
+  async chatStream({ apiKey }, model, messages, onDelta) {
+    const r = await cloudHttpClient.post(
+      "https://api.openai.com/v1/chat/completions",
+      { model, messages, stream: true },
+      {
+        headers: { Authorization: `Bearer ${apiKey}`, Accept: "text/event-stream" },
+        timeout: CHAT_TIMEOUT,
+        responseType: "stream",
+      },
+    );
+    const text = await consumeJsonStream(r.data, extractOpenAiDelta, onDelta);
+    if (!text) throw new Error("OpenAI returned no reply text");
     return text;
   },
   async listModels({ apiKey }) {
@@ -100,6 +187,34 @@ const gemini: ProviderAdapter = {
     );
     const parts = r.data?.candidates?.[0]?.content?.parts as Array<{ text?: string }> | undefined;
     const text = (parts ?? []).map((p) => p.text ?? "").join("");
+    if (!text) throw new Error("Gemini returned no reply text");
+    return text;
+  },
+  async chatStream({ apiKey }, model, messages, onDelta) {
+    const contents = messages.map((m) => ({
+      role: m.role === "assistant" ? "model" : "user",
+      parts: [{ text: m.content }],
+    }));
+    const r = await cloudHttpClient.post(
+      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`,
+      { contents },
+      {
+        headers: { "x-goog-api-key": apiKey, Accept: "text/event-stream" },
+        timeout: CHAT_TIMEOUT,
+        responseType: "stream",
+      },
+    );
+    const text = await consumeJsonStream(
+      r.data,
+      (payload) => {
+        const msg = streamedError(payload);
+        if (msg) throw new Error(msg);
+        const parts = (payload as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> })
+          ?.candidates?.[0]?.content?.parts;
+        return (parts ?? []).map((p) => p.text ?? "").join("");
+      },
+      onDelta,
+    );
     if (!text) throw new Error("Gemini returned no reply text");
     return text;
   },
@@ -143,6 +258,38 @@ const anthropic: ProviderAdapter = {
       .filter((b) => b.type === "text")
       .map((b) => b.text ?? "")
       .join("");
+    if (!text) throw new Error("Claude returned no reply text");
+    return text;
+  },
+  async chatStream({ apiKey }, model, messages, onDelta) {
+    const r = await cloudHttpClient.post(
+      "https://api.anthropic.com/v1/messages",
+      { model, max_tokens: 1024, messages, stream: true },
+      {
+        headers: {
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
+          Accept: "text/event-stream",
+        },
+        timeout: CHAT_TIMEOUT,
+        responseType: "stream",
+      },
+    );
+    const text = await consumeJsonStream(
+      r.data,
+      (payload) => {
+        const p = payload as {
+          type?: string;
+          delta?: { type?: string; text?: string };
+          error?: { message?: string };
+        };
+        if (p?.type === "error") throw new Error(p.error?.message ?? "Claude stream error");
+        if (p?.type === "content_block_delta" && p.delta?.type === "text_delta")
+          return p.delta.text ?? "";
+        return null;
+      },
+      onDelta,
+    );
     if (!text) throw new Error("Claude returned no reply text");
     return text;
   },
@@ -190,6 +337,26 @@ const ollama: ProviderAdapter = {
     if (typeof text !== "string" || !text) throw new Error("Ollama returned no reply text");
     return text;
   },
+  async chatStream(creds, model, messages, onDelta) {
+    const base = requireBaseUrl(creds);
+    const r = await httpClient.post(
+      `${base}/api/chat`,
+      { model, messages, stream: true },
+      { timeout: CHAT_TIMEOUT, responseType: "stream" },
+    );
+    // Ollama streams NDJSON: {"message":{"content":"…"},"done":false} per line.
+    const text = await consumeJsonStream(
+      r.data,
+      (payload) => {
+        const p = payload as { message?: { content?: string }; error?: string };
+        if (p?.error) throw new Error(p.error);
+        return p?.message?.content ?? null;
+      },
+      onDelta,
+    );
+    if (!text) throw new Error("Ollama returned no reply text");
+    return text;
+  },
   async listModels(creds) {
     const base = requireBaseUrl(creds);
     const r = await httpClient.get(`${base}/api/tags`, { timeout: LIST_TIMEOUT });
@@ -221,6 +388,24 @@ const openaiCompatible: ProviderAdapter = {
     const text = r.data?.choices?.[0]?.message?.content;
     if (typeof text !== "string" || !text)
       throw new Error("The local AI server returned no reply text");
+    return text;
+  },
+  async chatStream(creds, model, messages, onDelta) {
+    const base = requireBaseUrl(creds);
+    const r = await httpClient.post(
+      `${base}/v1/chat/completions`,
+      { model, messages, stream: true },
+      {
+        headers: {
+          ...(creds.apiKey ? { Authorization: `Bearer ${creds.apiKey}` } : {}),
+          Accept: "text/event-stream",
+        },
+        timeout: CHAT_TIMEOUT,
+        responseType: "stream",
+      },
+    );
+    const text = await consumeJsonStream(r.data, extractOpenAiDelta, onDelta);
+    if (!text) throw new Error("The local AI server returned no reply text");
     return text;
   },
   async listModels(creds) {
@@ -264,6 +449,17 @@ export async function aiChat(
   messages: ChatMessage[],
 ): Promise<string> {
   return ADAPTERS[account.provider].chat(account, model, messages);
+}
+
+// Streaming variant: onDelta fires for each incremental piece of reply text;
+// resolves with the full reply once the provider closes the stream.
+export async function aiChatStream(
+  account: AiAccount,
+  model: string,
+  messages: ChatMessage[],
+  onDelta: StreamDelta,
+): Promise<string> {
+  return ADAPTERS[account.provider].chatStream(account, model, messages, onDelta);
 }
 
 // Live model list for an account, falling back to the static list when the

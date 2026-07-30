@@ -3703,7 +3703,8 @@ export const AiChatBody = zod.object({
   "messages": zod.array(zod.object({
   "role": zod.enum(['user', 'assistant']),
   "content": zod.string()
-})).describe('The conversation so far, oldest first.')
+})).describe('The conversation so far, oldest first.'),
+  "stream": zod.boolean().nullish().describe('When true the response is a chunked NDJSON stream (application\/x-ndjson): one {\"delta\": \"…\"} line per piece of reply text, ending with {\"done\": true, \"sample\": bool, \"model\": \"…\"} — or {\"error\": \"…\"} if the provider fails mid-stream.')
 })
 
 export const AiChatResponse = zod.object({

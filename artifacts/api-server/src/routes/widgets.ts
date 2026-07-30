@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, type Response } from "express";
 import Parser from "rss-parser";
 import { requireAuth, verifyToken, type AuthRequest } from "../lib/auth.js";
 import { connectionStmts } from "../lib/db.js";
@@ -51,7 +51,13 @@ import {
 } from "../lib/calendar.js";
 import { guessGameType, queryGamePlayersDetailed, type PlayerCount } from "../lib/gameQuery.js";
 import { getAiAccount, listAiAccounts } from "../lib/aiAccounts.js";
-import { aiChat, aiListModels, resolveModel, type ChatMessage } from "../lib/aiProviders.js";
+import {
+  aiChat,
+  aiChatStream,
+  aiListModels,
+  resolveModel,
+  type ChatMessage,
+} from "../lib/aiProviders.js";
 
 const router = Router();
 
@@ -6597,14 +6603,33 @@ router.get("/calendar/caldav", requireAuth, async (req: AuthRequest, res) => {
 const AI_MAX_MESSAGES = 40;
 const AI_MAX_CONTENT = 8000;
 
-// POST /api/widgets/ai/chat — { accountId, model?, messages: [{role, content}] }
+// Streaming responses are NDJSON over a chunked HTTP response: one JSON
+// object per line — {"delta":"…"} for each piece of reply text, then a final
+// {"done":true,"model":"…","sample":…} (or {"error":"…"} if the provider
+// fails, since the 200 status is already committed by then).
+function beginNdjsonStream(res: Response): void {
+  res.status(200);
+  res.setHeader("Content-Type", "application/x-ndjson; charset=utf-8");
+  res.setHeader("Cache-Control", "no-cache, no-transform");
+  // Defeat proxy buffering so tokens reach the browser as they're produced.
+  res.setHeader("X-Accel-Buffering", "no");
+  res.flushHeaders();
+}
+
+function writeNdjson(res: Response, obj: unknown): void {
+  res.write(JSON.stringify(obj) + "\n");
+}
+
+// POST /api/widgets/ai/chat — { accountId, model?, messages: [{role, content}], stream? }
 router.post("/ai/chat", requireAuth, async (req: AuthRequest, res) => {
   const userId = req.user!.userId;
   const body = (req.body ?? {}) as {
     accountId?: unknown;
     model?: unknown;
     messages?: unknown;
+    stream?: unknown;
   };
+  const wantStream = body.stream === true;
 
   const rawMessages = Array.isArray(body.messages) ? body.messages : [];
   const messages: ChatMessage[] = rawMessages
@@ -6630,12 +6655,16 @@ router.post("/ai/chat", requireAuth, async (req: AuthRequest, res) => {
   // No accounts configured at all → demo reply so the tile can show its
   // sample conversation without a key (sample:true tells the tile).
   if (listAiAccounts(userId).length === 0) {
-    res.json({
-      sample: true,
-      reply:
-        "This is a demo reply — add an AI account (OpenAI, Gemini, Claude, or a local server like Ollama) in Settings, then pick it in this tile's settings to chat for real.",
-      model: "demo",
-    });
+    const demoReply =
+      "This is a demo reply — add an AI account (OpenAI, Gemini, Claude, or a local server like Ollama) in Settings, then pick it in this tile's settings to chat for real.";
+    if (wantStream) {
+      beginNdjsonStream(res);
+      writeNdjson(res, { delta: demoReply });
+      writeNdjson(res, { done: true, sample: true, model: "demo" });
+      res.end();
+      return;
+    }
+    res.json({ sample: true, reply: demoReply, model: "demo" });
     return;
   }
 
@@ -6657,6 +6686,34 @@ router.post("/ai/chat", requireAuth, async (req: AuthRequest, res) => {
     return;
   }
   try {
+    if (wantStream) {
+      // The 200 + headers are committed as soon as the first delta arrives,
+      // so provider failures after that point are reported in-band as a
+      // final {"error"} line instead of a 502.
+      let started = false;
+      try {
+        await aiChatStream(account, model, messages, (delta) => {
+          if (!started) {
+            beginNdjsonStream(res);
+            started = true;
+          }
+          writeNdjson(res, { delta });
+        });
+        if (!started) beginNdjsonStream(res);
+        writeNdjson(res, { done: true, sample: false, model });
+        res.end();
+      } catch (err) {
+        if (!started) throw err; // headers not sent yet → normal 502 below
+        const detail = describeHttpError(err);
+        logger.error(
+          { reason: detail, provider: account.provider, model },
+          "AI chat stream error (mid-stream)",
+        );
+        writeNdjson(res, { error: `AI request failed: ${aiErrorHint(detail.status, model, account.provider)}` });
+        res.end();
+      }
+      return;
+    }
     const reply = await aiChat(account, model, messages);
     res.json({ sample: false, reply, model });
   } catch (err) {
@@ -6665,18 +6722,21 @@ router.post("/ai/chat", requireAuth, async (req: AuthRequest, res) => {
       { reason: detail, provider: account.provider, model },
       "AI chat widget error",
     );
-    const status = detail.status;
-    const hint =
-      status === 401 || status === 403
-        ? "The API key was rejected — check it in Settings."
-        : status === 429
-          ? "Rate limit or quota exceeded for this account."
-          : status === 404 || status === 400
-            ? `The model "${model}" was rejected by ${account.provider}.`
-            : "The provider did not respond.";
-    res.status(502).json({ error: `AI request failed: ${hint}` });
+    res
+      .status(502)
+      .json({ error: `AI request failed: ${aiErrorHint(detail.status, model, account.provider)}` });
   }
 });
+
+function aiErrorHint(status: number | null, model: string, provider: string): string {
+  return status === 401 || status === 403
+    ? "The API key was rejected — check it in Settings."
+    : status === 429
+      ? "Rate limit or quota exceeded for this account."
+      : status === 404 || status === 400
+        ? `The model "${model}" was rejected by ${provider}.`
+        : "The provider did not respond.";
+}
 
 // GET /api/widgets/ai/models?accountId=… — model options for the tile editor's
 // override picker. Falls back to a static per-provider list when the live

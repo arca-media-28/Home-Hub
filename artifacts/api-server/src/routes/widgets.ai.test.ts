@@ -235,6 +235,149 @@ describe("POST /api/widgets/ai/chat", () => {
   });
 });
 
+const { Readable } = await import("node:stream");
+
+describe("POST /api/widgets/ai/chat (stream mode)", () => {
+
+  // NDJSON lines the route writes, parsed.
+  function parseNdjson(text: string): Array<Record<string, unknown>> {
+    return text
+      .split("\n")
+      .filter((l) => l.trim())
+      .map((l) => JSON.parse(l));
+  }
+
+  it("streams a demo reply when no accounts are configured", async () => {
+    const res = await request(app)
+      .post("/api/widgets/ai/chat")
+      .send({ stream: true, messages: [{ role: "user", content: "hi" }] });
+    expect(res.status).toBe(200);
+    expect(res.headers["content-type"]).toContain("application/x-ndjson");
+    const lines = parseNdjson(res.text);
+    expect(lines.at(-1)).toMatchObject({ done: true, sample: true, model: "demo" });
+    expect((lines[0].delta as string).length).toBeGreaterThan(0);
+    expect(cloudPost).not.toHaveBeenCalled();
+  });
+
+  it("streams OpenAI SSE deltas as NDJSON delta lines", async () => {
+    findByService.mockReturnValue(aiRow([openaiAccount]));
+    const sse = [
+      'data: {"choices":[{"delta":{"content":"Hel"}}]}\n',
+      'data: {"choices":[{"delta":{"content":"lo!"}}]}\n',
+      "data: [DONE]\n",
+    ];
+    cloudPost.mockResolvedValueOnce({ data: Readable.from(sse) });
+    const res = await request(app)
+      .post("/api/widgets/ai/chat")
+      .send({ stream: true, accountId: "acc1", messages: [{ role: "user", content: "hi" }] });
+    expect(res.status).toBe(200);
+    const lines = parseNdjson(res.text);
+    expect(lines.map((l) => l.delta).filter(Boolean)).toEqual(["Hel", "lo!"]);
+    expect(lines.at(-1)).toMatchObject({ done: true, sample: false, model: "gpt-4o-mini" });
+    // The provider was asked to stream.
+    const [, body, opts] = cloudPost.mock.calls[0] as [
+      string,
+      { stream: boolean },
+      { responseType: string },
+    ];
+    expect(body.stream).toBe(true);
+    expect(opts.responseType).toBe("stream");
+  });
+
+  it("streams Ollama NDJSON via the LAN client", async () => {
+    findByService.mockReturnValue(aiRow([ollamaAccount]));
+    const ndjson = [
+      '{"message":{"content":"hi "},"done":false}\n',
+      '{"message":{"content":"there"},"done":false}\n',
+      '{"message":{"content":""},"done":true}\n',
+    ];
+    localPost.mockResolvedValueOnce({ data: Readable.from(ndjson) });
+    const res = await request(app)
+      .post("/api/widgets/ai/chat")
+      .send({ stream: true, accountId: "oll1", messages: [{ role: "user", content: "hi" }] });
+    expect(res.status).toBe(200);
+    const lines = parseNdjson(res.text);
+    expect(lines.map((l) => l.delta).filter(Boolean)).toEqual(["hi ", "there"]);
+    expect(lines.at(-1)).toMatchObject({ done: true, model: "llama3.2" });
+    expect(cloudPost).not.toHaveBeenCalled();
+  });
+
+  it("streams Anthropic content_block_delta events", async () => {
+    findByService.mockReturnValue(
+      aiRow([{ id: "c1", label: "Claude", provider: "anthropic", apiKey: "sk-ant", model: "claude-3-5-haiku-latest" }]),
+    );
+    const sse = [
+      'data: {"type":"message_start"}\n',
+      'data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"Hey"}}\n',
+      'data: {"type":"message_stop"}\n',
+    ];
+    cloudPost.mockResolvedValueOnce({ data: Readable.from(sse) });
+    const res = await request(app)
+      .post("/api/widgets/ai/chat")
+      .send({ stream: true, accountId: "c1", messages: [{ role: "user", content: "hi" }] });
+    const lines = parseNdjson(res.text);
+    expect(lines.map((l) => l.delta).filter(Boolean)).toEqual(["Hey"]);
+    expect(lines.at(-1)).toMatchObject({ done: true });
+  });
+
+  it("streams Gemini SSE candidates from the streaming endpoint", async () => {
+    findByService.mockReturnValue(
+      aiRow([{ id: "g1", label: "Gem", provider: "gemini", apiKey: "AIza-x", model: null }]),
+    );
+    const sse = [
+      'data: {"candidates":[{"content":{"parts":[{"text":"Bon"}]}}]}\n',
+      'data: {"candidates":[{"content":{"parts":[{"text":"jour"}]}}]}\n',
+    ];
+    cloudPost.mockResolvedValueOnce({ data: Readable.from(sse) });
+    const res = await request(app)
+      .post("/api/widgets/ai/chat")
+      .send({ stream: true, accountId: "g1", messages: [{ role: "user", content: "hi" }] });
+    const lines = parseNdjson(res.text);
+    expect(lines.map((l) => l.delta).filter(Boolean)).toEqual(["Bon", "jour"]);
+    const [url] = cloudPost.mock.calls[0] as [string];
+    expect(url).toContain("streamGenerateContent");
+  });
+
+  it("502s with a hint when the provider rejects before any token", async () => {
+    findByService.mockReturnValue(aiRow([openaiAccount]));
+    cloudPost.mockRejectedValueOnce({ response: { status: 401 }, message: "401" });
+    const res = await request(app)
+      .post("/api/widgets/ai/chat")
+      .send({ stream: true, accountId: "acc1", messages: [{ role: "user", content: "hi" }] });
+    expect(res.status).toBe(502);
+    expect(res.body.error).toContain("API key was rejected");
+  });
+
+  it("reports a mid-stream provider failure as an in-band error line", async () => {
+    findByService.mockReturnValue(aiRow([openaiAccount]));
+    // One good delta, then the stream carries an error payload.
+    const sse = [
+      'data: {"choices":[{"delta":{"content":"par"}}]}\n',
+      'data: {"error":{"message":"overloaded"}}\n',
+    ];
+    cloudPost.mockResolvedValueOnce({ data: Readable.from(sse) });
+    const res = await request(app)
+      .post("/api/widgets/ai/chat")
+      .send({ stream: true, accountId: "acc1", messages: [{ role: "user", content: "hi" }] });
+    expect(res.status).toBe(200); // already committed
+    const lines = parseNdjson(res.text);
+    expect(lines[0]).toMatchObject({ delta: "par" });
+    expect(String(lines.at(-1)?.error)).toContain("AI request failed");
+  });
+
+  it("still answers plain JSON when stream is not requested", async () => {
+    findByService.mockReturnValue(aiRow([openaiAccount]));
+    cloudPost.mockResolvedValueOnce({
+      data: { choices: [{ message: { content: "plain" } }] },
+    });
+    const res = await request(app)
+      .post("/api/widgets/ai/chat")
+      .send({ accountId: "acc1", messages: [{ role: "user", content: "hi" }] });
+    expect(res.status).toBe(200);
+    expect(res.body.reply).toBe("plain");
+  });
+});
+
 describe("GET /api/widgets/ai/models", () => {
   it("404s for an unknown account", async () => {
     const res = await request(app).get("/api/widgets/ai/models?accountId=nope");
