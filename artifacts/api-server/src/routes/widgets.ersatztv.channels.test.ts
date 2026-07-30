@@ -90,8 +90,13 @@ function xmltvAround(now: number): string {
   };
   // Includes two future programmes on channel 1 listed out of order to prove
   // "up next" picks the earliest upcoming start, not the first in the feed.
+  // Also includes an already-finished programme and one starting beyond the
+  // ~3h guide horizon — both must be excluded from the schedule window.
   return `<?xml version="1.0"?>
 <tv>
+  <programme start="${fmt(now - 120_000)}" stop="${fmt(now - 60_000)}" channel="1">
+    <title>Already Over</title>
+  </programme>
   <programme start="${fmt(now - 60_000)}" stop="${fmt(now + 60_000)}" channel="1">
     <title>The Maltese Falcon</title>
   </programme>
@@ -100,6 +105,9 @@ function xmltvAround(now: number): string {
   </programme>
   <programme start="${fmt(now + 60_000)}" stop="${fmt(now + 120_000)}" channel="1">
     <title>Casablanca</title>
+  </programme>
+  <programme start="${fmt(now + 4 * 3_600_000)}" stop="${fmt(now + 5 * 3_600_000)}" channel="1">
+    <title>Beyond Horizon</title>
   </programme>
 </tv>`;
 }
@@ -160,6 +168,57 @@ describe("GET /api/widgets/ersatztv/channels", () => {
     expect(ch2.upNextTitle).toBeNull();
     expect(ch2.upNextStart).toBeNull();
     expect(ch2.streamUrl).toBe("/api/widgets/ersatztv/stream/iptv/channel/2.m3u8");
+    // Schedule window: current + upcoming programmes sorted by start;
+    // finished and beyond-horizon programmes are excluded.
+    expect(ch1.programs.map((p: { title: string }) => p.title)).toEqual([
+      "The Maltese Falcon",
+      "Casablanca",
+      "Later Feature",
+    ]);
+    for (const p of ch1.programs) {
+      expect(Number.isNaN(Date.parse(p.start))).toBe(false);
+      expect(Number.isNaN(Date.parse(p.stop))).toBe(false);
+      expect(Date.parse(p.stop)).toBeGreaterThan(Date.parse(p.start));
+    }
+    // A channel with no guide data gets an empty schedule, not a missing key.
+    expect(ch2.programs).toEqual([]);
+  });
+
+  it("includes a multi-hour schedule per channel in the sample lineup", async () => {
+    const res = await request(makeApp()).get("/api/widgets/ersatztv/channels");
+    expect(res.status).toBe(200);
+    for (const c of res.body.channels) {
+      expect(Array.isArray(c.programs)).toBe(true);
+      expect(c.programs.length).toBeGreaterThan(1);
+      // Blocks are contiguous and cover at least the next two hours.
+      const last = c.programs[c.programs.length - 1];
+      expect(Date.parse(last.stop)).toBeGreaterThan(Date.now() + 2 * 3_600_000);
+      for (let i = 1; i < c.programs.length; i++) {
+        expect(c.programs[i].start).toBe(c.programs[i - 1].stop);
+      }
+    }
+  });
+
+  it("still returns the channel lineup when only the XMLTV guide fails", async () => {
+    findByService.mockImplementation((_userId: number, service: string) =>
+      service === "ersatztv" ? ersatzRow : undefined,
+    );
+    httpGet.mockImplementation((url: string) => {
+      if (url.endsWith("/iptv/channels.m3u")) return Promise.resolve({ data: M3U });
+      if (url.endsWith("/iptv/xmltv.xml"))
+        return Promise.reject(new Error("guide timeout"));
+      return Promise.reject(new Error(`unexpected ${url}`));
+    });
+    const res = await request(makeApp()).get("/api/widgets/ersatztv/channels");
+    expect(res.status).toBe(200);
+    expect(res.body.sample).toBe(false);
+    expect(res.body.channels).toHaveLength(2);
+    for (const c of res.body.channels) {
+      expect(c.nowPlaying).toBeNull();
+      expect(c.upNextTitle).toBeNull();
+      expect(c.programs).toEqual([]);
+      expect(c.streamUrl).toMatch(/^\/api\/widgets\/ersatztv\/stream\//);
+    }
   });
 
   it("returns 502 when configured but the server fails", async () => {

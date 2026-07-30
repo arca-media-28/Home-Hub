@@ -82,6 +82,10 @@ test("ersatztv tile shows the tuned channel and persists channel switching", asy
 
   // Mock a real lineup; leave the HLS playlist request pending so playback
   // neither succeeds nor turns fatal during the pop-out interaction.
+  // Channel 1 carries a schedule window (guide-grid blocks); channel 2 has
+  // none, exercising the "no guide data" placeholder row.
+  const now = Date.now();
+  const iso = (min: number) => new Date(now + min * 60_000).toISOString();
   await page.route("**/api/widgets/ersatztv/channels", (route) =>
     route.fulfill({
       json: {
@@ -91,12 +95,20 @@ test("ersatztv tile shows the tuned channel and persists channel switching", asy
             number: "1",
             name: "Movies",
             nowPlaying: "The Maltese Falcon",
+            nowPlayingStart: iso(-30),
+            nowPlayingStop: iso(30),
+            programs: [
+              { title: "The Maltese Falcon", start: iso(-30), stop: iso(30) },
+              { title: "Casablanca", start: iso(30), stop: iso(120) },
+              { title: "The Big Sleep", start: iso(120), stop: iso(180) },
+            ],
             streamUrl: "/api/widgets/ersatztv/stream/iptv/channel/1.m3u8",
           },
           {
             number: "2",
             name: "Cartoons",
             nowPlaying: "Looney Tunes",
+            programs: [],
             streamUrl: "/api/widgets/ersatztv/stream/iptv/channel/2.m3u8",
           },
         ],
@@ -125,6 +137,24 @@ test("ersatztv tile shows the tuned channel and persists channel switching", asy
   const entries = page.getByTestId("videoplayer-channel-entry");
   await expect(entries).toHaveCount(2);
   await expect(entries.nth(1)).toHaveAttribute("data-current", "true");
+
+  // DirecTV-style guide grid: time-slot header + programme blocks laid out
+  // on the timeline, a now-line, and a highlighted currently airing block.
+  await expect(page.getByTestId("videoplayer-guide-grid")).toBeVisible();
+  await expect(page.getByTestId("videoplayer-guide-nowline")).toBeAttached();
+  const programs = page.getByTestId("videoplayer-guide-program");
+  await expect(programs).toHaveCount(3);
+  const airing = page.locator('[data-testid="videoplayer-guide-program"][data-airing="true"]');
+  await expect(airing).toHaveCount(1);
+  await expect(airing).toContainText("The Maltese Falcon");
+  // The later programme block is wider than the shorter one (proportional
+  // durations: Casablanca 90m vs Big Sleep 60m).
+  const widths = await programs.evaluateAll((els) =>
+    els.map((el) => el.getBoundingClientRect().width),
+  );
+  expect(widths[1]!).toBeGreaterThan(widths[2]!);
+  // The channel without guide data shows a placeholder block.
+  await expect(page.getByTestId("videoplayer-guide-placeholder")).toBeVisible();
 
   // Tune to channel 1 and confirm the change is persisted server-side.
   await entries.nth(0).click();

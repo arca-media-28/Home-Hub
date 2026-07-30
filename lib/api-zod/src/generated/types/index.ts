@@ -56,6 +56,7 @@ export * from './emailMessage';
 export * from './emailMessageBodyData';
 export * from './errorResponse';
 export * from './ersatzChannelLineup';
+export * from './ersatzGuideProgram';
 export * from './ersatzPlayableChannel';
 export * from './ersatzTvChannel';
 export * from './ersatzTvData';

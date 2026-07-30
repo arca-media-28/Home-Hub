@@ -2942,6 +2942,11 @@ export const GetErsatzChannelsResponse = zod.object({
   "nowPlayingStop": zod.string().nullish().describe('ISO 8601 stop time of the current programme. Null when unknown.'),
   "upNextTitle": zod.string().nullish().describe('The next programme\'s title per the XMLTV guide. Null when unknown.'),
   "upNextStart": zod.string().nullish().describe('ISO 8601 start time of the next programme. Null when unknown.'),
+  "programs": zod.array(zod.object({
+  "title": zod.string().describe('The programme\'s title.'),
+  "start": zod.string().describe('ISO 8601 start time of the programme.'),
+  "stop": zod.string().describe('ISO 8601 stop time of the programme.')
+})).optional().describe('The channel\'s schedule window for the guide grid: the current programme plus everything starting within the next few hours, sorted by start time. Empty when the guide has no data for the channel.'),
   "streamUrl": zod.string().nullish().describe('Same-origin HLS playlist path (through the api-server\'s ErsatzTV stream proxy) the tile can play. The client appends its auth token as a query parameter. Null for sample channels.')
 }))
 })

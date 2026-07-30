@@ -13,6 +13,8 @@ Endpoints (both unauthenticated, fetched as text via `responseType: "text"`):
 
 **Up next rule:** the future programme with the *earliest* `start > now` — programmes are NOT guaranteed ordered in the feed, so track the min per channel rather than taking the first future entry. BOTH `/ersatztv/channels` (playable lineup) and the `/ersatztv` monitoring widget expose `upNextTitle`/`upNextStart` (ISO 8601, null when nothing further is scheduled).
 
+**Guide grid schedule:** `/ersatztv/channels` also returns `programs` per channel — programmes overlapping `[now, now+3h)`, sorted after collection (feed is unordered). The guide is ADDITIVE: an XMLTV fetch failure degrades to empty `programs` with a warn log and must never 502 the channel lineup (M3U alone is enough to tune). The Video Player pop-out renders it as a DirecTV-style grid; empty/absent `programs` shows a placeholder row.
+
 **Active streams metric:** comes from `GET /api/sessions` (no-auth) — a JSON array, one entry per active transcode session (MPEG-TS + HLS Segmenter); `activeStreams = array.length`. Fetched with its **own** try/catch so an older instance / missing endpoint / network error returns `null` (tile omits the metric) and **never 502s the whole tile**. Older note that "no endpoint exists" is wrong — `/api/sessions` is the source.
 
 **Widget convention:** unconfigured (no base URL) → sample data; configured-but-fetch-fails → 502. `reachable` is always `true` in a 200 (an unreachable configured server 502s instead); the field exists so the tile can render the "health" metric uniformly.

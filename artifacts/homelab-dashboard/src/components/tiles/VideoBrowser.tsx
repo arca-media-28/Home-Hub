@@ -222,7 +222,7 @@ export default function VideoBrowser({
         {/* Breadcrumbs (drill-down) */}
         {stack.length > 1 && (
           <div
-            className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground"
+            className="flex flex-wrap items-center gap-1 rounded-md border border-border/60 bg-muted/40 px-2 py-1.5 text-xs text-muted-foreground"
             data-testid="videoplayer-browser-breadcrumbs"
           >
             {stack.map((loader, i) => (
@@ -275,7 +275,7 @@ export default function VideoBrowser({
                       type="button"
                       onClick={() => openLibrary(lib)}
                       data-testid="videoplayer-browser-library"
-                      className="flex w-full min-w-0 items-center gap-2 rounded px-1 py-1.5 text-left hover:bg-muted/60"
+                      className="flex w-full min-w-0 items-center gap-2 rounded-md border-l-2 border-transparent px-1.5 py-1.5 text-left transition-colors hover:border-primary/60 hover:bg-muted/60"
                     >
                       <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded bg-muted text-muted-foreground">
                         <Clapperboard size={16} aria-hidden="true" />
@@ -302,7 +302,7 @@ export default function VideoBrowser({
                   {containers.map((c) => (
                     <div
                       key={c.id}
-                      className="group flex items-center gap-1 rounded pr-1 hover:bg-muted/60"
+                      className="group flex items-center gap-1 rounded-md border-l-2 border-transparent pr-1 transition-colors hover:border-primary/60 hover:bg-muted/60"
                     >
                       <button
                         type="button"
@@ -355,7 +355,7 @@ export default function VideoBrowser({
                       onClick={() => playVideos(videos, i)}
                       title={`Play ${v.title}`}
                       data-testid="videoplayer-browser-video"
-                      className="group flex w-full min-w-0 items-center gap-2 rounded px-1 py-1 text-left hover:bg-muted/60"
+                      className="group flex w-full min-w-0 items-center gap-2 rounded-md border-l-2 border-transparent px-1.5 py-1 text-left transition-colors hover:border-primary/60 hover:bg-muted/60"
                     >
                       <span className="w-5 flex-shrink-0 text-right text-xs tabular-nums text-muted-foreground group-hover:hidden">
                         {i + 1}

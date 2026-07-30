@@ -5,6 +5,7 @@
  * Tachboard API
  * OpenAPI spec version: 0.1.0
  */
+import type { ErsatzGuideProgram } from './ersatzGuideProgram';
 
 export interface ErsatzPlayableChannel {
   /** The channel's number (ErsatzTV channel numbers can be fractional strings like "5.1"). */
@@ -36,6 +37,8 @@ export interface ErsatzPlayableChannel {
      * @nullable
      */
   upNextStart?: string | null;
+  /** The channel's schedule window for the guide grid: the current programme plus everything starting within the next few hours, sorted by start time. Empty when the guide has no data for the channel. */
+  programs?: ErsatzGuideProgram[];
   /**
      * Same-origin HLS playlist path (through the api-server's ErsatzTV stream proxy) the tile can play. The client appends its auth token as a query parameter. Null for sample channels.
      * @nullable

@@ -28,6 +28,9 @@ import {
 // tiles with other sources never pay for it.
 const VideoBrowser = lazy(() => import("./VideoBrowser"));
 
+// The cable-guide grid is ErsatzTV-only; also lazy for the same reason.
+const ErsatzGuideGrid = lazy(() => import("./ErsatzGuideGrid"));
+
 // ---------------------------------------------------------------------------
 // Video Player tile: a full-surface video player. Sources chosen in the tile
 // editor: uploaded video files, pasted direct video URLs, a YouTube video or
@@ -1174,112 +1177,23 @@ export default function VideoPlayerTile({
           </Suspense>
         )}
         {!editMode && isErsatz && channelsOpen && ersatzChannels.length > 0 && (
-          <div
-            className="absolute inset-x-2 bottom-[60px] top-2 z-10 flex flex-col overflow-hidden rounded-md bg-black/85 backdrop-blur-sm"
-            data-testid="videoplayer-channels"
-          >
-            <div className="flex items-center justify-between border-b border-white/10 px-2.5 py-1.5">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-white/70">
-                Channels ({ersatzChannels.length})
-              </span>
-              <button
-                type="button"
-                aria-label="Close channels"
-                data-testid="videoplayer-channels-close"
-                onClick={() => setChannelsOpen(false)}
-                className="rounded px-1.5 text-[13px] leading-none text-white/60 hover:text-white"
-              >
-                ✕
-              </button>
-            </div>
-            <ul className="min-h-0 flex-1 overflow-y-auto py-1">
-              {ersatzChannels.map((channel) => {
-                const isCurrent =
-                  current?.id === `ersatztv-${channel.number}`;
-                const channelProgress = guideProgress(
-                  channel.nowPlayingStart,
-                  channel.nowPlayingStop,
-                  guideNow,
-                );
-                return (
-                  <li key={channel.number}>
-                    <button
-                      type="button"
-                      data-testid="videoplayer-channel-entry"
-                      data-current={isCurrent ? "true" : undefined}
-                      aria-current={isCurrent ? "true" : undefined}
-                      onClick={() => {
-                        if (!isCurrent) tuneChannel(channel.number);
-                        setChannelsOpen(false);
-                      }}
-                      className={`flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-[11px] leading-tight transition-colors ${
-                        isCurrent
-                          ? "bg-white/15 text-white"
-                          : "text-white/70 hover:bg-white/10 hover:text-white"
-                      }`}
-                      ref={
-                        isCurrent
-                          ? (el) => el?.scrollIntoView({ block: "nearest" })
-                          : undefined
-                      }
-                    >
-                      <span className="w-7 shrink-0 text-right tabular-nums text-white/40">
-                        {channel.number}
-                      </span>
-                      {isCurrent ? (
-                        <Play className="h-3 w-3 shrink-0 fill-current" />
-                      ) : (
-                        <span className="w-3 shrink-0" />
-                      )}
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate">
-                          {channel.name}
-                          {channel.nowPlaying && (
-                            <span className="text-white/45">
-                              {" "}
-                              — {channel.nowPlaying}
-                            </span>
-                          )}
-                        </span>
-                        {channelProgress && (
-                          <span
-                            className="mt-0.5 flex items-center gap-1.5"
-                            data-testid="videoplayer-channel-progress"
-                          >
-                            <span className="h-0.5 w-12 shrink-0 overflow-hidden rounded-full bg-white/15">
-                              <span
-                                className="block h-full rounded-full bg-white/60"
-                                style={{
-                                  width: `${Math.round(channelProgress.fraction * 100)}%`,
-                                }}
-                              />
-                            </span>
-                            <span className="truncate text-[9px] text-white/45">
-                              {channelProgress.endsIn}
-                            </span>
-                          </span>
-                        )}
-                        {channel.upNextTitle && (
-                          <span
-                            className="block truncate text-[10px] text-white/40"
-                            data-testid="videoplayer-channel-upnext"
-                          >
-                            Up next: {channel.upNextTitle}
-                            {formatGuideTime(channel.upNextStart) &&
-                              ` · ${formatGuideTime(channel.upNextStart)}`}
-                          </span>
-                        )}
-                      </span>
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
+          <Suspense fallback={null}>
+            <ErsatzGuideGrid
+              channels={ersatzChannels}
+              currentNumber={
+                ersatzChannels.find(
+                  (c) => current?.id === `ersatztv-${c.number}`,
+                )?.number ?? null
+              }
+              nowMs={guideNow}
+              onTune={tuneChannel}
+              onClose={() => setChannelsOpen(false)}
+            />
+          </Suspense>
         )}
         {!editMode && !usesBrowser && playlistOpen && count > 1 && (
           <div
-            className="absolute inset-x-2 bottom-[60px] top-2 z-10 flex flex-col overflow-hidden rounded-md bg-black/85 backdrop-blur-sm"
+            className="absolute inset-x-2 bottom-[60px] top-2 z-10 flex flex-col overflow-hidden rounded-md border border-white/10 bg-black/90 backdrop-blur-sm"
             data-testid="videoplayer-playlist"
           >
             <div className="flex items-center justify-between border-b border-white/10 px-2.5 py-1.5">
@@ -1312,10 +1226,10 @@ export default function VideoPlayerTile({
                         jumpTo(orderIdx);
                         setPlaylistOpen(false);
                       }}
-                      className={`flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-[11px] leading-tight transition-colors ${
+                      className={`flex w-full items-center gap-2 border-l-2 px-2.5 py-1.5 text-left text-[11px] leading-tight transition-colors ${
                         isCurrent
-                          ? "bg-white/15 text-white"
-                          : "text-white/70 hover:bg-white/10 hover:text-white"
+                          ? "border-white/70 bg-white/15 text-white"
+                          : "border-transparent text-white/70 hover:bg-white/10 hover:text-white"
                       }`}
                       ref={
                         isCurrent

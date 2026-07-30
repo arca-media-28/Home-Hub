@@ -4870,18 +4870,33 @@ function parseXmltvTime(value: string): number {
 }
 
 // Per-channel guide info parsed from an XMLTV document: what's airing right
-// now plus the next upcoming programme (title + ISO start time).
+// now plus the next upcoming programme (title + ISO start time), plus the
+// full schedule window (current + upcoming programmes for the next few
+// hours) for the guide grid.
+interface ErsatzGuideProgram {
+  title: string;
+  start: number;
+  stop: number;
+}
+
 interface ErsatzGuideEntry {
   nowPlaying?: string;
   nowPlayingStart?: number;
   nowPlayingStop?: number;
   upNextTitle?: string;
   upNextStart?: number;
+  programs?: ErsatzGuideProgram[];
 }
+
+// How far ahead the guide grid schedule extends. Programmes starting beyond
+// this horizon are dropped to keep payloads small.
+const ERSATZ_GUIDE_HORIZON_MS = 3 * 60 * 60_000;
 
 // Build a map of channelId → guide entry from an XMLTV document. A programme
 // is "now playing" when start ≤ now < stop; "up next" is the future programme
 // with the earliest start time (programmes need not be ordered in the feed).
+// Every programme overlapping [now, now + horizon) is also collected into
+// `programs` (sorted by start) so the guide grid can lay out a timeline.
 function parseXmltvGuide(xml: string, nowMs: number): Map<string, ErsatzGuideEntry> {
   const guide = new Map<string, ErsatzGuideEntry>();
   const programmeRe = /<programme\b([^>]*)>([\s\S]*?)<\/programme>/g;
@@ -4914,9 +4929,48 @@ function parseXmltvGuide(xml: string, nowMs: number): Map<string, ErsatzGuideEnt
         entry.upNextStart = start;
       }
     }
+    // Collect the schedule window for the guide grid: anything overlapping
+    // [now, now + horizon). The feed need not be ordered, so sort below.
+    if (stop > nowMs && start < nowMs + ERSATZ_GUIDE_HORIZON_MS) {
+      (entry.programs ??= []).push({ title, start, stop });
+    }
     guide.set(channel, entry);
   }
+  for (const entry of guide.values()) {
+    entry.programs?.sort((a, b) => a.start - b.start);
+  }
   return guide;
+}
+
+// Serialize a guide entry's schedule window as ISO strings for the API.
+function serializeErsatzPrograms(
+  entry: ErsatzGuideEntry | undefined,
+): { title: string; start: string; stop: string }[] {
+  return (entry?.programs ?? []).map((p) => ({
+    title: p.title,
+    start: new Date(p.start).toISOString(),
+    stop: new Date(p.stop).toISOString(),
+  }));
+}
+
+// Demo schedule for the sample lineup: back-to-back blocks so the guide grid
+// looks real without an ErsatzTV connection.
+function sampleErsatzPrograms(
+  startOffsetMin: number,
+  titles: string[],
+  blockMin: number,
+): { title: string; start: string; stop: string }[] {
+  const now = Date.now();
+  let cursor = now + startOffsetMin * 60_000;
+  return titles.map((title) => {
+    const start = cursor;
+    cursor += blockMin * 60_000;
+    return {
+      title,
+      start: new Date(start).toISOString(),
+      stop: new Date(cursor).toISOString(),
+    };
+  });
 }
 
 // Fetch the live active-stream count from ErsatzTV's /api/sessions endpoint,
@@ -5089,20 +5143,31 @@ router.get("/ersatztv/channels", requireAuth, async (req: AuthRequest, res) => {
     res.json({
       sample: true,
       channels: [
-        { number: "1", name: "Movies 24/7", nowPlaying: "The Maltese Falcon", nowPlayingStart: new Date(Date.now() - 55 * 60_000).toISOString(), nowPlayingStop: new Date(Date.now() + 45 * 60_000).toISOString(), upNextTitle: "Casablanca", upNextStart: new Date(Date.now() + 45 * 60_000).toISOString(), streamUrl: null },
-        { number: "2", name: "Retro Cartoons", nowPlaying: "Looney Tunes", nowPlayingStart: new Date(Date.now() - 10 * 60_000).toISOString(), nowPlayingStop: new Date(Date.now() + 20 * 60_000).toISOString(), upNextTitle: "Tom and Jerry", upNextStart: new Date(Date.now() + 20 * 60_000).toISOString(), streamUrl: null },
-        { number: "3", name: "Nature Documentaries", nowPlaying: "Planet Earth: Jungles", nowPlayingStart: new Date(Date.now() - 30 * 60_000).toISOString(), nowPlayingStop: new Date(Date.now() + 30 * 60_000).toISOString(), upNextTitle: "Blue Planet: Coasts", upNextStart: new Date(Date.now() + 30 * 60_000).toISOString(), streamUrl: null },
+        { number: "1", name: "Movies 24/7", nowPlaying: "The Maltese Falcon", nowPlayingStart: new Date(Date.now() - 55 * 60_000).toISOString(), nowPlayingStop: new Date(Date.now() + 45 * 60_000).toISOString(), upNextTitle: "Casablanca", upNextStart: new Date(Date.now() + 45 * 60_000).toISOString(), streamUrl: null, programs: sampleErsatzPrograms(-55, ["The Maltese Falcon", "Casablanca", "The Big Sleep"], 100) },
+        { number: "2", name: "Retro Cartoons", nowPlaying: "Looney Tunes", nowPlayingStart: new Date(Date.now() - 10 * 60_000).toISOString(), nowPlayingStop: new Date(Date.now() + 20 * 60_000).toISOString(), upNextTitle: "Tom and Jerry", upNextStart: new Date(Date.now() + 20 * 60_000).toISOString(), streamUrl: null, programs: sampleErsatzPrograms(-10, ["Looney Tunes", "Tom and Jerry", "Popeye", "Betty Boop", "Woody Woodpecker", "Felix the Cat", "Mighty Mouse"], 30) },
+        { number: "3", name: "Nature Documentaries", nowPlaying: "Planet Earth: Jungles", nowPlayingStart: new Date(Date.now() - 30 * 60_000).toISOString(), nowPlayingStop: new Date(Date.now() + 30 * 60_000).toISOString(), upNextTitle: "Blue Planet: Coasts", upNextStart: new Date(Date.now() + 30 * 60_000).toISOString(), streamUrl: null, programs: sampleErsatzPrograms(-30, ["Planet Earth: Jungles", "Blue Planet: Coasts", "Frozen Planet: Ice Worlds", "Life: Reptiles"], 60) },
       ],
     });
     return;
   }
   try {
-    const [channelsRes, guideRes] = await Promise.all([
+    // The guide is additive: an XMLTV failure must not take down the channel
+    // list (the tile can still tune without programme info), so it gets its
+    // own catch that degrades to an empty guide with a warning.
+    const [channelsRes, guide] = await Promise.all([
       httpClient.get(`${base}/iptv/channels.m3u`, { responseType: "text" }),
-      httpClient.get(`${base}/iptv/xmltv.xml`, { responseType: "text" }),
+      httpClient
+        .get(`${base}/iptv/xmltv.xml`, { responseType: "text" })
+        .then((r) => parseXmltvGuide(String(r.data ?? ""), Date.now()))
+        .catch((err: unknown) => {
+          logger.warn(
+            { reason: normalizeHttpError(err) },
+            "ErsatzTV XMLTV guide unavailable; returning channels without guide data",
+          );
+          return new Map<string, ErsatzGuideEntry>();
+        }),
     ]);
     const channelList = parseM3uChannels(String(channelsRes.data ?? ""));
-    const guide = parseXmltvGuide(String(guideRes.data ?? ""), Date.now());
     const channels = channelList.map((c) => {
       const entry = guide.get(c.tvgId) ?? guide.get(c.number);
       return {
@@ -5122,6 +5187,7 @@ router.get("/ersatztv/channels", requireAuth, async (req: AuthRequest, res) => {
           entry?.upNextStart != null
             ? new Date(entry.upNextStart).toISOString()
             : null,
+        programs: serializeErsatzPrograms(entry),
         streamUrl: `${ERSATZ_STREAM_PREFIX}/iptv/channel/${encodeURIComponent(c.number)}.m3u8`,
       };
     });

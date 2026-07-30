@@ -5562,6 +5562,20 @@ components:
           items:
             $ref: "#/components/schemas/PhotoItem"
 
+    ErsatzGuideProgram:
+      type: object
+      required: [title, start, stop]
+      properties:
+        title:
+          description: The programme's title.
+          type: string
+        start:
+          description: ISO 8601 start time of the programme.
+          type: string
+        stop:
+          description: ISO 8601 stop time of the programme.
+          type: string
+
     ErsatzPlayableChannel:
       type: object
       required: [number, name]
@@ -5587,6 +5601,15 @@ components:
         upNextStart:
           description: ISO 8601 start time of the next programme. Null when unknown.
           type: ["string", "null"]
+        programs:
+          description: >-
+            The channel's schedule window for the guide grid: the current
+            programme plus everything starting within the next few hours,
+            sorted by start time. Empty when the guide has no data for the
+            channel.
+          type: array
+          items:
+            $ref: "#/components/schemas/ErsatzGuideProgram"
         streamUrl:
           description: >-
             Same-origin HLS playlist path (through the api-server's ErsatzTV
