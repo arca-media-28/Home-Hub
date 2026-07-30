@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
-import { describe, it, expect } from "vitest";
-import { renderMarkdown } from "./markdown";
+import { describe, it, expect, vi } from "vitest";
+import { render, fireEvent, waitFor } from "@testing-library/react";
+import { renderMarkdown, MarkdownContent } from "./markdown";
 
 describe("renderMarkdown", () => {
   it("renders lists, emphasis, and code", () => {
@@ -30,5 +31,33 @@ describe("renderMarkdown", () => {
     expect(html).toContain('target="_blank"');
     expect(html).toContain('rel="noopener noreferrer"');
     expect(html).toContain('href="https://example.com"');
+  });
+});
+
+describe("MarkdownContent copy button", () => {
+  const md = "```js\nconst x = 1;\nconsole.log(x);\n```";
+
+  it("adds a copy button to each fenced code block", () => {
+    const { container } = render(
+      <MarkdownContent text={`${md}\n\ntext\n\n${md}`} />,
+    );
+    const buttons = container.querySelectorAll("button[data-copy-code]");
+    expect(buttons.length).toBe(2);
+    expect(buttons[0].textContent).toBe("Copy");
+  });
+
+  it("copies the raw code and shows confirmation", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, { clipboard: { writeText } });
+    const { container } = render(<MarkdownContent text={md} />);
+    const button = container.querySelector("button[data-copy-code]")!;
+    fireEvent.click(button);
+    expect(writeText).toHaveBeenCalledWith("const x = 1;\nconsole.log(x);\n");
+    await waitFor(() => expect(button.textContent).toBe("Copied!"));
+  });
+
+  it("does not add a button when there is no code block", () => {
+    const { container } = render(<MarkdownContent text="just **text**" />);
+    expect(container.querySelector("button[data-copy-code]")).toBeNull();
   });
 });
