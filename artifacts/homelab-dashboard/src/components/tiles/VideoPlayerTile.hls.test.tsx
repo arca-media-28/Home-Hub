@@ -207,6 +207,12 @@ describe("VideoPlayerTile HLS stall recovery", () => {
       await act(async () => {});
       expect(hlsInstances.length).toBe(1);
 
+      // Buffer a fragment first so the tune-in grace window is over and the
+      // normal mid-playback auto-reattach budget applies.
+      act(() => {
+        hlsInstances[0]!.emit(MockHls.Events.FRAG_BUFFERED);
+      });
+
       // Exhaust instance budgets back-to-back. After each exhaustion the
       // tile waits ~4s then attaches a brand-new instance — 3 times.
       for (let attempt = 0; attempt < 3; attempt++) {
@@ -320,8 +326,12 @@ describe("VideoPlayerTile HLS stall recovery", () => {
       render(<VideoPlayerTile tile={TILE} editMode={false} />);
       await act(async () => {});
 
-      // Exhaust the initial instance plus all 3 auto-reattaches to reach the
-      // real error state.
+      // End the tune-in grace window (buffered fragment), then exhaust the
+      // initial instance plus all 3 auto-reattaches to reach the real error
+      // state.
+      act(() => {
+        hlsInstances[0]!.emit(MockHls.Events.FRAG_BUFFERED);
+      });
       for (let attempt = 0; attempt < 4; attempt++) {
         const hls = hlsInstances[hlsInstances.length - 1]!;
         for (let i = 0; i < 4; i++) {
@@ -351,6 +361,152 @@ describe("VideoPlayerTile HLS stall recovery", () => {
       emitFatal(next, MockHls.ErrorTypes.NETWORK_ERROR);
       expect(next.startLoad).toHaveBeenCalledTimes(1);
       expect(screen.queryByTestId("videoplayer-error")).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe("VideoPlayerTile tune-in grace window", () => {
+  it("keeps retrying quietly during tune-in instead of showing the error screen", async () => {
+    vi.useFakeTimers();
+    try {
+      render(<VideoPlayerTile tile={TILE} editMode={false} />);
+      await act(async () => {});
+      expect(hlsInstances.length).toBe(1);
+
+      // No fragment ever buffered — the channel is still tuning. Exhaust the
+      // in-instance budget 6 times in a row (double the normal 3-reattach
+      // budget); within the grace window the tile never shows the error
+      // screen, just the "Tuning…" hint, and keeps re-attaching.
+      for (let attempt = 0; attempt < 6; attempt++) {
+        const hls = hlsInstances[hlsInstances.length - 1]!;
+        for (let i = 0; i < 4; i++) {
+          emitFatal(hls, MockHls.ErrorTypes.NETWORK_ERROR);
+        }
+        expect(screen.queryByTestId("videoplayer-error")).toBeNull();
+        expect(
+          screen.getByTestId("videoplayer-reconnecting-badge").textContent,
+        ).toContain("Tuning");
+        await act(async () => {
+          vi.advanceTimersByTime(2_000);
+        });
+        await act(async () => {});
+        expect(hlsInstances.length).toBe(attempt + 2);
+      }
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("surfaces the error screen once the grace window and retry budget are exhausted", async () => {
+    vi.useFakeTimers();
+    try {
+      render(<VideoPlayerTile tile={TILE} editMode={false} />);
+      await act(async () => {});
+
+      // Burn one tune-in retry, then let the whole grace window elapse
+      // without the channel ever buffering a fragment.
+      const first = hlsInstances[0]!;
+      for (let i = 0; i < 4; i++) {
+        emitFatal(first, MockHls.ErrorTypes.NETWORK_ERROR);
+      }
+      await act(async () => {
+        vi.advanceTimersByTime(46_000);
+      });
+      await act(async () => {});
+      expect(hlsInstances.length).toBe(2);
+      expect(screen.queryByTestId("videoplayer-error")).toBeNull();
+
+      // Past the grace window the normal auto-reattach budget applies: 3
+      // more full exhaustions re-attach, the 4th finally errors.
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const hls = hlsInstances[hlsInstances.length - 1]!;
+        for (let i = 0; i < 4; i++) {
+          emitFatal(hls, MockHls.ErrorTypes.NETWORK_ERROR);
+        }
+        expect(screen.queryByTestId("videoplayer-error")).toBeNull();
+        await act(async () => {
+          vi.advanceTimersByTime(4_000);
+        });
+        await act(async () => {});
+      }
+      const last = hlsInstances[hlsInstances.length - 1]!;
+      for (let i = 0; i < 4; i++) {
+        emitFatal(last, MockHls.ErrorTypes.NETWORK_ERROR);
+      }
+      expect(screen.getByTestId("videoplayer-error")).toBeTruthy();
+      expect(screen.getByTestId("videoplayer-retry")).toBeTruthy();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("clears the error state immediately when tuning to a different channel", async () => {
+    vi.useFakeTimers();
+    try {
+      const CHANNEL2 = {
+        ...CHANNEL,
+        number: "2",
+        name: "Movie TV",
+        streamUrl: "/api/widgets/ersatztv/stream/2.m3u8",
+      };
+      channelsRef.current = [CHANNEL, CHANNEL2];
+      const { rerender } = render(
+        <VideoPlayerTile tile={TILE} editMode={false} />,
+      );
+      await act(async () => {});
+
+      // Drive channel 1 all the way to the genuine error state.
+      act(() => {
+        hlsInstances[0]!.emit(MockHls.Events.FRAG_BUFFERED);
+      });
+      for (let attempt = 0; attempt < 4; attempt++) {
+        const hls = hlsInstances[hlsInstances.length - 1]!;
+        for (let i = 0; i < 4; i++) {
+          emitFatal(hls, MockHls.ErrorTypes.NETWORK_ERROR);
+        }
+        await act(async () => {
+          vi.advanceTimersByTime(4_000);
+        });
+        await act(async () => {});
+      }
+      expect(screen.getByTestId("videoplayer-error")).toBeTruthy();
+      const countBefore = hlsInstances.length;
+
+      // Tune to channel 2: the stale error clears immediately and a fresh
+      // hls instance attaches to the new channel's stream.
+      rerender(
+        <VideoPlayerTile
+          tile={
+            {
+              ...TILE,
+              tileSettings: {
+                ...(TILE.tileSettings as object),
+                videoErsatzChannel: "2",
+              },
+            } as unknown as Tile
+          }
+          editMode={false}
+        />,
+      );
+      await act(async () => {});
+      expect(screen.queryByTestId("videoplayer-error")).toBeNull();
+      expect(hlsInstances.length).toBeGreaterThan(countBefore);
+      expect(hlsInstances[hlsInstances.length - 1]!.loadedUrl).toContain(
+        "/api/widgets/ersatztv/stream/2.m3u8",
+      );
+
+      // The new channel gets a full tune-in grace window of its own: a fatal
+      // error right away shows the Tuning hint, not the error screen.
+      const fresh = hlsInstances[hlsInstances.length - 1]!;
+      for (let i = 0; i < 4; i++) {
+        emitFatal(fresh, MockHls.ErrorTypes.NETWORK_ERROR);
+      }
+      expect(screen.queryByTestId("videoplayer-error")).toBeNull();
+      expect(
+        screen.getByTestId("videoplayer-reconnecting-badge").textContent,
+      ).toContain("Tuning");
     } finally {
       vi.useRealTimers();
     }

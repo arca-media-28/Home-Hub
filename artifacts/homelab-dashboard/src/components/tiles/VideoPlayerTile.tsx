@@ -769,6 +769,34 @@ export default function VideoPlayerTile({
   // one hls.js instance exhausts its in-instance recovery budget. Persisted
   // across attach-effect runs; reset by healthy playback or a manual Retry.
   const autoReattachRef = useRef(0);
+  // ── Tune-in grace window ──────────────────────────────────────────────────
+  // ErsatzTV takes several seconds to spin up its transcoder when a channel
+  // is first tuned, and hls.js reports those early failed playlist/segment
+  // fetches as fatal errors. Until the first fragment buffers (tunedRef),
+  // fatal errors within TUNE_GRACE_MS of tuning keep re-attaching quietly
+  // behind a "Tuning…" hint instead of consuming the auto-reattach budget or
+  // surfacing the error screen. Mid-playback recovery (after tunedRef flips
+  // true) is unchanged.
+  const TUNE_GRACE_MS = 45_000;
+  const TUNE_RETRY_DELAY_MS = 2_000;
+  const tuneStartRef = useRef(Date.now());
+  const tunedRef = useRef(false);
+  // Drives the badge label ("Tuning…" vs "Reconnecting…"). State, not a ref,
+  // because the badge must re-render when the first fragment buffers.
+  const [tuning, setTuning] = useState(true);
+  // Render-phase reset on channel change: clearing mediaFailed here (rather
+  // than in an effect) guarantees the <video> element is back in the tree
+  // before the attach effect runs, so tuning away from a dead channel
+  // immediately drops the error screen and re-attaches.
+  const prevTuneUrlRef = useRef(currentUrl);
+  if (prevTuneUrlRef.current !== currentUrl) {
+    prevTuneUrlRef.current = currentUrl;
+    tuneStartRef.current = Date.now();
+    tunedRef.current = false;
+    autoReattachRef.current = 0;
+    setTuning(true);
+    if (mediaFailed) setMediaFailed(false);
+  }
   useEffect(() => {
     if (!currentUrl || !isHlsUrl || nativeHls || stopped) return;
     const el = videoRef.current;
@@ -799,6 +827,10 @@ export default function VideoPlayerTile({
         networkRecoveries = 0;
         mediaRecoveries = 0;
         autoReattachRef.current = 0;
+        // The channel is really playing now — tune-in is over; later errors
+        // follow the normal mid-playback recovery path.
+        tunedRef.current = true;
+        setTuning(false);
         // Playback is flowing again — clear the "Reconnecting…" hint.
         setHlsReconnecting(false);
       });
@@ -820,13 +852,22 @@ export default function VideoPlayerTile({
         // short pause so a struggling server isn't hammered.
         hls.destroy();
         hls = null;
-        if (autoReattachRef.current < 3) {
-          autoReattachRef.current += 1;
+        // While still inside the tune-in grace window (channel never
+        // buffered a fragment yet), keep retrying without consuming the
+        // auto-reattach budget — the transcoder just needs time to start.
+        const inTuneGrace =
+          !tunedRef.current &&
+          Date.now() - tuneStartRef.current < TUNE_GRACE_MS;
+        if (inTuneGrace || autoReattachRef.current < 3) {
+          if (!inTuneGrace) autoReattachRef.current += 1;
           setHlsReconnecting(true);
-          reattachTimer = window.setTimeout(() => {
-            reattachTimer = null;
-            setHlsRetryNonce((n) => n + 1);
-          }, 4000);
+          reattachTimer = window.setTimeout(
+            () => {
+              reattachTimer = null;
+              setHlsRetryNonce((n) => n + 1);
+            },
+            inTuneGrace ? TUNE_RETRY_DELAY_MS : 4000,
+          );
           return;
         }
         setHlsReconnecting(false);
@@ -1100,7 +1141,21 @@ export default function VideoPlayerTile({
               // Only configured sources surface the error state; if the
               // built-in yule log itself can't load (offline box) there is
               // nothing better to fall back to, so stay quiet.
-              if (!demo) setMediaFailed(true);
+              if (demo) return;
+              // Element-level errors during the tune-in grace window of a
+              // live HLS channel are retried quietly (fresh attach) instead
+              // of flashing the error screen — same policy as fatal hls.js
+              // errors while the transcoder spins up.
+              if (
+                isHlsUrl &&
+                !tunedRef.current &&
+                Date.now() - tuneStartRef.current < TUNE_GRACE_MS
+              ) {
+                setHlsReconnecting(true);
+                setHlsRetryNonce((n) => n + 1);
+                return;
+              }
+              setMediaFailed(true);
             }}
             onPlay={() => setPlaying(true)}
             onPause={() => setPlaying(false)}
@@ -1146,7 +1201,7 @@ export default function VideoPlayerTile({
             data-testid="videoplayer-reconnecting-badge"
           >
             <span className="h-2 w-2 animate-spin rounded-full border border-white/70 border-t-transparent" />
-            Reconnecting…
+            {tuning ? "Tuning…" : "Reconnecting…"}
           </span>
         )}
         {audioOnly && !hlsReconnecting && (
