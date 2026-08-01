@@ -797,6 +797,19 @@ export default function VideoPlayerTile({
     setTuning(true);
     if (mediaFailed) setMediaFailed(false);
   }
+  // Tuning banner: while the tune-in grace window is active on a live
+  // channel (no fragment buffered yet), the frame is just black — show a
+  // TV-style banner with the channel number, name, and current programme
+  // instead of only the tiny "Tuning…" badge. Purely presentational; the
+  // retry/error handling above is untouched.
+  const showTuningBanner =
+    isErsatz &&
+    !demo &&
+    isHlsUrl &&
+    tuning &&
+    !stopped &&
+    !mediaFailed &&
+    !!tunedErsatz;
   useEffect(() => {
     if (!currentUrl || !isHlsUrl || nativeHls || stopped) return;
     const el = videoRef.current;
@@ -1162,7 +1175,12 @@ export default function VideoPlayerTile({
             onWaiting={() => {
               if (isHlsUrl) setBuffering(true);
             }}
-            onPlaying={() => setBuffering(false)}
+            onPlaying={() => {
+              setBuffering(false);
+              // Native-HLS browsers (Safari) never fire hls.js events, so
+              // the banner is also cleared as soon as playback starts.
+              setTuning(false);
+            }}
           />
         )}
         {stopped && (
@@ -1195,7 +1213,31 @@ export default function VideoPlayerTile({
             <span className="h-8 w-8 animate-spin rounded-full border-2 border-white/70 border-t-transparent" />
           </div>
         )}
-        {hlsReconnecting && (
+        {showTuningBanner && tunedErsatz && (
+          <div
+            className="pointer-events-none absolute inset-x-0 top-0 z-10 bg-gradient-to-b from-black/85 via-black/55 to-transparent px-3 pb-8 pt-2.5"
+            data-testid="videoplayer-tuning-banner"
+          >
+            <div className="flex items-center gap-2">
+              <span className="shrink-0 rounded bg-white/15 px-1.5 py-0.5 text-sm font-bold tabular-nums text-white">
+                {tunedErsatz.number}
+              </span>
+              <span className="min-w-0 truncate text-sm font-semibold text-white">
+                {tunedErsatz.name}
+              </span>
+              <span className="ml-auto flex shrink-0 items-center gap-1.5 text-[10px] font-medium text-white/80">
+                <span className="h-2 w-2 animate-spin rounded-full border border-white/70 border-t-transparent" />
+                Tuning…
+              </span>
+            </div>
+            {tunedErsatz.nowPlaying && (
+              <p className="mt-1 truncate text-xs text-white/70">
+                Now: {tunedErsatz.nowPlaying}
+              </p>
+            )}
+          </div>
+        )}
+        {hlsReconnecting && !showTuningBanner && (
           <span
             className="pointer-events-none absolute top-1.5 left-1.5 z-10 flex items-center gap-1.5 rounded bg-black/60 px-2 py-1 text-[10px] font-medium text-white/90 backdrop-blur-sm"
             data-testid="videoplayer-reconnecting-badge"

@@ -166,21 +166,20 @@ describe("VideoPlayerTile HLS stall recovery", () => {
     for (let i = 1; i <= 3; i++) {
       emitFatal(hls, MockHls.ErrorTypes.NETWORK_ERROR);
       expect(hls.startLoad).toHaveBeenCalledTimes(i);
-      // Mid-recovery the non-blocking badge shows instead of the error state.
-      expect(
-        screen.getByTestId("videoplayer-reconnecting-badge"),
-      ).toBeTruthy();
+      // Mid-recovery: no fragment ever buffered yet, so the tune-in banner
+      // shows instead of the error state (the badge is hidden behind it).
+      expect(screen.getByTestId("videoplayer-tuning-banner")).toBeTruthy();
       expect(screen.queryByTestId("videoplayer-error")).toBeNull();
     }
 
     // 4th fatal network error exhausts this instance's budget: the instance
     // is destroyed, but instead of an error state the tile keeps showing the
-    // reconnecting badge while it waits to auto-reattach a fresh instance.
+    // tuning banner while it waits to auto-reattach a fresh instance.
     emitFatal(hls, MockHls.ErrorTypes.NETWORK_ERROR);
     expect(hls.startLoad).toHaveBeenCalledTimes(3);
     expect(hls.destroy).toHaveBeenCalled();
     expect(screen.queryByTestId("videoplayer-error")).toBeNull();
-    expect(screen.getByTestId("videoplayer-reconnecting-badge")).toBeTruthy();
+    expect(screen.getByTestId("videoplayer-tuning-banner")).toBeTruthy();
   });
 
   it("retries fatal media errors with recoverMediaError up to 3 times, then errors", async () => {
@@ -195,9 +194,10 @@ describe("VideoPlayerTile HLS stall recovery", () => {
     emitFatal(hls, MockHls.ErrorTypes.MEDIA_ERROR);
     expect(hls.recoverMediaError).toHaveBeenCalledTimes(3);
     expect(hls.destroy).toHaveBeenCalled();
-    // Budget exhaustion no longer errors immediately — auto-reattach kicks in.
+    // Budget exhaustion no longer errors immediately — auto-reattach kicks in
+    // (still tuning, so the banner is the visible hint).
     expect(screen.queryByTestId("videoplayer-error")).toBeNull();
-    expect(screen.getByTestId("videoplayer-reconnecting-badge")).toBeTruthy();
+    expect(screen.getByTestId("videoplayer-tuning-banner")).toBeTruthy();
   });
 
   it("auto-reattaches a fresh instance after budget exhaustion, erroring only after 3 auto retries", async () => {
@@ -367,6 +367,37 @@ describe("VideoPlayerTile HLS stall recovery", () => {
   });
 });
 
+describe("VideoPlayerTile tuning banner", () => {
+  it("shows channel number, name, and programme while tuning, and hides once a fragment buffers", async () => {
+    channelsRef.current = [
+      { ...CHANNEL, nowPlaying: "The Twilight Zone" },
+    ];
+    const hls = await renderTvTile();
+
+    // Before the first buffered fragment the banner identifies the channel.
+    const banner = screen.getByTestId("videoplayer-tuning-banner");
+    expect(banner.textContent).toContain("1");
+    expect(banner.textContent).toContain("Retro TV");
+    expect(banner.textContent).toContain("The Twilight Zone");
+    expect(banner.textContent).toContain("Tuning");
+
+    // Video starts flowing — the banner disappears.
+    act(() => {
+      hls.emit(MockHls.Events.FRAG_BUFFERED);
+    });
+    expect(screen.queryByTestId("videoplayer-tuning-banner")).toBeNull();
+  });
+
+  it("clears the banner when playback starts via the video element (native HLS path)", async () => {
+    await renderTvTile();
+    expect(screen.getByTestId("videoplayer-tuning-banner")).toBeTruthy();
+    act(() => {
+      document.querySelector("video")!.dispatchEvent(new Event("playing"));
+    });
+    expect(screen.queryByTestId("videoplayer-tuning-banner")).toBeNull();
+  });
+});
+
 describe("VideoPlayerTile tune-in grace window", () => {
   it("keeps retrying quietly during tune-in instead of showing the error screen", async () => {
     vi.useFakeTimers();
@@ -378,7 +409,7 @@ describe("VideoPlayerTile tune-in grace window", () => {
       // No fragment ever buffered — the channel is still tuning. Exhaust the
       // in-instance budget 6 times in a row (double the normal 3-reattach
       // budget); within the grace window the tile never shows the error
-      // screen, just the "Tuning…" hint, and keeps re-attaching.
+      // screen, just the tuning banner, and keeps re-attaching.
       for (let attempt = 0; attempt < 6; attempt++) {
         const hls = hlsInstances[hlsInstances.length - 1]!;
         for (let i = 0; i < 4; i++) {
@@ -386,7 +417,7 @@ describe("VideoPlayerTile tune-in grace window", () => {
         }
         expect(screen.queryByTestId("videoplayer-error")).toBeNull();
         expect(
-          screen.getByTestId("videoplayer-reconnecting-badge").textContent,
+          screen.getByTestId("videoplayer-tuning-banner").textContent,
         ).toContain("Tuning");
         await act(async () => {
           vi.advanceTimersByTime(2_000);
@@ -498,15 +529,17 @@ describe("VideoPlayerTile tune-in grace window", () => {
       );
 
       // The new channel gets a full tune-in grace window of its own: a fatal
-      // error right away shows the Tuning hint, not the error screen.
+      // error right away shows the tuning banner (with the new channel's
+      // identity), not the error screen.
       const fresh = hlsInstances[hlsInstances.length - 1]!;
       for (let i = 0; i < 4; i++) {
         emitFatal(fresh, MockHls.ErrorTypes.NETWORK_ERROR);
       }
       expect(screen.queryByTestId("videoplayer-error")).toBeNull();
-      expect(
-        screen.getByTestId("videoplayer-reconnecting-badge").textContent,
-      ).toContain("Tuning");
+      const banner = screen.getByTestId("videoplayer-tuning-banner");
+      expect(banner.textContent).toContain("Tuning");
+      expect(banner.textContent).toContain("Movie TV");
+      expect(banner.textContent).toContain("2");
     } finally {
       vi.useRealTimers();
     }
