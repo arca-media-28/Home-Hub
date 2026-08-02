@@ -212,6 +212,11 @@ describe("VideoPlayerTile HLS stall recovery", () => {
       act(() => {
         hlsInstances[0]!.emit(MockHls.Events.FRAG_BUFFERED);
       });
+      // Let the post-tune banner linger window elapse so the reconnecting
+      // badge (suppressed while the banner is up) is visible below.
+      await act(async () => {
+        vi.advanceTimersByTime(4_100);
+      });
 
       // Exhaust instance budgets back-to-back. After each exhaustion the
       // tile waits ~4s then attaches a brand-new instance — 3 times.
@@ -368,33 +373,80 @@ describe("VideoPlayerTile HLS stall recovery", () => {
 });
 
 describe("VideoPlayerTile tuning banner", () => {
-  it("shows channel number, name, and programme while tuning, and hides once a fragment buffers", async () => {
+  it("shows channel number, name, and programme while tuning, then lingers a few seconds after a fragment buffers before fading out", async () => {
     channelsRef.current = [
       { ...CHANNEL, nowPlaying: "The Twilight Zone" },
     ];
     const hls = await renderTvTile();
+    vi.useFakeTimers();
+    try {
+      // Before the first buffered fragment the banner identifies the channel.
+      const banner = screen.getByTestId("videoplayer-tuning-banner");
+      expect(banner.textContent).toContain("1");
+      expect(banner.textContent).toContain("Retro TV");
+      expect(banner.textContent).toContain("The Twilight Zone");
+      expect(banner.textContent).toContain("Tuning");
 
-    // Before the first buffered fragment the banner identifies the channel.
-    const banner = screen.getByTestId("videoplayer-tuning-banner");
-    expect(banner.textContent).toContain("1");
-    expect(banner.textContent).toContain("Retro TV");
-    expect(banner.textContent).toContain("The Twilight Zone");
-    expect(banner.textContent).toContain("Tuning");
+      // Video starts flowing — like a real TV, the banner lingers so the
+      // viewer can confirm the channel; the "Tuning…" spinner is gone.
+      act(() => {
+        hls.emit(MockHls.Events.FRAG_BUFFERED);
+      });
+      const lingering = screen.getByTestId("videoplayer-tuning-banner");
+      expect(lingering.textContent).toContain("Retro TV");
+      expect(lingering.textContent).not.toContain("Tuning");
 
-    // Video starts flowing — the banner disappears.
-    act(() => {
-      hls.emit(MockHls.Events.FRAG_BUFFERED);
-    });
-    expect(screen.queryByTestId("videoplayer-tuning-banner")).toBeNull();
+      // Near the end of the linger window it starts fading out…
+      await act(async () => {
+        vi.advanceTimersByTime(3_500);
+      });
+      expect(
+        screen.getByTestId("videoplayer-tuning-banner").className,
+      ).toContain("opacity-0");
+
+      // …and after the full window it is gone.
+      await act(async () => {
+        vi.advanceTimersByTime(600);
+      });
+      expect(screen.queryByTestId("videoplayer-tuning-banner")).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
-  it("clears the banner when playback starts via the video element (native HLS path)", async () => {
+  it("lingers then clears the banner when playback starts via the video element (native HLS path)", async () => {
     await renderTvTile();
-    expect(screen.getByTestId("videoplayer-tuning-banner")).toBeTruthy();
-    act(() => {
-      document.querySelector("video")!.dispatchEvent(new Event("playing"));
-    });
-    expect(screen.queryByTestId("videoplayer-tuning-banner")).toBeNull();
+    vi.useFakeTimers();
+    try {
+      expect(screen.getByTestId("videoplayer-tuning-banner")).toBeTruthy();
+      act(() => {
+        document.querySelector("video")!.dispatchEvent(new Event("playing"));
+      });
+      // Still visible right after playback starts (linger)…
+      expect(screen.getByTestId("videoplayer-tuning-banner")).toBeTruthy();
+      // …gone after the linger window elapses.
+      await act(async () => {
+        vi.advanceTimersByTime(4_100);
+      });
+      expect(screen.queryByTestId("videoplayer-tuning-banner")).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("hides a lingering banner immediately when the stream is stopped", async () => {
+    const hls = await renderTvTile();
+    vi.useFakeTimers();
+    try {
+      act(() => {
+        hls.emit(MockHls.Events.FRAG_BUFFERED);
+      });
+      expect(screen.getByTestId("videoplayer-tuning-banner")).toBeTruthy();
+      fireEvent.click(screen.getByTestId("videoplayer-stop"));
+      expect(screen.queryByTestId("videoplayer-tuning-banner")).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

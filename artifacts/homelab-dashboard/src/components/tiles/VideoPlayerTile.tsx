@@ -810,6 +810,49 @@ export default function VideoPlayerTile({
     !stopped &&
     !mediaFailed &&
     !!tunedErsatz;
+  // Banner linger: like a real TV, keep the banner on screen a few seconds
+  // after the picture appears so the viewer can confirm what they tuned to,
+  // then fade it out. Linger starts only on the tuning→playing transition
+  // (not when the banner disappears because of stop/error/channel change),
+  // and a new channel change cancels any in-flight linger immediately.
+  const BANNER_LINGER_MS = 4_000;
+  const BANNER_FADE_MS = 700;
+  const [bannerLinger, setBannerLinger] = useState(false);
+  const [bannerFading, setBannerFading] = useState(false);
+  const prevShowBannerRef = useRef(showTuningBanner);
+  useEffect(() => {
+    const wasShowing = prevShowBannerRef.current;
+    prevShowBannerRef.current = showTuningBanner;
+    if (showTuningBanner) {
+      // Banner is back (new tune-in): drop any leftover linger state.
+      setBannerLinger(false);
+      setBannerFading(false);
+      return;
+    }
+    // Only linger when the banner left because playback actually started.
+    if (!wasShowing || tuning || stopped || mediaFailed) return;
+    setBannerLinger(true);
+    setBannerFading(false);
+    const fadeTimer = window.setTimeout(
+      () => setBannerFading(true),
+      BANNER_LINGER_MS - BANNER_FADE_MS,
+    );
+    const hideTimer = window.setTimeout(() => {
+      setBannerLinger(false);
+      setBannerFading(false);
+    }, BANNER_LINGER_MS);
+    return () => {
+      window.clearTimeout(fadeTimer);
+      window.clearTimeout(hideTimer);
+    };
+  }, [showTuningBanner, tuning, stopped, mediaFailed]);
+  // Stop/error/channel switch mid-linger: hide instantly, no stale banner.
+  useEffect(() => {
+    if ((stopped || mediaFailed) && bannerLinger) {
+      setBannerLinger(false);
+      setBannerFading(false);
+    }
+  }, [stopped, mediaFailed, bannerLinger]);
   useEffect(() => {
     if (!currentUrl || !isHlsUrl || nativeHls || stopped) return;
     const el = videoRef.current;
@@ -1213,9 +1256,9 @@ export default function VideoPlayerTile({
             <span className="h-8 w-8 animate-spin rounded-full border-2 border-white/70 border-t-transparent" />
           </div>
         )}
-        {showTuningBanner && tunedErsatz && (
+        {(showTuningBanner || bannerLinger) && tunedErsatz && (
           <div
-            className="pointer-events-none absolute inset-x-0 top-0 z-10 bg-gradient-to-b from-black/85 via-black/55 to-transparent px-3 pb-8 pt-2.5"
+            className={`pointer-events-none absolute inset-x-0 top-0 z-10 bg-gradient-to-b from-black/85 via-black/55 to-transparent px-3 pb-8 pt-2.5 transition-opacity duration-700 ${bannerFading ? "opacity-0" : "opacity-100"}`}
             data-testid="videoplayer-tuning-banner"
           >
             <div className="flex items-center gap-2">
@@ -1225,10 +1268,12 @@ export default function VideoPlayerTile({
               <span className="min-w-0 truncate text-sm font-semibold text-white">
                 {tunedErsatz.name}
               </span>
-              <span className="ml-auto flex shrink-0 items-center gap-1.5 text-[10px] font-medium text-white/80">
-                <span className="h-2 w-2 animate-spin rounded-full border border-white/70 border-t-transparent" />
-                Tuning…
-              </span>
+              {showTuningBanner && (
+                <span className="ml-auto flex shrink-0 items-center gap-1.5 text-[10px] font-medium text-white/80">
+                  <span className="h-2 w-2 animate-spin rounded-full border border-white/70 border-t-transparent" />
+                  Tuning…
+                </span>
+              )}
             </div>
             {tunedErsatz.nowPlaying && (
               <p className="mt-1 truncate text-xs text-white/70">
@@ -1237,7 +1282,7 @@ export default function VideoPlayerTile({
             )}
           </div>
         )}
-        {hlsReconnecting && !showTuningBanner && (
+        {hlsReconnecting && !showTuningBanner && !bannerLinger && (
           <span
             className="pointer-events-none absolute top-1.5 left-1.5 z-10 flex items-center gap-1.5 rounded bg-black/60 px-2 py-1 text-[10px] font-medium text-white/90 backdrop-blur-sm"
             data-testid="videoplayer-reconnecting-badge"
