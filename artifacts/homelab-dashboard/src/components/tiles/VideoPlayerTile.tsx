@@ -1280,6 +1280,16 @@ export default function VideoPlayerTile({
                 Now: {tunedErsatz.nowPlaying}
               </p>
             )}
+            {tunedErsatz.upNextTitle && (
+              <p
+                className="truncate text-xs text-white/50"
+                data-testid="videoplayer-banner-upnext"
+              >
+                Up next: {tunedErsatz.upNextTitle}
+                {formatGuideTime(tunedErsatz.upNextStart) &&
+                  ` · ${formatGuideTime(tunedErsatz.upNextStart)}`}
+              </p>
+            )}
           </div>
         )}
         {hlsReconnecting && !showTuningBanner && !bannerLinger && (

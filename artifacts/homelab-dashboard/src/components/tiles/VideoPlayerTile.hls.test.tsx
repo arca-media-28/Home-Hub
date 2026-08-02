@@ -450,6 +450,31 @@ describe("VideoPlayerTile tuning banner", () => {
   });
 });
 
+describe("VideoPlayerTile tuning banner up-next line", () => {
+  it("shows the next programme and its start time when the guide has it", async () => {
+    channelsRef.current = [
+      {
+        ...CHANNEL,
+        nowPlaying: "The Maltese Falcon",
+        upNextTitle: "Casablanca",
+        upNextStart: new Date(Date.now() + 45 * 60_000).toISOString(),
+      },
+    ];
+    await renderTvTile();
+    const upNext = screen.getByTestId("videoplayer-banner-upnext");
+    expect(upNext.textContent).toContain("Up next: Casablanca");
+    // A formatted clock time follows the title (e.g. "· 3:45 PM").
+    expect(upNext.textContent).toContain("·");
+  });
+
+  it("omits the up-next line when the guide has no upcoming data", async () => {
+    channelsRef.current = [{ ...CHANNEL, nowPlaying: "News Loop" }];
+    await renderTvTile();
+    expect(screen.getByTestId("videoplayer-tuning-banner")).toBeTruthy();
+    expect(screen.queryByTestId("videoplayer-banner-upnext")).toBeNull();
+  });
+});
+
 describe("VideoPlayerTile tune-in grace window", () => {
   it("keeps retrying quietly during tune-in instead of showing the error screen", async () => {
     vi.useFakeTimers();
