@@ -191,7 +191,7 @@ test("guide metric renders the grid inline and remotes an ErsatzTV player tile",
     .toBe("1");
 });
 
-test("without an eligible player the guide has no click affordance", async ({
+test("without an eligible player the guide is read-only but still shows programme details", async ({
   page,
 }) => {
   const { token, authHeaders } = await register(page);
@@ -206,10 +206,54 @@ test("without an eligible player the guide has no click affordance", async ({
   for (const el of await entries.all()) {
     expect(await el.evaluate((node) => node.tagName)).toBe("DIV");
   }
-  // The airing programme block is a span, not a button.
+  // Programme blocks still open the details popover, but with no Watch
+  // button (tuning is disabled in read-only mode).
   const airing = page.locator(
     '[data-testid="ersatztv-tile-guide-program"][data-airing="true"]',
   );
   await expect(airing).toHaveCount(1);
-  expect(await airing.evaluate((node) => node.tagName)).toBe("SPAN");
+  await airing.click();
+  const popover = page.getByTestId("ersatztv-tile-guide-program-popover");
+  await expect(popover).toBeVisible();
+  await expect(
+    page.getByTestId("ersatztv-tile-guide-program-popover-title"),
+  ).toHaveText("The Maltese Falcon");
+  await expect(
+    page.getByTestId("ersatztv-tile-guide-program-popover-times"),
+  ).toContainText("–");
+  await expect(
+    page.getByTestId("ersatztv-tile-guide-program-popover-watch"),
+  ).toHaveCount(0);
+  // Close button dismisses it.
+  await page.getByTestId("ersatztv-tile-guide-program-popover-close").click();
+  await expect(popover).toHaveCount(0);
+});
+
+test("tapping an upcoming programme block shows its start–stop times", async ({
+  page,
+}) => {
+  const { token, authHeaders } = await register(page);
+  await seedErsatzTile(page, authHeaders, ["nowPlaying", "guide"]);
+  await mockErsatz(page);
+  await openDashboard(page, token);
+
+  await expect(page.getByTestId("ersatztv-tile-guide")).toBeVisible({ timeout: 15000 });
+  // The future programme (Casablanca, +30m → +120m) opens a popover with
+  // its title and start–stop times.
+  const upcoming = page
+    .getByTestId("ersatztv-tile-guide-program")
+    .filter({ hasText: "Casablanca" });
+  await expect(upcoming).toHaveCount(1);
+  await upcoming.click();
+  const popover = page.getByTestId("ersatztv-tile-guide-program-popover");
+  await expect(popover).toBeVisible();
+  await expect(
+    page.getByTestId("ersatztv-tile-guide-program-popover-title"),
+  ).toHaveText("Casablanca");
+  const times = page.getByTestId("ersatztv-tile-guide-program-popover-times");
+  await expect(times).toContainText("–");
+  await expect(times).toContainText("1h 30m");
+  // Escape dismisses it too.
+  await page.keyboard.press("Escape");
+  await expect(popover).toHaveCount(0);
 });

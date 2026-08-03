@@ -36,6 +36,30 @@ function slotLabel(ms: number): string {
   });
 }
 
+function durationLabel(startMs: number, stopMs: number): string {
+  const min = Math.max(0, Math.round((stopMs - startMs) / 60_000));
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  if (h > 0 && m > 0) return `${h}h ${m}m`;
+  if (h > 0) return `${h}h`;
+  return `${m}m`;
+}
+
+// Details shown when a programme block is tapped/clicked.
+type ProgramDetails = {
+  title: string;
+  startMs: number;
+  stopMs: number;
+  channelNumber: string;
+  channelName: string;
+  airing: boolean;
+  // Anchor (relative to the overlay) for popover positioning.
+  anchorX: number;
+  anchorY: number;
+  // True when the popover should open above the anchor (block near bottom).
+  openUp: boolean;
+};
+
 export default function ErsatzGuideGrid({
   channels,
   currentNumber,
@@ -64,6 +88,33 @@ export default function ErsatzGuideGrid({
   const tid = (suffix: string) => `${testIdPrefix}-${suffix}`;
   // Measure the overlay so the grid can scale with the tile.
   const overlayRef = useRef<HTMLDivElement | null>(null);
+  // Programme details popover (opened by tapping a programme block).
+  const [details, setDetails] = useState<ProgramDetails | null>(null);
+  // Clamp the popover fully inside the overlay (overflow-hidden would clip
+  // it otherwise and leave the close button unclickable on small tiles).
+  const popoverRef = useRef<HTMLDivElement | null>(null);
+  const [popTop, setPopTop] = useState(4);
+  useEffect(() => {
+    if (!details) return;
+    const overlay = overlayRef.current;
+    const pop = popoverRef.current;
+    const overlayH = overlay?.clientHeight ?? 0;
+    const popH = pop?.offsetHeight ?? 0;
+    const desired = details.openUp
+      ? details.anchorY - popH - 4
+      : details.anchorY + 4;
+    setPopTop(
+      Math.min(Math.max(4, desired), Math.max(4, overlayH - popH - 4)),
+    );
+  }, [details]);
+  useEffect(() => {
+    if (!details) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setDetails(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [details]);
   const [box, setBox] = useState<{ w: number; h: number } | null>(null);
   useEffect(() => {
     const el = overlayRef.current;
@@ -175,7 +226,12 @@ export default function ErsatzGuideGrid({
       <div
         ref={scrollRef}
         onScroll={() => {
-          if (!autoScrollingRef.current) userScrolledRef.current = true;
+          if (!autoScrollingRef.current) {
+            userScrolledRef.current = true;
+            // The popover is anchored to a fixed spot in the overlay, so
+            // scrolling would leave it pointing at the wrong block.
+            setDetails(null);
+          }
         }}
         className="min-h-0 flex-1 overflow-auto overscroll-contain"
         data-testid={tid("guide-grid")}
@@ -336,35 +392,58 @@ export default function ErsatzGuideGrid({
                           ? "border-white/30 bg-white/20 text-white"
                           : "border-white/10 bg-white/[0.06] text-white/65"
                       }`;
-                      // The airing block doubles as a tune target (when a
-                      // tune handler exists).
-                      return airing && onTune ? (
+                      // Every block opens a details popover (works in
+                      // read-only mode too); tuning happens from within it.
+                      return (
                         <button
                           key={`${p.start}-${i}`}
                           type="button"
                           data-testid={tid("guide-program")}
-                          data-airing="true"
+                          data-airing={airing ? "true" : undefined}
                           title={p.title}
-                          onClick={() => {
-                            if (!isCurrent) onTune(channel.number);
-                            onClose?.();
+                          onClick={(e) => {
+                            const overlay = overlayRef.current;
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            const oRect = overlay?.getBoundingClientRect();
+                            const anchorX = oRect
+                              ? Math.min(
+                                  Math.max(e.clientX - oRect.left, 8),
+                                  oRect.width - 8,
+                                )
+                              : 0;
+                            const anchorYRaw = oRect ? rect.bottom - oRect.top : 0;
+                            const openUp =
+                              !!oRect && anchorYRaw > oRect.height - 96;
+                            const anchorY = oRect
+                              ? openUp
+                                ? rect.top - oRect.top
+                                : anchorYRaw
+                              : 0;
+                            setDetails((prev) =>
+                              prev &&
+                              prev.channelNumber === channel.number &&
+                              prev.startMs === start
+                                ? null
+                                : {
+                                    title: p.title,
+                                    startMs: start,
+                                    stopMs: stop,
+                                    channelNumber: channel.number,
+                                    channelName: channel.name,
+                                    airing,
+                                    anchorX,
+                                    anchorY,
+                                    openUp,
+                                  },
+                            );
                           }}
-                          className={`${baseClass} text-left transition-colors hover:bg-white/30`}
+                          className={`${baseClass} text-left transition-colors ${
+                            airing ? "hover:bg-white/30" : "hover:bg-white/[0.12]"
+                          }`}
                           style={{ left, width }}
                         >
                           {block}
                         </button>
-                      ) : (
-                        <span
-                          key={`${p.start}-${i}`}
-                          data-testid={tid("guide-program")}
-                          data-airing={airing ? "true" : undefined}
-                          title={p.title}
-                          className={baseClass}
-                          style={{ left, width }}
-                        >
-                          {block}
-                        </span>
                       );
                     })
                   )}
@@ -372,6 +451,16 @@ export default function ErsatzGuideGrid({
               </div>
             );
           })}
+
+          {/* Click-away: any click on the grid background (not a block)
+              dismisses the popover. */}
+          {details && (
+            <div
+              className="absolute inset-0 z-20"
+              data-testid={tid("guide-popover-backdrop")}
+              onClick={() => setDetails(null)}
+            />
+          )}
 
           {/* Now line across all rows (below the sticky header). */}
           <div
@@ -383,6 +472,84 @@ export default function ErsatzGuideGrid({
           </div>
         </div>
       </div>
+
+      {/* Programme details popover — anchored inside the overlay so it never
+          escapes the tile, above (z) the scroll content. */}
+      {details && (
+        <div
+          ref={popoverRef}
+          className="absolute z-40 w-56 max-w-[85%] rounded-md border border-white/15 bg-neutral-900 p-2.5 shadow-lg shadow-black/50"
+          style={{
+            left: Math.min(
+              Math.max(details.anchorX - 112, 4),
+              Math.max(4, (box?.w ?? 0) - 228),
+            ),
+            top: popTop,
+          }}
+          data-testid={tid("guide-program-popover")}
+        >
+          <div className="flex items-start justify-between gap-2">
+            <span
+              className="min-w-0 break-words font-semibold leading-snug text-white"
+              style={{ fontSize: font(11) }}
+              data-testid={tid("guide-program-popover-title")}
+            >
+              {details.title}
+            </span>
+            <button
+              type="button"
+              aria-label="Close programme details"
+              data-testid={tid("guide-program-popover-close")}
+              onClick={() => setDetails(null)}
+              className="shrink-0 rounded px-1 leading-none text-white/50 hover:text-white"
+              style={{ fontSize: font(12) }}
+            >
+              ✕
+            </button>
+          </div>
+          <div
+            className="mt-1 text-white/70"
+            style={{ fontSize: font(10) }}
+            data-testid={tid("guide-program-popover-times")}
+          >
+            {slotLabel(details.startMs)} – {slotLabel(details.stopMs)}
+            <span className="text-white/40">
+              {" "}
+              · {durationLabel(details.startMs, details.stopMs)}
+            </span>
+          </div>
+          <div
+            className="mt-0.5 truncate text-white/45"
+            style={{ fontSize: font(9) }}
+          >
+            {details.channelNumber} · {details.channelName}
+            {details.airing && (
+              <span className="ml-1.5 rounded-sm bg-red-500/20 px-1 py-px font-medium uppercase tracking-wide text-red-300">
+                Now
+              </span>
+            )}
+          </div>
+          {details.airing && onTune && details.channelNumber !== currentNumber && (
+            <button
+              type="button"
+              data-testid={tid("guide-program-popover-watch")}
+              onClick={() => {
+                onTune(details.channelNumber);
+                setDetails(null);
+                onClose?.();
+              }}
+              className="mt-2 flex w-full items-center justify-center gap-1.5 rounded border border-white/20 bg-white/10 py-1 font-medium text-white transition-colors hover:bg-white/20"
+              style={{ fontSize: font(10) }}
+            >
+              <Play
+                className="shrink-0 fill-current"
+                style={{ width: font(9), height: font(9) }}
+              />
+              Watch
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

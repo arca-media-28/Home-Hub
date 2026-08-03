@@ -12,3 +12,5 @@ description: HLS stream proxy + token-query auth pattern for playing ErsatzTV ch
 - Tuned channel persists in `tileSettings.videoErsatzChannel` (string channel number, whitelisted in pickTileSettings); sample lineup has `streamUrl: null` so the tile filters them out and stays in yule-log demo.
 - **Why**: token in query is the only way authenticated media segments work across native HLS and hls.js; rewriting against the redirect-followed URL is required or relative segment URIs 404.
 - e2e trick: `page.route` the stream URL and never fulfill → hls.js stays "loading" long enough to test the channel pop-out without a real stream.
+- Guide programme popover: EVERY block (incl. read-only mode) opens a details popover (title, start–stop, duration, Watch button when airing+tunable); tuning no longer fires from clicking the airing block directly.
+- Popover inside the overflow-hidden guide overlay MUST clamp its top using measured offsetHeight vs overlay clientHeight — naive anchor math clips it on small embedded tiles and Playwright clicks get "intercepted" by the overlay div.
