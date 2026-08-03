@@ -25,6 +25,7 @@ import { integrationMeta, INTEGRATION_SERVICE } from "@/lib/integrationMeta";
 import {
   METRIC_CATALOG,
   allMetricKeys,
+  defaultMetricKeys,
   TRUENAS_METRIC_VARIANTS,
   truenasMetricVariant,
   filterTruenasPools,
@@ -913,7 +914,7 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
   // The set of metric keys currently shown. A null selection means "show all",
   // so reflect every catalog key as checked in the picker.
   const catalog = integration === NONE ? [] : METRIC_CATALOG[integration] ?? [];
-  const enabledKeys = new Set(metrics ?? allMetricKeys(integration));
+  const enabledKeys = new Set(metrics ?? defaultMetricKeys(integration));
 
   // qBittorrent category discovery — only fetch live status when the editor is
   // open and qBittorrent is the selected integration. The list of selectable
@@ -1378,7 +1379,7 @@ export default function TileEditModal({ open, onOpenChange, tile, mode, defaultG
   }
 
   function toggleMetric(key: string, checked: boolean) {
-    const base = metrics ?? allMetricKeys(integration);
+    const base = metrics ?? defaultMetricKeys(integration);
     const set = new Set(base);
     if (checked) set.add(key);
     else set.delete(key);

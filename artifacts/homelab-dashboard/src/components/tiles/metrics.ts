@@ -10,6 +10,10 @@ import { TileIntegration } from "@workspace/api-client-react";
 export interface MetricDef {
   key: string;
   label: string;
+  // When true, the metric is NOT part of the implicit "show all" default (a
+  // tile with a null metrics selection). Used for opt-in extras added after
+  // release so existing tiles don't suddenly change appearance.
+  defaultOff?: boolean;
 }
 
 export const METRIC_CATALOG: Record<string, MetricDef[]> = {
@@ -77,6 +81,8 @@ export const METRIC_CATALOG: Record<string, MetricDef[]> = {
     { key: "activeStreams", label: "Active streams" },
     { key: "nowPlaying", label: "Now playing" },
     { key: "upNext", label: "Up next" },
+    // Opt-in so existing ErsatzTV tiles keep their current look.
+    { key: "guide", label: "TV guide", defaultOff: true },
   ],
   [TileIntegration.stocks]: [
     { key: "dailyChange", label: "Daily change" },
@@ -156,23 +162,33 @@ export function truenasMetricVariant(
   return TRUENAS_METRIC_VARIANTS.find((v) => v.key === key);
 }
 
-// All metric keys for an integration (used as the default "show all" set).
+// All metric keys for an integration (used to validate stored selections).
 export function allMetricKeys(integration: string | null | undefined): string[] {
   if (!integration) return [];
   return (METRIC_CATALOG[integration] ?? []).map((m) => m.key);
 }
 
+// The keys enabled by the implicit "show all" default (null selection):
+// everything except metrics flagged `defaultOff`.
+export function defaultMetricKeys(
+  integration: string | null | undefined,
+): string[] {
+  if (!integration) return [];
+  return (METRIC_CATALOG[integration] ?? [])
+    .filter((m) => !m.defaultOff)
+    .map((m) => m.key);
+}
+
 // Resolve the set of enabled metric keys for a tile. A null/undefined selection
-// means "show all" (backward-compatible default); an explicit array (including
-// an empty one) is honored as-is, intersected with the integration's catalog so
-// stale keys never leak through.
+// means "show all" (backward-compatible default, excluding `defaultOff`
+// opt-ins); an explicit array (including an empty one) is honored as-is,
+// intersected with the integration's catalog so stale keys never leak through.
 export function resolveEnabledMetrics(
   integration: string | null | undefined,
   selected: string[] | null | undefined,
 ): Set<string> {
-  const all = allMetricKeys(integration);
-  if (selected == null) return new Set(all);
-  const valid = new Set(all);
+  if (selected == null) return new Set(defaultMetricKeys(integration));
+  const valid = new Set(allMetricKeys(integration));
   return new Set(selected.filter((k) => valid.has(k)));
 }
 

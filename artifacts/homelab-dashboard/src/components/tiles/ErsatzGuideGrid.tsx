@@ -42,14 +42,26 @@ export default function ErsatzGuideGrid({
   nowMs,
   onTune,
   onClose,
+  embedded = false,
+  testIdPrefix = "videoplayer",
 }: {
-  channels: (ErsatzPlayableChannel & { streamUrl: string })[];
+  channels: (ErsatzPlayableChannel & { streamUrl?: string | null })[];
   // Channel number of what's currently tuned (null when nothing matches).
   currentNumber: string | null;
   nowMs: number;
-  onTune: (number: string) => void;
-  onClose: () => void;
+  // Optional: when omitted, channel cells render without any click
+  // affordance (the guide is read-only — e.g. no eligible player to remote).
+  onTune?: (number: string) => void;
+  // Optional: when omitted (embedded mode), no close button is shown and
+  // tuning doesn't dismiss anything.
+  onClose?: () => void;
+  // Embedded mode renders the guide as a normal in-flow block that fills its
+  // parent (for the ErsatzTV status tile) instead of the absolute overlay
+  // used inside the Video Player.
+  embedded?: boolean;
+  testIdPrefix?: string;
 }) {
+  const tid = (suffix: string) => `${testIdPrefix}-${suffix}`;
   // Measure the overlay so the grid can scale with the tile.
   const overlayRef = useRef<HTMLDivElement | null>(null);
   const [box, setBox] = useState<{ w: number; h: number } | null>(null);
@@ -73,11 +85,13 @@ export default function ErsatzGuideGrid({
   // Zoom factor from height: rows should fill the body of the overlay
   // (minus the title bar ~30px and the slot header). Clamped to 1..2 so a
   // short lineup on a huge tile doesn't become comically large and small
-  // tiles keep the compact baseline.
+  // tiles keep the compact baseline. Embedded guides may shrink slightly
+  // below the baseline so a few rows fit inside a modest tile section.
   const bodyH = (box?.h ?? 0) - 30 - BASE_HEADER_H;
   const idealRow =
     channels.length > 0 && bodyH > 0 ? bodyH / channels.length : BASE_ROW_H;
-  const zoom = Math.min(2, Math.max(1, idealRow / BASE_ROW_H));
+  const minZoom = embedded ? 0.8 : 1;
+  const zoom = Math.min(2, Math.max(minZoom, idealRow / BASE_ROW_H));
   const rowH = Math.round(BASE_ROW_H * zoom);
   const headerH = Math.round(BASE_HEADER_H * zoom);
   const channelCol = Math.round(BASE_CHANNEL_COL * zoom);
@@ -130,8 +144,12 @@ export default function ErsatzGuideGrid({
   return (
     <div
       ref={overlayRef}
-      className="absolute inset-x-2 bottom-[60px] top-2 z-10 flex flex-col overflow-hidden rounded-md border border-white/10 bg-black/90 backdrop-blur-sm"
-      data-testid="videoplayer-channels"
+      className={
+        embedded
+          ? "relative flex h-full w-full flex-col overflow-hidden rounded-md border border-white/10 bg-neutral-950"
+          : "absolute inset-x-2 bottom-[60px] top-2 z-10 flex flex-col overflow-hidden rounded-md border border-white/10 bg-black/90 backdrop-blur-sm"
+      }
+      data-testid={tid("channels")}
     >
       <div className="flex items-center justify-between border-b border-white/10 px-2.5 py-1.5">
         <span
@@ -140,16 +158,18 @@ export default function ErsatzGuideGrid({
         >
           Guide ({channels.length} channels)
         </span>
-        <button
-          type="button"
-          aria-label="Close channels"
-          data-testid="videoplayer-channels-close"
-          onClick={onClose}
-          className="rounded px-1.5 leading-none text-white/60 hover:text-white"
-          style={{ fontSize: font(13) }}
-        >
-          ✕
-        </button>
+        {onClose && (
+          <button
+            type="button"
+            aria-label="Close channels"
+            data-testid={tid("channels-close")}
+            onClick={onClose}
+            className="rounded px-1.5 leading-none text-white/60 hover:text-white"
+            style={{ fontSize: font(13) }}
+          >
+            ✕
+          </button>
+        )}
       </div>
 
       <div
@@ -158,7 +178,7 @@ export default function ErsatzGuideGrid({
           if (!autoScrollingRef.current) userScrolledRef.current = true;
         }}
         className="min-h-0 flex-1 overflow-auto overscroll-contain"
-        data-testid="videoplayer-guide-grid"
+        data-testid={tid("guide-grid")}
       >
         <div className="relative" style={{ width: channelCol + timelineW }}>
           {/* Time-slot header */}
@@ -201,40 +221,68 @@ export default function ErsatzGuideGrid({
                   isCurrent ? "bg-white/[0.07]" : ""
                 }`}
                 style={{ height: rowH }}
-                data-testid="videoplayer-guide-row"
+                data-testid={tid("guide-row")}
                 data-current={isCurrent ? "true" : undefined}
               >
-                {/* Sticky channel cell — the click-to-tune target. */}
-                <button
-                  type="button"
-                  data-testid="videoplayer-channel-entry"
-                  data-current={isCurrent ? "true" : undefined}
-                  aria-current={isCurrent ? "true" : undefined}
-                  onClick={() => {
-                    if (!isCurrent) onTune(channel.number);
-                    onClose();
-                  }}
-                  className={`sticky left-0 z-20 flex shrink-0 items-center gap-1.5 border-r border-white/10 px-2 text-left leading-tight transition-colors ${
-                    isCurrent
-                      ? "bg-neutral-900 text-white"
-                      : "bg-neutral-950 text-white/70 hover:bg-neutral-800 hover:text-white"
-                  }`}
-                  style={{ width: channelCol, fontSize: font(11) }}
-                >
-                  <span
-                    className="shrink-0 text-right tabular-nums text-white/40"
-                    style={{ width: font(24) }}
+                {/* Sticky channel cell — the click-to-tune target (a plain
+                    cell with no affordance when no tune handler exists). */}
+                {onTune ? (
+                  <button
+                    type="button"
+                    data-testid={tid("channel-entry")}
+                    data-current={isCurrent ? "true" : undefined}
+                    aria-current={isCurrent ? "true" : undefined}
+                    onClick={() => {
+                      if (!isCurrent) onTune(channel.number);
+                      onClose?.();
+                    }}
+                    className={`sticky left-0 z-20 flex shrink-0 items-center gap-1.5 border-r border-white/10 px-2 text-left leading-tight transition-colors ${
+                      isCurrent
+                        ? "bg-neutral-900 text-white"
+                        : "bg-neutral-950 text-white/70 hover:bg-neutral-800 hover:text-white"
+                    }`}
+                    style={{ width: channelCol, fontSize: font(11) }}
                   >
-                    {channel.number}
-                  </span>
-                  {isCurrent && (
-                    <Play
-                      className="shrink-0 fill-current"
-                      style={{ width: font(10), height: font(10) }}
-                    />
-                  )}
-                  <span className="min-w-0 flex-1 truncate">{channel.name}</span>
-                </button>
+                    <span
+                      className="shrink-0 text-right tabular-nums text-white/40"
+                      style={{ width: font(24) }}
+                    >
+                      {channel.number}
+                    </span>
+                    {isCurrent && (
+                      <Play
+                        className="shrink-0 fill-current"
+                        style={{ width: font(10), height: font(10) }}
+                      />
+                    )}
+                    <span className="min-w-0 flex-1 truncate">{channel.name}</span>
+                  </button>
+                ) : (
+                  <div
+                    data-testid={tid("channel-entry")}
+                    data-current={isCurrent ? "true" : undefined}
+                    className={`sticky left-0 z-20 flex shrink-0 items-center gap-1.5 border-r border-white/10 px-2 text-left leading-tight ${
+                      isCurrent
+                        ? "bg-neutral-900 text-white"
+                        : "bg-neutral-950 text-white/70"
+                    }`}
+                    style={{ width: channelCol, fontSize: font(11) }}
+                  >
+                    <span
+                      className="shrink-0 text-right tabular-nums text-white/40"
+                      style={{ width: font(24) }}
+                    >
+                      {channel.number}
+                    </span>
+                    {isCurrent && (
+                      <Play
+                        className="shrink-0 fill-current"
+                        style={{ width: font(10), height: font(10) }}
+                      />
+                    )}
+                    <span className="min-w-0 flex-1 truncate">{channel.name}</span>
+                  </div>
+                )}
 
                 {/* Timeline: proportional programme blocks. */}
                 <div className="relative min-w-0 flex-1">
@@ -242,7 +290,7 @@ export default function ErsatzGuideGrid({
                     <div
                       className="absolute inset-y-0.5 left-0.5 flex items-center overflow-hidden rounded-sm border border-dashed border-white/10 bg-white/[0.03] px-2"
                       style={{ width: timelineW - 4 }}
-                      data-testid="videoplayer-guide-placeholder"
+                      data-testid={tid("guide-placeholder")}
                     >
                       <span
                         className="truncate italic text-white/35"
@@ -288,17 +336,18 @@ export default function ErsatzGuideGrid({
                           ? "border-white/30 bg-white/20 text-white"
                           : "border-white/10 bg-white/[0.06] text-white/65"
                       }`;
-                      // The airing block doubles as a tune target.
-                      return airing ? (
+                      // The airing block doubles as a tune target (when a
+                      // tune handler exists).
+                      return airing && onTune ? (
                         <button
                           key={`${p.start}-${i}`}
                           type="button"
-                          data-testid="videoplayer-guide-program"
+                          data-testid={tid("guide-program")}
                           data-airing="true"
                           title={p.title}
                           onClick={() => {
                             if (!isCurrent) onTune(channel.number);
-                            onClose();
+                            onClose?.();
                           }}
                           className={`${baseClass} text-left transition-colors hover:bg-white/30`}
                           style={{ left, width }}
@@ -308,7 +357,8 @@ export default function ErsatzGuideGrid({
                       ) : (
                         <span
                           key={`${p.start}-${i}`}
-                          data-testid="videoplayer-guide-program"
+                          data-testid={tid("guide-program")}
+                          data-airing={airing ? "true" : undefined}
                           title={p.title}
                           className={baseClass}
                           style={{ left, width }}
@@ -327,7 +377,7 @@ export default function ErsatzGuideGrid({
           <div
             className="pointer-events-none absolute bottom-0 z-10 w-px bg-red-500/80"
             style={{ left: channelCol + nowX, top: headerH }}
-            data-testid="videoplayer-guide-nowline"
+            data-testid={tid("guide-nowline")}
           >
             <span className="absolute -left-[3px] top-0 h-[7px] w-[7px] rounded-full bg-red-500" />
           </div>

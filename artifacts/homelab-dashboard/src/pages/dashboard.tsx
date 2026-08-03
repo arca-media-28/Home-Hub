@@ -50,6 +50,7 @@ import AquariumTile from "@/components/tiles/AquariumTile";
 import VisualizerTile from "@/components/tiles/VisualizerTile";
 import PictureFrameTile from "@/components/tiles/PictureFrameTile";
 import VideoPlayerTile from "@/components/tiles/VideoPlayerTile";
+import { PageTilesContext } from "@/components/tiles/pageTiles";
 import AiChatTile from "@/components/tiles/AiChatTile";
 import TileEditModal, { type EditMode } from "@/components/TileEditModal";
 import { INTEGRATION_SERVICE, CONNECTION_BACKED_INTEGRATIONS } from "@/lib/integrationMeta";
@@ -1256,6 +1257,7 @@ export default function Dashboard() {
   }
 
   return (
+    <PageTilesContext.Provider value={tiles}>
     <div className="min-h-screen bg-background bg-dot-pattern">
       {/* Header */}
       <header className="sticky top-0 z-30 border-b border-border bg-background/80 backdrop-blur-sm">
@@ -2118,5 +2120,6 @@ export default function Dashboard() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+    </PageTilesContext.Provider>
   );
 }

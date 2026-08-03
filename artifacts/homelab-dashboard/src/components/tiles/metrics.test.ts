@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { TileIntegration } from "@workspace/api-client-react";
 import {
   allMetricKeys,
+  defaultMetricKeys,
   resolveEnabledMetrics,
   filterTruenasPools,
   tileDensity,
@@ -285,6 +286,31 @@ describe("tileBudget columns + scrollable", () => {
     const d = tileDensity(1, 1, { width: 200, height: 20 }, true, true);
     expect(d.level).toBe("lg");
     expect(d.scrollable).toBe(true);
+  });
+});
+
+describe("defaultMetricKeys / defaultOff opt-ins", () => {
+  it("excludes defaultOff metrics from the implicit show-all set", () => {
+    const all = allMetricKeys(TileIntegration.ersatztv);
+    const defaults = defaultMetricKeys(TileIntegration.ersatztv);
+    expect(all).toContain("guide");
+    expect(defaults).not.toContain("guide");
+    // Everything else stays in the default set.
+    expect(defaults).toEqual(all.filter((k) => k !== "guide"));
+  });
+
+  it("resolveEnabledMetrics(null) omits opt-ins but honors explicit selections", () => {
+    // Null selection (legacy tiles): guide stays off.
+    const implicit = resolveEnabledMetrics(TileIntegration.ersatztv, null);
+    expect(implicit.has("guide")).toBe(false);
+    expect(implicit.has("nowPlaying")).toBe(true);
+    // Explicit selection including guide: honored.
+    const explicit = resolveEnabledMetrics(TileIntegration.ersatztv, [
+      "guide",
+      "health",
+    ]);
+    expect(explicit.has("guide")).toBe(true);
+    expect(explicit.has("nowPlaying")).toBe(false);
   });
 });
 
