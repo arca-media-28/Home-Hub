@@ -229,6 +229,117 @@ test("without an eligible player the guide is read-only but still shows programm
   await expect(popover).toHaveCount(0);
 });
 
+// Assert `inner` is fully contained inside `outer` (with a small tolerance
+// for subpixel rounding).
+async function expectContained(
+  inner: import("@playwright/test").Locator,
+  outer: import("@playwright/test").Locator,
+) {
+  const i = await inner.boundingBox();
+  const o = await outer.boundingBox();
+  expect(i, "inner bounding box").toBeTruthy();
+  expect(o, "outer bounding box").toBeTruthy();
+  if (!i || !o) return;
+  const tol = 1;
+  expect(i.x, "left edge").toBeGreaterThanOrEqual(o.x - tol);
+  expect(i.y, "top edge").toBeGreaterThanOrEqual(o.y - tol);
+  expect(i.x + i.width, "right edge").toBeLessThanOrEqual(o.x + o.width + tol);
+  expect(i.y + i.height, "bottom edge").toBeLessThanOrEqual(
+    o.y + o.height + tol,
+  );
+}
+
+test("popover stays inside a tiny 4x4 tile and its close button works", async ({
+  page,
+}) => {
+  const { token, authHeaders } = await register(page);
+  // Smallest realistic embedded-guide tile.
+  const res = await page.request.post("/api/tiles", {
+    data: {
+      type: "integration",
+      integration: "ersatztv",
+      name: "ErsatzTV",
+      gridX: 0,
+      gridY: 0,
+      gridW: 4,
+      gridH: 4,
+      metrics: ["guide"],
+    },
+    headers: authHeaders,
+  });
+  expect(res.ok(), `tile create failed: ${res.status()}`).toBeTruthy();
+  await mockErsatz(page);
+  await openDashboard(page, token);
+
+  const guide = page.getByTestId("ersatztv-tile-guide");
+  await expect(guide).toBeVisible({ timeout: 15000 });
+
+  const airing = page.locator(
+    '[data-testid="ersatztv-tile-guide-program"][data-airing="true"]',
+  );
+  await airing.click();
+  const popover = page.getByTestId("ersatztv-tile-guide-program-popover");
+  await expect(popover).toBeVisible();
+
+  // The popover must be fully contained within the guide area of the tile —
+  // no clipping by overflow-hidden and no bleeding over neighbours.
+  await expectContained(popover, guide);
+
+  // The close button is visible, inside the tile, and actually dismisses.
+  const close = page.getByTestId("ersatztv-tile-guide-program-popover-close");
+  await expect(close).toBeVisible();
+  await expectContained(close, guide);
+  await close.click();
+  await expect(popover).toHaveCount(0);
+});
+
+test("popover stays readable on a ~400px-wide phone viewport", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 400, height: 780 });
+  const { token, authHeaders } = await register(page);
+  await seedErsatzTile(page, authHeaders, ["nowPlaying", "guide"]);
+  await mockErsatz(page);
+  await openDashboard(page, token);
+
+  const guide = page.getByTestId("ersatztv-tile-guide");
+  await expect(guide).toBeVisible({ timeout: 15000 });
+
+  // Open the popover from the airing programme block. On a narrow viewport
+  // large parts of the block sit under the sticky channel column, so a
+  // coordinate-based click is unreliable — dispatch the click event on the
+  // block itself (the interesting assertions are about the popover, below).
+  const airing = page.locator(
+    '[data-testid="ersatztv-tile-guide-program"][data-airing="true"]',
+  );
+  await expect(airing).toBeVisible();
+  await airing.dispatchEvent("click");
+  const popover = page.getByTestId("ersatztv-tile-guide-program-popover");
+  await expect(popover).toBeVisible();
+
+  // Contained in the guide (and therefore in the tile and the viewport).
+  await expectContained(popover, guide);
+  const box = await popover.boundingBox();
+  expect(box).toBeTruthy();
+  if (box) {
+    expect(box.x).toBeGreaterThanOrEqual(-1);
+    expect(box.x + box.width).toBeLessThanOrEqual(401);
+  }
+
+  // Title and times are visible and the close button is clickable.
+  await expect(
+    page.getByTestId("ersatztv-tile-guide-program-popover-title"),
+  ).toBeVisible();
+  await expect(
+    page.getByTestId("ersatztv-tile-guide-program-popover-times"),
+  ).toBeVisible();
+  const close = page.getByTestId("ersatztv-tile-guide-program-popover-close");
+  await expect(close).toBeVisible();
+  await expectContained(close, guide);
+  await close.click();
+  await expect(popover).toHaveCount(0);
+});
+
 test("tapping an upcoming programme block shows its start–stop times", async ({
   page,
 }) => {

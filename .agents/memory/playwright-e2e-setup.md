@@ -22,3 +22,6 @@ Root config `playwright.config.ts` + specs under `tests/e2e/`; run with `pnpm ru
 
 ## API readiness
 - Playwright webServer now waits on `http://localhost:3000/api/healthz` (API health through the Vite proxy), not the web root — the web dev server boots before the API's first build, and waiting only on `/` let the first spec hit warm-up 500s on `/api/auth/register`.
+
+## Sticky-column guides & coordinate clicks
+- In the ErsatzTV guide grid, programme blocks near "now" sit partly under the sticky channel column / header on narrow viewports; Playwright's real `click()` retries forever ("subtree intercepts pointer events"). Use `locator.dispatchEvent("click")` to open the popover, then keep real clicks for the popover's own buttons (z-40, above the grid).
