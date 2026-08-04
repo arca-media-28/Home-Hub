@@ -340,6 +340,97 @@ test("popover stays readable on a ~400px-wide phone viewport", async ({
   await expect(popover).toHaveCount(0);
 });
 
+test("phone: scrolling the guide timeline makes programmes tappable with a real click", async ({
+  page,
+}) => {
+  // Narrow phone viewport: near "now", programme blocks sit largely under
+  // the sticky channel column, so a real pointer click is intercepted. A
+  // phone user horizontally scrolls the timeline first — emulate that with
+  // a horizontal wheel gesture (Playwright's touch-scroll equivalent) and
+  // then tap a programme block with a REAL click (no dispatchEvent).
+  await page.setViewportSize({ width: 400, height: 780 });
+  const { token, authHeaders } = await register(page);
+  // Full-width tile — on a phone the guide tile spans the screen.
+  const res = await page.request.post("/api/tiles", {
+    data: {
+      type: "integration",
+      integration: "ersatztv",
+      name: "ErsatzTV",
+      gridX: 0,
+      gridY: 0,
+      gridW: 12,
+      gridH: 8,
+      metrics: ["nowPlaying", "guide"],
+    },
+    headers: authHeaders,
+  });
+  expect(res.ok(), `tile create failed: ${res.status()}`).toBeTruthy();
+  await mockErsatz(page);
+  await openDashboard(page, token);
+
+  const grid = page.getByTestId("ersatztv-tile-guide-grid");
+  await expect(grid).toBeVisible({ timeout: 15000 });
+  // Wait for the auto-scroll (now-line positioning) to settle so the user
+  // scroll below isn't overwritten.
+  await expect
+    .poll(() => grid.evaluate((el) => el.scrollLeft))
+    .toBeGreaterThan(0);
+  const before = await grid.evaluate((el) => el.scrollLeft);
+
+  // The upcoming programme (Casablanca, starts +30m) begins to the right of
+  // "now" — on this narrow viewport its left portion sits beyond / under the
+  // sticky channel column. Scroll the timeline by exactly the distance that
+  // brings its left edge just past the sticky column.
+  const upcoming = page
+    .getByTestId("ersatztv-tile-guide-program")
+    .filter({ hasText: "Casablanca" });
+  await expect(upcoming).toBeVisible();
+  const sticky = await page
+    .getByTestId("ersatztv-tile-channel-entry")
+    .first()
+    .boundingBox();
+  const blockBefore = await upcoming.boundingBox();
+  expect(sticky, "sticky column box").toBeTruthy();
+  expect(blockBefore, "programme block box").toBeTruthy();
+  if (!sticky || !blockBefore) return;
+  const stickyRight = sticky.x + sticky.width;
+  const delta = Math.round(blockBefore.x - (stickyRight + 8));
+  expect(delta, "programme starts right of the sticky column").toBeGreaterThan(0);
+
+  // Scroll with a horizontal wheel gesture over the timeline area (the
+  // pointer-driven equivalent of a phone touch-scroll).
+  const box = await grid.boundingBox();
+  expect(box).toBeTruthy();
+  if (!box) return;
+  await page.mouse.move(box.x + box.width - 40, box.y + box.height / 2);
+  await page.mouse.wheel(delta, 0);
+  await expect
+    .poll(() => grid.evaluate((el) => el.scrollLeft))
+    .toBeGreaterThan(before);
+
+  // Now the block's left portion is inside the visible timeline — a REAL
+  // pointer click there must land on the block (not be intercepted by the
+  // sticky column) and open its details popover. Click via raw mouse
+  // coordinates so Playwright's auto scroll-into-view doesn't undo the
+  // user's scroll position.
+  const blockAfter = await upcoming.boundingBox();
+  expect(blockAfter).toBeTruthy();
+  if (!blockAfter) return;
+  const clickX = blockAfter.x + 12;
+  const clickY = blockAfter.y + blockAfter.height / 2;
+  expect(clickX, "click point clear of the sticky column").toBeGreaterThan(
+    stickyRight,
+  );
+  await page.mouse.click(clickX, clickY);
+  const popover = page.getByTestId("ersatztv-tile-guide-program-popover");
+  await expect(popover).toBeVisible();
+  await expect(
+    page.getByTestId("ersatztv-tile-guide-program-popover-title"),
+  ).toHaveText("Casablanca");
+  await page.getByTestId("ersatztv-tile-guide-program-popover-close").click();
+  await expect(popover).toHaveCount(0);
+});
+
 test("tapping an upcoming programme block shows its start–stop times", async ({
   page,
 }) => {

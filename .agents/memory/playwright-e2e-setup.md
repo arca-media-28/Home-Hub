@@ -25,3 +25,8 @@ Root config `playwright.config.ts` + specs under `tests/e2e/`; run with `pnpm ru
 
 ## Sticky-column guides & coordinate clicks
 - In the ErsatzTV guide grid, programme blocks near "now" sit partly under the sticky channel column / header on narrow viewports; Playwright's real `click()` retries forever ("subtree intercepts pointer events"). Use `locator.dispatchEvent("click")` to open the popover, then keep real clicks for the popover's own buttons (z-40, above the grid).
+- Real-pointer clicking a programme AFTER a horizontal scroll: `locator.click()` auto-scrolls the element into view, which re-aligns its left edge back UNDER the sticky column and re-intercepts. Instead: wheel-scroll the grid by a computed delta (`blockBox.x - stickyRight - 8`), re-measure the box, and `page.mouse.click()` at raw coordinates (no auto-scroll). See "phone: scrolling…" test in ersatztv-tile-guide.spec.ts.
+- On a 400px viewport a gridW=6 tile is only ~150px wide — the sticky channel column alone fills it, so no timeline is ever clickable. Seed gridW=12 (full width) for phone-interaction tests.
+
+## Background servers from the bash tool
+- `setsid`/`nohup` background processes (dev servers, playwright runs) get reaped between bash tool invocations — don't rely on them. To run e2e on Replit: start the artifact workflows (`artifacts/api-server: API Server`, `artifacts/homelab-dashboard: web`) and run `E2E_BASE_URL="https://$REPLIT_DEV_DOMAIN" pnpm exec playwright test <spec>`. Also `localhost` resolves to ::1 (EAFNOSUPPORT) — the dev-domain route avoids it.
