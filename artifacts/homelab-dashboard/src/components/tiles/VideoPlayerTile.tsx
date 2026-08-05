@@ -853,8 +853,74 @@ export default function VideoPlayerTile({
       setBannerFading(false);
     }
   }, [stopped, mediaFailed, bannerLinger]);
+  // ── Suspend buffering when the player isn't visible ───────────────────────
+  // hls.js keeps fetching and buffering segments even when nobody can see
+  // the video (hidden browser tab, tile scrolled out of view), so a live
+  // stream's memory climbs for no benefit. Two visibility signals feed one
+  // `hlsSuspended` flag that gates the attach effect below: flipping it true
+  // runs the effect cleanup (destroying the hls.js instance and freeing its
+  // buffers); flipping it back false re-attaches a fresh instance that tunes
+  // straight to the live edge.
+  const HIDDEN_SUSPEND_GRACE_MS = 15_000;
+  // Tab hidden: wait out a short grace period first so quick tab flips
+  // don't tear the stream down (and pay a re-tune) for nothing.
+  const [pageHiddenLong, setPageHiddenLong] = useState(false);
   useEffect(() => {
-    if (!currentUrl || !isHlsUrl || nativeHls || stopped) return;
+    let timer: number | null = null;
+    const onVisibility = () => {
+      if (document.hidden) {
+        if (timer == null) {
+          timer = window.setTimeout(() => {
+            timer = null;
+            setPageHiddenLong(true);
+          }, HIDDEN_SUSPEND_GRACE_MS);
+        }
+      } else {
+        if (timer != null) {
+          window.clearTimeout(timer);
+          timer = null;
+        }
+        setPageHiddenLong(false);
+      }
+    };
+    onVisibility();
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      if (timer != null) window.clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, []);
+  // Tile scrolled fully out of the viewport. The observed node is the
+  // player box div, which only exists on the playing branch of the render —
+  // a callback ref (stored in state) makes the observer effect re-run when
+  // that branch mounts/unmounts.
+  const [tileOffscreen, setTileOffscreen] = useState(false);
+  const [playerBoxNode, setPlayerBoxNode] = useState<HTMLDivElement | null>(
+    null,
+  );
+  useEffect(() => {
+    if (!playerBoxNode || typeof IntersectionObserver === "undefined") {
+      setTileOffscreen(false);
+      return;
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[entries.length - 1];
+        setTileOffscreen(!(entry?.isIntersecting ?? true));
+      },
+      { threshold: 0 },
+    );
+    observer.observe(playerBoxNode);
+    return () => {
+      observer.disconnect();
+      setTileOffscreen(false);
+    };
+  }, [playerBoxNode]);
+  const hlsSuspended = pageHiddenLong || tileOffscreen;
+
+  useEffect(() => {
+    if (!currentUrl || !isHlsUrl || nativeHls || stopped || hlsSuspended)
+      return;
     const el = videoRef.current;
     if (!el) return;
     let cancelled = false;
@@ -866,7 +932,17 @@ export default function VideoPlayerTile({
         if (!demo) setMediaFailed(true);
         return;
       }
-      hls = new Hls({ liveDurationInfinity: true });
+      hls = new Hls({
+        liveDurationInfinity: true,
+        // Bound client memory for long live sessions: trim already-watched
+        // video behind the playhead, keep only a modest forward buffer, and
+        // cap the total buffered bytes. Defaults never trim the back buffer,
+        // so hours of live TV grow memory without limit.
+        backBufferLength: 30,
+        maxBufferLength: 30,
+        maxMaxBufferLength: 60,
+        maxBufferSize: 30 * 1000 * 1000,
+      });
       // Recoverable-error handling: hls.js flags errors as fatal when it has
       // given up retrying internally, but many of those are still salvageable
       // — a network blip or server restart can be resumed with startLoad(),
@@ -940,7 +1016,15 @@ export default function VideoPlayerTile({
       // A stale hint must not survive a channel change or a fresh attach.
       setHlsReconnecting(false);
     };
-  }, [currentUrl, isHlsUrl, nativeHls, demo, hlsRetryNonce, stopped]);
+  }, [
+    currentUrl,
+    isHlsUrl,
+    nativeHls,
+    demo,
+    hlsRetryNonce,
+    stopped,
+    hlsSuspended,
+  ]);
 
   // A channel change starts over with a clean slate for auto-reattaches and
   // any leftover Stop state from the previous channel.
@@ -1131,7 +1215,10 @@ export default function VideoPlayerTile({
     );
   } else {
     body = (
-      <div className="relative w-full h-full overflow-hidden bg-black group">
+      <div
+        ref={setPlayerBoxNode}
+        className="relative w-full h-full overflow-hidden bg-black group"
+      >
         {current && !(stopped && isHlsUrl) && (
           <video
             key={current.url}
