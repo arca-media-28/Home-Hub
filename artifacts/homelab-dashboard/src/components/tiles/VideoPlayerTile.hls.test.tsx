@@ -695,6 +695,91 @@ describe("VideoPlayerTile page-switch mute", () => {
   });
 });
 
+describe("VideoPlayerTile suspend/resume hint", () => {
+  function setHidden(hidden: boolean) {
+    Object.defineProperty(document, "hidden", {
+      configurable: true,
+      get: () => hidden,
+    });
+    act(() => {
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+  }
+
+  afterEach(() => {
+    Object.defineProperty(document, "hidden", {
+      configurable: true,
+      get: () => false,
+    });
+    vi.useRealTimers();
+  });
+
+  it("shows a Resuming badge after a long tab-hide suspension until the first fragment buffers", async () => {
+    vi.useFakeTimers();
+    render(<VideoPlayerTile tile={TILE} editMode={false} />);
+    await act(async () => {});
+    expect(hlsInstances.length).toBe(1);
+    const first = hlsInstances[0]!;
+
+    // Tune-in completes; let the post-tune banner linger elapse so badges
+    // are not suppressed later.
+    act(() => {
+      first.emit(MockHls.Events.FRAG_BUFFERED);
+    });
+    await act(async () => {
+      vi.advanceTimersByTime(4_100);
+    });
+    expect(screen.queryByTestId("videoplayer-resuming-badge")).toBeNull();
+
+    // Hide the tab past the suspend grace: the instance is torn down.
+    setHidden(true);
+    await act(async () => {
+      vi.advanceTimersByTime(16_000);
+    });
+    expect(first.destroy).toHaveBeenCalled();
+    // No badge while suspended (nobody can see it anyway).
+    expect(screen.queryByTestId("videoplayer-resuming-badge")).toBeNull();
+
+    // Show the tab again: a fresh instance attaches and the badge explains
+    // the black frame while it re-tunes to the live edge.
+    setHidden(false);
+    await act(async () => {});
+    expect(hlsInstances.length).toBe(2);
+    expect(screen.getByTestId("videoplayer-resuming-badge")).toBeTruthy();
+    expect(screen.queryByTestId("videoplayer-error")).toBeNull();
+
+    // First buffered fragment: playback is flowing, badge clears.
+    act(() => {
+      hlsInstances[1]!.emit(MockHls.Events.FRAG_BUFFERED);
+    });
+    expect(screen.queryByTestId("videoplayer-resuming-badge")).toBeNull();
+  });
+
+  it("does not show the Resuming badge for a quick tab flip inside the grace window", async () => {
+    vi.useFakeTimers();
+    render(<VideoPlayerTile tile={TILE} editMode={false} />);
+    await act(async () => {});
+    const first = hlsInstances[0]!;
+    act(() => {
+      first.emit(MockHls.Events.FRAG_BUFFERED);
+    });
+    await act(async () => {
+      vi.advanceTimersByTime(4_100);
+    });
+
+    setHidden(true);
+    await act(async () => {
+      vi.advanceTimersByTime(5_000);
+    });
+    setHidden(false);
+    await act(async () => {});
+    // Stream was never suspended, so there is nothing to resume.
+    expect(hlsInstances.length).toBe(1);
+    expect(first.destroy).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("videoplayer-resuming-badge")).toBeNull();
+  });
+});
+
 describe("VideoPlayerTile audio-only detection", () => {
   function setMediaState(
     el: HTMLVideoElement,

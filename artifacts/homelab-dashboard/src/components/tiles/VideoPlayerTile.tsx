@@ -918,6 +918,37 @@ export default function VideoPlayerTile({
   }, [playerBoxNode]);
   const hlsSuspended = pageHiddenLong || tileOffscreen;
 
+  // "Resuming…" hint: when the suspension above ends (tab shown again or the
+  // tile scrolled back into view), the fresh hls.js instance re-tunes to the
+  // live edge behind a black frame. A brief badge — same style as the
+  // Tuning/Reconnecting badge — explains the pause until the first fragment
+  // buffers. Only meaningful for live HLS via hls.js (the only path the
+  // suspension gate tears down).
+  const [hlsResuming, setHlsResuming] = useState(false);
+  const prevSuspendedRef = useRef(hlsSuspended);
+  useEffect(() => {
+    const wasSuspended = prevSuspendedRef.current;
+    prevSuspendedRef.current = hlsSuspended;
+    if (
+      wasSuspended &&
+      !hlsSuspended &&
+      currentUrl &&
+      isHlsUrl &&
+      !nativeHls &&
+      !stopped
+    ) {
+      setHlsResuming(true);
+    }
+    if (hlsSuspended) setHlsResuming(false);
+  }, [hlsSuspended, currentUrl, isHlsUrl, nativeHls, stopped]);
+  // A stale hint must not outlive a channel change or an explicit stop.
+  useEffect(() => {
+    setHlsResuming(false);
+  }, [currentUrl]);
+  useEffect(() => {
+    if (stopped || mediaFailed) setHlsResuming(false);
+  }, [stopped, mediaFailed]);
+
   useEffect(() => {
     if (!currentUrl || !isHlsUrl || nativeHls || stopped || hlsSuspended)
       return;
@@ -963,8 +994,10 @@ export default function VideoPlayerTile({
         // follow the normal mid-playback recovery path.
         tunedRef.current = true;
         setTuning(false);
-        // Playback is flowing again — clear the "Reconnecting…" hint.
+        // Playback is flowing again — clear the "Reconnecting…" hint and the
+        // post-suspension "Resuming…" hint.
         setHlsReconnecting(false);
+        setHlsResuming(false);
       });
       hls.on(Hls.Events.ERROR, (_event, data) => {
         if (!data.fatal || !hls) return;
@@ -1388,6 +1421,20 @@ export default function VideoPlayerTile({
             {tuning ? "Tuning…" : "Reconnecting…"}
           </span>
         )}
+        {hlsResuming &&
+          !hlsReconnecting &&
+          !showTuningBanner &&
+          !bannerLinger &&
+          !stopped &&
+          !mediaFailed && (
+            <span
+              className="pointer-events-none absolute top-1.5 left-1.5 z-10 flex items-center gap-1.5 rounded bg-black/60 px-2 py-1 text-[10px] font-medium text-white/90 backdrop-blur-sm"
+              data-testid="videoplayer-resuming-badge"
+            >
+              <span className="h-2 w-2 animate-spin rounded-full border border-white/70 border-t-transparent" />
+              Resuming live TV…
+            </span>
+          )}
         {audioOnly && !hlsReconnecting && (
           <span
             className="pointer-events-none absolute top-1.5 left-1.5 z-10 max-w-[85%] rounded bg-black/60 px-2 py-1 text-[10px] font-medium leading-snug text-white/90 backdrop-blur-sm"
