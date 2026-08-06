@@ -316,6 +316,112 @@ describe("GET /api/widgets/videoplayer/browse", () => {
     ]);
   });
 
+  it("routes browse items with browser-unsupported audio through the Plex transcoder", async () => {
+    findByService.mockImplementation((_userId: number, service: string) =>
+      service === "plex" ? plexRow : undefined,
+    );
+    httpGet.mockResolvedValue({
+      data: {
+        MediaContainer: {
+          Metadata: [
+            {
+              ratingKey: 30,
+              title: "Loud Ep",
+              type: "episode",
+              index: 1,
+              duration: 1800000,
+              Media: [{ audioCodec: "eac3", Part: [{ key: "/library/parts/30/ep.mkv" }] }],
+            },
+            {
+              ratingKey: 31,
+              title: "Quiet Ep",
+              type: "episode",
+              index: 2,
+              duration: 1800000,
+              Media: [{ audioCodec: "aac", Part: [{ key: "/library/parts/31/ep.mkv" }] }],
+            },
+          ],
+        },
+      },
+    });
+    const res = await request(makeApp()).get(
+      "/api/widgets/videoplayer/browse?server=plex&kind=episodes&id=8",
+    );
+    expect(res.status).toBe(200);
+    const urls = res.body.videos.map((v: { streamUrl: string }) => v.streamUrl);
+    // eac3 → universal transcode HLS with audio→AAC, direct-stream video.
+    expect(urls[0]).toContain(
+      "http://plex.local:32400/video/:/transcode/universal/start.m3u8?",
+    );
+    expect(urls[0]).toContain("path=%2Flibrary%2Fmetadata%2F30");
+    expect(urls[0]).toContain("protocol=hls");
+    expect(urls[0]).toContain("directStream=1");
+    expect(urls[0]).toContain("directPlay=0");
+    expect(urls[0]).toContain("audioCodec=aac");
+    expect(urls[0]).toContain("X-Plex-Token=plex-token");
+    // aac → direct part URL as before.
+    expect(urls[1]).toBe(
+      "http://plex.local:32400/library/parts/31/ep.mkv?X-Plex-Token=plex-token",
+    );
+  });
+
+  it.each(["ac3", "dca", "truehd", "pcm"])(
+    "transcodes browse audio codec %s",
+    async (codec) => {
+      findByService.mockImplementation((_userId: number, service: string) =>
+        service === "plex" ? plexRow : undefined,
+      );
+      httpGet.mockResolvedValue({
+        data: {
+          MediaContainer: {
+            Metadata: [
+              {
+                ratingKey: 40,
+                title: "Movie",
+                type: "movie",
+                Media: [{ audioCodec: codec, Part: [{ key: "/library/parts/40/f.mkv" }] }],
+              },
+            ],
+          },
+        },
+      });
+      const res = await request(makeApp()).get(
+        "/api/widgets/videoplayer/browse?server=plex&kind=movies&libraryId=1",
+      );
+      expect(res.status).toBe(200);
+      expect(res.body.videos[0].streamUrl).toContain(
+        "/video/:/transcode/universal/start.m3u8?",
+      );
+    },
+  );
+
+  it("keeps direct play when the audio codec is unknown", async () => {
+    findByService.mockImplementation((_userId: number, service: string) =>
+      service === "plex" ? plexRow : undefined,
+    );
+    httpGet.mockResolvedValue({
+      data: {
+        MediaContainer: {
+          Metadata: [
+            {
+              ratingKey: 41,
+              title: "Mystery",
+              type: "movie",
+              Media: [{ Part: [{ key: "/library/parts/41/f.mp4" }] }],
+            },
+          ],
+        },
+      },
+    });
+    const res = await request(makeApp()).get(
+      "/api/widgets/videoplayer/browse?server=plex&kind=movies&libraryId=1",
+    );
+    expect(res.status).toBe(200);
+    expect(res.body.videos[0].streamUrl).toBe(
+      "http://plex.local:32400/library/parts/41/f.mp4?X-Plex-Token=plex-token",
+    );
+  });
+
   it("lists a Plex movie library as playable posters for kind=movies", async () => {
     findByService.mockImplementation((_userId: number, service: string) =>
       service === "plex" ? plexRow : undefined,
@@ -696,6 +802,45 @@ describe("GET /api/widgets/videoplayer", () => {
         durationMs: 5400000,
       },
     ]);
+  });
+
+  it("transcodes flat-playlist items with unsupported audio, direct-plays the rest", async () => {
+    findByService.mockImplementation((_userId: number, service: string) =>
+      service === "plex" ? plexRow : undefined,
+    );
+    httpGet.mockResolvedValue({
+      data: {
+        MediaContainer: {
+          Metadata: [
+            {
+              ratingKey: 50,
+              title: "DTS Movie",
+              type: "movie",
+              duration: 5400000,
+              Media: [{ audioCodec: "dca", Part: [{ key: "/library/parts/50/f.mkv" }] }],
+            },
+            {
+              ratingKey: 51,
+              title: "AAC Movie",
+              type: "movie",
+              duration: 5400000,
+              Media: [{ audioCodec: "aac", Part: [{ key: "/library/parts/51/f.mp4" }] }],
+            },
+          ],
+        },
+      },
+    });
+    const res = await request(makeApp()).get(
+      "/api/widgets/videoplayer?server=plex&libraryId=1",
+    );
+    expect(res.status).toBe(200);
+    const urls = res.body.videos.map((v: { streamUrl: string }) => v.streamUrl);
+    expect(urls[0]).toContain("/video/:/transcode/universal/start.m3u8?");
+    expect(urls[0]).toContain("path=%2Flibrary%2Fmetadata%2F50");
+    expect(urls[0]).toContain("audioCodec=aac");
+    expect(urls[1]).toBe(
+      "http://plex.local:32400/library/parts/51/f.mp4?X-Plex-Token=plex-token",
+    );
   });
 
   it("re-queries a Plex show library for episodes", async () => {

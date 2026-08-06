@@ -2441,6 +2441,52 @@ router.get("/videoplayer/libraries", requireAuth, async (req: AuthRequest, res) 
 // Cap playlists so a huge library doesn't produce megabyte responses.
 const VIDEO_PLAYLIST_LIMIT = 200;
 
+// Audio codecs browsers can decode natively in a <video> element. Anything
+// else (ac3, eac3, dts, truehd, pcm variants…) direct-plays as silent video,
+// so those items are routed through Plex's universal transcode instead.
+const BROWSER_SAFE_AUDIO_CODECS = new Set(["aac", "mp3", "opus", "vorbis", "flac"]);
+
+interface PlexVideoMedia {
+  audioCodec?: string;
+  Part?: Array<{ key?: string }>;
+}
+
+// Build the playable stream URL for a Plex item. Compatible audio keeps the
+// existing direct part URL (no transcoding). Unsupported audio gets a Plex
+// universal-transcode HLS playlist that direct-streams the video track and
+// transcodes only audio to AAC. Unknown codecs stay on direct play — never
+// transcode speculatively.
+export function plexVideoStreamUrl(
+  baseUrl: string,
+  token: string,
+  ratingKey: string,
+  media: PlexVideoMedia | undefined,
+): string | null {
+  const partKey = media?.Part?.[0]?.key;
+  if (!partKey) return null;
+  const codec = media?.audioCodec?.toLowerCase();
+  if (!codec || BROWSER_SAFE_AUDIO_CODECS.has(codec)) {
+    return `${baseUrl}${partKey}?X-Plex-Token=${token}`;
+  }
+  const params = new URLSearchParams({
+    path: `/library/metadata/${ratingKey}`,
+    mediaIndex: "0",
+    partIndex: "0",
+    protocol: "hls",
+    fastSeek: "1",
+    directPlay: "0",
+    directStream: "1",
+    audioCodec: "aac",
+    // The transcoder requires a client identity; a stable per-item session id
+    // lets Plex reuse/clean up the transcode session across reloads.
+    session: `tachboard-video-${ratingKey}`,
+    "X-Plex-Client-Identifier": "tachboard-videoplayer",
+    "X-Plex-Product": "Tachboard",
+    "X-Plex-Token": token,
+  });
+  return `${baseUrl}/video/:/transcode/universal/start.m3u8?${params.toString()}`;
+}
+
 // GET /widgets/videoplayer/browse — gradual drill-down for the Video Player
 // tile's browser: shows in a TV library → a show's seasons → a season's
 // playable episodes. `show_episodes` flattens a whole show into an ordered
@@ -2665,7 +2711,7 @@ router.get("/videoplayer/browse", requireAuth, async (req: AuthRequest, res) => 
       childCount?: number;
       thumb?: string;
       duration?: number;
-      Media?: Array<{ Part?: Array<{ key?: string }> }>;
+      Media?: PlexVideoMedia[];
     }>;
     if (kind === "shows" || kind === "seasons") {
       const containers = rows
@@ -2697,14 +2743,15 @@ router.get("/videoplayer/browse", requireAuth, async (req: AuthRequest, res) => 
     const videos = rows
       .slice(0, VIDEO_PLAYLIST_LIMIT)
       .map((m) => {
-        const partKey = m.Media?.[0]?.Part?.[0]?.key;
-        if (!partKey) return null;
+        const ratingKey = String(m.ratingKey ?? "");
+        const streamUrl = plexVideoStreamUrl(baseUrl, token, ratingKey, m.Media?.[0]);
+        if (!streamUrl) return null;
         const prefix =
           kind !== "movies" && typeof m.index === "number" ? `${m.index}. ` : "";
         return {
-          id: String(m.ratingKey ?? ""),
+          id: ratingKey,
           title: `${prefix}${m.title ?? "Untitled"}`,
-          streamUrl: `${baseUrl}${partKey}?X-Plex-Token=${token}`,
+          streamUrl,
           durationMs: typeof m.duration === "number" ? m.duration : null,
           thumb: thumbUrl(m.thumb),
         };
@@ -2749,7 +2796,7 @@ router.get("/videoplayer", requireAuth, async (req: AuthRequest, res) => {
           grandparentTitle?: string;
           type?: string;
           duration?: number;
-          Media?: Array<{ Part?: Array<{ key?: string }> }>;
+          Media?: PlexVideoMedia[];
         }>;
       };
       let rows = await fetchRows();
@@ -2761,13 +2808,14 @@ router.get("/videoplayer", requireAuth, async (req: AuthRequest, res) => {
       const videos = rows
         .slice(0, VIDEO_PLAYLIST_LIMIT)
         .map((m) => {
-          const partKey = m.Media?.[0]?.Part?.[0]?.key;
-          if (!partKey) return null;
+          const ratingKey = String(m.ratingKey ?? "");
+          const streamUrl = plexVideoStreamUrl(baseUrl, token, ratingKey, m.Media?.[0]);
+          if (!streamUrl) return null;
           const title = m.grandparentTitle ? `${m.grandparentTitle} — ${m.title ?? ""}` : (m.title ?? "Untitled");
           return {
-            id: String(m.ratingKey ?? ""),
+            id: ratingKey,
             title,
-            streamUrl: `${baseUrl}${partKey}?X-Plex-Token=${token}`,
+            streamUrl,
             durationMs: typeof m.duration === "number" ? m.duration : null,
           };
         })
