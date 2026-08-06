@@ -58,17 +58,16 @@ const svg = `<?xml version="1.0" encoding="UTF-8"?>
   <svg x="${tileX}" y="${tileY}" width="${TILE}" height="${TILE}" viewBox="0 0 180 180">
     <rect width="180" height="180" rx="40" fill="${CARD}"/>
     <g stroke="${RED}" stroke-width="11" stroke-linecap="round" stroke-linejoin="round">
-      <line x1="56" y1="56" x2="124" y2="124"/>
-      <line x1="124" y1="56" x2="56" y2="124"/>
+      <line x1="50" y1="56" x2="130" y2="56"/>
+      <line x1="90" y1="56" x2="90" y2="128"/>
     </g>
     <g fill="${RED}">
-      <circle cx="56" cy="56" r="15"/>
-      <circle cx="124" cy="56" r="15"/>
-      <circle cx="56" cy="124" r="15"/>
-      <circle cx="124" cy="124" r="15"/>
+      <circle cx="50" cy="56" r="15"/>
+      <circle cx="130" cy="56" r="15"/>
+      <circle cx="90" cy="128" r="15"/>
     </g>
-    <circle cx="90" cy="90" r="22" fill="${CARD}"/>
-    <circle cx="90" cy="90" r="19" fill="${RED}"/>
+    <circle cx="90" cy="56" r="22" fill="${CARD}"/>
+    <circle cx="90" cy="56" r="19" fill="${RED}"/>
   </svg>
 
   <!-- wordmark -->
