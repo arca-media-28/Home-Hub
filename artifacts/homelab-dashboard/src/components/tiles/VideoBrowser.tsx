@@ -8,7 +8,7 @@ import type {
   VideoContainer,
   VideoLibrary,
 } from "@workspace/api-client-react";
-import { ArrowLeft, Clapperboard, Film, Play, Tv } from "lucide-react";
+import { ArrowLeft, Clapperboard, Film, Play, Search, Tv, X } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -105,6 +105,10 @@ export default function VideoBrowser({
   const [paneError, setPaneError] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
 
+  // Search: a client-side filter of whatever the pane has loaded. Cleared
+  // whenever navigation changes what the pane is showing.
+  const [search, setSearch] = useState("");
+
   const fetchLevel = useCallback(
     async (level: Level): Promise<PaneState> => {
       const r = await browseVideoLibrary(
@@ -121,6 +125,7 @@ export default function VideoBrowser({
   const loadStack = useCallback(
     async (next: Level[]) => {
       setStack(next);
+      setSearch("");
       const top = next[next.length - 1];
       if (!top) {
         setPane(null);
@@ -226,12 +231,25 @@ export default function VideoBrowser({
   };
 
   const top = stack[stack.length - 1];
-  const containers = pane?.containers ?? [];
-  const videos = pane?.videos ?? [];
+  const allContainers = pane?.containers ?? [];
+  const allVideos = pane?.videos ?? [];
+  const query = search.trim().toLowerCase();
+  const containers = query
+    ? allContainers.filter((c) => c.title.toLowerCase().includes(query))
+    : allContainers;
+  const videos = query
+    ? allVideos.filter((v) => v.title.toLowerCase().includes(query))
+    : allVideos;
   const sample = (pane?.sample ?? false) || librariesSample;
   const isEpisodeList = top?.type === "episodes";
-  const paneEmpty =
-    !paneLoading && !paneError && containers.length === 0 && videos.length === 0;
+  const hasContent = allContainers.length > 0 || allVideos.length > 0;
+  const paneEmpty = !paneLoading && !paneError && !hasContent;
+  const searchEmpty =
+    !paneLoading &&
+    !paneError &&
+    hasContent &&
+    containers.length === 0 &&
+    videos.length === 0;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -328,6 +346,33 @@ export default function VideoBrowser({
                     </span>
                   ))}
                 </div>
+                <div className="relative flex-shrink-0">
+                  <Search
+                    size={13}
+                    aria-hidden="true"
+                    className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground"
+                  />
+                  <input
+                    type="text"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Search…"
+                    aria-label="Search this view"
+                    data-testid="videoplayer-browser-search"
+                    className="h-7 w-32 rounded-md border border-border/60 bg-background pl-7 pr-6 text-xs outline-none transition-[width] placeholder:text-muted-foreground focus:w-44 focus:border-primary/50 sm:w-40 sm:focus:w-56"
+                  />
+                  {search && (
+                    <button
+                      type="button"
+                      onClick={() => setSearch("")}
+                      aria-label="Clear search"
+                      data-testid="videoplayer-browser-search-clear"
+                      className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded text-muted-foreground hover:text-foreground"
+                    >
+                      <X size={12} aria-hidden="true" />
+                    </button>
+                  )}
+                </div>
               </div>
             )}
 
@@ -350,6 +395,14 @@ export default function VideoBrowser({
               {top && paneEmpty && (
                 <div className="py-12 text-center text-sm text-muted-foreground">
                   Nothing here.
+                </div>
+              )}
+              {top && searchEmpty && (
+                <div
+                  className="py-12 text-center text-sm text-muted-foreground"
+                  data-testid="videoplayer-browser-search-empty"
+                >
+                  No matches for “{search.trim()}”.
                 </div>
               )}
 
