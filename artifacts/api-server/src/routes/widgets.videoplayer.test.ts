@@ -173,14 +173,14 @@ describe("GET /api/widgets/videoplayer/browse", () => {
 
   it("rejects an unknown kind", async () => {
     const res = await request(makeApp()).get(
-      "/api/widgets/videoplayer/browse?server=plex&kind=movies&libraryId=1",
+      "/api/widgets/videoplayer/browse?server=plex&kind=albums&libraryId=1",
     );
     expect(res.status).toBe(400);
   });
 
-  it("requires libraryId for kind=shows", async () => {
+  it.each(["shows", "movies"])("requires libraryId for kind=%s", async (kind) => {
     const res = await request(makeApp()).get(
-      "/api/widgets/videoplayer/browse?server=plex&kind=shows",
+      `/api/widgets/videoplayer/browse?server=plex&kind=${kind}`,
     );
     expect(res.status).toBe(400);
   });
@@ -311,6 +311,51 @@ describe("GET /api/widgets/videoplayer/browse", () => {
         streamUrl:
           "http://plex.local:32400/library/parts/9/ep.mkv?X-Plex-Token=plex-token",
         durationMs: 1800000,
+        thumb: null,
+      },
+    ]);
+  });
+
+  it("lists a Plex movie library as playable posters for kind=movies", async () => {
+    findByService.mockImplementation((_userId: number, service: string) =>
+      service === "plex" ? plexRow : undefined,
+    );
+    httpGet.mockResolvedValue({
+      data: {
+        MediaContainer: {
+          Metadata: [
+            {
+              ratingKey: 21,
+              title: "Big Movie",
+              type: "movie",
+              index: 3,
+              duration: 5400000,
+              thumb: "/library/metadata/21/thumb/1",
+              Media: [{ Part: [{ key: "/library/parts/21/file.mp4" }] }],
+            },
+            // No playable part → dropped.
+            { ratingKey: 22, title: "Broken", type: "movie" },
+          ],
+        },
+      },
+    });
+    const res = await request(makeApp()).get(
+      "/api/widgets/videoplayer/browse?server=plex&kind=movies&libraryId=1",
+    );
+    expect(res.status).toBe(200);
+    expect(httpGet.mock.calls[0]![0]).toBe(
+      "http://plex.local:32400/library/sections/1/all",
+    );
+    expect(res.body.videos).toEqual([
+      {
+        id: "21",
+        // Movies never get an index prefix, even when Plex reports one.
+        title: "Big Movie",
+        streamUrl:
+          "http://plex.local:32400/library/parts/21/file.mp4?X-Plex-Token=plex-token",
+        durationMs: 5400000,
+        thumb:
+          "http://plex.local:32400/library/metadata/21/thumb/1?X-Plex-Token=plex-token",
       },
     ]);
   });
@@ -448,6 +493,42 @@ describe("GET /api/widgets/videoplayer/browse", () => {
         title: "1. Pilot",
         streamUrl: "http://jf.local:8096/Videos/e1/stream?static=true&api_key=jf-key",
         durationMs: 1_800_000,
+        thumb: null,
+      },
+    ]);
+  });
+
+  it("lists a Jellyfin movie library as playable posters for kind=movies", async () => {
+    findByService.mockImplementation((_userId: number, service: string) =>
+      service === "jellyfin" ? jellyfinRow : undefined,
+    );
+    httpGet.mockResolvedValue({
+      data: {
+        Items: [
+          {
+            Id: "m1",
+            Name: "Big Movie",
+            Type: "Movie",
+            RunTimeTicks: 54_000_000_000,
+            ImageTags: { Primary: "tag1" },
+          },
+        ],
+      },
+    });
+    const res = await request(makeApp()).get(
+      "/api/widgets/videoplayer/browse?server=jellyfin&kind=movies&libraryId=lib1",
+    );
+    expect(res.status).toBe(200);
+    const params = (httpGet.mock.calls[0]![1] as { params: Record<string, string> }).params;
+    expect(params["ParentId"]).toBe("lib1");
+    expect(params["IncludeItemTypes"]).toBe("Movie,Video,MusicVideo");
+    expect(res.body.videos).toEqual([
+      {
+        id: "m1",
+        title: "Big Movie",
+        streamUrl: "http://jf.local:8096/Videos/m1/stream?static=true&api_key=jf-key",
+        durationMs: 5_400_000,
+        thumb: "http://jf.local:8096/Items/m1/Images/Primary?api_key=jf-key",
       },
     ]);
   });

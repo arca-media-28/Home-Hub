@@ -14,7 +14,7 @@ export type BrowseVideoLibraryParams = {
  */
 server: BrowseVideoLibraryServer;
 /**
- * What to list. "shows" lists a TV library's shows (requires libraryId); "seasons" lists a show's seasons (requires id); "episodes" lists a season's playable episodes (requires id); "show_episodes" lists every playable episode of a show in order (requires id), used to queue a whole show.
+ * What to list. "shows" lists a TV library's shows (requires libraryId); "movies" lists a movie library's playable movies with posters (requires libraryId); "seasons" lists a show's seasons (requires id); "episodes" lists a season's playable episodes (requires id); "show_episodes" lists every playable episode of a show in order (requires id), used to queue a whole show.
  */
 kind: BrowseVideoLibraryKind;
 /**

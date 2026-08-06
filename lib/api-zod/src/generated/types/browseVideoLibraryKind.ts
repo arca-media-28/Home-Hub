@@ -11,6 +11,7 @@ export type BrowseVideoLibraryKind = typeof BrowseVideoLibraryKind[keyof typeof 
 
 export const BrowseVideoLibraryKind = {
   shows: 'shows',
+  movies: 'movies',
   seasons: 'seasons',
   episodes: 'episodes',
   show_episodes: 'show_episodes',

@@ -1233,13 +1233,14 @@ paths:
           required: true
           description: >-
             What to list. "shows" lists a TV library's shows (requires
-            libraryId); "seasons" lists a show's seasons (requires id);
-            "episodes" lists a season's playable episodes (requires id);
-            "show_episodes" lists every playable episode of a show in order
-            (requires id), used to queue a whole show.
+            libraryId); "movies" lists a movie library's playable movies with
+            posters (requires libraryId); "seasons" lists a show's seasons
+            (requires id); "episodes" lists a season's playable episodes
+            (requires id); "show_episodes" lists every playable episode of a
+            show in order (requires id), used to queue a whole show.
           schema:
             type: string
-            enum: [shows, seasons, episodes, show_episodes]
+            enum: [shows, movies, seasons, episodes, show_episodes]
         - name: libraryId
           in: query
           required: false
@@ -5677,6 +5678,12 @@ components:
         durationMs:
           description: Runtime in milliseconds when known.
           type: ["number", "null"]
+        thumb:
+          description: >-
+            Fully-qualified, authenticated poster/thumbnail URL the browser can
+            load directly. Only populated by the browse endpoint; null or
+            absent when unavailable.
+          type: ["string", "null"]
 
     VideoPlaylistData:
       type: object

@@ -427,13 +427,16 @@ export default function VideoPlayerTile({
   // element loads its metadata.
   const savedRef = useRef<PlaybackMemory | null>(loadPlaybackMemory(tile.id));
 
-  // A queue picked via the Plex drill-down browser. While set, it replaces
-  // the flat library playlist as the tile's video list. Restored from the
-  // playback memory so a page switch/reload resumes the picked episodes.
+  // A queue picked via the media-server drill-down browser (Plex or
+  // Jellyfin). While set, it replaces the flat library playlist as the
+  // tile's video list. Restored from the playback memory so a page
+  // switch/reload resumes the picked episodes.
   const [overrideQueue, setOverrideQueue] = useState<VideoEntry[] | null>(
     () => {
       const saved = savedRef.current;
-      return source === "plex" && saved?.queue && saved.queue.length > 0
+      return (source === "plex" || source === "jellyfin") &&
+        saved?.queue &&
+        saved.queue.length > 0
         ? saved.queue
         : null;
     },
@@ -506,8 +509,9 @@ export default function VideoPlayerTile({
       };
     }
     if (isServerSource) {
-      // A queue picked in the drill-down browser wins over the flat playlist.
-      if (source === "plex" && overrideQueue && overrideQueue.length > 0) {
+      // A queue picked in the drill-down browser wins over the flat playlist
+      // (Plex and Jellyfin both use the browser).
+      if (overrideQueue && overrideQueue.length > 0) {
         return { videos: overrideQueue, demo: false, failed: false };
       }
       if (!libraryId) return { videos: yule, demo: true, failed: false };
@@ -1167,6 +1171,9 @@ export default function VideoPlayerTile({
       setOverrideQueue(entries);
       setPlaying(true);
     }
+    // A deliberate pick should sound like the tile is configured to: drop
+    // any restored/page-switch mute and follow the tile's mute setting.
+    setMuted(startMuted);
     setBrowserOpen(false);
   }
 

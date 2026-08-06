@@ -2440,6 +2440,11 @@ export interface VideoItem {
      * @nullable
      */
   durationMs?: number | null;
+  /**
+     * Fully-qualified, authenticated poster/thumbnail URL the browser can load directly. Only populated by the browse endpoint; null or absent when unavailable.
+     * @nullable
+     */
+  thumb?: string | null;
 }
 
 export interface VideoPlaylistData {
@@ -2814,7 +2819,7 @@ export type BrowseVideoLibraryParams = {
  */
 server: BrowseVideoLibraryServer;
 /**
- * What to list. "shows" lists a TV library's shows (requires libraryId); "seasons" lists a show's seasons (requires id); "episodes" lists a season's playable episodes (requires id); "show_episodes" lists every playable episode of a show in order (requires id), used to queue a whole show.
+ * What to list. "shows" lists a TV library's shows (requires libraryId); "movies" lists a movie library's playable movies with posters (requires libraryId); "seasons" lists a show's seasons (requires id); "episodes" lists a season's playable episodes (requires id); "show_episodes" lists every playable episode of a show in order (requires id), used to queue a whole show.
  */
 kind: BrowseVideoLibraryKind;
 /**
@@ -2840,6 +2845,7 @@ export type BrowseVideoLibraryKind = typeof BrowseVideoLibraryKind[keyof typeof 
 
 export const BrowseVideoLibraryKind = {
   shows: 'shows',
+  movies: 'movies',
   seasons: 'seasons',
   episodes: 'episodes',
   show_episodes: 'show_episodes',

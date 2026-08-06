@@ -2447,8 +2447,9 @@ const VIDEO_PLAYLIST_LIMIT = 200;
 // episode queue (Plex allLeaves; Jellyfin recursive episode query). Movie
 // libraries keep using the flat /videoplayer playlist endpoint, so no
 // artificial empty levels exist here. Supports Plex and Jellyfin.
-const VIDEO_BROWSE_KINDS = ["shows", "seasons", "episodes", "show_episodes"];
+const VIDEO_BROWSE_KINDS = ["shows", "movies", "seasons", "episodes", "show_episodes"];
 const VIDEO_BROWSE_KINDS_NEEDING_ID = ["seasons", "episodes", "show_episodes"];
+const VIDEO_BROWSE_KINDS_NEEDING_LIBRARY = ["shows", "movies"];
 
 router.get("/videoplayer/browse", requireAuth, async (req: AuthRequest, res) => {
   const server = String(req.query["server"] ?? "");
@@ -2463,8 +2464,8 @@ router.get("/videoplayer/browse", requireAuth, async (req: AuthRequest, res) => 
     res.status(400).json({ error: "Unknown browse kind" });
     return;
   }
-  if (kind === "shows" && !libraryId) {
-    res.status(400).json({ error: "kind=shows requires a libraryId" });
+  if (VIDEO_BROWSE_KINDS_NEEDING_LIBRARY.includes(kind) && !libraryId) {
+    res.status(400).json({ error: `kind=${kind} requires a libraryId` });
     return;
   }
   if (VIDEO_BROWSE_KINDS_NEEDING_ID.includes(kind) && !id) {
@@ -2499,6 +2500,13 @@ router.get("/videoplayer/browse", requireAuth, async (req: AuthRequest, res) => 
         params["IncludeItemTypes"] = "Series";
         params["Fields"] = "RecursiveItemCount,ProductionYear";
         params["SortBy"] = "SortName";
+      } else if (kind === "movies") {
+        // A movie library's playable items, with posters for the grid view.
+        params["ParentId"] = libraryId;
+        params["Recursive"] = "true";
+        params["IncludeItemTypes"] = "Movie,Video,MusicVideo";
+        params["Fields"] = "RunTimeTicks";
+        params["SortBy"] = "SortName";
       } else if (kind === "seasons") {
         params["ParentId"] = id;
         params["IncludeItemTypes"] = "Season";
@@ -2527,6 +2535,20 @@ router.get("/videoplayer/browse", requireAuth, async (req: AuthRequest, res) => 
         RunTimeTicks?: number;
         ImageTags?: Record<string, string>;
       }>;
+      if (kind === "movies") {
+        const videos = items
+          .filter((i) => i.Id)
+          .map((i) => ({
+            id: String(i.Id),
+            title: i.Name ?? "Untitled",
+            streamUrl: `${baseUrl}/Videos/${encodeURIComponent(String(i.Id))}/stream?static=true&api_key=${apiKey}`,
+            durationMs:
+              typeof i.RunTimeTicks === "number" ? Math.round(i.RunTimeTicks / 10000) : null,
+            thumb: thumbUrl(i),
+          }));
+        res.json({ sample: false, videos });
+        return;
+      }
       if (kind === "shows" || kind === "seasons") {
         const containers = items
           .filter((i) => i.Id)
@@ -2560,6 +2582,7 @@ router.get("/videoplayer/browse", requireAuth, async (req: AuthRequest, res) => 
             streamUrl: `${baseUrl}/Videos/${encodeURIComponent(String(i.Id))}/stream?static=true&api_key=${apiKey}`,
             durationMs:
               typeof i.RunTimeTicks === "number" ? Math.round(i.RunTimeTicks / 10000) : null,
+            thumb: thumbUrl(i),
           };
         });
       res.json({ sample: false, videos });
@@ -2584,7 +2607,7 @@ router.get("/videoplayer/browse", requireAuth, async (req: AuthRequest, res) => 
       : null;
   try {
     const path =
-      kind === "shows"
+      kind === "shows" || kind === "movies"
         ? `/library/sections/${encodeURIComponent(libraryId)}/all`
         : kind === "show_episodes"
           ? `/library/metadata/${encodeURIComponent(id)}/allLeaves`
@@ -2631,18 +2654,21 @@ router.get("/videoplayer/browse", requireAuth, async (req: AuthRequest, res) => 
       res.json({ sample: false, containers });
       return;
     }
-    // episodes / show_episodes → playable videos.
+    // movies / episodes / show_episodes → playable videos (movies keep
+    // their plain title — no index prefix — and carry a poster thumb).
     const videos = rows
       .slice(0, VIDEO_PLAYLIST_LIMIT)
       .map((m) => {
         const partKey = m.Media?.[0]?.Part?.[0]?.key;
         if (!partKey) return null;
-        const prefix = typeof m.index === "number" ? `${m.index}. ` : "";
+        const prefix =
+          kind !== "movies" && typeof m.index === "number" ? `${m.index}. ` : "";
         return {
           id: String(m.ratingKey ?? ""),
           title: `${prefix}${m.title ?? "Untitled"}`,
           streamUrl: `${baseUrl}${partKey}?X-Plex-Token=${token}`,
           durationMs: typeof m.duration === "number" ? m.duration : null,
+          thumb: thumbUrl(m.thumb),
         };
       })
       .filter((v): v is NonNullable<typeof v> => v !== null);

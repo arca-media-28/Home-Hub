@@ -18,4 +18,9 @@ export interface VideoItem {
      * @nullable
      */
   durationMs?: number | null;
+  /**
+     * Fully-qualified, authenticated poster/thumbnail URL the browser can load directly. Only populated by the browse endpoint; null or absent when unavailable.
+     * @nullable
+     */
+  thumb?: string | null;
 }
