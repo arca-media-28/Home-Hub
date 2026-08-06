@@ -359,6 +359,10 @@ describe("GET /api/widgets/videoplayer/browse", () => {
     expect(urls[0]).toContain("directPlay=0");
     expect(urls[0]).toContain("audioCodec=aac");
     expect(urls[0]).toContain("X-Plex-Token=plex-token");
+    // The transcoder needs a client platform profile or the HLS session can
+    // refuse to start / keep incompatible audio (endless "Tuning…" client-side).
+    expect(urls[0]).toContain("X-Plex-Platform=Chrome");
+    expect(urls[0]).toContain("X-Plex-Client-Identifier=tachboard-videoplayer");
     // aac → direct part URL as before.
     expect(urls[1]).toBe(
       "http://plex.local:32400/library/parts/31/ep.mkv?X-Plex-Token=plex-token",

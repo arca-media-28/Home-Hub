@@ -1024,7 +1024,12 @@ export default function VideoPlayerTile({
         // While still inside the tune-in grace window (channel never
         // buffered a fragment yet), keep retrying without consuming the
         // auto-reattach budget — the transcoder just needs time to start.
+        // ErsatzTV-only: its live transcoder legitimately takes a while to
+        // spin up. Plex VOD transcodes either stream promptly or are
+        // genuinely broken, so they go through the normal bounded budget
+        // and surface a clear error instead of spinning on "Tuning…".
         const inTuneGrace =
+          isErsatz &&
           !tunedRef.current &&
           Date.now() - tuneStartRef.current < TUNE_GRACE_MS;
         if (inTuneGrace || autoReattachRef.current < 3) {
@@ -1058,6 +1063,7 @@ export default function VideoPlayerTile({
     isHlsUrl,
     nativeHls,
     demo,
+    isErsatz,
     hlsRetryNonce,
     stopped,
     hlsSuspended,
@@ -1131,17 +1137,14 @@ export default function VideoPlayerTile({
     setPlaying(true);
   }
 
-  // "Restart from beginning": intentionally forget the saved spot. Clears
-  // the persisted playback memory for this tile, resets the play order
-  // (fresh shuffle when enabled) back to the first entry, and rewinds the
-  // current element to 0:00 in case the first video is already showing
-  // (a position reset alone wouldn't remount the <video>).
+  // "Play from beginning": replay the CURRENT video from 0:00. Keeps the
+  // play order and position exactly as they are (shuffle order included) —
+  // it must never jump back to the first item of the queue/category. Any
+  // saved resume timestamp is dropped so the rewind can't be clobbered by
+  // a restored position.
   function restartFromBeginning() {
     savedRef.current = null;
     clearPlaybackMemory(tile.id);
-    const base = videos.map((_, i) => i);
-    setOrder(shuffle && playMode === "playlist" ? shuffled(base) : base);
-    setPos(0);
     const el = videoRef.current;
     if (el) {
       el.currentTime = 0;
@@ -1171,9 +1174,9 @@ export default function VideoPlayerTile({
       setOverrideQueue(entries);
       setPlaying(true);
     }
-    // A deliberate pick should sound like the tile is configured to: drop
-    // any restored/page-switch mute and follow the tile's mute setting.
-    setMuted(startMuted);
+    // Keep the user's current mute/volume state: the start-muted default
+    // only applies on initial tile load, not on every selection (picking a
+    // new video must not silently re-mute an unmuted player).
     setBrowserOpen(false);
   }
 
@@ -1328,8 +1331,10 @@ export default function VideoPlayerTile({
               // Element-level errors during the tune-in grace window of a
               // live HLS channel are retried quietly (fresh attach) instead
               // of flashing the error screen — same policy as fatal hls.js
-              // errors while the transcoder spins up.
+              // errors while the transcoder spins up (ErsatzTV live only —
+              // Plex VOD failures surface the error state immediately).
               if (
+                isErsatz &&
                 isHlsUrl &&
                 !tunedRef.current &&
                 Date.now() - tuneStartRef.current < TUNE_GRACE_MS
@@ -1345,11 +1350,22 @@ export default function VideoPlayerTile({
             onWaiting={() => {
               if (isHlsUrl) setBuffering(true);
             }}
+            onLoadedData={() => {
+              // First frame decoded — playback is genuinely underway. This
+              // is a source-agnostic success signal (Plex transcodes and
+              // native-HLS included), so end tune-in here too.
+              tunedRef.current = true;
+              setTuning(false);
+              setHlsReconnecting(false);
+            }}
             onPlaying={() => {
               setBuffering(false);
               // Native-HLS browsers (Safari) never fire hls.js events, so
-              // the banner is also cleared as soon as playback starts.
+              // the banner is also cleared as soon as playback starts. Any
+              // playing signal (Plex or ErsatzTV) ends the tune-in state.
+              tunedRef.current = true;
               setTuning(false);
+              setHlsReconnecting(false);
             }}
           />
         )}

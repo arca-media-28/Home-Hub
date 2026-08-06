@@ -77,15 +77,17 @@ const CHANNEL = {
   nowPlayingStop: null,
 };
 
-const { channelsRef, invalidateQueries } = vi.hoisted(() => ({
+const { channelsRef, invalidateQueries, playlistRef } = vi.hoisted(() => ({
   // Mutable ref so individual tests can swap in a channel with guide bounds.
   channelsRef: { current: [] as unknown[] },
   invalidateQueries: vi.fn().mockResolvedValue(undefined),
+  // Mutable ref so Plex-mode tests can provide a server playlist.
+  playlistRef: { current: undefined as unknown },
 }));
 
 vi.mock("@workspace/api-client-react", () => ({
   useGetVideoPlaylist: () => ({
-    data: undefined,
+    data: playlistRef.current,
     isError: false,
     isLoading: false,
   }),
@@ -136,10 +138,38 @@ function emitFatal(hls: InstanceType<typeof MockHls>, type: string) {
   });
 }
 
+// The Plex drill-down browser is lazy-loaded and dialog-heavy; replace it
+// with a stub that hands a fixed queue back through onPlay so the
+// browser-handoff path (playFromBrowser) can be exercised directly.
+vi.mock("./VideoBrowser", () => ({
+  default: ({
+    open,
+    onPlay,
+  }: {
+    open: boolean;
+    onPlay: (entries: unknown[], startIndex: number) => void;
+  }) =>
+    open ? (
+      <button
+        data-testid="mock-browser-play"
+        onClick={() =>
+          onPlay(
+            [
+              { id: "picked-1", title: "Picked One", url: "http://plex/p1.mp4" },
+              { id: "picked-2", title: "Picked Two", url: "http://plex/p2.mp4" },
+            ],
+            0,
+          )
+        }
+      />
+    ) : null,
+}));
+
 beforeEach(() => {
   localStorage.clear();
   hlsInstances.length = 0;
   channelsRef.current = [CHANNEL];
+  playlistRef.current = undefined;
   // jsdom's media elements don't implement playback; the tile calls
   // el.play().catch(...) so it must return a promise.
   window.HTMLMediaElement.prototype.play = vi
@@ -903,5 +933,192 @@ describe("VideoPlayerTile guide refresh at programme end", () => {
         (c) => c[0]?.queryKey?.[0] === "ersatz-channels",
       ).length,
     ).toBe(0);
+  });
+});
+
+// ── Plex playback regressions (Task: transcoded tuning / restart / mute) ────
+
+const PLEX_HLS_TILE = {
+  id: 77,
+  integration: "videoplayer",
+  tileSettings: { videoSource: "plex", videoLibraryId: "1" },
+} as unknown as Tile;
+
+const URLS_TILE = {
+  id: 78,
+  integration: "videoplayer",
+  tileSettings: {
+    videoSource: "urls",
+    videoUrls: [
+      "http://media/one.mp4",
+      "http://media/two.mp4",
+      "http://media/three.mp4",
+    ],
+    videoShuffle: false,
+    videoMuted: true,
+  },
+} as unknown as Tile;
+
+describe("VideoPlayerTile Plex HLS transcode tuning", () => {
+  beforeEach(() => {
+    playlistRef.current = {
+      sample: false,
+      videos: [
+        {
+          id: "movie-1",
+          title: "Transcoded Movie",
+          streamUrl:
+            "http://plex.local:32400/video/:/transcode/universal/start.m3u8?protocol=hls",
+        },
+      ],
+    };
+  });
+
+  it("attaches hls.js to the Plex transcode playlist", async () => {
+    render(<VideoPlayerTile tile={PLEX_HLS_TILE} editMode={false} />);
+    await waitFor(() => expect(hlsInstances.length).toBe(1));
+    expect(hlsInstances[0]!.loadedUrl).toContain(
+      "/video/:/transcode/universal/start.m3u8",
+    );
+  });
+
+  it("clears the Tuning state when the transcode buffers a fragment", async () => {
+    render(<VideoPlayerTile tile={PLEX_HLS_TILE} editMode={false} />);
+    await waitFor(() => expect(hlsInstances.length).toBe(1));
+    const hls = hlsInstances[0]!;
+    // A recoverable blip mid-tune shows the "Tuning…" badge…
+    emitFatal(hls, MockHls.ErrorTypes.NETWORK_ERROR);
+    expect(
+      screen.getByTestId("videoplayer-reconnecting-badge").textContent,
+    ).toContain("Tuning");
+    // …and the first buffered fragment clears it (Plex, not just ErsatzTV).
+    act(() => {
+      hls.emit(MockHls.Events.FRAG_BUFFERED);
+    });
+    expect(screen.queryByTestId("videoplayer-reconnecting-badge")).toBeNull();
+    expect(screen.queryByTestId("videoplayer-error")).toBeNull();
+  });
+
+  it("clears the Tuning state on a plain video-element playback signal", async () => {
+    render(<VideoPlayerTile tile={PLEX_HLS_TILE} editMode={false} />);
+    await waitFor(() => expect(hlsInstances.length).toBe(1));
+    emitFatal(hlsInstances[0]!, MockHls.ErrorTypes.NETWORK_ERROR);
+    expect(
+      screen.getByTestId("videoplayer-reconnecting-badge").textContent,
+    ).toContain("Tuning");
+    // The element decodes its first frame — a success signal that is not an
+    // ErsatzTV-oriented hls.js event.
+    act(() => {
+      document.querySelector("video")!.dispatchEvent(new Event("loadeddata"));
+    });
+    expect(screen.queryByTestId("videoplayer-reconnecting-badge")).toBeNull();
+  });
+
+  it("surfaces an explicit error when the transcode keeps failing instead of spinning forever", async () => {
+    vi.useFakeTimers();
+    try {
+      render(<VideoPlayerTile tile={PLEX_HLS_TILE} editMode={false} />);
+      await act(async () => {});
+      expect(hlsInstances.length).toBe(1);
+
+      // Plex gets NO ErsatzTV-style unlimited tune-in grace: each instance
+      // exhausts its in-instance budget, then only 3 bounded auto-reattaches
+      // happen before the error state appears — no endless "Tuning…".
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const hls = hlsInstances[hlsInstances.length - 1]!;
+        for (let i = 0; i < 4; i++) {
+          emitFatal(hls, MockHls.ErrorTypes.NETWORK_ERROR);
+        }
+        expect(screen.queryByTestId("videoplayer-error")).toBeNull();
+        await act(async () => {
+          vi.advanceTimersByTime(4_000);
+        });
+        await act(async () => {});
+        expect(hlsInstances.length).toBe(attempt + 2);
+      }
+      const last = hlsInstances[hlsInstances.length - 1]!;
+      for (let i = 0; i < 4; i++) {
+        emitFatal(last, MockHls.ErrorTypes.NETWORK_ERROR);
+      }
+      expect(screen.getByTestId("videoplayer-error")).toBeTruthy();
+      expect(screen.getByTestId("videoplayer-retry")).toBeTruthy();
+      // And it stays failed — no further quiet reattach loop.
+      await act(async () => {
+        vi.advanceTimersByTime(60_000);
+      });
+      expect(hlsInstances.length).toBe(4);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe("VideoPlayerTile play-from-beginning", () => {
+  function videoId(): string | null {
+    return (
+      document.querySelector("video")?.getAttribute("data-video-id") ?? null
+    );
+  }
+
+  it("replays the CURRENT video from 0:00 instead of jumping to the first item", async () => {
+    render(<VideoPlayerTile tile={URLS_TILE} editMode={false} />);
+    expect(videoId()).toBe("urls-0");
+
+    // Advance to the second entry, simulate some progress.
+    fireEvent.click(screen.getByTestId("videoplayer-next"));
+    expect(videoId()).toBe("urls-1");
+    const video = document.querySelector("video")!;
+    video.currentTime = 42;
+
+    fireEvent.click(screen.getByTestId("videoplayer-restart"));
+    // Still the same (second) video, rewound to the start.
+    expect(videoId()).toBe("urls-1");
+    expect(video.currentTime).toBe(0);
+    expect(screen.getByTestId("videoplayer-time-current").textContent).toBe(
+      "0:00",
+    );
+  });
+});
+
+describe("VideoPlayerTile mute persistence across video changes", () => {
+  it("keeps the player unmuted when skipping to the next/previous video", async () => {
+    render(<VideoPlayerTile tile={URLS_TILE} editMode={false} />);
+    const video = () => document.querySelector("video")!;
+    expect(video().muted).toBe(true); // start-muted default applies on load
+
+    fireEvent.click(screen.getByTestId("videoplayer-mute"));
+    expect(video().muted).toBe(false);
+
+    fireEvent.click(screen.getByTestId("videoplayer-next"));
+    expect(video().muted).toBe(false);
+    fireEvent.click(screen.getByTestId("videoplayer-prev"));
+    expect(video().muted).toBe(false);
+  });
+
+  it("keeps the user's mute state when picking a video via the Plex browser", async () => {
+    playlistRef.current = {
+      sample: false,
+      videos: [
+        { id: "lib-1", title: "Library Movie", streamUrl: "http://plex/lib1.mp4" },
+      ],
+    };
+    render(<VideoPlayerTile tile={PLEX_HLS_TILE} editMode={false} />);
+    await waitFor(() => expect(document.querySelector("video")).toBeTruthy());
+    const video = () => document.querySelector("video")!;
+
+    // Unmute, then hand a new queue over from the browser.
+    fireEvent.click(screen.getByTestId("videoplayer-mute"));
+    expect(video().muted).toBe(false);
+
+    fireEvent.click(screen.getByTestId("videoplayer-playlist-toggle"));
+    await waitFor(() =>
+      expect(screen.getByTestId("mock-browser-play")).toBeTruthy(),
+    );
+    fireEvent.click(screen.getByTestId("mock-browser-play"));
+    await waitFor(() =>
+      expect(video().getAttribute("data-video-id")).toBe("picked-1"),
+    );
+    // The selection did NOT reset the player back to the start-muted default.
+    expect(video().muted).toBe(false);
   });
 });

@@ -2482,6 +2482,12 @@ export function plexVideoStreamUrl(
     session: `tachboard-video-${ratingKey}`,
     "X-Plex-Client-Identifier": "tachboard-videoplayer",
     "X-Plex-Product": "Tachboard",
+    // Without a platform the transcoder has no client profile to decide
+    // what the player can handle and the HLS session can refuse to start
+    // (or direct-stream audio the browser can't decode). "Chrome" selects
+    // Plex's standard web profile: H.264 video + AAC audio.
+    "X-Plex-Platform": "Chrome",
+    "X-Plex-Device-Name": "Tachboard",
     "X-Plex-Token": token,
   });
   return `${baseUrl}/video/:/transcode/universal/start.m3u8?${params.toString()}`;
