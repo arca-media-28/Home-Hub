@@ -377,6 +377,86 @@ describe("GET /api/widgets/videoplayer/browse", () => {
     expect(res.body.videos).toEqual([]);
   });
 
+  it("pages Plex results and reports nextOffset/total when truncated", async () => {
+    findByService.mockImplementation((_userId: number, service: string) =>
+      service === "plex" ? plexRow : undefined,
+    );
+    httpGet.mockResolvedValue({
+      data: {
+        MediaContainer: {
+          totalSize: 500,
+          Metadata: Array.from({ length: 200 }, (_, i) => ({
+            ratingKey: i,
+            title: `Show ${i}`,
+            type: "show",
+          })),
+        },
+      },
+    });
+    const res = await request(makeApp()).get(
+      "/api/widgets/videoplayer/browse?server=plex&kind=shows&libraryId=2&offset=200",
+    );
+    expect(res.status).toBe(200);
+    expect(httpGet.mock.calls[0]![1]).toMatchObject({
+      params: {
+        "X-Plex-Container-Start": "200",
+        "X-Plex-Container-Size": "200",
+      },
+    });
+    expect(res.body.total).toBe(500);
+    expect(res.body.nextOffset).toBe(400);
+    expect(res.body.containers).toHaveLength(200);
+  });
+
+  it("pages Jellyfin results via StartIndex and reports nextOffset/total", async () => {
+    findByService.mockImplementation((_userId: number, service: string) =>
+      service === "jellyfin" ? jellyfinRow : undefined,
+    );
+    httpGet.mockResolvedValue({
+      data: {
+        TotalRecordCount: 450,
+        Items: Array.from({ length: 200 }, (_, i) => ({
+          Id: `m${i}`,
+          Name: `Movie ${i}`,
+          Type: "Movie",
+        })),
+      },
+    });
+    const res = await request(makeApp()).get(
+      "/api/widgets/videoplayer/browse?server=jellyfin&kind=movies&libraryId=lib1&offset=200",
+    );
+    expect(res.status).toBe(200);
+    expect(httpGet.mock.calls[0]![1]).toMatchObject({
+      params: expect.objectContaining({ StartIndex: "200", Limit: "200" }),
+    });
+    expect(res.body.total).toBe(450);
+    expect(res.body.nextOffset).toBe(400);
+    expect(res.body.videos).toHaveLength(200);
+  });
+
+  it("returns nextOffset null when the Plex level fits in one page", async () => {
+    findByService.mockImplementation((_userId: number, service: string) =>
+      service === "plex" ? plexRow : undefined,
+    );
+    httpGet.mockResolvedValue({
+      data: {
+        MediaContainer: {
+          totalSize: 2,
+          Metadata: [
+            { ratingKey: 1, title: "A", type: "show" },
+            { ratingKey: 2, title: "B", type: "show" },
+          ],
+        },
+      },
+    });
+    const res = await request(makeApp()).get(
+      "/api/widgets/videoplayer/browse?server=plex&kind=shows&libraryId=2",
+    );
+    expect(res.status).toBe(200);
+    expect(res.body.nextOffset).toBeNull();
+    expect(res.body.total).toBe(2);
+  });
+
   it("returns 502 when a configured Plex fails (never sample fallback)", async () => {
     findByService.mockImplementation((_userId: number, service: string) =>
       service === "plex" ? plexRow : undefined,

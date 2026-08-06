@@ -25,4 +25,9 @@ libraryId?: string;
  * The container id (show or season ratingKey) to drill into. Required for kind=seasons, kind=episodes, and kind=show_episodes.
  */
 id?: string;
+/**
+ * Zero-based index of the first item to return within the level. Each response returns at most one page of items; when more remain, nextOffset carries the offset to request the following page. Defaults to 0.
+ * @minimum 0
+ */
+offset?: number;
 };

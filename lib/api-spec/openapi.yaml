@@ -1255,6 +1255,17 @@ paths:
             Required for kind=seasons, kind=episodes, and kind=show_episodes.
           schema:
             type: string
+        - name: offset
+          in: query
+          required: false
+          description: >-
+            Zero-based index of the first item to return within the level.
+            Each response returns at most one page of items; when more remain,
+            nextOffset carries the offset to request the following page.
+            Defaults to 0.
+          schema:
+            type: integer
+            minimum: 0
       responses:
         "200":
           description: >-
@@ -5747,6 +5758,17 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/VideoItem"
+        nextOffset:
+          description: >-
+            When the level has more items than this page returned, the offset
+            to pass to fetch the next page. Null/absent when the listing is
+            complete.
+          type: [integer, "null"]
+        total:
+          description: >-
+            Total number of items in the level when the media server reports
+            it. Null/absent when unknown.
+          type: [integer, "null"]
 
     AudioTrack:
       type: object

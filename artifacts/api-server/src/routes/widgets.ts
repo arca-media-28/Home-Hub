@@ -2472,6 +2472,11 @@ router.get("/videoplayer/browse", requireAuth, async (req: AuthRequest, res) => 
     res.status(400).json({ error: `kind=${kind} requires an id` });
     return;
   }
+  // Zero-based index of the first item to return: each response is one page of
+  // at most VIDEO_PLAYLIST_LIMIT items; nextOffset tells the client where the
+  // following page starts (null when the listing is complete).
+  const rawOffset = Number(req.query["offset"] ?? 0);
+  const offset = Number.isFinite(rawOffset) && rawOffset > 0 ? Math.floor(rawOffset) : 0;
 
   if (server === "jellyfin") {
     // Jellyfin drill-down via the Items API. Containers (Series/Season) come
@@ -2493,6 +2498,7 @@ router.get("/videoplayer/browse", requireAuth, async (req: AuthRequest, res) => 
       const params: Record<string, string> = {
         api_key: apiKey,
         Limit: String(VIDEO_PLAYLIST_LIMIT),
+        StartIndex: String(offset),
       };
       if (kind === "shows") {
         params["ParentId"] = libraryId;
@@ -2524,6 +2530,18 @@ router.get("/videoplayer/browse", requireAuth, async (req: AuthRequest, res) => 
         params["SortBy"] = "ParentIndexNumber,IndexNumber,SortName";
       }
       const r = await httpClient.get(`${baseUrl}/Items`, { params });
+      // Jellyfin reports the level's full size; page forward until exhausted.
+      const totalRecords = r.data?.TotalRecordCount;
+      const total = typeof totalRecords === "number" ? totalRecords : null;
+      const rawCount = (r.data?.Items ?? []).length as number;
+      const nextOffset =
+        total != null
+          ? offset + rawCount < total
+            ? offset + rawCount
+            : null
+          : rawCount >= VIDEO_PLAYLIST_LIMIT
+            ? offset + rawCount
+            : null;
       const items = (r.data?.Items ?? []) as Array<{
         Id?: string;
         Name?: string;
@@ -2546,7 +2564,7 @@ router.get("/videoplayer/browse", requireAuth, async (req: AuthRequest, res) => 
               typeof i.RunTimeTicks === "number" ? Math.round(i.RunTimeTicks / 10000) : null,
             thumb: thumbUrl(i),
           }));
-        res.json({ sample: false, videos });
+        res.json({ sample: false, videos, nextOffset, total });
         return;
       }
       if (kind === "shows" || kind === "seasons") {
@@ -2568,7 +2586,7 @@ router.get("/videoplayer/browse", requireAuth, async (req: AuthRequest, res) => 
               thumb: thumbUrl(i),
             };
           });
-        res.json({ sample: false, containers });
+        res.json({ sample: false, containers, nextOffset, total });
         return;
       }
       // episodes / show_episodes → playable videos.
@@ -2585,7 +2603,7 @@ router.get("/videoplayer/browse", requireAuth, async (req: AuthRequest, res) => 
             thumb: thumbUrl(i),
           };
         });
-      res.json({ sample: false, videos });
+      res.json({ sample: false, videos, nextOffset, total });
     } catch (err) {
       logger.error({ reason: describeHttpError(err) }, "Jellyfin video browse error");
       res.status(502).json({ error: "Failed to browse videos from Jellyfin" });
@@ -2614,8 +2632,28 @@ router.get("/videoplayer/browse", requireAuth, async (req: AuthRequest, res) => 
           : `/library/metadata/${encodeURIComponent(id)}/children`;
     const r = await httpClient.get(`${baseUrl}${path}`, {
       headers: { "X-Plex-Token": token, Accept: "application/json" },
+      // Plex server-side paging: return one window of the listing. totalSize
+      // in the response carries the full level size for nextOffset math.
+      params: {
+        "X-Plex-Container-Start": String(offset),
+        "X-Plex-Container-Size": String(VIDEO_PLAYLIST_LIMIT),
+      },
     });
-    const rows = (r.data?.MediaContainer?.Metadata ?? []) as Array<{
+    const container = r.data?.MediaContainer as
+      | { totalSize?: number; size?: number }
+      | undefined;
+    const rawRows = (r.data?.MediaContainer?.Metadata ?? []) as unknown[];
+    const total =
+      typeof container?.totalSize === "number" ? container.totalSize : null;
+    const nextOffset =
+      total != null
+        ? offset + rawRows.length < total
+          ? offset + rawRows.length
+          : null
+        : rawRows.length >= VIDEO_PLAYLIST_LIMIT
+          ? offset + rawRows.length
+          : null;
+    const rows = rawRows as Array<{
       ratingKey?: string | number;
       title?: string;
       grandparentTitle?: string;
@@ -2651,7 +2689,7 @@ router.get("/videoplayer/browse", requireAuth, async (req: AuthRequest, res) => 
             thumb: thumbUrl(m.thumb),
           };
         });
-      res.json({ sample: false, containers });
+      res.json({ sample: false, containers, nextOffset, total });
       return;
     }
     // movies / episodes / show_episodes → playable videos (movies keep
@@ -2672,7 +2710,7 @@ router.get("/videoplayer/browse", requireAuth, async (req: AuthRequest, res) => 
         };
       })
       .filter((v): v is NonNullable<typeof v> => v !== null);
-    res.json({ sample: false, videos });
+    res.json({ sample: false, videos, nextOffset, total });
   } catch (err) {
     logger.error({ reason: describeHttpError(err) }, "Plex video browse error");
     res.status(502).json({ error: "Failed to browse videos from Plex" });

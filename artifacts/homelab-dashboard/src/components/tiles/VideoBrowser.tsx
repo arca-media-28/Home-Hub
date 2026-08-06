@@ -41,6 +41,10 @@ interface PaneState {
   sample: boolean;
   containers?: VideoContainer[];
   videos?: VideoItem[];
+  // Offset of the next page when the level has more items than are loaded;
+  // null when everything is loaded. `total` is the server-reported level size.
+  nextOffset?: number | null;
+  total?: number | null;
 }
 
 // Poster card art with a glyph fallback when no thumb exists.
@@ -110,13 +114,19 @@ export default function VideoBrowser({
   const [search, setSearch] = useState("");
 
   const fetchLevel = useCallback(
-    async (level: Level): Promise<PaneState> => {
+    async (level: Level, offset = 0): Promise<PaneState> => {
       const r = await browseVideoLibrary(
         level.type === "shows" || level.type === "movies"
-          ? { server, kind: level.type, libraryId: level.libraryId }
-          : { server, kind: level.type, id: level.id },
+          ? { server, kind: level.type, libraryId: level.libraryId, offset }
+          : { server, kind: level.type, id: level.id, offset },
       );
-      return { sample: r.sample, containers: r.containers, videos: r.videos };
+      return {
+        sample: r.sample,
+        containers: r.containers,
+        videos: r.videos,
+        nextOffset: r.nextOffset ?? null,
+        total: r.total ?? null,
+      };
     },
     [server],
   );
@@ -190,6 +200,35 @@ export default function VideoBrowser({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, server]);
 
+  // Append the next page of the current level to what's already loaded.
+  const [moreLoading, setMoreLoading] = useState(false);
+  const loadMore = useCallback(async () => {
+    const level = stack[stack.length - 1];
+    const from = pane?.nextOffset;
+    if (!level || from == null || moreLoading) return;
+    setMoreLoading(true);
+    try {
+      const next = await fetchLevel(level, from);
+      setPane((prev) => ({
+        sample: (prev?.sample ?? false) || next.sample,
+        containers:
+          prev?.containers || next.containers
+            ? [...(prev?.containers ?? []), ...(next.containers ?? [])]
+            : undefined,
+        videos:
+          prev?.videos || next.videos
+            ? [...(prev?.videos ?? []), ...(next.videos ?? [])]
+            : undefined,
+        nextOffset: next.nextOffset ?? null,
+        total: next.total ?? prev?.total ?? null,
+      }));
+    } catch {
+      setPaneError(true);
+    } finally {
+      setMoreLoading(false);
+    }
+  }, [stack, pane, moreLoading, fetchLevel]);
+
   const push = (level: Level) => void loadStack([...stack, level]);
   const goBack = () => void loadStack(stack.slice(0, -1));
 
@@ -212,12 +251,15 @@ export default function VideoBrowser({
     setBusyId(c.id);
     setPaneError(false);
     try {
-      const r = await browseVideoLibrary({
-        server,
-        kind: c.kind === "show" ? "show_episodes" : "episodes",
-        id: c.id,
-      });
-      const vids = r.videos ?? [];
+      // Queue the whole container, following pagination so long shows aren't
+      // cut off at the first page (bounded to avoid runaway loops).
+      const kind = c.kind === "show" ? ("show_episodes" as const) : ("episodes" as const);
+      let r = await browseVideoLibrary({ server, kind, id: c.id });
+      const vids = [...(r.videos ?? [])];
+      for (let guard = 0; r.nextOffset != null && guard < 25; guard++) {
+        r = await browseVideoLibrary({ server, kind, id: c.id, offset: r.nextOffset });
+        vids.push(...(r.videos ?? []));
+      }
       if (!r.sample && vids.length > 0) {
         playVideos(vids, 0);
       } else {
@@ -535,6 +577,30 @@ export default function VideoBrowser({
                       )}
                     </button>
                   ))}
+                </div>
+              )}
+
+              {/* Truncation notice + load-more affordance when the level has
+                  more items than are loaded so far. */}
+              {!paneLoading && !paneError && pane?.nextOffset != null && (
+                <div
+                  className="mt-3 flex flex-col items-center gap-1.5 pb-1"
+                  data-testid="videoplayer-browser-more"
+                >
+                  <div className="text-xs text-muted-foreground">
+                    Showing {allContainers.length + allVideos.length}
+                    {pane.total != null ? ` of ${pane.total}` : ""} items
+                    {query ? " — search only covers what’s loaded" : ""}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void loadMore()}
+                    disabled={moreLoading}
+                    data-testid="videoplayer-browser-load-more"
+                    className="rounded-md border border-border/60 bg-muted/40 px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted/70 disabled:opacity-60"
+                  >
+                    {moreLoading ? "Loading…" : "Load more"}
+                  </button>
                 </div>
               )}
             </div>

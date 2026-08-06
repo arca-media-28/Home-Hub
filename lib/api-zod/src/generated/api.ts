@@ -3026,11 +3026,16 @@ export const GetVideoPlaylistResponse = zod.object({
 /**
  * @summary Drill into a Plex or Jellyfin video library (shows → seasons → episodes)
  */
+export const browseVideoLibraryQueryOffsetMin = 0;
+
+
+
 export const BrowseVideoLibraryQueryParams = zod.object({
   "server": zod.enum(['plex', 'jellyfin']).describe('Which media server to browse. \"plex\" and \"jellyfin\" support video drill-down; other sources use the flat playlist endpoint.'),
   "kind": zod.enum(['shows', 'movies', 'seasons', 'episodes', 'show_episodes']).describe('What to list. \"shows\" lists a TV library\'s shows (requires libraryId); \"movies\" lists a movie library\'s playable movies with posters (requires libraryId); \"seasons\" lists a show\'s seasons (requires id); \"episodes\" lists a season\'s playable episodes (requires id); \"show_episodes\" lists every playable episode of a show in order (requires id), used to queue a whole show.'),
   "libraryId": zod.coerce.string().optional().describe('The library section to list shows from. Required for kind=shows.'),
-  "id": zod.coerce.string().optional().describe('The container id (show or season ratingKey) to drill into. Required for kind=seasons, kind=episodes, and kind=show_episodes.')
+  "id": zod.coerce.string().optional().describe('The container id (show or season ratingKey) to drill into. Required for kind=seasons, kind=episodes, and kind=show_episodes.'),
+  "offset": zod.coerce.number().min(browseVideoLibraryQueryOffsetMin).optional().describe('Zero-based index of the first item to return within the level. Each response returns at most one page of items; when more remain, nextOffset carries the offset to request the following page. Defaults to 0.')
 })
 
 export const BrowseVideoLibraryResponse = zod.object({
@@ -3048,7 +3053,9 @@ export const BrowseVideoLibraryResponse = zod.object({
   "streamUrl": zod.string().describe('A direct-play URL the browser\'s <video> element can load. Carries the media server\'s own auth token as a query parameter.'),
   "durationMs": zod.number().nullish().describe('Runtime in milliseconds when known.'),
   "thumb": zod.string().nullish().describe('Fully-qualified, authenticated poster\/thumbnail URL the browser can load directly. Only populated by the browse endpoint; null or absent when unavailable.')
-})).optional().describe('Playable episodes with direct-play stream URLs. Absent when the request returned containers instead.')
+})).optional().describe('Playable episodes with direct-play stream URLs. Absent when the request returned containers instead.'),
+  "nextOffset": zod.number().nullish().describe('When the level has more items than this page returned, the offset to pass to fetch the next page. Null\/absent when the listing is complete.'),
+  "total": zod.number().nullish().describe('Total number of items in the level when the media server reports it. Null\/absent when unknown.')
 })
 
 

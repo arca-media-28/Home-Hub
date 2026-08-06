@@ -15,4 +15,14 @@ export interface VideoBrowseResult {
   containers?: VideoContainer[];
   /** Playable episodes with direct-play stream URLs. Absent when the request returned containers instead. */
   videos?: VideoItem[];
+  /**
+     * When the level has more items than this page returned, the offset to pass to fetch the next page. Null/absent when the listing is complete.
+     * @nullable
+     */
+  nextOffset?: number | null;
+  /**
+     * Total number of items in the level when the media server reports it. Null/absent when unknown.
+     * @nullable
+     */
+  total?: number | null;
 }
