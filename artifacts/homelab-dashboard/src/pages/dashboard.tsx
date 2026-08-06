@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect, useLayoutEffect } from "react";
+import { TachLogo } from "@/components/TachLogo";
 import { useLocation } from "wouter";
 import GridLayout from "react-grid-layout";
 import "react-grid-layout/css/styles.css";
@@ -68,7 +69,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import {
   LayoutGrid,
-  Boxes,
   Plus,
   LogOut,
   Lock,
@@ -1250,7 +1250,7 @@ export default function Dashboard() {
       <header className="sticky top-0 z-30 border-b border-border bg-background/80 backdrop-blur-sm">
         <div className="max-w-screen-2xl mx-auto px-4 h-14 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
-            <Boxes className="w-5 h-5 text-primary" />
+            <TachLogo className="w-5 h-5 text-primary" />
             <span className="font-bold text-sm uppercase tracking-widest text-foreground">
               Tachboard
             </span>

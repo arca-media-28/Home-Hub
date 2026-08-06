@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { useLocation, Link } from "wouter";
 import { useRegister } from "@workspace/api-client-react";
+import { TachLogo } from "@/components/TachLogo";
 import { useToast } from "@/hooks/use-toast";
-import { Boxes, User, Lock, ChevronRight } from "lucide-react";
+import { User, Lock, ChevronRight } from "lucide-react";
 
 export default function Register() {
   const [, setLocation] = useLocation();
@@ -39,7 +40,7 @@ export default function Register() {
 
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-2">
-            <Boxes className="w-5 h-5 text-primary" />
+            <TachLogo className="w-5 h-5 text-primary" />
             <h1 className="text-xl font-bold text-foreground uppercase tracking-widest">
               Create an account
             </h1>

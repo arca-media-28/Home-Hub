@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { TachLogo } from "@/components/TachLogo";
 import { useLocation } from "wouter";
 import {
   useGetMe,
@@ -59,7 +60,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  Boxes,
   ArrowLeft,
   Loader2,
   Check,
@@ -2915,7 +2915,7 @@ export default function Settings() {
       <header className="sticky top-0 z-30 border-b border-border bg-background/80 backdrop-blur-sm">
         <div className="max-w-screen-md mx-auto px-4 h-14 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
-            <Boxes className="w-5 h-5 text-primary" />
+            <TachLogo className="w-5 h-5 text-primary" />
             <span className="font-bold text-sm uppercase tracking-widest text-foreground">
               Settings
             </span>
