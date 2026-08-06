@@ -2493,7 +2493,18 @@ export function plexVideoStreamUrl(
 // episode queue (Plex allLeaves; Jellyfin recursive episode query). Movie
 // libraries keep using the flat /videoplayer playlist endpoint, so no
 // artificial empty levels exist here. Supports Plex and Jellyfin.
-const VIDEO_BROWSE_KINDS = ["shows", "movies", "seasons", "episodes", "show_episodes"];
+const VIDEO_BROWSE_KINDS = [
+  "shows",
+  "movies",
+  "seasons",
+  "episodes",
+  "show_episodes",
+  "recently_added",
+  "continue_watching",
+];
+// Server-level home categories — Plex-only (backed by /library/recentlyAdded
+// and /library/onDeck); Jellyfin equivalents are future work.
+const VIDEO_BROWSE_PLEX_ONLY_KINDS = ["recently_added", "continue_watching"];
 const VIDEO_BROWSE_KINDS_NEEDING_ID = ["seasons", "episodes", "show_episodes"];
 const VIDEO_BROWSE_KINDS_NEEDING_LIBRARY = ["shows", "movies"];
 
@@ -2516,6 +2527,10 @@ router.get("/videoplayer/browse", requireAuth, async (req: AuthRequest, res) => 
   }
   if (VIDEO_BROWSE_KINDS_NEEDING_ID.includes(kind) && !id) {
     res.status(400).json({ error: `kind=${kind} requires an id` });
+    return;
+  }
+  if (VIDEO_BROWSE_PLEX_ONLY_KINDS.includes(kind) && server !== "plex") {
+    res.status(400).json({ error: `kind=${kind} is only supported for Plex` });
     return;
   }
   // Zero-based index of the first item to return: each response is one page of
@@ -2671,11 +2686,15 @@ router.get("/videoplayer/browse", requireAuth, async (req: AuthRequest, res) => 
       : null;
   try {
     const path =
-      kind === "shows" || kind === "movies"
-        ? `/library/sections/${encodeURIComponent(libraryId)}/all`
-        : kind === "show_episodes"
-          ? `/library/metadata/${encodeURIComponent(id)}/allLeaves`
-          : `/library/metadata/${encodeURIComponent(id)}/children`;
+      kind === "recently_added"
+        ? "/library/recentlyAdded"
+        : kind === "continue_watching"
+          ? "/library/onDeck"
+          : kind === "shows" || kind === "movies"
+            ? `/library/sections/${encodeURIComponent(libraryId)}/all`
+            : kind === "show_episodes"
+              ? `/library/metadata/${encodeURIComponent(id)}/allLeaves`
+              : `/library/metadata/${encodeURIComponent(id)}/children`;
     const r = await httpClient.get(`${baseUrl}${path}`, {
       headers: { "X-Plex-Token": token, Accept: "application/json" },
       // Plex server-side paging: return one window of the listing. totalSize
@@ -2713,6 +2732,61 @@ router.get("/videoplayer/browse", requireAuth, async (req: AuthRequest, res) => 
       duration?: number;
       Media?: PlexVideoMedia[];
     }>;
+    if (kind === "recently_added" || kind === "continue_watching") {
+      // Home categories return MIXED rows: playable episodes/movies plus
+      // show/season containers (Recently Added surfaces whole seasons).
+      // Playable rows become videos with their show context in the title;
+      // container rows keep drill-in behaviour via the existing grid.
+      const containers: Array<{
+        id: string;
+        kind: string;
+        title: string;
+        subtitle: string | null;
+        thumb: string | null;
+      }> = [];
+      const videos: Array<{
+        id: string;
+        title: string;
+        streamUrl: string;
+        durationMs: number | null;
+        thumb: string | null;
+      }> = [];
+      for (const m of rows.slice(0, VIDEO_PLAYLIST_LIMIT)) {
+        const ratingKey = String(m.ratingKey ?? "");
+        if (m.type === "episode" || m.type === "movie") {
+          const streamUrl = plexVideoStreamUrl(baseUrl, token, ratingKey, m.Media?.[0]);
+          if (!streamUrl) continue;
+          const context =
+            m.type === "episode" && m.grandparentTitle ? `${m.grandparentTitle} · ` : "";
+          const prefix =
+            m.type === "episode" && typeof m.index === "number" ? `${m.index}. ` : "";
+          videos.push({
+            id: ratingKey,
+            title: `${context}${prefix}${m.title ?? "Untitled"}`,
+            streamUrl,
+            durationMs: typeof m.duration === "number" ? m.duration : null,
+            thumb: thumbUrl(m.thumb),
+          });
+        } else if (m.type === "show" || m.type === "season") {
+          const count = m.leafCount ?? m.childCount;
+          const parts = [
+            m.type === "season" ? (m.parentTitle ?? null) : m.year ? String(m.year) : null,
+            typeof count === "number"
+              ? `${count} episode${count === 1 ? "" : "s"}`
+              : null,
+          ].filter(Boolean);
+          containers.push({
+            id: String(m.ratingKey ?? ""),
+            kind: m.type,
+            title: m.title ?? "Untitled",
+            subtitle: parts.length > 0 ? parts.join(" · ") : null,
+            thumb: thumbUrl(m.thumb),
+          });
+        }
+      }
+      res.json({ sample: false, containers, videos, nextOffset, total });
+      return;
+    }
     if (kind === "shows" || kind === "seasons") {
       const containers = rows
         // Plex season listings can include an "All episodes" pseudo-entry

@@ -35,7 +35,16 @@ type Level =
   | { type: "shows"; libraryId: string; title: string }
   | { type: "movies"; libraryId: string; title: string }
   | { type: "seasons"; id: string; title: string }
-  | { type: "episodes"; id: string; title: string };
+  | { type: "episodes"; id: string; title: string }
+  // Plex-only server-level home categories (no library/id).
+  | { type: "recently_added"; title: string }
+  | { type: "continue_watching"; title: string };
+
+// Sidebar entries for the Plex home categories, pinned above the libraries.
+const PLEX_CATEGORIES = [
+  { kind: "continue_watching", title: "Continue Watching" },
+  { kind: "recently_added", title: "Recently Added" },
+] as const;
 
 interface PaneState {
   sample: boolean;
@@ -118,7 +127,9 @@ export default function VideoBrowser({
       const r = await browseVideoLibrary(
         level.type === "shows" || level.type === "movies"
           ? { server, kind: level.type, libraryId: level.libraryId, offset }
-          : { server, kind: level.type, id: level.id, offset },
+          : level.type === "recently_added" || level.type === "continue_watching"
+            ? { server, kind: level.type, offset }
+            : { server, kind: level.type, id: level.id, offset },
       );
       return {
         sample: r.sample,
@@ -155,6 +166,14 @@ export default function VideoBrowser({
       }
     },
     [fetchLevel],
+  );
+
+  const openCategory = useCallback(
+    (cat: (typeof PLEX_CATEGORIES)[number]) => {
+      setActiveLibraryId(`cat:${cat.kind}`);
+      void loadStack([{ type: cat.kind, title: cat.title }]);
+    },
+    [loadStack],
   );
 
   const openLibrary = useCallback(
@@ -309,9 +328,42 @@ export default function VideoBrowser({
         <div className="flex min-h-0 flex-1">
           {/* ── Sidebar: libraries ─────────────────────────────────────── */}
           <div className="flex w-44 flex-shrink-0 flex-col gap-0.5 overflow-y-auto border-r border-border/60 bg-muted/30 p-2 sm:w-52">
-            <div className="px-1.5 pb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-              Libraries
-            </div>
+            {server === "plex" && (
+              <>
+                <div className="px-1.5 pb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                  Home
+                </div>
+                {PLEX_CATEGORIES.map((cat) => (
+                  <button
+                    key={cat.kind}
+                    type="button"
+                    onClick={() => openCategory(cat)}
+                    data-testid={`videoplayer-browser-category-${cat.kind}`}
+                    data-active={activeLibraryId === `cat:${cat.kind}` || undefined}
+                    className={`flex w-full min-w-0 items-center gap-2 rounded-md px-1.5 py-1.5 text-left text-sm transition-colors ${
+                      activeLibraryId === `cat:${cat.kind}`
+                        ? "bg-primary/15 font-medium text-foreground"
+                        : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
+                    }`}
+                  >
+                    {cat.kind === "continue_watching" ? (
+                      <Play size={15} className="flex-shrink-0" aria-hidden="true" />
+                    ) : (
+                      <Clapperboard size={15} className="flex-shrink-0" aria-hidden="true" />
+                    )}
+                    <span className="min-w-0 flex-1 truncate">{cat.title}</span>
+                  </button>
+                ))}
+                <div className="px-1.5 pb-1 pt-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                  Libraries
+                </div>
+              </>
+            )}
+            {server !== "plex" && (
+              <div className="px-1.5 pb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                Libraries
+              </div>
+            )}
             {librariesLoading && (
               <div className="px-1.5 py-2 text-xs text-muted-foreground">Loading…</div>
             )}

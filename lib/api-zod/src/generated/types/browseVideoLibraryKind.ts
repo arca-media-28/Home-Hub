@@ -15,4 +15,6 @@ export const BrowseVideoLibraryKind = {
   seasons: 'seasons',
   episodes: 'episodes',
   show_episodes: 'show_episodes',
+  recently_added: 'recently_added',
+  continue_watching: 'continue_watching',
 } as const;

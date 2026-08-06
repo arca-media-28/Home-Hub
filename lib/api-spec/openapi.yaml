@@ -1237,10 +1237,13 @@ paths:
             posters (requires libraryId); "seasons" lists a show's seasons
             (requires id); "episodes" lists a season's playable episodes
             (requires id); "show_episodes" lists every playable episode of a
-            show in order (requires id), used to queue a whole show.
+            show in order (requires id), used to queue a whole show;
+            "recently_added" and "continue_watching" list the server's
+            Recently Added and Continue Watching (On Deck) items (Plex only,
+            no libraryId/id).
           schema:
             type: string
-            enum: [shows, movies, seasons, episodes, show_episodes]
+            enum: [shows, movies, seasons, episodes, show_episodes, recently_added, continue_watching]
         - name: libraryId
           in: query
           required: false

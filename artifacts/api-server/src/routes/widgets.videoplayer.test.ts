@@ -483,6 +483,150 @@ describe("GET /api/widgets/videoplayer/browse", () => {
     expect(res.body.videos).toEqual([]);
   });
 
+  it("rejects home categories for non-Plex servers", async () => {
+    const res = await request(makeApp()).get(
+      "/api/widgets/videoplayer/browse?server=jellyfin&kind=continue_watching",
+    );
+    expect(res.status).toBe(400);
+    const res2 = await request(makeApp()).get(
+      "/api/widgets/videoplayer/browse?server=jellyfin&kind=recently_added",
+    );
+    expect(res2.status).toBe(400);
+  });
+
+  it("returns sample for home categories when Plex is not connected", async () => {
+    const res = await request(makeApp()).get(
+      "/api/widgets/videoplayer/browse?server=plex&kind=continue_watching",
+    );
+    expect(res.status).toBe(200);
+    expect(res.body.sample).toBe(true);
+    expect(httpGet).not.toHaveBeenCalled();
+  });
+
+  it("lists Continue Watching (On Deck) episodes with show context", async () => {
+    findByService.mockImplementation((_userId: number, service: string) =>
+      service === "plex" ? plexRow : undefined,
+    );
+    httpGet.mockResolvedValue({
+      data: {
+        MediaContainer: {
+          Metadata: [
+            {
+              ratingKey: 50,
+              title: "The One Where",
+              type: "episode",
+              index: 3,
+              grandparentTitle: "Friends",
+              duration: 1500000,
+              thumb: "/library/metadata/50/thumb/1",
+              Media: [{ Part: [{ key: "/library/parts/50/ep.mkv" }] }],
+            },
+            // No playable part → dropped.
+            { ratingKey: 51, title: "Broken", type: "episode" },
+          ],
+        },
+      },
+    });
+    const res = await request(makeApp()).get(
+      "/api/widgets/videoplayer/browse?server=plex&kind=continue_watching",
+    );
+    expect(res.status).toBe(200);
+    expect(httpGet.mock.calls[0]![0]).toBe("http://plex.local:32400/library/onDeck");
+    expect(res.body.containers).toEqual([]);
+    expect(res.body.videos).toEqual([
+      {
+        id: "50",
+        title: "Friends · 3. The One Where",
+        streamUrl:
+          "http://plex.local:32400/library/parts/50/ep.mkv?X-Plex-Token=plex-token",
+        durationMs: 1500000,
+        thumb:
+          "http://plex.local:32400/library/metadata/50/thumb/1?X-Plex-Token=plex-token",
+      },
+    ]);
+  });
+
+  it("lists Recently Added as mixed containers and playable videos", async () => {
+    findByService.mockImplementation((_userId: number, service: string) =>
+      service === "plex" ? plexRow : undefined,
+    );
+    httpGet.mockResolvedValue({
+      data: {
+        MediaContainer: {
+          Metadata: [
+            {
+              ratingKey: 60,
+              title: "Season 2",
+              type: "season",
+              parentTitle: "Severance",
+              leafCount: 10,
+              thumb: "/library/metadata/60/thumb/1",
+            },
+            {
+              ratingKey: 61,
+              title: "New Movie",
+              type: "movie",
+              duration: 5400000,
+              Media: [{ Part: [{ key: "/library/parts/61/f.mp4" }] }],
+            },
+            // Unknown row types are dropped, not crashed on.
+            { ratingKey: 62, title: "Stray", type: "album" },
+          ],
+        },
+      },
+    });
+    const res = await request(makeApp()).get(
+      "/api/widgets/videoplayer/browse?server=plex&kind=recently_added",
+    );
+    expect(res.status).toBe(200);
+    expect(httpGet.mock.calls[0]![0]).toBe(
+      "http://plex.local:32400/library/recentlyAdded",
+    );
+    expect(res.body.containers).toEqual([
+      {
+        id: "60",
+        kind: "season",
+        title: "Season 2",
+        subtitle: "Severance · 10 episodes",
+        thumb:
+          "http://plex.local:32400/library/metadata/60/thumb/1?X-Plex-Token=plex-token",
+      },
+    ]);
+    expect(res.body.videos).toEqual([
+      {
+        id: "61",
+        title: "New Movie",
+        streamUrl:
+          "http://plex.local:32400/library/parts/61/f.mp4?X-Plex-Token=plex-token",
+        durationMs: 5400000,
+        thumb: null,
+      },
+    ]);
+  });
+
+  it("returns empty lists when a Plex home category has nothing", async () => {
+    findByService.mockImplementation((_userId: number, service: string) =>
+      service === "plex" ? plexRow : undefined,
+    );
+    httpGet.mockResolvedValue({ data: { MediaContainer: { Metadata: [] } } });
+    const res = await request(makeApp()).get(
+      "/api/widgets/videoplayer/browse?server=plex&kind=recently_added",
+    );
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ sample: false, containers: [], videos: [] });
+  });
+
+  it("returns 502 when a configured Plex fails for a home category", async () => {
+    findByService.mockImplementation((_userId: number, service: string) =>
+      service === "plex" ? plexRow : undefined,
+    );
+    httpGet.mockRejectedValue(new Error("boom"));
+    const res = await request(makeApp()).get(
+      "/api/widgets/videoplayer/browse?server=plex&kind=continue_watching",
+    );
+    expect(res.status).toBe(502);
+  });
+
   it("pages Plex results and reports nextOffset/total when truncated", async () => {
     findByService.mockImplementation((_userId: number, service: string) =>
       service === "plex" ? plexRow : undefined,
