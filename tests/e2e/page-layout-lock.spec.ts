@@ -113,11 +113,10 @@ test("a page can be locked to a fixed scale preset that survives reload and resi
   // viewports — only the scale changed.
   expect(narrow.gridIntrinsicWidth).toBe(wide.gridIntrinsicWidth);
 
-  // --- Portrait must never clip horizontally --------------------------------
-  // Switch the page to portrait. Portrait fits to height, but on a short page
-  // (this seed has a single 4-row tile) the height-fit scale would exceed the
-  // width-fit scale and blow the grid past the viewport. The scale must clamp
-  // to the width so the whole grid stays visible inside the container.
+  // --- Portrait fits to width (never clips horizontally) --------------------
+  // Switch the page to portrait. Portrait, like landscape, scales to fit the
+  // viewport WIDTH — tiles render at their intended size edge-to-edge and the
+  // page scrolls vertically when content extends past the fold.
   await page.setViewportSize({ width: 900, height: 1400 });
   await page.getByRole("button", { name: /^Edit$/ }).click();
   await page.getByRole("button", { name: /1080p/ }).click();
@@ -142,8 +141,10 @@ test("a page can be locked to a fixed scale preset that survives reload and resi
       gridIntrinsicWidth: grid.offsetWidth,
     };
   });
-  // Allow 1px of sub-pixel rounding slack.
+  // Fit-to-width: the scaled grid fills the container width (within 1px of
+  // sub-pixel rounding slack) — no oversized side padding, no horizontal clip.
   expect(portrait.visibleWidth).toBeLessThanOrEqual(portrait.containerWidth + 1);
+  expect(portrait.visibleWidth).toBeGreaterThanOrEqual(portrait.containerWidth - 1);
   // Vertical mode uses its own simplified column tiers shaped by the screen's
   // SHORT side, so the portrait grid's intrinsic width must be substantially
   // narrower than the landscape one (a tall narrow grid, not a squeezed-down
@@ -235,8 +236,8 @@ const coldRefreshScenarios: ColdRefreshScenario[] = [
     preset: /^2K$/,
     viewport: { width: 1920, height: 1080 },
   },
-  // Portrait fixed preset: scale is clamped by width (min of height/width fit),
-  // and the measurement-timing path runs through the portrait branch.
+  // Portrait fixed preset: fits to width like landscape, and the
+  // measurement-timing path runs through the portrait branch.
   {
     name: "1080p portrait",
     preset: /^1080p$/,
@@ -342,3 +343,104 @@ for (const scenario of coldRefreshScenarios) {
     }
   });
 }
+
+// ---------------------------------------------------------------------------
+// Portrait fixed pages fill the width and SCROLL vertically when content
+// extends past one screen height (fold guides are advisory only, never a
+// content ceiling). Previously portrait fit-to-height: tall content shrank the
+// whole grid far below the viewport width, leaving tiny tiles with huge side
+// padding. Guards:
+//   1. A tall portrait page's scaled grid still fills the container width.
+//   2. The reserved page height exceeds the viewport height (the page scrolls
+//      instead of compressing), and the bottom-most tile is reachable by
+//      scrolling — not clipped by the overflow wrapper.
+//   3. A tile placed below the fold persists and renders after a reload.
+// ---------------------------------------------------------------------------
+test("a tall portrait fixed page fills the width and scrolls instead of shrinking", async ({
+  page,
+}) => {
+  const username = `portraitscroll_${rand()}`;
+  const password = `Pw_${rand()}!`;
+
+  const reg = await page.request.post("/api/auth/register", {
+    data: { username, password },
+  });
+  expect(reg.ok(), `register failed: ${reg.status()}`).toBeTruthy();
+  const { token } = (await reg.json()) as { token: string };
+  const authHeaders = { Authorization: `Bearer ${token}` };
+
+  // Seed a tall stack of tiles — far more rows than fit in one viewport
+  // height — including one placed WELL below the fold.
+  for (let row = 0; row < 8; row++) {
+    const res = await page.request.post("/api/tiles", {
+      data: { name: `Row ${row}`, gridX: 0, gridY: row * 4, gridW: 6, gridH: 4 },
+      headers: authHeaders,
+    });
+    expect(res.ok(), `tile create failed: ${res.status()}`).toBeTruthy();
+  }
+
+  await page.addInitScript((t) => {
+    window.localStorage.setItem("token", t as string);
+  }, token);
+
+  await page.setViewportSize({ width: 900, height: 1400 });
+  await page.goto("/");
+  await page.locator(".react-grid-layout").waitFor();
+
+  // Lock to a 1080p portrait fixed preset.
+  await page.getByRole("button", { name: /^Edit$/ }).click();
+  await page.getByRole("button", { name: /Auto \/ responsive/i }).click();
+  await page.getByRole("menuitemradio", { name: /^1080p$/ }).click();
+  await page
+    .getByRole("button", { name: /Vertical|Horizontal|2K|4K|1080p|Compact/ })
+    .click();
+  await page.getByRole("menuitemradio", { name: /Vertical/ }).click();
+  await page.getByRole("button", { name: /^Done$/ }).click();
+  await expect(page.getByTestId("fixed-scale-wrapper")).toBeVisible();
+
+  // Let the ResizeObserver measurement settle, then probe.
+  const probe = () =>
+    page.evaluate(() => {
+      const grid = document.querySelector<HTMLElement>(".react-grid-layout");
+      const wrap = document.querySelector<HTMLElement>(
+        '[data-testid="fixed-scale-wrapper"]',
+      );
+      const outer = wrap?.parentElement as HTMLElement | undefined;
+      if (!grid || !wrap || !outer) throw new Error("grid/wrapper not found");
+      const m = new DOMMatrixReadOnly(getComputedStyle(wrap).transform);
+      return {
+        visibleWidth: grid.offsetWidth * m.a,
+        containerWidth: outer.clientWidth,
+        scaledGridHeight: grid.offsetHeight * m.d,
+        reservedHeight: outer.getBoundingClientRect().height,
+        viewportHeight: window.innerHeight,
+      };
+    });
+  await expect
+    .poll(async () => (await probe()).reservedHeight, { timeout: 10_000 })
+    .toBeGreaterThan(20);
+  const p = await probe();
+
+  // Fit-to-width: the scaled grid fills the container width (±1px slack).
+  expect(p.visibleWidth).toBeGreaterThanOrEqual(p.containerWidth - 1);
+  expect(p.visibleWidth).toBeLessThanOrEqual(p.containerWidth + 1);
+
+  // The page reserves the full scaled content height — taller than the
+  // viewport, so it scrolls — and nothing is clipped at the bottom.
+  expect(p.reservedHeight).toBeGreaterThan(p.viewportHeight);
+  expect(p.reservedHeight).toBeGreaterThanOrEqual(p.scaledGridHeight - 2);
+
+  // The bottom-most tile (seeded below the fold) is present and reachable by
+  // scrolling into view.
+  const bottomTile = page.getByText("Row 7", { exact: false }).first();
+  await bottomTile.scrollIntoViewIfNeeded();
+  await expect(bottomTile).toBeVisible();
+
+  // --- A tile placed below the fold persists across reload ------------------
+  await page.goto("/");
+  await page.locator(".react-grid-layout").waitFor();
+  await expect(page.getByTestId("fixed-scale-wrapper")).toBeVisible();
+  const again = page.getByText("Row 7", { exact: false }).first();
+  await again.scrollIntoViewIfNeeded();
+  await expect(again).toBeVisible();
+});

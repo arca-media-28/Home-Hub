@@ -402,9 +402,6 @@ export default function Dashboard() {
   // column count correct on the very first paint, so saved tile positions are
   // never compacted out of bounds on a hard refresh.
   const [gridWidth, setGridWidth] = useState<number | null>(null);
-  // Available height below the grid container, used to fit-to-height vertical
-  // (portrait) fixed-preset pages. null until measured.
-  const [availHeight, setAvailHeight] = useState<number | null>(null);
   // Pixel offset of the "fold" (viewport bottom) from the grid container's
   // top. Used only for the edit-mode dotted safe-zone guide.
   const [foldOffset, setFoldOffset] = useState<number | null>(null);
@@ -472,17 +469,12 @@ export default function Dashboard() {
     const measure = () => {
       const w = el.clientWidth;
       if (w) setGridWidth(w);
-      // Height from the container's top to the bottom of the viewport, less a
-      // little breathing room. Drives fit-to-height for portrait pages.
-      const top = el.getBoundingClientRect().top;
-      const h = window.innerHeight - top - 24;
-      if (h > 0) setAvailHeight(h);
       // Fold offset within the container: how many pixels from the container's
       // top fit in the viewport without scrolling. Computed against the
       // container's absolute document position so it stays correct even if the
       // user has scrolled when a resize fires. Drives the edit-mode safe-zone
-      // guide line.
-      const absTop = top + window.scrollY;
+      // guide line (purely advisory — content may extend past it and scroll).
+      const absTop = el.getBoundingClientRect().top + window.scrollY;
       const fold = window.innerHeight - absTop;
       setFoldOffset(fold > 0 ? fold : null);
     };
@@ -491,7 +483,7 @@ export default function Dashboard() {
     ro.observe(el);
     // The container's width changes are caught by the ResizeObserver, but a pure
     // viewport-height change (window shorter, no width change) is not — so also
-    // remeasure on window resize for the portrait fit-to-height case.
+    // remeasure on window resize to keep the fold-guide offset current.
     window.addEventListener("resize", measure);
     return () => {
       ro.disconnect();
@@ -797,19 +789,14 @@ export default function Dashboard() {
 
   // The scale factor applied to a fixed grid in locked (non-edit) mode. Edit
   // mode is never scaled so react-grid-layout's pointer math stays correct.
-  // Landscape fits to width. Portrait fits to height but is also clamped by the
-  // width-fit scale (min of the two) so a short page never scales up past the
-  // viewport width and clips horizontally — the grid stays fully visible and
-  // centered. Defaults to 1 until the inputs are known.
-  const widthScale =
-    gridWidth !== null ? gridWidth / intrinsicGridWidth(cols) : 1;
+  // Both orientations fit to width: the grid fills the viewport width at its
+  // intended size and the page scrolls vertically when content extends past
+  // the fold — the fold guide is advisory only, never a content ceiling.
+  // (Portrait used to fit-to-height, which shrank the whole grid whenever
+  // content exceeded one screenful.) Defaults to 1 until the inputs are known.
   const scale =
-    fixedLayout && !editMode
-      ? effOrientation === "portrait"
-        ? availHeight !== null && intrinsicHeight
-          ? Math.min(availHeight / intrinsicHeight, widthScale)
-          : 1
-        : widthScale
+    fixedLayout && !editMode && gridWidth !== null
+      ? gridWidth / intrinsicGridWidth(cols)
       : 1;
 
   const handleLayoutChange = useCallback(
@@ -851,8 +838,8 @@ export default function Dashboard() {
     [editMode, saveLayout, queryClient, tilesQueryKey, activePageId, activeDeviceModeId, activeVariant],
   );
 
-  // Measure the fixed grid's intrinsic (unscaled) height so a portrait page can
-  // be fit to height. offsetHeight (and ResizeObserver's reported size) ignore
+  // Measure the fixed grid's intrinsic (unscaled) height so the locked wrapper
+  // can reserve intrinsicHeight * scale. offsetHeight (and ResizeObserver's reported size) ignore
   // CSS transforms, so the measured height is the true layout height even while
   // a scale is applied — and since scaling only changes the OUTER wrapper, the
   // observed inner element never resizes in response, so there's no feedback
