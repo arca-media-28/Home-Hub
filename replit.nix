@@ -1,5 +1,6 @@
 {pkgs}: {
   deps = [
+    pkgs.systemdLibs
     pkgs.freetype
     pkgs.fontconfig
     pkgs.libglvnd

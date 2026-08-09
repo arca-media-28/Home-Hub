@@ -33,7 +33,10 @@ export default defineConfig({
   ],
   webServer: useEmbeddedServer
     ? {
-        command: "pnpm run dev:local",
+        // VITE_FORCE_API_PROXY turns the web app's `/api`→localhost proxy on
+        // even when REPL_ID is present, so the suite runs unchanged both on
+        // and off Replit.
+        command: "VITE_FORCE_API_PROXY=1 pnpm run dev:local",
         // Wait on the API health endpoint *through* the Vite proxy: the web
         // dev server comes up before the API's first build finishes, and
         // waiting only on the web root lets specs start while /api still 500s.

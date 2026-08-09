@@ -16,7 +16,12 @@ const basePath = process.env.BASE_PATH ?? "/";
 // production build — `server.proxy` applies solely to the `vite` dev server,
 // so the Docker single-container setup (Express serving the frontend and
 // `/api`) is untouched. Keep frontend requests relative (`/api/...`).
-const isReplit = process.env.REPL_ID !== undefined;
+// VITE_FORCE_API_PROXY=1 overrides the gate so the e2e suite (Playwright's
+// embedded `pnpm run dev:local` web server) can run against localhost even
+// inside a Replit workspace, where REPL_ID is always present.
+const isReplit =
+  process.env.REPL_ID !== undefined &&
+  process.env.VITE_FORCE_API_PROXY !== "1";
 const apiProxyTarget =
   process.env.VITE_API_PROXY_TARGET ?? "http://localhost:5000";
 const devProxy = isReplit
