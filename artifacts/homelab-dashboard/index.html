@@ -46,8 +46,27 @@
           "--secondary", "--secondary-foreground", "--muted", "--muted-foreground",
           "--accent", "--accent-foreground", "--border", "--input",
           "--primary", "--primary-foreground", "--sidebar-primary",
-          "--sidebar-primary-foreground", "--ring", "--sidebar-ring", "--chart-1"
+          "--sidebar-primary-foreground", "--ring", "--sidebar-ring", "--chart-1",
+          // Per-theme surface helpers (Slate/Workshop/Pebble tokenized fields,
+          // neumorphic shadows, brushed-metal gradient stops).
+          "--neu-shadow-dark", "--neu-shadow-light",
+          "--metal-streak-1", "--metal-streak-2", "--metal-streak-3",
+          "--metal-top", "--metal-bottom", "--metal-card-mid", "--metal-card-base",
+          "--metal-bevel", "--panel-shadow"
         ];
+
+        // Themes whose page field / cards / shadows are painted from theme
+        // tokens (index.css) rather than the generic derivation. Deltas mirror
+        // each theme's default background→surface lightness gaps so a custom
+        // background keeps the stock contrast relationships, just recolored.
+        var THEME_SURFACES = {
+          // Slate: bg 16 → card 16 (+0), secondary 21 (+5), border 22 (+6)
+          nebula: { dark: true, cardD: 0, subtleD: 5, borderD: 6, neu: true },
+          // Pebble: bg 90 → card 90 (+0), secondary 88 (-2), border 86 (-4)
+          pebble: { dark: false, cardD: 0, subtleD: -2, borderD: -4, neu: true },
+          // Workshop: bg 78 → card 90 (+12), secondary 85 (+7), border 62 (-16)
+          workshop: { dark: false, cardD: 12, subtleD: 7, borderD: -16, metal: true }
+        };
 
         // Extra inline vars only custom themes set (radius/fonts/outlines), cleared
         // when switching back to a built-in so nothing leaks across themes.
@@ -85,7 +104,7 @@
           return Math.round(h) + " " + clamp(Math.round(s), 0, 100) + "% " + clamp(Math.round(l), 0, 100) + "%";
         }
 
-        function applyBackground(root, hsl) {
+        function applyBackground(root, hsl, theme) {
           var isLight = hsl.l > 50;
           var h = hsl.h, s = Math.min(hsl.s, 40);
           // contrasting foreground
@@ -94,6 +113,41 @@
           var subtleL = isLight ? clamp(hsl.l - 5, 0, 100) : clamp(hsl.l + 8, 0, 100);
           var borderL = isLight ? clamp(hsl.l - 12, 0, 100) : clamp(hsl.l + 14, 0, 100);
           var mutedFgL = isLight ? 42 : 62;
+
+          var conf = theme ? THEME_SURFACES[theme] : null;
+          if (conf) {
+            // When the picked color's polarity disagrees with the theme's
+            // (e.g. a light pick on dark Slate), mirror the deltas so derived
+            // surfaces stay visible instead of clamping into the background.
+            var sign = (conf.dark !== isLight) ? 1 : -1;
+            cardL = clamp(hsl.l + conf.cardD * sign, 0, 100);
+            subtleL = clamp(hsl.l + conf.subtleD * sign, 0, 100);
+            borderL = clamp(hsl.l + conf.borderD * sign, 0, 100);
+            if (conf.neu) {
+              // Dual neumorphic shadow tones: darker + more saturated below,
+              // lighter above (Pebble's default light tone resolves to white).
+              root.style.setProperty("--neu-shadow-dark", isLight
+                ? triplet(h, Math.min(hsl.s + 8, 60), clamp(hsl.l - 18, 0, 100))
+                : triplet(h, Math.min(hsl.s + 6, 60), clamp(hsl.l - 7, 2, 100)));
+              root.style.setProperty("--neu-shadow-light", triplet(h, s, clamp(hsl.l + 10, 0, 100)));
+            }
+            if (conf.metal) {
+              // Brushed-metal streaks/gradient stops tinted from the pick;
+              // deltas mirror the stock 78%-lightness palette.
+              var d = sign;
+              root.style.setProperty("--metal-streak-1", triplet(h, s, clamp(hsl.l - 3 * d, 0, 100)));
+              root.style.setProperty("--metal-streak-2", triplet(h, s, clamp(hsl.l + 4 * d, 0, 100)));
+              root.style.setProperty("--metal-streak-3", triplet(h, s, clamp(hsl.l - 5 * d, 0, 100)));
+              root.style.setProperty("--metal-top", triplet(h, s, clamp(hsl.l + 8 * d, 0, 100)));
+              root.style.setProperty("--metal-bottom", triplet(h, s, clamp(hsl.l - 5 * d, 0, 100)));
+              root.style.setProperty("--metal-card-mid", triplet(h, s, clamp(hsl.l + 4 * d, 0, 100)));
+              root.style.setProperty("--metal-card-base", triplet(h, s, clamp(hsl.l - 10 * d, 0, 100)));
+              root.style.setProperty("--metal-bevel", triplet(h, Math.min(hsl.s + 6, 60),
+                isLight ? clamp(hsl.l - 40, 5, 60) : clamp(hsl.l - 8, 2, 60)));
+              root.style.setProperty("--panel-shadow", triplet(h, Math.min(hsl.s + 14, 60),
+                isLight ? 25 : clamp(hsl.l - 10, 4, 25)));
+            }
+          }
 
           root.style.setProperty("--background", triplet(h, hsl.s, hsl.l));
           root.style.setProperty("--foreground", fg);
@@ -197,7 +251,7 @@
           colors = colors || {};
           if (colors.background) {
             var bg = hexToHsl(colors.background);
-            if (bg) applyBackground(root, bg);
+            if (bg) applyBackground(root, bg, theme);
           }
           if (colors.primary) {
             var pr = hexToHsl(colors.primary);

@@ -78,3 +78,11 @@ and typeface inline.
 `curl $REPLIT_DEV_DOMAIN/api/...` does NOT reach the API (web and api-server are separate artifacts
 with their own routing), and the screenshot tool can't seed localStorage. Use the testing skill
 (`runTest`) to register through the UI and screenshot the dashboard/modal instead.
+
+**Background-customization tokenization:** Slate(nebula)/Workshop/Pebble page fields, cards,
+neumorphic shadows and Workshop's metal gradient are painted from CSS vars (`--background`,
+`--neu-shadow-dark/light`, `--metal-*`, `--panel-shadow`) with stock defaults in each theme block
+in index.css — never hardcoded HSLs. The before-paint `applyBackground(root, hsl, theme)` in
+index.html has a THEME_SURFACES delta map that re-derives those helpers (sign flips when the
+picked lightness contradicts the theme's polarity). New helper vars MUST be added to OVERRIDE_VARS
+or reset leaves them stale. Custom themes call applyBackground without a theme → generic path.

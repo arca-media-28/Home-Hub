@@ -246,6 +246,12 @@
   --input: 225 14% 25%;
   --ring: 234 70% 70%;
 
+  /* Neumorphic dual-shadow tones (dark bottom-right / light top-left) used by
+     the .bg-card + --app-shadow-* rules below. Kept as vars so a custom
+     background override can re-derive them (see applyBackground in index.html). */
+  --neu-shadow-dark: 225 20% 9%;
+  --neu-shadow-light: 225 14% 26%;
+
   --chart-1: 234 70% 70%;
   --chart-2: 210 65% 62%;
   --chart-3: 260 55% 68%;
@@ -344,6 +350,19 @@
   --input: 214 16% 64%;
   --ring: 210 64% 42%;
 
+  /* Brushed-metal gradient stops + panel shadow tone, tokenized so a custom
+     background override can retint the metal field and shadows (see
+     applyBackground in index.html). Defaults match the stock palette exactly. */
+  --metal-streak-1: 214 16% 75%;
+  --metal-streak-2: 210 18% 82%;
+  --metal-streak-3: 214 16% 73%;
+  --metal-top: 210 20% 86%;
+  --metal-bottom: 214 16% 73%;
+  --metal-card-mid: 214 16% 82%;
+  --metal-card-base: 214 18% 68%;
+  --metal-bevel: 214 22% 38%;
+  --panel-shadow: 215 30% 25%;
+
   --chart-1: 210 64% 42%;
   --chart-2: 35 70% 50%;
   --chart-3: 150 45% 42%;
@@ -393,6 +412,10 @@
   --input: 222 16% 86%;
   --ring: 232 58% 55%;
 
+  /* Neumorphic dual-shadow tones (see nebula note). */
+  --neu-shadow-dark: 222 24% 72%;
+  --neu-shadow-light: 0 0% 100%;
+
   --chart-1: 232 58% 55%;
   --chart-2: 190 55% 52%;
   --chart-3: 280 45% 62%;
@@ -427,11 +450,11 @@
   --app-shadow-2xl: 0 36px 72px hsl(26 44% 18% / .17);
 }
 [data-theme="nebula"] {
-  --app-shadow-sm: 2px 2px 5px hsl(225 20% 9% / .75), -2px -2px 5px hsl(225 14% 26% / .55);
-  --app-shadow-md: 4px 4px 10px hsl(225 20% 9% / .75), -4px -4px 10px hsl(225 14% 26% / .55);
-  --app-shadow-lg: 7px 7px 16px hsl(225 20% 9% / .7), -7px -7px 16px hsl(225 14% 26% / .6);
-  --app-shadow-xl: 10px 10px 24px hsl(225 20% 9% / .65), -10px -10px 24px hsl(225 14% 26% / .6);
-  --app-shadow-2xl: 14px 14px 32px hsl(225 20% 9% / .65), -14px -14px 32px hsl(225 14% 26% / .6);
+  --app-shadow-sm: 2px 2px 5px hsl(var(--neu-shadow-dark) / .75), -2px -2px 5px hsl(var(--neu-shadow-light) / .55);
+  --app-shadow-md: 4px 4px 10px hsl(var(--neu-shadow-dark) / .75), -4px -4px 10px hsl(var(--neu-shadow-light) / .55);
+  --app-shadow-lg: 7px 7px 16px hsl(var(--neu-shadow-dark) / .7), -7px -7px 16px hsl(var(--neu-shadow-light) / .6);
+  --app-shadow-xl: 10px 10px 24px hsl(var(--neu-shadow-dark) / .65), -10px -10px 24px hsl(var(--neu-shadow-light) / .6);
+  --app-shadow-2xl: 14px 14px 32px hsl(var(--neu-shadow-dark) / .65), -14px -14px 32px hsl(var(--neu-shadow-light) / .6);
 }
 /* Friction — solid, heavy dark drop shadows (industrial, no glow). */
 [data-theme="friction"] {
@@ -443,19 +466,19 @@
 }
 /* Workshop — pronounced realistic drop shadows under raised metal panels. */
 [data-theme="workshop"] {
-  --app-shadow-sm: 0 1px 2px hsl(215 30% 25% / .25);
-  --app-shadow-md: 0 3px 8px hsl(215 30% 25% / .30);
-  --app-shadow-lg: 0 10px 24px hsl(215 30% 25% / .35);
-  --app-shadow-xl: 0 16px 36px hsl(215 30% 25% / .40);
-  --app-shadow-2xl: 0 26px 56px hsl(215 30% 25% / .45);
+  --app-shadow-sm: 0 1px 2px hsl(var(--panel-shadow) / .25);
+  --app-shadow-md: 0 3px 8px hsl(var(--panel-shadow) / .30);
+  --app-shadow-lg: 0 10px 24px hsl(var(--panel-shadow) / .35);
+  --app-shadow-xl: 0 16px 36px hsl(var(--panel-shadow) / .40);
+  --app-shadow-2xl: 0 26px 56px hsl(var(--panel-shadow) / .45);
 }
 /* Pebble — signature neumorphic dual shadow: dark bottom-right, light top-left. */
 [data-theme="pebble"] {
-  --app-shadow-sm: 2px 2px 5px hsl(222 24% 72% / .6), -2px -2px 5px hsl(0 0% 100% / .75);
-  --app-shadow-md: 4px 4px 10px hsl(222 24% 72% / .6), -4px -4px 10px hsl(0 0% 100% / .8);
-  --app-shadow-lg: 7px 7px 16px hsl(222 24% 72% / .55), -7px -7px 16px hsl(0 0% 100% / .85);
-  --app-shadow-xl: 10px 10px 24px hsl(222 24% 72% / .5), -10px -10px 24px hsl(0 0% 100% / .9);
-  --app-shadow-2xl: 14px 14px 32px hsl(222 24% 72% / .5), -14px -14px 32px hsl(0 0% 100% / .9);
+  --app-shadow-sm: 2px 2px 5px hsl(var(--neu-shadow-dark) / .6), -2px -2px 5px hsl(var(--neu-shadow-light) / .75);
+  --app-shadow-md: 4px 4px 10px hsl(var(--neu-shadow-dark) / .6), -4px -4px 10px hsl(var(--neu-shadow-light) / .8);
+  --app-shadow-lg: 7px 7px 16px hsl(var(--neu-shadow-dark) / .55), -7px -7px 16px hsl(var(--neu-shadow-light) / .85);
+  --app-shadow-xl: 10px 10px 24px hsl(var(--neu-shadow-dark) / .5), -10px -10px 24px hsl(var(--neu-shadow-light) / .9);
+  --app-shadow-2xl: 14px 14px 32px hsl(var(--neu-shadow-dark) / .5), -14px -14px 32px hsl(var(--neu-shadow-light) / .9);
 }
 
 /* ============================================================
@@ -549,7 +572,7 @@
 }
 [data-theme="nebula"] .bg-dot-pattern {
   background-image: none;
-  background-color: hsl(225 14% 16%);
+  background-color: hsl(var(--background));
 }
 
 /* Friction — royal-blue field with a red corner flare and a faint steel grid,
@@ -567,8 +590,8 @@
    top-down metal gradient. */
 [data-theme="workshop"] .bg-dot-pattern {
   background-image:
-    repeating-linear-gradient(90deg, hsl(214 16% 75% / .55) 0px, hsl(210 18% 82% / .55) 2px, hsl(214 16% 73% / .55) 3px),
-    linear-gradient(to bottom, hsl(210 20% 86%), hsl(214 16% 73%));
+    repeating-linear-gradient(90deg, hsl(var(--metal-streak-1) / .55) 0px, hsl(var(--metal-streak-2) / .55) 2px, hsl(var(--metal-streak-3) / .55) 3px),
+    linear-gradient(to bottom, hsl(var(--metal-top)), hsl(var(--metal-bottom)));
   background-size: 4px 100%, cover;
   background-attachment: fixed;
 }
@@ -576,16 +599,16 @@
 /* Pebble — flat monochrome field so the soft extruded shadows read cleanly. */
 [data-theme="pebble"] .bg-dot-pattern {
   background-image: none;
-  background-color: hsl(222 16% 90%);
+  background-color: hsl(var(--background));
 }
 
 /* Slate reads as dark neumorphic: cards match the background and are shaped
    only by the dual extruded shadow, mirroring Pebble on a dark field. */
 [data-theme="nebula"] .bg-card {
-  background-color: hsl(225 14% 16%);
+  background-color: hsl(var(--background));
   box-shadow:
-    6px 6px 14px hsl(225 20% 9% / .75),
-    -6px -6px 14px hsl(225 14% 26% / .55);
+    6px 6px 14px hsl(var(--neu-shadow-dark) / .75),
+    -6px -6px 14px hsl(var(--neu-shadow-light) / .55);
   border-color: transparent;
 }
 
@@ -595,31 +618,31 @@
   background-image: linear-gradient(
     to bottom,
     hsl(0 0% 100% / .55),
-    hsl(214 16% 82% / .12) 44%,
-    hsl(214 18% 68% / .14)
+    hsl(var(--metal-card-mid) / .12) 44%,
+    hsl(var(--metal-card-base) / .14)
   );
   box-shadow:
     inset 0 1px 0 hsl(0 0% 100% / .7),
-    inset 0 -1px 0 hsl(214 22% 38% / .22),
-    0 2px 4px hsl(215 30% 25% / .22),
-    0 10px 22px hsl(215 30% 25% / .20);
-  border-color: hsl(214 16% 64%);
+    inset 0 -1px 0 hsl(var(--metal-bevel) / .22),
+    0 2px 4px hsl(var(--panel-shadow) / .22),
+    0 10px 22px hsl(var(--panel-shadow) / .20);
+  border-color: hsl(var(--card-border));
 }
 /* Workshop primary buttons get a glossy gel finish. */
 [data-theme="workshop"] .bg-primary {
   background-image: linear-gradient(to bottom, hsl(0 0% 100% / .22), hsl(0 0% 0% / .14));
   box-shadow:
     inset 0 1px 0 hsl(0 0% 100% / .35),
-    0 2px 4px hsl(215 30% 25% / .30);
+    0 2px 4px hsl(var(--panel-shadow) / .30);
 }
 
 /* Pebble surfaces are extruded from the same-color background by the dual
    neumorphic shadow and have no visible border. */
 [data-theme="pebble"] .bg-card {
-  background-color: hsl(222 16% 90%);
+  background-color: hsl(var(--background));
   box-shadow:
-    6px 6px 14px hsl(222 24% 72% / .55),
-    -6px -6px 14px hsl(0 0% 100% / .85);
+    6px 6px 14px hsl(var(--neu-shadow-dark) / .55),
+    -6px -6px 14px hsl(var(--neu-shadow-light) / .85);
   border-color: transparent;
 }
 
