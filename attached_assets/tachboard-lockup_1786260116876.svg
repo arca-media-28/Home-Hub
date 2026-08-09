@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 452 96" width="452" height="96">
+  <title>Tachboard</title>
+  <g transform="scale(0.1875)">
+    <rect x="28" y="28" width="456" height="456" rx="108" fill="#16244A" stroke="#FFFFFF" stroke-width="24"/>
+    <rect x="88" y="88" width="104" height="76" rx="20" fill="#E8ECF5"/>
+    <rect x="204" y="88" width="104" height="76" rx="20" fill="#E8ECF5"/>
+    <rect x="320" y="88" width="104" height="76" rx="20" fill="#D93A3A"/>
+    <rect x="204" y="176" width="104" height="118" rx="20" fill="#CDD6E8"/>
+    <rect x="204" y="306" width="104" height="118" rx="20" fill="#8FA1C8"/>
+  </g>
+  <text x="124" y="49" font-family="Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="40" font-weight="600" letter-spacing="5.5" fill="#E8ECF5">TACHBOARD</text>
+</svg>
