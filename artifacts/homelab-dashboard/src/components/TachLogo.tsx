@@ -1,6 +1,6 @@
-// Tachboard brand mark: T-shaped glyph matching public/favicon.svg
-// (top bar with dot endpoints, stem down to a third dot, hub at the junction).
-// Strokes/fills use currentColor so it follows text color like a lucide icon.
+// Tachboard brand mark: "Tile T mosaic" — a T built from dashboard tiles
+// (wide filled top bar, outlined middle tile, filled bottom tile).
+// Uses currentColor so it follows text color across all 6 themes.
 export function TachLogo({ className }: { className?: string }) {
   return (
     <svg
@@ -10,22 +10,17 @@ export function TachLogo({ className }: { className?: string }) {
       className={className}
       aria-hidden="true"
     >
-      <g
+      <rect x="26" y="30" width="128" height="40" rx="14" fill="currentColor" />
+      <rect
+        x="64"
+        y="80"
+        width="52"
+        height="32"
+        rx="10"
         stroke="currentColor"
-        strokeWidth="14"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <line x1="42" y1="48" x2="138" y2="48" />
-        <line x1="90" y1="48" x2="90" y2="136" />
-      </g>
-      <g fill="currentColor">
-        <circle cx="42" cy="48" r="18" />
-        <circle cx="138" cy="48" r="18" />
-        <circle cx="90" cy="136" r="18" />
-      </g>
-      <circle cx="90" cy="48" r="27" fill="var(--background, #fff)" />
-      <circle cx="90" cy="48" r="22" fill="currentColor" />
+        strokeWidth="9"
+      />
+      <rect x="64" y="120" width="52" height="32" rx="10" fill="currentColor" />
     </svg>
   );
 }

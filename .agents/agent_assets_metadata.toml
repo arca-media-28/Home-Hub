@@ -1,0 +1,23 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "DMHl19__yFsw6cuoHTyBW"
+uri = "file://artifacts/homelab-dashboard/public/.logo-options.png"
+type = "image"
+title = "Tachboard logo options"
+description = "Six logo concepts shown at header size and favicon size."
+
+[[outputs]]
+id = "G5yKBiI5SStFagB_122iD"
+uri = "file://artifacts/homelab-dashboard/public/.logo-options-2.png"
+type = "image"
+title = "Round 2: D & E variants"
+description = "Tile-grid and badge variants from round 2 (for reference)."
+
+[[outputs]]
+id = "lm7lqze5fSI28G0vVqk5P"
+uri = "file://artifacts/homelab-dashboard/public/.logo-options-3.png"
+type = "image"
+title = "Round 3: Tile-T and TB monogram options"
+description = "Six new concepts: a T built from tiles (T1–T3) and TB monograms for Tachboard (TB1–TB3)."

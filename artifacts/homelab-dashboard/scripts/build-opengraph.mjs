@@ -57,17 +57,9 @@ const svg = `<?xml version="1.0" encoding="UTF-8"?>
   <!-- logo tile (reuses favicon glyph) -->
   <svg x="${tileX}" y="${tileY}" width="${TILE}" height="${TILE}" viewBox="0 0 180 180">
     <rect width="180" height="180" rx="40" fill="${CARD}"/>
-    <g stroke="${RED}" stroke-width="11" stroke-linecap="round" stroke-linejoin="round">
-      <line x1="50" y1="56" x2="130" y2="56"/>
-      <line x1="90" y1="56" x2="90" y2="128"/>
-    </g>
-    <g fill="${RED}">
-      <circle cx="50" cy="56" r="15"/>
-      <circle cx="130" cy="56" r="15"/>
-      <circle cx="90" cy="128" r="15"/>
-    </g>
-    <circle cx="90" cy="56" r="22" fill="${CARD}"/>
-    <circle cx="90" cy="56" r="19" fill="${RED}"/>
+    <rect x="26" y="30" width="128" height="40" rx="14" fill="${RED}"/>
+    <rect x="64" y="80" width="52" height="32" rx="10" fill="none" stroke="${RED}" stroke-width="9"/>
+    <rect x="64" y="120" width="52" height="32" rx="10" fill="${RED}"/>
   </svg>
 
   <!-- wordmark -->
