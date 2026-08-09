@@ -1,9 +1,8 @@
 /*
  * Generates public/opengraph.jpg — the social-share / Open Graph card.
- * Uses the Friction brand palette so the preview matches the favicon and the
- * default theme: royal-blue field (#11264f), red accent (#d23f30), white text,
- * echoing the logo's blue/red/white identity and the Friction bg-dot-pattern
- * (red corner flare + faint steel grid).
+ * Uses the Tachboard mosaic-T brand mark (public/brand/tachboard-mark.svg):
+ * navy field (#16244A), accent red (#D93A3A), white text, with a faint steel
+ * grid + subtle corner flares echoing the dashboard's dot pattern.
  *
  * Run:  node scripts/build-opengraph.mjs
  * (requires ImageMagick + librsvg, available in the Replit environment)
@@ -20,12 +19,11 @@ const tmpSvg = join(here, "..", "public", ".opengraph.tmp.svg");
 const W = 1280;
 const H = 720;
 
-// Brand tokens (match favicon.svg + Friction theme in src/index.css)
-const FIELD = "#11264f"; // royal blue (favicon tile + task-cited background)
-const CARD = "#17223f"; // Friction --card (224 46% 17%), logo tile surface
-const RED = "#d23f30"; // favicon red / Friction --primary
-const WHITE = "#f5f5f5"; // Friction --foreground (0 0% 96%)
-const MUTED = "#b3bacb"; // Friction --muted-foreground (220 18% 72%)
+// Brand tokens (match public/brand/tachboard-mark.svg)
+const FIELD = "#16244A"; // navy (mosaic-T mark field)
+const RED = "#D93A3A"; // accent red (mosaic-T accent block)
+const WHITE = "#f5f5f5"; // wordmark
+const MUTED = "#b3bacb"; // tagline
 
 // Centered logo tile
 const TILE = 168;
@@ -54,12 +52,14 @@ const svg = `<?xml version="1.0" encoding="UTF-8"?>
   <rect width="${W}" height="${H}" fill="url(#redFlare)"/>
   <rect width="${W}" height="${H}" fill="url(#blueFlare)"/>
 
-  <!-- logo tile (reuses favicon glyph) -->
-  <svg x="${tileX}" y="${tileY}" width="${TILE}" height="${TILE}" viewBox="0 0 180 180">
-    <rect width="180" height="180" rx="40" fill="${CARD}"/>
-    <rect x="26" y="30" width="128" height="40" rx="14" fill="${RED}"/>
-    <rect x="64" y="80" width="52" height="32" rx="10" fill="none" stroke="${RED}" stroke-width="9"/>
-    <rect x="64" y="120" width="52" height="32" rx="10" fill="${RED}"/>
+  <!-- mosaic-T brand mark (mirrors public/brand/tachboard-mark.svg) -->
+  <svg x="${tileX}" y="${tileY}" width="${TILE}" height="${TILE}" viewBox="0 0 512 512">
+    <rect x="28" y="28" width="456" height="456" rx="108" fill="${FIELD}" stroke="#FFFFFF" stroke-width="24"/>
+    <rect x="88" y="88" width="104" height="76" rx="20" fill="#E8ECF5"/>
+    <rect x="204" y="88" width="104" height="76" rx="20" fill="#E8ECF5"/>
+    <rect x="320" y="88" width="104" height="76" rx="20" fill="${RED}"/>
+    <rect x="204" y="176" width="104" height="118" rx="20" fill="#CDD6E8"/>
+    <rect x="204" y="306" width="104" height="118" rx="20" fill="#8FA1C8"/>
   </svg>
 
   <!-- wordmark -->
